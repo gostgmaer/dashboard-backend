@@ -1,0 +1,16 @@
+{
+    "search.exclude": {
+        "**/*.code-search": false,
+        "**/bower_components": false
+    },
+    "search.useGlobalIgnoreFiles": true,
+    "prettier.printWidth": 10000,
+    "prettier.tabWidth": 2,
+    "prettier.singleQuote": true,
+    "mdb.presetConnections": [
+        {
+            "name": "Preset Connection",
+            "connectionString": "mongodb://localhost:27017"
+        }
+    ],
+}
