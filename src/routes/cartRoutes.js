@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const cartController = require('../controller/cart/cart');
-const { body, query, param } = require('express-validator');
+const { body, query, param, validationResult } = require('express-validator');
 const authMiddleware = require('../middleware/auth');
-const roleMiddleware = require('../middleware/roleCheck');
+const  authorize  = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
+const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
+const Cart = require('../models/cart');
 
 /**
  * 🚀 CONSOLIDATED CART ROUTES
@@ -14,10 +16,57 @@ const { enviroment } = require('../config/setting');
  * ✅ Discount and metadata management
  * ✅ Cart merging for user sessions
  * ✅ Admin-focused operations for analytics and bulk updates
- * ✅ Role-based access control
- * ✅ Comprehensive validation schemas
+ * ✅ Permission-based access control via authorize middleware
+ * ✅ Comprehensive validation schemas with sanitization
+ * ✅ Rate limiting for bulk operations
+ * ✅ Instance-level checks for IDOR prevention
  * ✅ Performance optimized routes
  */
+
+/**
+ * Rate limiter for high-risk bulk operations
+ * Limits to 10 requests per 15 minutes per IP
+ */
+const bulkOperationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per window
+  message: { success: false, message: 'Too many requests, please try again later' }
+});
+
+/**
+ * Middleware to check instance-level access for cart-specific routes
+ * Ensures the user has permission to access/modify the specific cart
+ */
+const instanceCheckMiddleware = async (req, res, next) => {
+  try {
+    const cartId = req.params.cartId || req.user.cartId; // Assumes cartId is linked to user
+    if (cartId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
+     
+      const cart = await Cart.findById(cartId);
+      if (!cart) {
+        return res.status(404).json({ success: false, message: 'Cart not found' });
+      }
+      if (cart.userId.toString() !== req.user.id) { // Restrict to own cart
+        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s cart' });
+      }
+    }
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error during instance check' });
+  }
+};
+
+/**
+ * Middleware to handle validation errors
+ */
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+  next();
+};
 
 // ========================================
 // 🔧 VALIDATION SCHEMAS
@@ -26,58 +75,68 @@ const { enviroment } = require('../config/setting');
 const cartValidation = {
   addItem: [
     body('productId').isMongoId().withMessage('Invalid product ID'),
-    body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
-    body('variantId').optional().isMongoId().withMessage('Invalid variant ID')
+    body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
+    body('variantId').optional().isMongoId().withMessage('Invalid variant ID'),
+    validate
   ],
 
   updateQuantity: [
     param('productId').isMongoId().withMessage('Invalid product ID'),
-    body('quantity').isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
-    body('variantId').optional().isMongoId().withMessage('Invalid variant ID')
+    body('quantity').isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer').toInt(),
+    body('variantId').optional().isMongoId().withMessage('Invalid variant ID'),
+    validate
   ],
 
   removeItem: [
-    param('productId').isMongoId().withMessage('Invalid product ID')
+    param('productId').isMongoId().withMessage('Invalid product ID'),
+    validate
   ],
 
   discount: [
-    body('discountCode').isString().withMessage('Discount code must be a string').isLength({ max: 50 }).withMessage('Discount code cannot exceed 50 characters')
+    body('discountCode').isString().withMessage('Discount code must be a string').isLength({ max: 50 }).withMessage('Discount code cannot exceed 50 characters').trim().escape(),
+    validate
   ],
 
   merge: [
     body('cartItems').isArray({ min: 1 }).withMessage('Cart items array is required'),
     body('cartItems.*.productId').isMongoId().withMessage('Invalid product ID in cart items'),
-    body('cartItems.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
-    body('cartItems.*.variantId').optional().isMongoId().withMessage('Invalid variant ID')
+    body('cartItems.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
+    body('cartItems.*.variantId').optional().isMongoId().withMessage('Invalid variant ID'),
+    validate
   ],
 
   metadata: [
     body('metadata').isObject().withMessage('Metadata must be an object'),
-    body('metadata.*').optional().isString().withMessage('Metadata values must be strings').isLength({ max: 500 }).withMessage('Metadata value cannot exceed 500 characters')
+    body('metadata.*').optional().isString().withMessage('Metadata values must be strings').isLength({ max: 500 }).withMessage('Metadata value cannot exceed 500 characters').trim().escape(),
+    validate
   ],
 
   bulkUpdate: [
     body('cartIds').isArray({ min: 1 }).withMessage('Cart IDs array is required'),
     body('cartIds.*').isMongoId().withMessage('Invalid cart ID in array'),
-    body('status').isIn(['active', 'abandoned', 'completed']).withMessage('Invalid status')
+    body('status').isIn(['active', 'abandoned', 'completed']).withMessage('Invalid status'),
+    validate
   ],
 
   query: [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer').toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
     query('sort').optional().isIn(['createdAt', 'updatedAt', 'total']).withMessage('Invalid sort field'),
     query('order').optional().isIn(['asc', 'desc']).withMessage('Order must be asc or desc'),
-    query('userId').optional().isMongoId().withMessage('Invalid user ID')
+    query('userId').optional().isMongoId().withMessage('Invalid user ID'),
+    validate
   ],
 
   analytics: [
     query('startDate').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
     query('endDate').optional().isISO8601().withMessage('End date must be a valid ISO 8601 date'),
-    query('status').optional().isIn(['active', 'abandoned', 'completed']).withMessage('Invalid status filter')
+    query('status').optional().isIn(['active', 'abandoned', 'completed']).withMessage('Invalid status filter'),
+    validate
   ],
 
   removeProduct: [
-    param('productId').isMongoId().withMessage('Invalid product ID')
+    param('productId').isMongoId().withMessage('Invalid product ID'),
+    validate
   ]
 };
 
@@ -88,6 +147,8 @@ const cartValidation = {
 // POST /api/cart/add - Add item to cart
 router.post('/add',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartValidation.addItem,
   cartController.addItem
 );
@@ -95,6 +156,8 @@ router.post('/add',
 // DELETE /api/cart/remove/:productId - Remove item from cart
 router.delete('/remove/:productId',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartValidation.removeItem,
   cartController.removeItem
 );
@@ -102,6 +165,8 @@ router.delete('/remove/:productId',
 // PATCH /api/cart/update/:productId - Update item quantity in cart
 router.patch('/update/:productId',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartValidation.updateQuantity,
   cartController.updateQuantity
 );
@@ -109,18 +174,24 @@ router.patch('/update/:productId',
 // DELETE /api/cart/clear - Clear user's cart
 router.delete('/clear',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartController.clearCart
 );
 
 // GET /api/cart - Get user's cart
 router.get('/',
   authMiddleware,
+  authorize('cart', 'read'),
+  instanceCheckMiddleware,
   cartController.getCart
 );
 
 // POST /api/cart/discount - Apply discount to cart
 router.post('/discount',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartValidation.discount,
   cartController.applyDiscount
 );
@@ -128,6 +199,8 @@ router.post('/discount',
 // POST /api/cart/merge - Merge cart (e.g., guest to user cart)
 router.post('/merge',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartValidation.merge,
   cartController.mergeCart
 );
@@ -135,6 +208,8 @@ router.post('/merge',
 // POST /api/cart/metadata - Set cart metadata
 router.post('/metadata',
   authMiddleware,
+  authorize('cart', 'write'),
+  instanceCheckMiddleware,
   cartValidation.metadata,
   cartController.setMetadata
 );
@@ -146,7 +221,8 @@ router.post('/metadata',
 // GET /api/cart/paginated - Get paginated carts
 router.get('/paginated',
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('cart', 'read'),
+  bulkOperationLimiter,
   cartValidation.query,
   cartController.getPaginatedCarts
 );
@@ -154,7 +230,8 @@ router.get('/paginated',
 // GET /api/cart/abandoned - Get abandoned carts
 router.get('/abandoned',
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('cart', 'read'),
+  bulkOperationLimiter,
   cartValidation.query,
   cartController.getAbandonedCarts
 );
@@ -162,7 +239,8 @@ router.get('/abandoned',
 // PATCH /api/cart/bulk-update - Bulk update cart status
 router.patch('/bulk-update',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('cart', 'update'),
+  bulkOperationLimiter,
   cartValidation.bulkUpdate,
   cartController.bulkUpdateCartStatus
 );
@@ -170,7 +248,8 @@ router.patch('/bulk-update',
 // GET /api/cart/analytics - Get cart analytics
 router.get('/analytics',
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('cart', 'report'),
+  bulkOperationLimiter,
   cartValidation.analytics,
   cartController.getCartAnalytics
 );
@@ -178,7 +257,8 @@ router.get('/analytics',
 // DELETE /api/cart/product/:productId - Remove product from all carts
 router.delete('/product/:productId',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('cart', 'update'),
+  bulkOperationLimiter,
   cartValidation.removeProduct,
   cartController.removeProductFromAllCarts
 );
@@ -186,7 +266,8 @@ router.delete('/product/:productId',
 // DELETE /api/cart/all - Clear all carts
 router.delete('/all',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('cart', 'update'),
+  bulkOperationLimiter,
   cartController.clearAllCarts
 );
 
@@ -195,17 +276,17 @@ router.delete('/all',
 // ========================================
 
 const routeOrderMiddleware = (req, res, next) => {
-  // Ensure specific routes come before dynamic ones
-  if (req.path.startsWith('/add') ||
-    req.path.startsWith('/clear') ||
-    req.path.startsWith('/discount') ||
-    req.path.startsWith('/merge') ||
-    req.path.startsWith('/metadata') ||
-    req.path.startsWith('/paginated') ||
-    req.path.startsWith('/abandoned') ||
-    req.path.startsWith('/bulk-update') ||
-    req.path.startsWith('/analytics') ||
-    req.path.startsWith('/all')) {
+  const path = req.path.toLowerCase(); // Case-insensitive matching
+  if (path.startsWith('/add') ||
+      path.startsWith('/clear') ||
+      path.startsWith('/discount') ||
+      path.startsWith('/merge') ||
+      path.startsWith('/metadata') ||
+      path.startsWith('/paginated') ||
+      path.startsWith('/abandoned') ||
+      path.startsWith('/bulk-update') ||
+      path.startsWith('/analytics') ||
+      path.startsWith('/all')) {
     return next();
   }
 
@@ -219,43 +300,50 @@ router.use(routeOrderMiddleware);
 // 📝 ROUTE DOCUMENTATION ENDPOINT
 // ========================================
 
-router.get('/docs/routes', (req, res) => {
-  if (enviroment !== 'development') {
-    return res.status(404).json({
-      success: false,
-      message: 'Route documentation only available in development mode'
+router.get('/docs/routes',
+  authMiddleware,
+  authorize('cart', 'view'),
+  (req, res) => {
+    if (enviroment !== 'development') {
+      return res.status(404).json({
+        success: false,
+        message: 'Route documentation only available in development mode'
+      });
+    }
+
+    const routes = {
+      userOperations: [
+        'POST   /api/cart/add                    - Add item to cart (write, instance check)',
+        'DELETE /api/cart/remove/:productId      - Remove item from cart (write, instance check)',
+        'PATCH  /api/cart/update/:productId      - Update item quantity in cart (write, instance check)',
+        'DELETE /api/cart/clear                  - Clear user\'s cart (write, instance check)',
+        'GET    /api/cart                        - Get user\'s cart (read, instance check)',
+        'POST   /api/cart/discount               - Apply discount to cart (write, instance check)',
+        'POST   /api/cart/merge                  - Merge cart (e.g., guest to user cart) (write, instance check)',
+        'POST   /api/cart/metadata               - Set cart metadata (write, instance check)'
+      ],
+      adminOperations: [
+        'GET    /api/cart/paginated              - Get paginated carts (read, rate-limited)',
+        'GET    /api/cart/abandoned              - Get abandoned carts (read, rate-limited)',
+        'PATCH  /api/cart/bulk-update            - Bulk update cart status (update, rate-limited)',
+        'GET    /api/cart/analytics              - Get cart analytics (report, rate-limited)',
+        'DELETE /api/cart/product/:productId     - Remove product from all carts (update, rate-limited)',
+        'DELETE /api/cart/all                    - Clear all carts (update, rate-limited)'
+      ],
+      documentation: [
+        'GET    /api/cart/docs/routes            - Get API route documentation (view, dev-only)'
+      ]
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalRoutes: Object.values(routes).flat().length,
+        categories: routes
+      },
+      message: 'Cart API routes documentation'
     });
   }
-
-  const routes = {
-    userOperations: [
-      'POST   /api/cart/add                    - Add item to cart',
-      'DELETE /api/cart/remove/:productId      - Remove item from cart',
-      'PATCH  /api/cart/update/:productId      - Update item quantity in cart',
-      'DELETE /api/cart/clear                  - Clear user\'s cart',
-      'GET    /api/cart                        - Get user\'s cart',
-      'POST   /api/cart/discount               - Apply discount to cart',
-      'POST   /api/cart/merge                  - Merge cart (e.g., guest to user cart)',
-      'POST   /api/cart/metadata               - Set cart metadata'
-    ],
-    adminOperations: [
-      'GET    /api/cart/paginated              - Get paginated carts',
-      'GET    /api/cart/abandoned              - Get abandoned carts',
-      'PATCH  /api/cart/bulk-update            - Bulk update cart status',
-      'GET    /api/cart/analytics              - Get cart analytics',
-      'DELETE /api/cart/product/:productId     - Remove product from all carts',
-      'DELETE /api/cart/all                    - Clear all carts'
-    ]
-  };
-
-  res.status(200).json({
-    success: true,
-    data: {
-      totalRoutes: Object.values(routes).flat().length,
-      categories: routes
-    },
-    message: 'Cart API routes documentation'
-  });
-});
+);
 
 module.exports = { cartRoutes: router };

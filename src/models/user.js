@@ -1,14 +1,15 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const Wishlist = require('./wishlist');
 const Cart = require('./cart');
 const Product = require('./products');
 const Address = require('./address');
 const Order = require('./orders');
+const Role = require('./role');
+const { jwtSecret } = require('../config/setting');
 
 const SALT_ROUNDS = 10;
-
-
 
 const userSchema = new mongoose.Schema(
   {
@@ -19,18 +20,19 @@ const userSchema = new mongoose.Schema(
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     dateOfBirth: { type: Date, default: null },
-    gender: { type: String, enum: ["male", "female", "other", "prefer_not_to_say"], default: null, trim: true },
+    gender: { type: String, enum: ['male', 'female', 'other', 'prefer_not_to_say'], default: null, trim: true },
     phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
     address: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
     orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
     favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+    tempPasswordActive: { type: Boolean, default: false },
     profilePicture: { type: String, default: null },
     resetToken: { type: String, default: null },
     resetTokenExpiration: { type: Date, default: null },
     session: [{ type: Object }],
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    status: { type: String, enum: ["active", "inactive", "pending", "banned", "deleted", "archived", "draft"], default: "draft", trim: true },
+    status: { type: String, enum: ['active', 'inactive', 'pending', 'banned', 'deleted', 'archived', 'draft'], default: 'draft', trim: true },
     created_user_id: { type: String, default: null },
     updated_user_id: { type: String, default: null },
     confirmToken: { type: String, default: null },
@@ -59,121 +61,91 @@ userSchema.virtual('fullName').get(function () {
 });
 
 // Common population logic for all get methods
-const populateFields = [
-  'role',
-  'address',
-  'orders',
-  'favoriteProducts',
-  'shoppingCart',
-  'wishList',
-  'referredBy',
-  'created_by',
-  'updated_by',
-];
+const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
+  async getMyProfile() {
+    await this.populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by']);
 
+    // const Wishlist = mongoose.model('Wishlist');
+    // const Cart = mongoose.model('Cart');
+    // const Order = mongoose.model('Order');
+    // const User = mongoose.model('User');
 
- 
-  async getMyProfile () {
-  await this.populate([
-    'role',
-    'address',
-    'orders',
-    'favoriteProducts',
-    'shoppingCart',
-    'wishList',
-    'referredBy',
-    'created_by',
-    'updated_by',
-  ]);
+    const wishlistCount = this.wishList ? (await Wishlist.findById(this.wishList)).items.length : 0;
 
-  // const Wishlist = mongoose.model('Wishlist');
-  // const Cart = mongoose.model('Cart');
-  // const Order = mongoose.model('Order');
-  // const User = mongoose.model('User');
+    const cartItemsCount = this.shoppingCart ? (await Cart.findById(this.shoppingCart)).items.reduce((acc, i) => acc + i.quantity, 0) : 0;
 
-  const wishlistCount = this.wishList
-    ? (await Wishlist.findById(this.wishList)).items.length
-    : 0;
+    const referralUsers = await User.find({ referredBy: this._id });
+    const referralCount = referralUsers.length;
+    const referralLoyaltyPoints = referralUsers.reduce((sum, u) => sum + (u.loyaltyPoints || 0), 0);
 
-  const cartItemsCount = this.shoppingCart
-    ? (await Cart.findById(this.shoppingCart)).items.reduce((acc, i) => acc + i.quantity, 0)
-    : 0;
+    const userOrders = await Order.find({ _id: { $in: this.orders } });
+    const totalSpent = userOrders
+      .filter((o) => o.status === 'completed') // Assuming order has a 'status' field
+      .reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
-  const referralUsers = await User.find({ referredBy: this._id });
-  const referralCount = referralUsers.length;
-  const referralLoyaltyPoints = referralUsers.reduce((sum, u) => sum + (u.loyaltyPoints || 0), 0);
+    const lastCompletedOrder = userOrders.filter((o) => o.status === 'completed').sort((a, b) => b.createdAt - a.createdAt)[0];
 
-  const userOrders = await Order.find({ _id: { $in: this.orders } });
-  const totalSpent = userOrders
-    .filter(o => o.status === 'completed') // Assuming order has a 'status' field
-    .reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    const orderStatusCounts = userOrders.reduce((acc, order) => {
+      acc[order.status] = (acc[order.status] || 0) + 1;
+      return acc;
+    }, {});
 
-  const lastCompletedOrder = userOrders
-    .filter(o => o.status === 'completed')
-    .sort((a, b) => b.createdAt - a.createdAt)[0];
+    // Engagement tier example
+    let engagementTier = 'bronze';
+    if (this.loyaltyPoints > 1000) engagementTier = 'gold';
+    else if (this.loyaltyPoints > 500) engagementTier = 'silver';
 
-  const orderStatusCounts = userOrders.reduce((acc, order) => {
-    acc[order.status] = (acc[order.status] || 0) + 1;
-    return acc;
-  }, {});
+    // Payment method summary with masked cards
+    const paymentMethodsSummary = this.paymentMethods.map((m) => ({
+      method: m.method,
+      isDefault: m.isDefault,
+      maskedCardNumber: m.details.cardNumber ? '**** **** **** ' + m.details.cardNumber.slice(-4) : null,
+      expiryDate: m.details.expiryDate,
+    }));
 
-  // Engagement tier example
-  let engagementTier = 'bronze';
-  if (this.loyaltyPoints > 1000) engagementTier = 'gold';
-  else if (this.loyaltyPoints > 500) engagementTier = 'silver';
-
-  // Payment method summary with masked cards
-  const paymentMethodsSummary = this.paymentMethods.map(m => ({
-    method: m.method,
-    isDefault: m.isDefault,
-    maskedCardNumber: m.details.cardNumber ? '**** **** **** ' + m.details.cardNumber.slice(-4) : null,
-    expiryDate: m.details.expiryDate,
-  }));
-
-  return {
-    id: this._id,
-    fullName: this.fullName,
-    email: this.email,
-    username: this.username,
-    dateOfBirth: this.dateOfBirth,
-    gender: this.gender,
-    phoneNumber: this.phoneNumber,
-    profilePicture: this.profilePicture,
-    role: this.role ? this.role.name : null,
-    address: this.address,
-    orderCount: this.orders.length,
-    favoriteProductsCount: this.favoriteProducts.length,
-    wishlistItemsCount: wishlistCount,
-    cartItemsCount: cartItemsCount,
-    loyaltyPoints: this.loyaltyPoints,
-    totalSpent,
-    lastCompletedOrderDate: lastCompletedOrder?.createdAt || null,
-    orderStatusCounts,
-    referralCount,
-    referralLoyaltyPoints,
-    engagementTier,
-    lastLogin: this.lastLogin,
-    isVerified: this.isVerified,
-    subscriptionStatus: this.subscriptionStatus,
-    subscriptionType: this.subscriptionType,
-    socialMedia: this.socialMedia,
-    preferences: this.preferences,
-    interests: this.interests,
-    paymentMethods: paymentMethodsSummary,
-    shippingPreferences: this.shippingPreferences,
-    notificationSettings: {
-      email: this.preferences.notifications,
-      newsletter: this.preferences.newsletter,
-      // add sms/push flags if tracked
-    },
-    accountStatus: this.status,
-    createdAt: this.createdAt,
-    updatedAt: this.updatedAt,
-  };
-},
-
+    return {
+      id: this._id,
+      fullName: this.fullName,
+      email: this.email,
+      username: this.username,
+      dateOfBirth: this.dateOfBirth,
+      gender: this.gender,
+      phoneNumber: this.phoneNumber,
+      profilePicture: this.profilePicture,
+      role: this.role ? this.role.name : null,
+      address: this.address,
+      orderCount: this.orders.length,
+      favoriteProductsCount: this.favoriteProducts.length,
+      wishlistItemsCount: wishlistCount,
+      cartItemsCount: cartItemsCount,
+      loyaltyPoints: this.loyaltyPoints,
+      totalSpent,
+      lastCompletedOrderDate: lastCompletedOrder?.createdAt || null,
+      orderStatusCounts,
+      referralCount,
+      referralLoyaltyPoints,
+      engagementTier,
+      lastLogin: this.lastLogin,
+      isVerified: this.isVerified,
+      subscriptionStatus: this.subscriptionStatus,
+      subscriptionType: this.subscriptionType,
+      socialMedia: this.socialMedia,
+      preferences: this.preferences,
+      interests: this.interests,
+      paymentMethods: paymentMethodsSummary,
+      shippingPreferences: this.shippingPreferences,
+      notificationSettings: {
+        email: this.preferences.notifications,
+        newsletter: this.preferences.newsletter,
+        // add sms/push flags if tracked
+      },
+      accountStatus: this.status,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+    };
+  },
 
   async authenticate(password) {
     return bcrypt.compare(password, this.hash_password);
@@ -189,8 +161,6 @@ userSchema.method({
   async validatePassword(password) {
     return bcrypt.compare(password, this.hash_password);
   },
-
-
 
   // Add product to wishlist
   async addToWishlist(productId) {
@@ -462,15 +432,15 @@ userSchema.method({
     this.lockExpires = null;
     await this.save();
   },
-async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
-  this.failedLogins = (this.failedLogins || 0) + 1;
-  if (this.failedLogins >= maxAttempts) {
-    this.status = 'inactive';
-    this.lockExpires = Date.now() + lockDurationMs; // lock for e.g. 1 hour
-  }
-  await this.save();
-  return this.status === 'inactive';
-},
+  async handleFailedLoginAttempt(maxAttempts = 5, lockDurationMs = 3600000) {
+    this.failedLogins = (this.failedLogins || 0) + 1;
+    if (this.failedLogins >= maxAttempts) {
+      this.status = 'inactive';
+      this.lockExpires = Date.now() + lockDurationMs; // lock for e.g. 1 hour
+    }
+    await this.save();
+    return this.status === 'inactive';
+  },
   // Profile
   async updateProfile(updates) {
     Object.assign(this, updates);
@@ -499,14 +469,16 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
   async updateCartItemQuantity(productId, qty) {
     if (!this.shoppingCart) throw new Error('No cart');
     const cart = await Cart.findById(this.shoppingCart);
-    const item = cart.items.find(i => i.product.toString() === productId.toString());
+    const item = cart.items.find((i) => i.product.toString() === productId.toString());
     if (!item) throw new Error('Item not in cart');
-    if (qty <= 0) cart.items = cart.items.filter(i => i.product.toString() !== productId.toString());
+    if (qty <= 0) cart.items = cart.items.filter((i) => i.product.toString() !== productId.toString());
     else item.quantity = qty;
     await cart.save();
     return this.populate(populateFields).shoppingCart;
   },
-  async clearCart() { /* ... */ },
+  async clearCart() {
+    /* ... */
+  },
 
   // Loyalty & referrals
 
@@ -533,7 +505,7 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     return this.preferences.notifications;
   },
   async setThemePreference(theme) {
-    if (!['light','dark'].includes(theme)) throw new Error('Invalid theme');
+    if (!['light', 'dark'].includes(theme)) throw new Error('Invalid theme');
     this.preferences.theme = theme;
     await this.save();
     return this.preferences.theme;
@@ -567,11 +539,11 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     await this.save();
     return this.subscriptionStatus;
   },
- 
+
   async getOrderHistory() {
     return this.populate('orders').orders;
   },
-  
+
   async updateEmail(newEmail) {
     if (!newEmail) throw new Error('Email required');
     this.email = newEmail.toLowerCase();
@@ -605,19 +577,17 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     await this.save();
   },
   async addAddress(addressObj) {
-  
     const newAddress = await Address.create(addressObj);
     this.address.push(newAddress._id);
     await this.save();
     return this.populate('address');
   },
   async removeAddress(addressId) {
-    this.address = this.address.filter(id => id.toString() !== addressId.toString());
+    this.address = this.address.filter((id) => id.toString() !== addressId.toString());
     await this.save();
     return this.populate('address');
   },
   async setDefaultAddress(addressId) {
-   
     for (const addrId of this.address) {
       const addr = await Address.findById(addrId);
       if (!addr) continue;
@@ -634,12 +604,10 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     await this.save();
   },
   async revokeToken(token) {
-    this.tokens = this.tokens.filter(t => t.token !== token);
+    this.tokens = this.tokens.filter((t) => t.token !== token);
     await this.save();
   },
 
-
-  
   async updateLoginTimestamp() {
     this.lastLogin = new Date();
     await this.save();
@@ -654,7 +622,6 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     await this.save();
   },
 
-
   async moveItemWishlistToFavorites(productId) {
     await this.removeFromWishlist(productId);
     await this.addFavoriteProduct(productId);
@@ -666,7 +633,7 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
 
   async calculateCartTotal() {
     if (!this.shoppingCart) return 0;
-   
+
     const cart = await Cart.findById(this.shoppingCart).populate('items.product');
     let total = 0;
     for (const item of cart.items) {
@@ -710,7 +677,6 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     await this.save();
   },
 
-
   async resetLoyaltyPoints() {
     this.loyaltyPoints = 0;
     await this.save();
@@ -729,7 +695,6 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
     await this.save();
   },
 
-
   // Reporting & Analytics
   async getActivitySummary() {
     return {
@@ -737,35 +702,30 @@ async handleFailedLoginAttempt (maxAttempts = 5, lockDurationMs = 3600000) {
       wishlistCount: await this.getWishlistCount(),
       cartItemCount: await this.getCartItemCount(),
       loyaltyPoints: this.loyaltyPoints,
-      lastLogin: this.lastLogin
+      lastLogin: this.lastLogin,
     };
   },
-
-
 });
 
-userSchema.statics.findActiveWithinDays = async function(days = 30) {
+userSchema.statics.findActiveWithinDays = async function (days = 30) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   return this.find({ lastLogin: { $gte: cutoff }, status: 'active' }).populate(populateFields);
 };
 
-userSchema.statics.getUserCountByRole = async function() {
-  return this.aggregate([
-    { $group: { _id: '$role', count: { $sum: 1 } } },
-    { $project: { role: '$_id', count: 1, _id: 0 } }
-  ]);
+userSchema.statics.getUserCountByRole = async function () {
+  return this.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }, { $project: { role: '$_id', count: 1, _id: 0 } }]);
 };
 
 // Static Methods
-userSchema.statics.findOldestUser = async function() {
+userSchema.statics.findOldestUser = async function () {
   return this.findOne().sort({ dateOfBirth: 1 }).populate(populateFields);
 };
 
-userSchema.statics.getTopLoyalUsers = async function(limit = 10) {
+userSchema.statics.getTopLoyalUsers = async function (limit = 10) {
   return this.find({}).sort({ loyaltyPoints: -1 }).limit(limit).populate(populateFields);
 };
 
-userSchema.statics.getNeverLoggedInUsers = async function() {
+userSchema.statics.getNeverLoggedInUsers = async function () {
   return this.find({ lastLogin: null }).populate(populateFields);
 };
 
@@ -781,7 +741,7 @@ userSchema.statics.getAdmins = function () {
   return this.find({ role: 'admin' }).populate(populateFields);
 };
 
-userSchema.statics.findByRole = async function(role) {
+userSchema.statics.findByRole = async function (role) {
   return this.find({ role }).populate(populateFields);
 };
 
@@ -791,21 +751,13 @@ userSchema.statics.getCustomers = function () {
 
 userSchema.statics.searchUsers = function (keyword) {
   return this.find({
-    $or: [
-      { firstName: { $regex: keyword, $options: 'i' } },
-      { lastName: { $regex: keyword, $options: 'i' } },
-      { email: { $regex: keyword, $options: 'i' } },
-      { username: { $regex: keyword, $options: 'i' } },
-    ],
+    $or: [{ firstName: { $regex: keyword, $options: 'i' } }, { lastName: { $regex: keyword, $options: 'i' } }, { email: { $regex: keyword, $options: 'i' } }, { username: { $regex: keyword, $options: 'i' } }],
   }).populate(populateFields);
 };
 
 userSchema.statics.getPaginatedUsers = async function ({ page = 1, limit = 20, filters = {} }) {
   const skip = (page - 1) * limit;
-  const [items, total] = await Promise.all([
-    this.find(filters).skip(skip).limit(limit).sort({ createdAt: -1 }).populate(populateFields),
-    this.countDocuments(filters),
-  ]);
+  const [items, total] = await Promise.all([this.find(filters).skip(skip).limit(limit).sort({ createdAt: -1 }).populate(populateFields), this.countDocuments(filters)]);
   return { items, total, page, pages: Math.ceil(total / limit) };
 };
 
@@ -855,49 +807,43 @@ userSchema.statics.getUsersBySubscriptionType = function (subscriptionType) {
   return this.find({ subscriptionType }).populate(populateFields);
 };
 
-userSchema.statics.getUserCountBySubscription = async function() {
-  return this.aggregate([
-    { $group: { _id: '$subscriptionType', count: { $sum: 1 } } },
-    { $project: { subscriptionType: '$_id', count: 1, _id: 0 } }
-  ]);
+userSchema.statics.getUserCountBySubscription = async function () {
+  return this.aggregate([{ $group: { _id: '$subscriptionType', count: { $sum: 1 } } }, { $project: { subscriptionType: '$_id', count: 1, _id: 0 } }]);
 };
-userSchema.statics.searchByEmailOrUsername = async function(term) {
+
+// Assign a role to a user by userId and roleId
+userSchema.statics.assignRoleById = async function (userId, roleId) {
+  const user = await this.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Optional: Validate roleId exists in Role collection here
+
+  user.role = roleId;
+  await user.save();
+
+  // Populate role details when returning
+  await user.populate('role').execPopulate();
+
+  return user;
+};
+
+userSchema.statics.searchByEmailOrUsername = async function (term) {
   return this.find({
-    $or: [
-      { email: { $regex: term, $options: 'i' } },
-      { username: { $regex: term, $options: 'i' } }
-    ]
+    $or: [{ email: { $regex: term, $options: 'i' } }, { username: { $regex: term, $options: 'i' } }],
   }).populate(populateFields);
 };
 
-userSchema.statics.getAverageLoyaltyPoints = async function() {
-  const result = await this.aggregate([
-    { $group: { _id: null, avgPoints: { $avg: '$loyaltyPoints' } } }
-  ]);
+userSchema.statics.getAverageLoyaltyPoints = async function () {
+  const result = await this.aggregate([{ $group: { _id: null, avgPoints: { $avg: '$loyaltyPoints' } } }]);
   return result[0]?.avgPoints || 0;
 };
 // Generate table statistics
 
 userSchema.statics.getTableStatistics = async function () {
   try {
-    const [totalUsers, statusCounts, subscriptionCounts, verifiedCount, averageLoyaltyPoints, recentLogins] = await Promise.all([
-      this.countDocuments(),
-      this.aggregate([
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-        { $project: { status: '$_id', count: 1, _id: 0 } },
-        { $sort: { count: -1 } }
-      ]),
-      this.aggregate([
-        { $group: { _id: '$subscriptionType', count: { $sum: 1 } } },
-        { $project: { subscriptionType: '$_id', count: 1, _id: 0 } }
-      ]),
-      this.countDocuments({ isVerified: true }),
-      this.aggregate([
-        { $group: { _id: null, avgPoints: { $avg: '$loyaltyPoints' } } },
-        { $project: { avgPoints: 1, _id: 0 } }
-      ]),
-      this.countDocuments({ lastLogin: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } })
-    ]);
+    const [totalUsers, statusCounts, subscriptionCounts, verifiedCount, averageLoyaltyPoints, recentLogins] = await Promise.all([this.countDocuments(), this.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }, { $project: { status: '$_id', count: 1, _id: 0 } }, { $sort: { count: -1 } }]), this.aggregate([{ $group: { _id: '$subscriptionType', count: { $sum: 1 } } }, { $project: { subscriptionType: '$_id', count: 1, _id: 0 } }]), this.countDocuments({ isVerified: true }), this.aggregate([{ $group: { _id: null, avgPoints: { $avg: '$loyaltyPoints' } } }, { $project: { avgPoints: 1, _id: 0 } }]), this.countDocuments({ lastLogin: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } })]);
     return {
       totalUsers,
       statusCounts,
@@ -914,13 +860,9 @@ userSchema.statics.getTableStatistics = async function () {
 userSchema.statics.getTableReport = async function () {
   try {
     const stats = await this.getTableStatistics();
-    const recentUsers = await this.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate(populateFields)
-      .select('username email fullName role status isVerified createdAt lastLogin');
+    const recentUsers = await this.find().sort({ createdAt: -1 }).limit(5).populate(populateFields).select('username email fullName role status isVerified createdAt lastLogin');
 
-    const formattedRecentUsers = recentUsers.map(user => ({
+    const formattedRecentUsers = recentUsers.map((user) => ({
       id: user._id,
       username: user.username,
       email: user.email,
@@ -946,13 +888,9 @@ userSchema.statics.getUserReportById = async function (userId) {
     const user = await this.findById(userId).populate(populateFields);
     if (!user) return null;
 
-    const wishlistItems = user.wishList
-      ? (await Wishlist.findById(user.wishList)).items
-      : [];
+    const wishlistItems = user.wishList ? (await Wishlist.findById(user.wishList)).items : [];
 
-    const cartItems = user.shoppingCart
-      ? (await Cart.findById(user.shoppingCart)).items
-      : [];
+    const cartItems = user.shoppingCart ? (await Cart.findById(user.shoppingCart)).items : [];
 
     return {
       id: user._id,
@@ -964,8 +902,8 @@ userSchema.statics.getUserReportById = async function (userId) {
       isVerified: user.isVerified,
       lastLogin: user.lastLogin,
       loyaltyPoints: user.loyaltyPoints,
-      orders: user.orders.map(order => order._id),
-      favoriteProducts: user.favoriteProducts.map(product => product._id),
+      orders: user.orders.map((order) => order._id),
+      favoriteProducts: user.favoriteProducts.map((product) => product._id),
       wishlistItems,
       cartItems,
       subscription: {
@@ -986,13 +924,9 @@ userSchema.statics.getActivitySummaryById = async function (userId) {
     const user = await this.findById(userId);
     if (!user) return null;
 
-    const wishlistCount = user.wishList
-      ? (await Wishlist.findById(user.wishList)).items.length
-      : 0;
+    const wishlistCount = user.wishList ? (await Wishlist.findById(user.wishList)).items.length : 0;
 
-    const cartItemCount = user.shoppingCart
-      ? (await Cart.findById(user.shoppingCart)).items.reduce((acc, i) => acc + i.quantity, 0)
-      : 0;
+    const cartItemCount = user.shoppingCart ? (await Cart.findById(user.shoppingCart)).items.reduce((acc, i) => acc + i.quantity, 0) : 0;
 
     return {
       orderCount: user.orders.length,
@@ -1006,9 +940,7 @@ userSchema.statics.getActivitySummaryById = async function (userId) {
   }
 };
 // Aggregate users by country (assumes one primary address with country field)
-userSchema.statics.getUserCountByCountry = async function() {
-
-  
+userSchema.statics.getUserCountByCountry = async function () {
   // Aggregate from Address collection with lookup to User
   return this.aggregate([
     {
@@ -1016,21 +948,102 @@ userSchema.statics.getUserCountByCountry = async function() {
         from: Address.collection.name,
         localField: 'address',
         foreignField: '_id',
-        as: 'addressDetails'
-      }
+        as: 'addressDetails',
+      },
     },
     { $unwind: '$addressDetails' },
     { $match: { 'addressDetails.country': { $exists: true, $ne: null } } },
     { $group: { _id: '$addressDetails.country', count: { $sum: 1 } } },
     { $project: { country: '$_id', count: 1, _id: 0 } },
-    { $sort: { count: -1 } }
+    { $sort: { count: -1 } },
   ]);
 };
 
+userSchema.statics.registerNewUser = async function (userData, registrationMetadata = {}) {
+  try {
+    let { password, role: roleId, email, username, ...rest } = userData;
+
+    email = email.trim().toLowerCase();
+    username = username.trim();
+
+    let tempPassword = null;
+    let tempPasswordActive = false;
+    if (!password) {
+      tempPassword = Math.random().toString(36).slice(-8);
+      password = tempPassword;
+      tempPasswordActive = true;
+    }
+
+    // Hash password
+    const hash_password = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // Role assignment with validation
+    if (!roleId) {
+      const defaultRole = await Role.findOne({ isDefault: true, isActive: true });
+      if (!defaultRole) throw new Error('Default role not configured');
+      roleId = defaultRole._id;
+    } else {
+      const roleExists = await Role.exists({ _id: roleId, isActive: true });
+      if (!roleExists) throw new Error('Assigned role does not exist or not active');
+    }
+
+    // Check uniqueness of email and username
+    const exists = await this.findOne({
+      $or: [{ email }, { username }],
+    });
+    if (exists) throw new Error('Email or username already registered');
+
+    // Generate unique referral code if missing
+    //   if (!referralCode) {
+    //   let unique = false;
+    //   while (!unique) {
+    //     referralCode = crypto.randomBytes(4).toString('hex');
+    //     const used = await this.findOne({ referralCode });
+    //     if (!used) unique = true;
+    //   }
+    // }
+
+    // Generate email confirmation token (for verification flow)
+    const confirmToken = jwt.sign(
+      {
+        email,
+      },
+      jwtSecret,
+      {
+        expiresIn: '72h',
+      }
+    );
+
+    // Create user doc including register metadata & security flags
+    const newUser = new this({
+      email,
+      username,
+      hash_password,
+      role: roleId,
+      tempPasswordActive,
+      isVerified: false,
+      confirmToken,
+      status: 'pending', // pending email verification
+      ...rest,
+    });
+
+    await newUser.save();
+
+    return {
+      user: newUser,
+      tempPasswordActive,
+      tempPassword,
+      confirmToken,
+    };
+  } catch (err) {
+    throw err;
+  }
+};
+
 // Get new user registrations count by day over last N days
-userSchema.statics.getRegistrationsOverTime = async function(days = 30) {
+userSchema.statics.getRegistrationsOverTime = async function (days = 30) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  
+
   return this.aggregate([
     { $match: { createdAt: { $gte: cutoff } } },
     {
@@ -1038,10 +1051,10 @@ userSchema.statics.getRegistrationsOverTime = async function(days = 30) {
         _id: {
           year: { $year: '$createdAt' },
           month: { $month: '$createdAt' },
-          day: { $dayOfMonth: '$createdAt' }
+          day: { $dayOfMonth: '$createdAt' },
         },
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
     {
       $project: {
@@ -1049,21 +1062,21 @@ userSchema.statics.getRegistrationsOverTime = async function(days = 30) {
           $dateFromParts: {
             year: '$_id.year',
             month: '$_id.month',
-            day: '$_id.day'
-          }
+            day: '$_id.day',
+          },
         },
         count: 1,
-        _id: 0
-      }
+        _id: 0,
+      },
     },
-    { $sort: { date: 1 } }
+    { $sort: { date: 1 } },
   ]);
 };
 
 // Get active user login counts by day over last N days
-userSchema.statics.getLoginActivityOverTime = async function(days = 30) {
+userSchema.statics.getLoginActivityOverTime = async function (days = 30) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  
+
   return this.aggregate([
     { $match: { lastLogin: { $gte: cutoff } } },
     {
@@ -1071,10 +1084,10 @@ userSchema.statics.getLoginActivityOverTime = async function(days = 30) {
         _id: {
           year: { $year: '$lastLogin' },
           month: { $month: '$lastLogin' },
-          day: { $dayOfMonth: '$lastLogin' }
+          day: { $dayOfMonth: '$lastLogin' },
         },
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
     {
       $project: {
@@ -1082,70 +1095,63 @@ userSchema.statics.getLoginActivityOverTime = async function(days = 30) {
           $dateFromParts: {
             year: '$_id.year',
             month: '$_id.month',
-            day: '$_id.day'
-          }
+            day: '$_id.day',
+          },
         },
         count: 1,
-        _id: 0
-      }
+        _id: 0,
+      },
     },
-    { $sort: { date: 1 } }
+    { $sort: { date: 1 } },
   ]);
 };
 
 // Find users with failed login attempts above a threshold
-userSchema.statics.findUsersWithFailedLogins = function(threshold = 5) {
+userSchema.statics.findUsersWithFailedLogins = function (threshold = 5) {
   return this.find({ failedLogins: { $gte: threshold } }).populate(populateFields);
 };
 
 // Find users with incomplete profiles (missing phone or address)
-userSchema.statics.findUsersWithIncompleteProfiles = function() {
+userSchema.statics.findUsersWithIncompleteProfiles = function () {
   return this.find({
-    $or: [
-      { phoneNumber: null },
-      { address: { $size: 0 } }
-    ]
+    $or: [{ phoneNumber: null }, { address: { $size: 0 } }],
   }).populate(populateFields);
 };
 
 // Group users by loyalty points brackets (0-100, 101-500, 501+)
-userSchema.statics.getUserLoyaltyBrackets = async function() {
+userSchema.statics.getUserLoyaltyBrackets = async function () {
   return this.aggregate([
     {
       $bucket: {
         groupBy: '$loyaltyPoints',
         boundaries: [0, 101, 501, 1000000],
-        default: "Unknown",
-        output: { count: { $sum: 1 } }
-      }
-    }
+        default: 'Unknown',
+        output: { count: { $sum: 1 } },
+      },
+    },
   ]);
 };
 
 // Aggregate and count most common user interests (top N)
-userSchema.statics.getTopUserInterests = async function(limit = 10) {
+userSchema.statics.getTopUserInterests = async function (limit = 10) {
   return this.aggregate([
     { $unwind: '$interests' },
     {
       $group: {
         _id: '$interests',
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
     { $sort: { count: -1 } },
     { $limit: limit },
-    { $project: { interest: '$_id', count: 1, _id: 0 } }
+    { $project: { interest: '$_id', count: 1, _id: 0 } },
   ]);
 };
 
-userSchema.statics.getAverageOrdersPerUser = async function() {
-  const result = await this.aggregate([
-    { $project: { orderCount: { $size: "$orders" } } },
-    { $group: { _id: null, avgOrders: { $avg: "$orderCount" } } }
-  ]);
+userSchema.statics.getAverageOrdersPerUser = async function () {
+  const result = await this.aggregate([{ $project: { orderCount: { $size: '$orders' } } }, { $group: { _id: null, avgOrders: { $avg: '$orderCount' } } }]);
   return result[0]?.avgOrders || 0;
 };
-
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 

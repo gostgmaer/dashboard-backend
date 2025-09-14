@@ -1,18 +1,29 @@
 const mongoose = require("mongoose");
-
+const ACTIONS = {
+  READ: 'read',
+  WRITE: 'write',
+  MODIFY: 'modify',
+  DELETE: 'delete',
+  MANAGE: 'manage'
+};
 const permissionSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, unique: true, trim: true }, 
+    name: { type: String, required: true, unique: true, trim: true },
     // e.g., "product:create", "order:approve"
 
-    description: { type: String, trim: true }, 
+    description: { type: String, trim: true },
     // Human-readable description
 
-    category: { type: String, trim: true }, 
-    isDefault:{type: Boolean, default: true  },
+    category: { type: String, trim: true },
+    isDefault: { type: Boolean, default: true },
     // e.g., "Product Management", "Order Management"
 
-    isActive: { type: Boolean, default: true }, 
+    isActive: { type: Boolean, default: true },
+    action: {
+      type: String,
+      enum: Object.values(ACTIONS),
+      required: true
+    },
     // Can disable a permission without deleting
 
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

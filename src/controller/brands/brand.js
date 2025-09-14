@@ -1,4 +1,4 @@
-const Brand = require("./brand");
+const Brand = require("../../models/brands");
 const createError = require("http-errors");
 const logger = require("winston"); // Assuming a logging library is configured
 const { cacheClient } = require("../../config/cache"); // Assuming Redis client configuration
@@ -10,9 +10,7 @@ const asyncHandler = (fn) => (req, res, next) =>
 // Create a new brand
 const createBrand = asyncHandler(async (req, res) => {
   const brandData = {
-    ...req.body,
-    createdBy: req.user?._id, // Assuming authenticated user
-    updatedBy: req.user?._id,
+    ...req.body
   };
   const brand = new Brand(brandData);
   await brand.save();

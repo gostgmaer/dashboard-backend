@@ -20,9 +20,10 @@ const {
   updateManyChildAttribute,
   deleteManyChildAttribute,
 } = require('../controller/attributes/attributeController');
-const { body, query, param } = require('express-validator');
+const { body, query, param, validationResult } = require('express-validator');
 const authMiddleware = require('../middleware/auth');
-const roleMiddleware = require('../middleware/roleCheck');
+const  authorize  = require('../middleware/authorize'); // Assumed exported from auth middleware
+const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
 
 /**
@@ -33,10 +34,68 @@ const { enviroment } = require('../config/setting');
  * ✅ Bulk operations for adding, updating, and deleting attributes
  * ✅ Management of attribute visibility (show/hide)
  * ✅ Hierarchical attribute structure with child attributes
- * ✅ Role-based access control
- * ✅ Comprehensive validation schemas
+ * ✅ Permission-based access control via authorize middleware
+ * ✅ Comprehensive validation schemas with sanitization
+ * ✅ Rate limiting for bulk operations
+ * ✅ Instance-level checks for IDOR prevention
  * ✅ Performance optimized routes
  */
+
+/**
+ * Rate limiter for high-risk bulk operations
+ * Limits to 10 requests per 15 minutes per IP
+ */
+const bulkOperationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per window
+  message: { success: false, message: 'Too many requests, please try again later' }
+});
+
+/**
+ * Middleware to check instance-level access for attribute-specific routes
+ * Ensures the user has permission to access/modify the specific attribute
+ */
+const instanceCheckMiddleware = async (req, res, next) => {
+  try {
+    const attributeId = req.params.id || req.params.attributeId || req.params.ids;
+    if (attributeId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
+      const Attribute = require('../models/Attribute'); // Assumed Attribute model
+      const attribute = await Attribute.findById(attributeId);
+      if (!attribute) {
+        return res.status(404).json({ success: false, message: 'Attribute not found' });
+      }
+      if (attribute.userId.toString() !== req.user.id) { // Restrict to own attributes
+        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s attribute' });
+      }
+    }
+    const childId = req.params.childId;
+    if (childId && !req.user.isSuperadmin) {
+      const Attribute = require('../models/Attribute');
+      const attribute = await Attribute.findOne({ 'children._id': childId });
+      if (!attribute) {
+        return res.status(404).json({ success: false, message: 'Child attribute not found' });
+      }
+      if (attribute.userId.toString() !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s child attribute' });
+      }
+    }
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error during instance check' });
+  }
+};
+
+/**
+ * Middleware to handle validation errors
+ */
+const validate = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+  next();
+};
 
 // ========================================
 // 🔧 VALIDATION SCHEMAS
@@ -44,64 +103,74 @@ const { enviroment } = require('../config/setting');
 
 const attributeValidation = {
   addAttribute: [
-    body('name').isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters'),
-    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
+    body('name').isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters').trim().escape(),
+    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
     body('isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
     body('values').optional().isArray().withMessage('Values must be an array'),
-    body('values.*').optional().isString().withMessage('Each value must be a string').isLength({ max: 100 }).withMessage('Each value cannot exceed 100 characters')
+    body('values.*').optional().isString().withMessage('Each value must be a string').isLength({ max: 100 }).withMessage('Each value cannot exceed 100 characters').trim().escape(),
+    body('userId').isMongoId().withMessage('Valid user ID is required'),
+    validate
   ],
 
   addAllAttributes: [
     body('attributes').isArray({ min: 1 }).withMessage('Attributes array is required'),
-    body('attributes.*.name').isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters'),
-    body('attributes.*.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
+    body('attributes.*.name').isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters').trim().escape(),
+    body('attributes.*.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
     body('attributes.*.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
     body('attributes.*.values').optional().isArray().withMessage('Values must be an array'),
-    body('attributes.*.values.*').optional().isString().withMessage('Each value must be a string').isLength({ max: 100 }).withMessage('Each value cannot exceed 100 characters')
+    body('attributes.*.values.*').optional().isString().withMessage('Each value must be a string').isLength({ max: 100 }).withMessage('Each value cannot exceed 100 characters').trim().escape(),
+    body('attributes.*.userId').isMongoId().withMessage('Valid user ID is required'),
+    validate
   ],
 
   addChildAttributes: [
     param('id').isMongoId().withMessage('Invalid attribute ID'),
     body('children').isArray({ min: 1 }).withMessage('Children array is required'),
-    body('children.*.name').isString().withMessage('Child name must be a string').isLength({ min: 1, max: 100 }).withMessage('Child name must be between 1 and 100 characters'),
-    body('children.*.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
-    body('children.*.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean')
+    body('children.*.name').isString().withMessage('Child name must be a string').isLength({ min: 1, max: 100 }).withMessage('Child name must be between 1 and 100 characters').trim().escape(),
+    body('children.*.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
+    body('children.*.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
+    validate
   ],
 
   updateAttributes: [
     param('id').isMongoId().withMessage('Invalid attribute ID'),
-    body('name').optional().isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters'),
-    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
+    body('name').optional().isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters').trim().escape(),
+    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
     body('isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
     body('values').optional().isArray().withMessage('Values must be an array'),
-    body('values.*').optional().isString().withMessage('Each value must be a string').isLength({ max: 100 }).withMessage('Each value cannot exceed 100 characters')
+    body('values.*').optional().isString().withMessage('Each value must be a string').isLength({ max: 100 }).withMessage('Each value cannot exceed 100 characters').trim().escape(),
+    validate
   ],
 
   updateChildAttributes: [
     param('attributeId').isMongoId().withMessage('Invalid attribute ID'),
     param('childId').isMongoId().withMessage('Invalid child attribute ID'),
-    body('name').optional().isString().withMessage('Child name must be a string').isLength({ min: 1, max: 100 }).withMessage('Child name must be between 1 and 100 characters'),
-    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
-    body('isVisible').optional().isBoolean().withMessage('isVisible must be a boolean')
+    body('name').optional().isString().withMessage('Child name must be a string').isLength({ min: 1, max: 100 }).withMessage('Child name must be between 1 and 100 characters').trim().escape(),
+    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
+    body('isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
+    validate
   ],
 
   updateStatus: [
     param('id').isMongoId().withMessage('Invalid attribute ID'),
-    body('isVisible').isBoolean().withMessage('isVisible must be a boolean')
+    body('isVisible').isBoolean().withMessage('isVisible must be a boolean'),
+    validate
   ],
 
   updateChildStatus: [
     param('id').isMongoId().withMessage('Invalid child attribute ID'),
-    body('isVisible').isBoolean().withMessage('isVisible must be a boolean')
+    body('isVisible').isBoolean().withMessage('isVisible must be a boolean'),
+    validate
   ],
 
   updateManyAttribute: [
     body('attributeIds').isArray({ min: 1 }).withMessage('Attribute IDs array is required'),
     body('attributeIds.*').isMongoId().withMessage('Invalid attribute ID in array'),
     body('updates').isObject().withMessage('Updates must be an object'),
-    body('updates.name').optional().isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters'),
-    body('updates.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
-    body('updates.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean')
+    body('updates.name').optional().isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters').trim().escape(),
+    body('updates.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
+    body('updates.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
+    validate
   ],
 
   updateManyChildAttribute: [
@@ -109,45 +178,53 @@ const attributeValidation = {
     body('childIds').isArray({ min: 1 }).withMessage('Child IDs array is required'),
     body('childIds.*').isMongoId().withMessage('Invalid child attribute ID in array'),
     body('updates').isObject().withMessage('Updates must be an object'),
-    body('updates.name').optional().isString().withMessage('Child name must be a string').isLength({ min: 1, max: 100 }).withMessage('Child name must be between 1 and 100 characters'),
-    body('updates.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
-    body('updates.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean')
+    body('updates.name').optional().isString().withMessage('Child name must be a string').isLength({ min: 1, max: 100 }).withMessage('Child name must be between 1 and 100 characters').trim().escape(),
+    body('updates.description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters').trim().escape(),
+    body('updates.isVisible').optional().isBoolean().withMessage('isVisible must be a boolean'),
+    validate
   ],
 
   deleteManyAttribute: [
     body('attributeIds').isArray({ min: 1 }).withMessage('Attribute IDs array is required'),
-    body('attributeIds.*').isMongoId().withMessage('Invalid attribute ID in array')
+    body('attributeIds.*').isMongoId().withMessage('Invalid attribute ID in array'),
+    validate
   ],
 
   deleteManyChildAttribute: [
     body('attributeId').isMongoId().withMessage('Invalid attribute ID'),
     body('childIds').isArray({ min: 1 }).withMessage('Child IDs array is required'),
-    body('childIds.*').isMongoId().withMessage('Invalid child attribute ID in array')
+    body('childIds.*').isMongoId().withMessage('Invalid child attribute ID in array'),
+    validate
   ],
 
   query: [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer').toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
     query('sort').optional().isIn(['createdAt', 'updatedAt', 'name']).withMessage('Invalid sort field'),
-    query('order').optional().isIn(['asc', 'desc']).withMessage('Order must be asc or desc')
+    query('order').optional().isIn(['asc', 'desc']).withMessage('Order must be asc or desc'),
+    validate
   ],
 
   getById: [
-    param('id').isMongoId().withMessage('Invalid attribute ID')
+    param('id').isMongoId().withMessage('Invalid attribute ID'),
+    validate
   ],
 
   getChildById: [
     param('id').isMongoId().withMessage('Invalid attribute ID'),
-    param('ids').isMongoId().withMessage('Invalid child attribute ID')
+    param('ids').isMongoId().withMessage('Invalid child attribute ID'),
+    validate
   ],
 
   deleteAttribute: [
-    param('id').isMongoId().withMessage('Invalid attribute ID')
+    param('id').isMongoId().withMessage('Invalid attribute ID'),
+    validate
   ],
 
   deleteChildAttribute: [
     param('attributeId').isMongoId().withMessage('Invalid attribute ID'),
-    param('childId').isMongoId().withMessage('Invalid child attribute ID')
+    param('childId').isMongoId().withMessage('Invalid child attribute ID'),
+    validate
   ]
 };
 
@@ -155,55 +232,62 @@ const attributeValidation = {
 // 📋 ATTRIBUTE CRUD OPERATIONS
 // ========================================
 
-// POST /api/attributes/add - Add a new attribute
-router.post('/add', 
+// POST /api/attributes - Add a new attribute
+router.post('/',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'write'),
   attributeValidation.addAttribute,
   addAttribute
 );
 
-// POST /api/attributes/add/all - Add multiple attributes
-router.post('/add/all', 
+// POST /api/attributes/bulk - Add multiple attributes
+router.post('/bulk',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'write'),
+  bulkOperationLimiter,
   attributeValidation.addAllAttributes,
   addAllAttributes
 );
 
 // GET /api/attributes - Get all attributes
-router.get('/', 
+router.get('/',
   authMiddleware,
+  authorize('attributes', 'read'),
   attributeValidation.query,
   getAllAttributes
 );
 
-// GET /api/attributes/show - Get visible attributes
-router.get('/show', 
+// GET /api/attributes/visible - Get visible attributes
+router.get('/visible',
   authMiddleware,
+  authorize('attributes', 'read'),
   attributeValidation.query,
   getShowingAttributes
 );
 
 // GET /api/attributes/:id - Get attribute by ID
-router.get('/:id', 
+router.get('/:id',
   authMiddleware,
+  authorize('attributes', 'read'),
+  instanceCheckMiddleware,
   attributeValidation.getById,
   getAttributeById
 );
 
 // PUT /api/attributes/:id - Update attribute
-router.put('/:id', 
+router.put('/:id',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  instanceCheckMiddleware,
   attributeValidation.updateAttributes,
   updateAttributes
 );
 
 // DELETE /api/attributes/:id - Delete attribute
-router.delete('/:id', 
+router.delete('/:id',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  instanceCheckMiddleware,
   attributeValidation.deleteAttribute,
   deleteAttribute
 );
@@ -212,33 +296,38 @@ router.delete('/:id',
 // 👶 CHILD ATTRIBUTE OPERATIONS
 // ========================================
 
-// PUT /api/attributes/add/child/:id - Add child attributes
-router.put('/add/child/:id', 
+// POST /api/attributes/:id/children - Add child attributes
+router.post('/:id/children',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'write'),
+  instanceCheckMiddleware,
   attributeValidation.addChildAttributes,
   addChildAttributes
 );
 
-// GET /api/attributes/child/:id/:ids - Get child attribute by ID
-router.get('/child/:id/:ids', 
+// GET /api/attributes/:id/children/:ids - Get child attribute by ID
+router.get('/:id/children/:ids',
   authMiddleware,
+  authorize('attributes', 'read'),
+  instanceCheckMiddleware,
   attributeValidation.getChildById,
   getChildAttributeById
 );
 
-// PUT /api/attributes/update/child/:attributeId/:childId - Update child attribute
-router.put('/update/child/:attributeId/:childId', 
+// PUT /api/attributes/:attributeId/children/:childId - Update child attribute
+router.put('/:attributeId/children/:childId',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  instanceCheckMiddleware,
   attributeValidation.updateChildAttributes,
   updateChildAttributes
 );
 
-// PUT /api/attributes/delete/child/:attributeId/:childId - Delete child attribute
-router.put('/delete/child/:attributeId/:childId', 
+// PATCH /api/attributes/:attributeId/children/:childId - Delete child attribute
+router.patch('/:attributeId/children/:childId',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  instanceCheckMiddleware,
   attributeValidation.deleteChildAttribute,
   deleteChildAttribute
 );
@@ -247,18 +336,20 @@ router.put('/delete/child/:attributeId/:childId',
 // 🔧 STATUS MANAGEMENT
 // ========================================
 
-// PUT /api/attributes/status/:id - Update attribute visibility
-router.put('/status/:id', 
+// PATCH /api/attributes/:id/status - Update attribute visibility
+router.patch('/:id/status',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  instanceCheckMiddleware,
   attributeValidation.updateStatus,
   updateStatus
 );
 
-// PUT /api/attributes/status/child/:id - Update child attribute visibility
-router.put('/status/child/:id', 
+// PATCH /api/attributes/children/:id/status - Update child attribute visibility
+router.patch('/children/:id/status',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  instanceCheckMiddleware,
   attributeValidation.updateChildStatus,
   updateChildStatus
 );
@@ -267,34 +358,38 @@ router.put('/status/child/:id',
 // 📦 BULK OPERATIONS
 // ========================================
 
-// PATCH /api/attributes/update/many - Update multiple attributes
-router.patch('/update/many', 
+// PATCH /api/attributes/bulk/update - Update multiple attributes
+router.patch('/bulk/update',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  bulkOperationLimiter,
   attributeValidation.updateManyAttribute,
   updateManyAttribute
 );
 
-// PATCH /api/attributes/update/child/many - Update multiple child attributes
-router.patch('/update/child/many', 
+// PATCH /api/attributes/bulk/children/update - Update multiple child attributes
+router.patch('/bulk/children/update',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  bulkOperationLimiter,
   attributeValidation.updateManyChildAttribute,
   updateManyChildAttribute
 );
 
-// PATCH /api/attributes/delete/many - Delete multiple attributes
-router.patch('/delete/many', 
+// PATCH /api/attributes/bulk/delete - Delete multiple attributes
+router.patch('/bulk/delete',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  bulkOperationLimiter,
   attributeValidation.deleteManyAttribute,
   deleteManyAttribute
 );
 
-// PATCH /api/attributes/delete/child/many - Delete multiple child attributes
-router.patch('/delete/child/many', 
+// PATCH /api/attributes/bulk/children/delete - Delete multiple child attributes
+router.patch('/bulk/children/delete',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'update'),
+  bulkOperationLimiter,
   attributeValidation.deleteManyChildAttribute,
   deleteManyChildAttribute
 );
@@ -303,10 +398,10 @@ router.patch('/delete/child/many',
 // 🧪 TEST ENDPOINTS
 // ========================================
 
-// PUT /api/attributes/show/test - Test visible attributes (likely for debugging)
-router.put('/show/test', 
+// GET /api/attributes/visible/test - Test visible attributes (likely for debugging)
+router.get('/visible/test',
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('attributes', 'view'),
   attributeValidation.query,
   getShowingAttributesTest
 );
@@ -316,17 +411,13 @@ router.put('/show/test',
 // ========================================
 
 const routeOrderMiddleware = (req, res, next) => {
-  // Ensure specific routes come before dynamic ones
-  if (req.path.startsWith('/add') || 
-      req.path.startsWith('/show') || 
-      req.path.startsWith('/update/many') || 
-      req.path.startsWith('/update/child/many') || 
-      req.path.startsWith('/delete/many') || 
-      req.path.startsWith('/delete/child/many') || 
-      req.path.startsWith('/child')) {
+  const path = req.path.toLowerCase(); // Case-insensitive matching
+  if (path.startsWith('/bulk') ||
+      path.startsWith('/visible') ||
+      path.startsWith('/children') ||
+      path === '/docs/routes') {
     return next();
   }
-
   next();
 };
 
@@ -337,53 +428,60 @@ router.use(routeOrderMiddleware);
 // 📝 ROUTE DOCUMENTATION ENDPOINT
 // ========================================
 
-router.get('/docs/routes', (req, res) => {
-  if (enviroment !== 'development') {
-    return res.status(404).json({
-      success: false,
-      message: 'Route documentation only available in development mode'
+router.get('/docs/routes',
+  authMiddleware,
+  authorize('attributes', 'view'),
+  (req, res) => {
+    if (enviroment !== 'development') {
+      return res.status(404).json({
+        success: false,
+        message: 'Route documentation only available in development mode'
+      });
+    }
+
+    const routes = {
+      attributeCrud: [
+        'POST   /api/attributes                          - Add a new attribute (write)',
+        'POST   /api/attributes/bulk                     - Add multiple attributes (write, rate-limited)',
+        'GET    /api/attributes                          - Get all attributes (read)',
+        'GET    /api/attributes/visible                  - Get visible attributes (read)',
+        'GET    /api/attributes/:id                      - Get attribute by ID (read, instance check)',
+        'PUT    /api/attributes/:id                      - Update attribute (update, instance check)',
+        'DELETE /api/attributes/:id                      - Delete attribute (update, instance check)'
+      ],
+      childAttributeOperations: [
+        'POST   /api/attributes/:id/children             - Add child attributes (write, instance check)',
+        'GET    /api/attributes/:id/children/:ids        - Get child attribute by ID (read, instance check)',
+        'PUT    /api/attributes/:attributeId/children/:childId - Update child attribute (update, instance check)',
+        'PATCH  /api/attributes/:attributeId/children/:childId - Delete child attribute (update, instance check)'
+      ],
+      statusManagement: [
+        'PATCH  /api/attributes/:id/status               - Update attribute visibility (update, instance check)',
+        'PATCH  /api/attributes/children/:id/status      - Update child attribute visibility (update, instance check)'
+      ],
+      bulkOperations: [
+        'PATCH  /api/attributes/bulk/update              - Update multiple attributes (update, rate-limited)',
+        'PATCH  /api/attributes/bulk/children/update     - Update multiple child attributes (update, rate-limited)',
+        'PATCH  /api/attributes/bulk/delete              - Delete multiple attributes (update, rate-limited)',
+        'PATCH  /api/attributes/bulk/children/delete     - Delete multiple child attributes (update, rate-limited)'
+      ],
+      testEndpoints: [
+        'GET    /api/attributes/visible/test             - Test visible attributes (view)'
+      ],
+      documentation: [
+        'GET    /api/attributes/docs/routes              - Get API route documentation (view, dev-only)'
+      ]
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalRoutes: Object.values(routes).flat().length,
+        categories: routes
+      },
+      message: 'Attribute API routes documentation'
     });
   }
+);
 
-  const routes = {
-    attributeCrud: [
-      'POST   /api/attributes/add                  - Add a new attribute',
-      'POST   /api/attributes/add/all             - Add multiple attributes',
-      'GET    /api/attributes                     - Get all attributes',
-      'GET    /api/attributes/show                - Get visible attributes',
-      'GET    /api/attributes/:id                 - Get attribute by ID',
-      'PUT    /api/attributes/:id                 - Update attribute',
-      'DELETE /api/attributes/:id                 - Delete attribute'
-    ],
-    childAttributeOperations: [
-      'PUT    /api/attributes/add/child/:id       - Add child attributes',
-      'GET    /api/attributes/child/:id/:ids      - Get child attribute by ID',
-      'PUT    /api/attributes/update/child/:attributeId/:childId - Update child attribute',
-      'PUT    /api/attributes/delete/child/:attributeId/:childId - Delete child attribute'
-    ],
-    statusManagement: [
-      'PUT    /api/attributes/status/:id          - Update attribute visibility',
-      'PUT    /api/attributes/status/child/:id    - Update child attribute visibility'
-    ],
-    bulkOperations: [
-      'PATCH  /api/attributes/update/many         - Update multiple attributes',
-      'PATCH  /api/attributes/update/child/many   - Update multiple child attributes',
-      'PATCH  /api/attributes/delete/many         - Delete multiple attributes',
-      'PATCH  /api/attributes/delete/child/many   - Delete multiple child attributes'
-    ],
-    testEndpoints: [
-      'PUT    /api/attributes/show/test           - Test visible attributes'
-    ]
-  };
-
-  res.status(200).json({
-    success: true,
-    data: {
-      totalRoutes: Object.values(routes).flat().length,
-      categories: routes
-    },
-    message: 'Attribute API routes documentation'
-  });
-});
-
-module.exports = {attributeRouter:router};
+module.exports = { attributeRouter: router };

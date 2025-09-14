@@ -26,6 +26,8 @@ const authRoute = require('./src/routes/auth');
 const { attributeRouter } = require('./src/routes/attributeRoutes');
 const { attachmentRoutes } = require('./src/routes/attachmentsRoutes');
 const addressRoute = require('./src/routes/address');
+const {logRoutes} = require('./src/routes/logRoutes');
+const {roleRoute} = require('./src/routes/roleRoute');
 
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
@@ -79,6 +81,7 @@ app.use('/api/settings', checkRoute("settingRoute", settingRoute));
 app.use('/api/reviews', checkRoute("reviewRoute", reviewRoute));
 app.use('/api/orders', checkRoute("orderRoutes", orderRoutes));
 app.use('/api/permissins', checkRoute("permissionRoute", permissionRoute));
+app.use('/api/roles', checkRoute("RoleRoutes", roleRoute));
 app.use('/api/carts', checkRoute("cartRoutes", cartRoutes));
 app.use('/api/brands', checkRoute("BrandRoute", BrandRoute));
 app.use('/api/user', checkRoute("authRoute", authRoute));
@@ -89,6 +92,7 @@ app.use('/api/logs', checkRoute("logRoute", logRoute));
 app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
+app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
 
 
 

@@ -93,7 +93,7 @@ const permissionValidation = {
 // POST /api/permission - Create a new permission
 router.post('/',
   authMiddleware,
-  authorize('permission', 'create'),
+  authorize('permission', 'write'),
   permissionValidation.create,
   permissionController.createPermission
 );
@@ -101,7 +101,7 @@ router.post('/',
 // GET /api/permission - Get all permissions (with optional filters)
 router.get('/',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   permissionValidation.query,
   permissionController.getPermissions
 );
@@ -109,7 +109,7 @@ router.get('/',
 // GET /api/permission/:id - Get a single permission by ID
 router.get('/:id',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   param('id').isMongoId().withMessage('Invalid permission ID'),
   permissionController.getSinglePermission
 );
@@ -144,7 +144,7 @@ router.delete('/:id',
 // GET /api/permission/active - Get all active permissions
 router.get('/active',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   permissionValidation.query,
   permissionController.getActivePermissions
 );
@@ -152,7 +152,7 @@ router.get('/active',
 // GET /api/permission/inactive - Get inactive permissions
 router.get('/inactive',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   permissionValidation.query,
   permissionController.getInactivePermissions
 );
@@ -160,7 +160,7 @@ router.get('/inactive',
 // GET /api/permission/search/name - Search permissions by name
 router.get('/search/name',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   permissionValidation.search,
   permissionController.searchPermissionsByName
 );
@@ -168,7 +168,7 @@ router.get('/search/name',
 // GET /api/permission/search - Search permissions by name or description
 router.get('/search',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   permissionValidation.search,
   permissionController.searchPermissions
 );
@@ -176,7 +176,7 @@ router.get('/search',
 // GET /api/permission/category/:category - Get permissions by category
 router.get('/category/:category',
   authMiddleware,
-  authorize('permission', 'view'),
+  authorize('permission', 'read'),
   permissionValidation.category,
   permissionValidation.query,
   permissionController.getPermissionsByCategory
@@ -197,7 +197,7 @@ router.get('/grouped',
 // POST /api/permission/bulk - Bulk create permissions
 router.post('/bulk',
   authMiddleware,
-  authorize('permission', 'create'),
+  authorize('permission', 'write'),
   permissionValidation.bulkCreate,
   permissionController.bulkCreatePermissions
 );
@@ -241,7 +241,7 @@ router.get('/exists/:name',
 // POST /api/permission/create-if-not-exists - Create a permission if it doesn't exist
 router.post('/create-if-not-exists',
   authMiddleware,
-  authorize('permission', 'create'),
+  authorize('permission', 'write'),
   permissionValidation.create,
   permissionController.createIfNotExists
 );

@@ -1,5 +1,5 @@
 const { StatusCodes, ReasonPhrases } = require('http-status-codes');
-const { Role } = require('../../models/role');
+const  Role  = require('../../models/role');
 const User = require('../../models/user');
 /**
  * Create a new role
