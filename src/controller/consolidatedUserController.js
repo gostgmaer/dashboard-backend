@@ -7,6 +7,7 @@ const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
+const { APIError, formatResponse } = require('../utils/apiUtils');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -123,6 +124,48 @@ class UserController {
   /**
    * CREATE USER - with validation and auto-calculations
    */
+
+
+  static async registerUser(req, res) {
+    // Validate incoming request data via express-validator middleware
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+     
+      const registrationMetadata = {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      };
+
+      // Call schema method for registration
+      const { user, tempPassword, tempPasswordActive, confirmToken } =
+        await User.registerNewUser(
+          req.body,
+          registrationMetadata
+        );
+
+      // Placeholder: send email (e.g., Welcome + verification link)
+      // await sendWelcomeEmail(user.email, {
+      //   username: user.username,
+      //   tempPassword: tempPasswordActive ? tempPassword : null,
+      //   confirmationLink: `${process.env.FRONTEND_URL}/verify-email?token=${confirmToken}`,
+      // });
+
+      // Respond with newly created user ID and relevant info (hide sensitive data)
+      res.status(201).json({
+        message: 'User registered successfully. Please check your email to verify your account.',
+        status: true,
+        tempPassword: tempPasswordActive ? tempPassword : undefined,
+        emailVerificationToken: confirmToken,user:user.id
+      });
+    } catch (err) {
+      // Handle errors (e.g., duplicate keys, validation)
+      res.status(500).json({ error: err.message || 'Registration failed.',  status: false, });
+    }
+  }
   static async createUser(req, res) {
     try {
       const errors = validationResult(req);
@@ -3845,6 +3888,41 @@ class UserController {
       return UserController.errorResponse(res, 'Advanced search failed', 500, error.message);
     }
   }
+
+
+
+  static async assignUserRoleById(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const { roleId } = req.body;
+
+      if (!roleId) {
+        throw new APIError('roleId field is required', 400);
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new APIError('User not found', 404);
+      }
+
+      // Optional: Verify roleId exists in Role collection before assignment here
+
+      user.role = roleId;
+      await user.save();
+
+      // Optionally populate role details
+      await user.populate('role');
+
+      res.status(200).json(formatResponse('Role assigned to user successfully', {
+        id: user._id,
+        email: user.email,
+        role: user.role.name
+      }));
+    } catch (err) {
+      next(err);
+    }
+  }
+
 }
 
 module.exports = UserController;

@@ -219,4 +219,4 @@ roleSchema.statics.getDefaultRoleId = async function () {
 };
 
 const Role = mongoose.model("Role", roleSchema);
-module.exports = { Role, PREDEFINED_ROLES };
+module.exports = Role;

@@ -9,11 +9,11 @@ class APIError extends Error {
   }
 }
 
-const formatResponse = (message, data = null) => {
+const formatResponse = (message, results = null) => {
   return {
     success: true,
     message,
-    data,
+    results,
   };
 };
 

@@ -34,8 +34,8 @@ const brandSchema = new mongoose.Schema(
     establishedYear: { type: Number, default: null },
     parentCompany: { type: String, default: "" },
     country: { type: String, default: "" },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     socialMedia: {
       facebook: { type: String, default: "" },
       twitter: { type: String, default: "" },

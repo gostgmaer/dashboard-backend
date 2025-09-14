@@ -26,26 +26,26 @@ const {
 
 
 
-authRoute.route("/user/auth/register").post(validateSignUpRequest, isRequestValidated, signUp);
-authRoute.route("/user/auth/social-register").post(SocialsignUp);
-authRoute.route("/user/auth/confirm-account/:token").post(accountConfirm);
+authRoute.route("/auth/register").post(validateSignUpRequest, isRequestValidated, signUp);
+authRoute.route("/auth/social-register").post(SocialsignUp);
+authRoute.route("/auth/confirm-account/:token").post(accountConfirm);
 authRoute.
-  route("/user/auth/login").post(validateSignIpRequest, isRequestValidated, signIn);
+  route("/auth/login").post(validateSignIpRequest, isRequestValidated, signIn);
   authRoute.
-  route("/user/auth/custom/login").post(customsignIn);
+  route("/auth/custom/login").post(customsignIn);
   authRoute.
-  route("/user/auth/checkAuth").post(isRequestValidated, checkAuth);
+  route("/auth/checkAuth").post(isRequestValidated, checkAuth);
 
   authRoute.
-  route("/user/auth/checkUser").post(isRequestValidated, chechUser);
+  route("/auth/checkUser").post(isRequestValidated, chechUser);
   
-authRoute.route("/user/auth/verify/session").post(varifySession);
-authRoute.route("/user/auth/session/refresh/token").post(getRefreshToken);
-authRoute.route("/user/auth/reset-password/:token").post(validateResetpassword, isRequestValidated, resetPassword);
-authRoute.route("/user/auth/forget-password").post(validateForgetPassword, isRequestValidated, forgetPassword);
-authRoute.route("/user/auth/change-password").post(userMiddleWare, UpdatebyMiddleWare, validateChangePassword, isRequestValidated, changedPassword);
-authRoute.route("/user/auth/profile").get(userMiddleWare, getProfile);
-authRoute.route("/user/auth/profile/update").patch(userMiddleWare,UpdatebyMiddleWare, updateProfile);
-authRoute.route("/user/auth/logout").post(userMiddleWare, singout);
+authRoute.route("/auth/verify/session").post(varifySession);
+authRoute.route("/auth/session/refresh/token").post(getRefreshToken);
+authRoute.route("/auth/reset-password/:token").post(validateResetpassword, isRequestValidated, resetPassword);
+authRoute.route("/auth/forget-password").post(validateForgetPassword, isRequestValidated, forgetPassword);
+authRoute.route("/auth/change-password").post(userMiddleWare, UpdatebyMiddleWare, validateChangePassword, isRequestValidated, changedPassword);
+authRoute.route("/auth/profile").get(userMiddleWare, getProfile);
+authRoute.route("/auth/profile/update").patch(userMiddleWare,UpdatebyMiddleWare, updateProfile);
+authRoute.route("/auth/logout").post(userMiddleWare, singout);
 
 module.exports = authRoute;

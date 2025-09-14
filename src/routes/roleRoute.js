@@ -3,8 +3,9 @@ const router = express.Router();
 const roleController = require('../controller/roles');
 const { body, query, param } = require('express-validator');
 const authMiddleware = require('../middleware/auth');
-const roleMiddleware = require('../middleware/roleCheck');
+// Assuming authorize is exported from auth middleware
 const { enviroment } = require('../config/setting');
+const authorize = require('../middleware/authorize');
 
 /**
  * 🚀 CONSOLIDATED ROLE ROUTES
@@ -15,9 +16,10 @@ const { enviroment } = require('../config/setting');
  * ✅ Bulk operations for activation/deactivation and permissions
  * ✅ Audit trail and role usage checks
  * ✅ Role cloning and import/export functionality
- * ✅ Role-based access control
+ * ✅ Role-based access control via authorize middleware
  * ✅ Comprehensive validation schemas
  * ✅ Performance optimized routes
+ * ✅ Authorization middleware for fine-grained access control
  */
 
 // ========================================
@@ -94,7 +96,7 @@ const roleValidation = {
 // POST /api/role - Create a new role
 router.post('/', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'write'),
   roleValidation.create,
   roleController.create
 );
@@ -102,7 +104,7 @@ router.post('/',
 // GET /api/role - Get all roles (with optional activeOnly or search query)
 router.get('/', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   roleValidation.query,
   roleController.getAll
 );
@@ -110,7 +112,7 @@ router.get('/',
 // GET /api/role/:id - Get a single role by ID
 router.get('/:id', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   roleController.getSingle
 );
@@ -118,7 +120,7 @@ router.get('/:id',
 // PUT /api/role/:id - Update a role by ID
 router.put('/:id', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.update,
   roleController.update
 );
@@ -126,7 +128,7 @@ router.put('/:id',
 // PATCH /api/role/:id - Update a role by ID (partial)
 router.patch('/:id', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.update,
   roleController.update
 );
@@ -134,7 +136,7 @@ router.patch('/:id',
 // DELETE /api/role/:id - Soft-delete (deactivate) a role by ID
 router.delete('/:id', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   roleController.remove
 );
@@ -146,7 +148,7 @@ router.delete('/:id',
 // GET /api/role/active - Get all active roles
 router.get('/active', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   roleValidation.query,
   roleController.getActiveRole
 );
@@ -154,7 +156,7 @@ router.get('/active',
 // POST /api/role/default - Set a default role
 router.post('/default', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   body('roleId').isMongoId().withMessage('Invalid role ID'),
   roleController.setDefaultRole
 );
@@ -162,28 +164,28 @@ router.post('/default',
 // GET /api/role/default - Get the default role
 router.get('/default', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   roleController.getDefaultRole
 );
 
 // GET /api/role/default/id - Get default role ID
 router.get('/default/id', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   roleController.getDefaultRoleId
 );
 
 // POST /api/role/ensure-predefined - Ensure predefined roles exist
 router.post('/ensure-predefined', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'write'),
   roleController.ensurePredefinedRoles
 );
 
 // GET /api/role/search - Search roles by keyword
 router.get('/search', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   query('keyword').isString().withMessage('Keyword must be a string').isLength({ max: 100 }).withMessage('Keyword cannot exceed 100 characters'),
   roleValidation.query,
   roleController.searchRoles
@@ -192,7 +194,7 @@ router.get('/search',
 // PATCH /api/role/bulk-deactivate - Bulk deactivate roles
 router.patch('/bulk-deactivate', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.bulkStatus,
   roleController.bulkDeactivate
 );
@@ -200,7 +202,7 @@ router.patch('/bulk-deactivate',
 // PATCH /api/role/bulk-activate - Bulk activate roles
 router.patch('/bulk-activate', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.bulkStatus,
   roleController.bulkActivate
 );
@@ -208,7 +210,7 @@ router.patch('/bulk-activate',
 // GET /api/role/all/counts - Get all roles with user counts
 router.get('/all/counts', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'view'),
   roleValidation.query,
   roleController.getAllWithCounts
 );
@@ -216,7 +218,7 @@ router.get('/all/counts',
 // POST /api/role/clone - Clone a role
 router.post('/clone', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'write'),
   body('roleId').isMongoId().withMessage('Invalid role ID'),
   body('newName').isString().withMessage('New role name must be a string').isLength({ min: 1, max: 50 }).withMessage('New role name must be between 1 and 50 characters'),
   roleController.cloneRole
@@ -229,7 +231,7 @@ router.post('/clone',
 // POST /api/role/:id/permission - Add a single permission to a role
 router.post('/:id/permission', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.permission,
   roleController.addPermission
 );
@@ -237,7 +239,7 @@ router.post('/:id/permission',
 // DELETE /api/role/:id/permission - Remove a single permission from a role
 router.delete('/:id/permission', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.permission,
   roleController.removePermission
 );
@@ -245,7 +247,7 @@ router.delete('/:id/permission',
 // GET /api/role/:id/permission/:permissionName - Check if a role has a specific permission
 router.get('/:id/permission/:permissionName', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'read'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   param('permissionName').isString().withMessage('Permission name must be a string').isLength({ max: 100 }).withMessage('Permission name cannot exceed 100 characters'),
   roleController.hasPermission
@@ -254,7 +256,7 @@ router.get('/:id/permission/:permissionName',
 // GET /api/role/:id/permissions - Get a role with its permissions
 router.get('/:id/permissions', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'view'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   roleController.getRoleWithPermissions
 );
@@ -262,7 +264,7 @@ router.get('/:id/permissions',
 // POST /api/role/:id/permissions - Assign multiple permissions to a role
 router.post('/:id/permissions', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.permissions,
   roleController.assignPermissions
 );
@@ -270,7 +272,7 @@ router.post('/:id/permissions',
 // DELETE /api/role/:id/permissions - Remove multiple permissions from a role
 router.delete('/:id/permissions', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.permissions,
   roleController.removePermissions
 );
@@ -278,7 +280,7 @@ router.delete('/:id/permissions',
 // PUT /api/role/:id/sync-permissions - Sync permissions for a role
 router.put('/:id/sync-permissions', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.permissions,
   roleController.syncPermissions
 );
@@ -286,7 +288,7 @@ router.put('/:id/sync-permissions',
 // POST /api/role/bulk-assign-permissions - Bulk assign permissions to multiple roles
 router.post('/bulk-assign-permissions', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'update'),
   roleValidation.bulkPermissions,
   roleController.bulkAssignPermissions
 );
@@ -298,7 +300,7 @@ router.post('/bulk-assign-permissions',
 // GET /api/role/:id/audit-trail - Get role audit trail
 router.get('/:id/audit-trail', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'report'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   roleController.getRoleAuditTrail
 );
@@ -306,7 +308,7 @@ router.get('/:id/audit-trail',
 // GET /api/role/:id/in-use - Check if a role is in use
 router.get('/:id/in-use', 
   authMiddleware,
-  roleMiddleware(['admin', 'manager']),
+  authorize('roles', 'view'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   roleController.isRoleInUse
 );
@@ -314,7 +316,7 @@ router.get('/:id/in-use',
 // GET /api/role/export - Export all roles
 router.get('/export', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'report'),
   roleValidation.export,
   roleController.exportRoles
 );
@@ -322,7 +324,7 @@ router.get('/export',
 // POST /api/role/import - Import roles
 router.post('/import', 
   authMiddleware,
-  roleMiddleware(['admin']),
+  authorize('roles', 'write'),
   roleValidation.import,
   roleController.importRoles
 );
@@ -355,61 +357,65 @@ router.use(routeOrderMiddleware);
 // 📝 ROUTE DOCUMENTATION ENDPOINT
 // ========================================
 
-router.get('/docs/routes', (req, res) => {
-  if (enviroment !== 'development') {
-    return res.status(404).json({
-      success: false,
-      message: 'Route documentation only available in development mode'
+router.get('/docs/routes', 
+  authMiddleware,
+  authorize('roles', 'view'),
+  (req, res) => {
+    if (enviroment !== 'development') {
+      return res.status(404).json({
+        success: false,
+        message: 'Route documentation only available in development mode'
+      });
+    }
+
+    const routes = {
+      crud: [
+        'POST   /api/role                          - Create a new role (write)',
+        'GET    /api/role                          - Get all roles (with optional filters) (read)',
+        'GET    /api/role/:id                      - Get a single role by ID (read)',
+        'PUT    /api/role/:id                      - Update a role by ID (update)',
+        'PATCH  /api/role/:id                      - Update a role by ID (partial) (update)',
+        'DELETE /api/role/:id                      - Soft-delete (deactivate) a role by ID (update)'
+      ],
+      roleManagement: [
+        'GET    /api/role/active                   - Get all active roles (read)',
+        'POST   /api/role/default                  - Set a default role (update)',
+        'GET    /api/role/default                  - Get the default role (read)',
+        'GET    /api/role/default/id               - Get default role ID (read)',
+        'POST   /api/role/ensure-predefined        - Ensure predefined roles exist (write)',
+        'GET    /api/role/search                   - Search roles by keyword (read)',
+        'PATCH  /api/role/bulk-deactivate          - Bulk deactivate roles (update)',
+        'PATCH  /api/role/bulk-activate            - Bulk activate roles (update)',
+        'GET    /api/role/all/counts               - Get all roles with user counts (view)',
+        'POST   /api/role/clone                    - Clone a role (write)'
+      ],
+      permissionManagement: [
+        'POST   /api/role/:id/permission           - Add a single permission to a role (update)',
+        'DELETE /api/role/:id/permission           - Remove a single permission from a role (update)',
+        'GET    /api/role/:id/permission/:permissionName - Check if a role has a specific permission (read)',
+        'GET    /api/role/:id/permissions          - Get a role with its permissions (view)',
+        'POST   /api/role/:id/permissions          - Assign multiple permissions to a role (update)',
+        'DELETE /api/role/:id/permissions          - Remove multiple permissions from a role (update)',
+        'PUT    /api/role/:id/sync-permissions     - Sync permissions for a role (update)',
+        'POST   /api/role/bulk-assign-permissions  - Bulk assign permissions to multiple roles (update)'
+      ],
+      auditUtilities: [
+        'GET    /api/role/:id/audit-trail          - Get role audit trail (report)',
+        'GET    /api/role/:id/in-use               - Check if a role is in use (view)',
+        'GET    /api/role/export                   - Export all roles (report)',
+        'POST   /api/role/import                   - Import roles (write)'
+      ]
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalRoutes: Object.values(routes).flat().length,
+        categories: routes
+      },
+      message: 'Role API routes documentation'
     });
   }
-
-  const routes = {
-    crud: [
-      'POST   /api/role                          - Create a new role',
-      'GET    /api/role                          - Get all roles (with optional filters)',
-      'GET    /api/role/:id                      - Get a single role by ID',
-      'PUT    /api/role/:id                      - Update a role by ID',
-      'PATCH  /api/role/:id                      - Update a role by ID (partial)',
-      'DELETE /api/role/:id                      - Soft-delete (deactivate) a role by ID'
-    ],
-    roleManagement: [
-      'GET    /api/role/active                   - Get all active roles',
-      'POST   /api/role/default                  - Set a default role',
-      'GET    /api/role/default                  - Get the default role',
-      'GET    /api/role/default/id               - Get default role ID',
-      'POST   /api/role/ensure-predefined        - Ensure predefined roles exist',
-      'GET    /api/role/search                   - Search roles by keyword',
-      'PATCH  /api/role/bulk-deactivate          - Bulk deactivate roles',
-      'PATCH  /api/role/bulk-activate            - Bulk activate roles',
-      'GET    /api/role/all/counts               - Get all roles with user counts',
-      'POST   /api/role/clone                    - Clone a role'
-    ],
-    permissionManagement: [
-      'POST   /api/role/:id/permission           - Add a single permission to a role',
-      'DELETE /api/role/:id/permission           - Remove a single permission from a role',
-      'GET    /api/role/:id/permission/:permissionName - Check if a role has a specific permission',
-      'GET    /api/role/:id/permissions          - Get a role with its permissions',
-      'POST   /api/role/:id/permissions          - Assign multiple permissions to a role',
-      'DELETE /api/role/:id/permissions          - Remove multiple permissions from a role',
-      'PUT    /api/role/:id/sync-permissions     - Sync permissions for a role',
-      'POST   /api/role/bulk-assign-permissions  - Bulk assign permissions to multiple roles'
-    ],
-    auditUtilities: [
-      'GET    /api/role/:id/audit-trail          - Get role audit trail',
-      'GET    /api/role/:id/in-use               - Check if a role is in use',
-      'GET    /api/role/export                   - Export all roles',
-      'POST   /api/role/import                   - Import roles'
-    ]
-  };
-
-  res.status(200).json({
-    success: true,
-    data: {
-      totalRoutes: Object.values(routes).flat().length,
-      categories: routes
-    },
-    message: 'Role API routes documentation'
-  });
-});
+);
 
 module.exports = { roleRoute: router };

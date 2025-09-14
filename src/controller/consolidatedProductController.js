@@ -1218,43 +1218,7 @@ class ProductController {
     /**
      * INCREMENT SOLD COUNT
      */
-    static async incrementSold(req, res) {
-        try {
-            const { id } = req.params;
-            const { quantity } = req.body;
-
-            if (!quantity || quantity <= 0) {
-                return ProductController.errorResponse(res, 'Positive quantity is required', 400);
-            }
-
-            if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
-            }
-
-            const product = await Product.findById(id);
-            if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
-            }
-
-            product.incrementSold(quantity);
-            await product.save();
-
-            return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
-                    soldCount: product.soldCount,
-                    quantity: quantity
-                }, 
-                `Sold count incremented by ${quantity}`
-            );
-
-        } catch (error) {
-            console.error('Failed to increment sold count:', error);
-            return ProductController.errorResponse(res, 'Failed to increment sold count', 500, error.message);
-        }
-    }
-
+   
     /**
      * CHECK IF DISCOUNT IS ACTIVE
      */
@@ -2245,6 +2209,76 @@ class ProductController {
     }
   }
 
+  // Increment product views
+static async incrementViews (req, res) {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    product.incrementViews();
+    await product.save();
+
+    res.json({
+      message: "Product views incremented",
+      views: product.views,
+    });
+  } catch (err) {
+    console.error("Error incrementing views:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Increment sold count & decrease stock
+static async incrementSold  (req, res) {
+  try {
+    const { id } = req.params;
+    const { quantity = 1 } = req.body;
+
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (product.stock < quantity) {
+      return res.status(400).json({ message: "Not enough stock" });
+    }
+
+    product.incrementSold(quantity);
+    await product.save();
+
+    res.json({
+      message: "Product sold count incremented",
+      soldCount: product.soldCount,
+      stock: product.stock,
+    });
+  } catch (err) {
+    console.error("Error incrementing sold count:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Check if discount is active
+
+
+static async checkBundleStatus(req, res) {
+    try {
+      const { id } = req.params;
+
+      const isBundle = await Product.isPartOfBundle(id);
+
+      return res.json({
+        message: "Bundle status checked",
+        isBundle,
+      });
+    } catch (err) {
+      console.error("Error checking bundle status:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  }
   static async downloadFile(req, res) {
     try {
       const { id, fileIndex } = req.params;
