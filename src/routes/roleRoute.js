@@ -1,0 +1,415 @@
+const express = require('express');
+const router = express.Router();
+const roleController = require('../controller/roles');
+const { body, query, param } = require('express-validator');
+const authMiddleware = require('../middleware/auth');
+const roleMiddleware = require('../middleware/roleCheck');
+const { enviroment } = require('../config/setting');
+
+/**
+ * 🚀 CONSOLIDATED ROLE ROUTES
+ * 
+ * Features:
+ * ✅ Comprehensive CRUD operations for roles
+ * ✅ Permission management (add, remove, sync, check)
+ * ✅ Bulk operations for activation/deactivation and permissions
+ * ✅ Audit trail and role usage checks
+ * ✅ Role cloning and import/export functionality
+ * ✅ Role-based access control
+ * ✅ Comprehensive validation schemas
+ * ✅ Performance optimized routes
+ */
+
+// ========================================
+// 🔧 VALIDATION SCHEMAS
+// ========================================
+
+const roleValidation = {
+  create: [
+    body('name').isString().withMessage('Role name must be a string').isLength({ min: 1, max: 50 }).withMessage('Role name must be between 1 and 50 characters'),
+    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
+    body('permissions').optional().isArray().withMessage('Permissions must be an array'),
+    body('permissions.*').optional().isString().withMessage('Each permission must be a string').isLength({ max: 100 }).withMessage('Permission cannot exceed 100 characters'),
+    body('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
+  ],
+
+  update: [
+    param('id').isMongoId().withMessage('Invalid role ID'),
+    body('name').optional().isString().withMessage('Role name must be a string').isLength({ min: 1, max: 50 }).withMessage('Role name must be between 1 and 50 characters'),
+    body('description').optional().isString().withMessage('Description must be a string').isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
+    body('permissions').optional().isArray().withMessage('Permissions must be an array'),
+    body('permissions.*').optional().isString().withMessage('Each permission must be a string').isLength({ max: 100 }).withMessage('Permission cannot exceed 100 characters'),
+    body('isActive').optional().isBoolean().withMessage('isActive must be a boolean')
+  ],
+
+  query: [
+    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    query('sort').optional().isIn(['createdAt', 'updatedAt', 'name']).withMessage('Invalid sort field'),
+    query('order').optional().isIn(['asc', 'desc']).withMessage('Order must be asc or desc'),
+    query('activeOnly').optional().isBoolean().withMessage('activeOnly must be a boolean'),
+    query('search').optional().isString().withMessage('Search must be a string').isLength({ max: 100 }).withMessage('Search cannot exceed 100 characters')
+  ],
+
+  permission: [
+    param('id').isMongoId().withMessage('Invalid role ID'),
+    body('permission').isString().withMessage('Permission must be a string').isLength({ max: 100 }).withMessage('Permission cannot exceed 100 characters')
+  ],
+
+  permissions: [
+    param('id').isMongoId().withMessage('Invalid role ID'),
+    body('permissions').isArray({ min: 1 }).withMessage('Permissions array is required'),
+    body('permissions.*').isString().withMessage('Each permission must be a string').isLength({ max: 100 }).withMessage('Permission cannot exceed 100 characters')
+  ],
+
+  bulkPermissions: [
+    body('roleIds').isArray({ min: 1 }).withMessage('Role IDs array is required'),
+    body('roleIds.*').isMongoId().withMessage('Invalid role ID in array'),
+    body('permissions').isArray({ min: 1 }).withMessage('Permissions array is required'),
+    body('permissions.*').isString().withMessage('Each permission must be a string').isLength({ max: 100 }).withMessage('Permission cannot exceed 100 characters')
+  ],
+
+  bulkStatus: [
+    body('roleIds').isArray({ min: 1 }).withMessage('Role IDs array is required'),
+    body('roleIds.*').isMongoId().withMessage('Invalid role ID in array')
+  ],
+
+  import: [
+    body('roles').isArray({ min: 1 }).withMessage('Roles array is required'),
+    body('roles.*.name').isString().withMessage('Role name must be a string').isLength({ min: 1, max: 50 }).withMessage('Role name must be between 1 and 50 characters'),
+    body('roles.*.permissions').optional().isArray().withMessage('Permissions must be an array'),
+    body('roles.*.permissions.*').optional().isString().withMessage('Each permission must be a string').isLength({ max: 100 }).withMessage('Permission cannot exceed 100 characters')
+  ],
+
+  export: [
+    query('format').optional().isIn(['json', 'csv']).withMessage('Invalid format'),
+    query('fields').optional().isString().withMessage('Fields must be a comma-separated string')
+  ]
+};
+
+// ========================================
+// 📋 CORE CRUD OPERATIONS
+// ========================================
+
+// POST /api/role - Create a new role
+router.post('/', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.create,
+  roleController.create
+);
+
+// GET /api/role - Get all roles (with optional activeOnly or search query)
+router.get('/', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  roleValidation.query,
+  roleController.getAll
+);
+
+// GET /api/role/:id - Get a single role by ID
+router.get('/:id', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  param('id').isMongoId().withMessage('Invalid role ID'),
+  roleController.getSingle
+);
+
+// PUT /api/role/:id - Update a role by ID
+router.put('/:id', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.update,
+  roleController.update
+);
+
+// PATCH /api/role/:id - Update a role by ID (partial)
+router.patch('/:id', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.update,
+  roleController.update
+);
+
+// DELETE /api/role/:id - Soft-delete (deactivate) a role by ID
+router.delete('/:id', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  param('id').isMongoId().withMessage('Invalid role ID'),
+  roleController.remove
+);
+
+// ========================================
+// 🔍 ROLE MANAGEMENT
+// ========================================
+
+// GET /api/role/active - Get all active roles
+router.get('/active', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  roleValidation.query,
+  roleController.getActiveRole
+);
+
+// POST /api/role/default - Set a default role
+router.post('/default', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  body('roleId').isMongoId().withMessage('Invalid role ID'),
+  roleController.setDefaultRole
+);
+
+// GET /api/role/default - Get the default role
+router.get('/default', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  roleController.getDefaultRole
+);
+
+// GET /api/role/default/id - Get default role ID
+router.get('/default/id', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  roleController.getDefaultRoleId
+);
+
+// POST /api/role/ensure-predefined - Ensure predefined roles exist
+router.post('/ensure-predefined', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleController.ensurePredefinedRoles
+);
+
+// GET /api/role/search - Search roles by keyword
+router.get('/search', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  query('keyword').isString().withMessage('Keyword must be a string').isLength({ max: 100 }).withMessage('Keyword cannot exceed 100 characters'),
+  roleValidation.query,
+  roleController.searchRoles
+);
+
+// PATCH /api/role/bulk-deactivate - Bulk deactivate roles
+router.patch('/bulk-deactivate', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.bulkStatus,
+  roleController.bulkDeactivate
+);
+
+// PATCH /api/role/bulk-activate - Bulk activate roles
+router.patch('/bulk-activate', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.bulkStatus,
+  roleController.bulkActivate
+);
+
+// GET /api/role/all/counts - Get all roles with user counts
+router.get('/all/counts', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  roleValidation.query,
+  roleController.getAllWithCounts
+);
+
+// POST /api/role/clone - Clone a role
+router.post('/clone', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  body('roleId').isMongoId().withMessage('Invalid role ID'),
+  body('newName').isString().withMessage('New role name must be a string').isLength({ min: 1, max: 50 }).withMessage('New role name must be between 1 and 50 characters'),
+  roleController.cloneRole
+);
+
+// ========================================
+// 🔐 PERMISSION MANAGEMENT
+// ========================================
+
+// POST /api/role/:id/permission - Add a single permission to a role
+router.post('/:id/permission', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.permission,
+  roleController.addPermission
+);
+
+// DELETE /api/role/:id/permission - Remove a single permission from a role
+router.delete('/:id/permission', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.permission,
+  roleController.removePermission
+);
+
+// GET /api/role/:id/permission/:permissionName - Check if a role has a specific permission
+router.get('/:id/permission/:permissionName', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  param('id').isMongoId().withMessage('Invalid role ID'),
+  param('permissionName').isString().withMessage('Permission name must be a string').isLength({ max: 100 }).withMessage('Permission name cannot exceed 100 characters'),
+  roleController.hasPermission
+);
+
+// GET /api/role/:id/permissions - Get a role with its permissions
+router.get('/:id/permissions', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  param('id').isMongoId().withMessage('Invalid role ID'),
+  roleController.getRoleWithPermissions
+);
+
+// POST /api/role/:id/permissions - Assign multiple permissions to a role
+router.post('/:id/permissions', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.permissions,
+  roleController.assignPermissions
+);
+
+// DELETE /api/role/:id/permissions - Remove multiple permissions from a role
+router.delete('/:id/permissions', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.permissions,
+  roleController.removePermissions
+);
+
+// PUT /api/role/:id/sync-permissions - Sync permissions for a role
+router.put('/:id/sync-permissions', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.permissions,
+  roleController.syncPermissions
+);
+
+// POST /api/role/bulk-assign-permissions - Bulk assign permissions to multiple roles
+router.post('/bulk-assign-permissions', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.bulkPermissions,
+  roleController.bulkAssignPermissions
+);
+
+// ========================================
+// 📊 AUDIT & UTILITIES
+// ========================================
+
+// GET /api/role/:id/audit-trail - Get role audit trail
+router.get('/:id/audit-trail', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  param('id').isMongoId().withMessage('Invalid role ID'),
+  roleController.getRoleAuditTrail
+);
+
+// GET /api/role/:id/in-use - Check if a role is in use
+router.get('/:id/in-use', 
+  authMiddleware,
+  roleMiddleware(['admin', 'manager']),
+  param('id').isMongoId().withMessage('Invalid role ID'),
+  roleController.isRoleInUse
+);
+
+// GET /api/role/export - Export all roles
+router.get('/export', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.export,
+  roleController.exportRoles
+);
+
+// POST /api/role/import - Import roles
+router.post('/import', 
+  authMiddleware,
+  roleMiddleware(['admin']),
+  roleValidation.import,
+  roleController.importRoles
+);
+
+// ========================================
+// 🔀 ROUTE MIDDLEWARE FOR SPECIAL HANDLING
+// ========================================
+
+const routeOrderMiddleware = (req, res, next) => {
+  // Ensure specific routes come before dynamic ones
+  if (req.path.startsWith('/active') || 
+      req.path.startsWith('/default') || 
+      req.path.startsWith('/ensure-predefined') || 
+      req.path.startsWith('/search') || 
+      req.path.startsWith('/bulk-') || 
+      req.path.startsWith('/all/counts') || 
+      req.path.startsWith('/clone') || 
+      req.path.startsWith('/export') || 
+      req.path.startsWith('/import')) {
+    return next();
+  }
+
+  next();
+};
+
+// Apply the middleware to all routes
+router.use(routeOrderMiddleware);
+
+// ========================================
+// 📝 ROUTE DOCUMENTATION ENDPOINT
+// ========================================
+
+router.get('/docs/routes', (req, res) => {
+  if (enviroment !== 'development') {
+    return res.status(404).json({
+      success: false,
+      message: 'Route documentation only available in development mode'
+    });
+  }
+
+  const routes = {
+    crud: [
+      'POST   /api/role                          - Create a new role',
+      'GET    /api/role                          - Get all roles (with optional filters)',
+      'GET    /api/role/:id                      - Get a single role by ID',
+      'PUT    /api/role/:id                      - Update a role by ID',
+      'PATCH  /api/role/:id                      - Update a role by ID (partial)',
+      'DELETE /api/role/:id                      - Soft-delete (deactivate) a role by ID'
+    ],
+    roleManagement: [
+      'GET    /api/role/active                   - Get all active roles',
+      'POST   /api/role/default                  - Set a default role',
+      'GET    /api/role/default                  - Get the default role',
+      'GET    /api/role/default/id               - Get default role ID',
+      'POST   /api/role/ensure-predefined        - Ensure predefined roles exist',
+      'GET    /api/role/search                   - Search roles by keyword',
+      'PATCH  /api/role/bulk-deactivate          - Bulk deactivate roles',
+      'PATCH  /api/role/bulk-activate            - Bulk activate roles',
+      'GET    /api/role/all/counts               - Get all roles with user counts',
+      'POST   /api/role/clone                    - Clone a role'
+    ],
+    permissionManagement: [
+      'POST   /api/role/:id/permission           - Add a single permission to a role',
+      'DELETE /api/role/:id/permission           - Remove a single permission from a role',
+      'GET    /api/role/:id/permission/:permissionName - Check if a role has a specific permission',
+      'GET    /api/role/:id/permissions          - Get a role with its permissions',
+      'POST   /api/role/:id/permissions          - Assign multiple permissions to a role',
+      'DELETE /api/role/:id/permissions          - Remove multiple permissions from a role',
+      'PUT    /api/role/:id/sync-permissions     - Sync permissions for a role',
+      'POST   /api/role/bulk-assign-permissions  - Bulk assign permissions to multiple roles'
+    ],
+    auditUtilities: [
+      'GET    /api/role/:id/audit-trail          - Get role audit trail',
+      'GET    /api/role/:id/in-use               - Check if a role is in use',
+      'GET    /api/role/export                   - Export all roles',
+      'POST   /api/role/import                   - Import roles'
+    ]
+  };
+
+  res.status(200).json({
+    success: true,
+    data: {
+      totalRoutes: Object.values(routes).flat().length,
+      categories: routes
+    },
+    message: 'Role API routes documentation'
+  });
+});
+
+module.exports = { roleRoute: router };
