@@ -1031,6 +1031,7 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
 
     return {
       user: newUser,
+      email,
       tempPasswordActive,
       tempPassword,
       confirmToken,

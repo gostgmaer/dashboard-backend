@@ -8,6 +8,8 @@ const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
 const { APIError, formatResponse } = require('../utils/apiUtils');
+const { welcomeEmailTemplate } = require('../email/emailTemplates');
+const { sendEmail } = require('../email');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -134,36 +136,39 @@ class UserController {
     }
 
     try {
-     
+
       const registrationMetadata = {
         ip: req.ip,
         userAgent: req.get('User-Agent'),
       };
 
       // Call schema method for registration
-      const { user, tempPassword, tempPasswordActive, confirmToken } =
+      const { user, tempPassword, tempPasswordActive, confirmToken,email } =
         await User.registerNewUser(
           req.body,
           registrationMetadata
         );
 
-      // Placeholder: send email (e.g., Welcome + verification link)
-      // await sendWelcomeEmail(user.email, {
-      //   username: user.username,
-      //   tempPassword: tempPasswordActive ? tempPassword : null,
-      //   confirmationLink: `${process.env.FRONTEND_URL}/verify-email?token=${confirmToken}`,
-      // });
+      // Send welcome email
+      const emailResult = await sendEmail(welcomeEmailTemplate, {user, tempPassword, tempPasswordActive, confirmToken,email});
 
-      // Respond with newly created user ID and relevant info (hide sensitive data)
-      res.status(201).json({
-        message: 'User registered successfully. Please check your email to verify your account.',
-        status: true,
-        tempPassword: tempPasswordActive ? tempPassword : undefined,
-        emailVerificationToken: confirmToken,user:user.id
-      });
+      // Return response
+      if (emailResult.success) {
+        return res.status(200).json({
+          success: true,
+          message: `Registration successful and welcome email sent${emailResult.usedFallback ? ' via fallback' : ''}`,
+          messageId: emailResult.messageId, user: user.id
+        });
+      } else {
+        return res.status(500).json({
+          success: false,
+          message: 'Registration successful but failed to send welcome email',
+          error: emailResult.error,
+        });
+      }
     } catch (err) {
       // Handle errors (e.g., duplicate keys, validation)
-      res.status(500).json({ error: err.message || 'Registration failed.',  status: false, });
+      res.status(500).json({ error: err.message || 'Registration failed.', status: false, });
     }
   }
   static async createUser(req, res) {
