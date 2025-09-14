@@ -28,6 +28,7 @@ const { attachmentRoutes } = require('./src/routes/attachmentsRoutes');
 const addressRoute = require('./src/routes/address');
 const {logRoutes} = require('./src/routes/logRoutes');
 const {roleRoute} = require('./src/routes/roleRoute');
+const { verifyEmailConnection } = require('./src/email');
 
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
@@ -51,7 +52,7 @@ function checkRoute(name, route) {
   }
   return route;
 }
-
+verifyEmailConnection().then((result) => console.log(result));
 // // Mount APIs
 // app.use('/api/products', ProductRoute);
 // app.use('/api/users', UserRoute);
