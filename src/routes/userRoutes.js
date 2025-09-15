@@ -279,12 +279,12 @@ router.put('/:id/authentication/change-password',
 );
 
 // POST /api/users/authentication/reset-token - Generate reset token
-router.post('/authentication/reset-token',
-  authorize('users', 'write'),
-  body('email').isEmail().withMessage('Valid email is required').trim().normalizeEmail(),
-  validate,
-  UserController.generateResetToken
-);
+// router.post('/authentication/reset-token',
+//   authorize('users', 'write'),
+//   body('email').isEmail().withMessage('Valid email is required').trim().normalizeEmail(),
+//   validate,
+//   UserController.generateResetToken
+// );
 
 // POST /api/users/authentication/reset-password - Reset password with token
 router.post('/authentication/reset-password',

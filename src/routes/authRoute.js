@@ -1,467 +1,195 @@
 const express = require('express');
-const router = express.Router();
+const authRoute = express.Router();
 const authController = require('../controller/authenticationController');
-const { body, query, param, validationResult } = require('express-validator');
-const authMiddleware = require('../middleware/auth');
-const { authorize } = require('../middleware/authorize');
+const AuthMiddleware = require('../middleware/auth');
+const authorize = require('../middleware/authorize');
 const rateLimit = require('express-rate-limit');
-const { enviroment } = require('../config/setting');
-const User = require('../models/user');
+const authAccess = require('../middleware/access');
 
 /**
  * 🚀 AUTHENTICATION ROUTES
- * 
+ *
  * Features:
- * ✅ User registration, login, and MFA verification
- * ✅ Token refresh and password management
- * ✅ Email verification and OTP handling
- * ✅ Session and device management
- * ✅ Resend email verification link
- * ✅ View failed login attempts
- * ✅ Update user profile
- * ✅ Lock user account
- * ✅ Authentication and authorization via authMiddleware and authorize
- * ✅ Validation with sanitization for security
- * ✅ Rate limiting for sensitive operations
- * ✅ Instance-level checks for user-specific operations
- * ✅ Route documentation endpoint (dev-only)
+ * ✅ Standardized responses
+ * ✅ Role-based access control
+ * ✅ OTP/MFA flows
+ * ✅ Session & device management
+ * ✅ Password & email workflows
+ * ✅ Profile & social account management
+ * ✅ Admin analytics & reporting
  */
 
-/**
- * Rate limiters for sensitive operations
- */
-const registrationRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per window
-  message: { success: false, message: 'Too many registration attempts, please try again later' }
+// Rate limiter for sensitive auth operations
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: 'Too many requests, please try again later', error: 'AUTH_RATE_LIMIT_EXCEEDED' }
 });
-
-const loginRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per window
-  message: { success: false, message: 'Too many login attempts, please try again later' }
-});
-
-const passwordResetRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
-  message: { success: false, message: 'Too many password reset attempts, please try again later' }
-});
-
-const otpRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per window
-  message: { success: false, message: 'Too many OTP requests, please try again later' }
-});
-
-const resendVerificationRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
-  message: { success: false, message: 'Too many verification resend attempts, please try again later' }
-});
-
-const updateProfileRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window
-  message: { success: false, message: 'Too many profile update attempts, please try again later' }
-});
-
-/**
- * Middleware to check instance-level access for user-specific routes
- * Ensures the user is accessing/modifying their own data
- */
-const instanceCheckMiddleware = async (req, res, next) => {
-  try {
-    if (!req.user.isSuperadmin) { // Superadmin bypass in authorize
-      const userId = req.user.id;
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-      }
-      if (user._id.toString() !== req.user.id) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s data' });
-      }
-    }
-    next();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Server error during instance check' });
-  }
-};
-
-/**
- * Middleware to handle validation errors
- */
-const validate = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
-  }
-  next();
-};
 
 // ========================================
-// 🔧 VALIDATION SCHEMAS
+// 🔑 PUBLIC ENDPOINTS
 // ========================================
-const authValidation = {
-  register: [
-    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
-    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters').trim().escape(),
-    body('username').notEmpty().withMessage('Username is required').trim().escape(),
-    validate
-  ],
-  login: [
-    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
-    body('password').notEmpty().withMessage('Password is required').trim().escape(),
-    validate
-  ],
-  verifyMFA: [
-    body('token').notEmpty().withMessage('MFA token is required').trim().escape(),
-    validate
-  ],
-  refreshToken: [
-    body('refreshToken').notEmpty().withMessage('Refresh token is required').trim(),
-    validate
-  ],
-  forgotPassword: [
-    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
-    validate
-  ],
-  resetPassword: [
-    body('token').notEmpty().withMessage('Reset token is required').trim().escape(),
-    body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters').trim().escape(),
-    validate
-  ],
-  verifyEmail: [
-    body('token').notEmpty().withMessage('Verification token is required').trim().escape(),
-    validate
-  ],
-  resendVerification: [
-    body('email').isEmail().withMessage('Valid email is required').normalizeEmail(),
-    validate
-  ],
-  logout: [
-    validate
-  ],
-  logoutAll: [
-    validate
-  ],
-  getProfile: [
-    validate
-  ],
-  getAuthStats: [
-    validate
-  ],
-  generateOTP: [
-    validate
-  ],
-  verifyOTP: [
-    body('otp').notEmpty().withMessage('OTP is required').trim().escape(),
-    validate
-  ],
-  changePassword: [
-    body('currentPassword').notEmpty().withMessage('Current password is required').trim().escape(),
-    body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters').trim().escape(),
-    validate
-  ],
-  enableMFA: [
-    validate
-  ],
-  confirmMFA: [
-    body('token').notEmpty().withMessage('MFA token is required').trim().escape(),
-    validate
-  ],
-  disableMFA: [
-    validate
-  ],
-  getActiveSessions: [
-    validate
-  ],
-  revokeSession: [
-    body('sessionId').isMongoId().withMessage('Invalid session ID'),
-    validate
-  ],
-  getDevices: [
-    validate
-  ],
-  removeDevice: [
-    body('deviceId').notEmpty().withMessage('Device ID is required').trim().escape(),
-    validate
-  ],
-  trustDevice: [
-    body('deviceId').notEmpty().withMessage('Device ID is required').trim().escape(),
-    validate
-  ],
-  getFailedLogins: [
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
-    validate
-  ],
-  updateProfile: [
-    body('username').optional().notEmpty().withMessage('Username cannot be empty').trim().escape(),
-    body('email').optional().isEmail().withMessage('Valid email is required').normalizeEmail(),
-    validate
-  ],
-  lockAccount: [
-    validate
-  ]
-};
+authRoute.post('/register', authLimiter, authController.registerUser);
+authRoute.post('/login', authLimiter, authController.login);
+authRoute.post('/verify-otp', authLimiter, authController.verifyOTPAndLogin);
+authRoute.post('/resend-otp', authLimiter, authController.resendOTP);
+authRoute.post('/forgot-password', authLimiter, authController.forgotPassword);
+authRoute.post('/reset-password/:token', authLimiter, authController.resetPassword);
+authRoute.post('/verify-user/:id', AuthMiddleware, authorize('users', 'update'), authController.verifyUser);
 
 // ========================================
-// 🔐 AUTHENTICATION ROUTES
+// 🔐 AUTHENTICATED ENDPOINTS
 // ========================================
+authRoute.post('/logout', AuthMiddleware, authController.logout);
+authRoute.post('/logout-all', AuthMiddleware, authAccess.requireOTP('logout_all'), authController.logoutAll);
+authRoute.post('/refresh-token', authController.refreshToken);
+authRoute.post('/change-password', AuthMiddleware, authAccess.requireOTP('change_password'), authController.changePassword);
 
-// POST /auth/register - Register a new user
-router.post('/register',
-  registrationRateLimit,
-  authValidation.register,
-  authController.registerUser
-);
+// ========================================
+// 📧 EMAIL VERIFICATION
+// ========================================
+authRoute.post('/send-email-verification', AuthMiddleware, authController.sendEmailVerification);
+authRoute.post('/verify-email/:token',authLimiter,  authController.verifyEmail);
+authRoute.post('/confirm-email', authLimiter, authController.confirmEmail);
 
-// POST /auth/login - User login
-router.post('/login',
-  loginRateLimit,
-  authValidation.login,
-  authController.login
-);
+// ========================================
+// 🔐 MFA / TOTP
+// ========================================
+authRoute.post('/totp/setup', AuthMiddleware, authAccess.requireEmailVerification(), authController.setupTOTP);
+authRoute.post('/totp/verify-setup', AuthMiddleware, authController.verifyTOTPSetup);
+authRoute.post('/totp/disable', AuthMiddleware, authAccess.requireOTP('disable_2fa'), authController.disableTOTP);
+authRoute.post('/totp/backup-codes', AuthMiddleware, authAccess.requireOTP('generate_backup_codes'), authController.generateBackupCodes);
+authRoute.post('/mfa/enable', AuthMiddleware, authController.enableMFA);
+authRoute.post('/mfa/confirm', AuthMiddleware, authController.confirmMFA);
+authRoute.post('/mfa/verify', AuthMiddleware, authController.verifyMFA);
 
-// POST /auth/verify-mfa - Verify MFA token
-router.post('/verify-mfa',
-  loginRateLimit,
-  authValidation.verifyMFA,
-  authController.verifyMFA
-);
+// ========================================
+// 📱 DEVICE & SESSION MANAGEMENT
+// ========================================
+authRoute.get('/profile', AuthMiddleware, authController.findFullyPopulatedById);
+authRoute.get('/devices', AuthMiddleware, authController.getDevices);
+authRoute.post('/devices/trust', AuthMiddleware, authAccess.requireOTP('trust_device'), authController.trustDevice);
+authRoute.delete('/devices/remove', AuthMiddleware, authAccess.requireOTP('remove_device'), authController.removeDevice);
+authRoute.get('/sessions', AuthMiddleware, authController.getActiveSessions);
+authRoute.post('/sessions/revoke', AuthMiddleware, authController.revokeSession);
+authRoute.post('/sessions/invalidate-all', AuthMiddleware, authorize('sessions', 'delete'), authController.invalidateAllSessions);
+authRoute.post('/sessions/revoke-token', AuthMiddleware, authController.revokeToken);
 
-// POST /auth/refresh-token - Refresh access token
-router.post('/refresh-token',
-  authValidation.refreshToken,
-  authController.refreshToken
-);
+// ========================================
+// 🔍 SECURITY & MONITORING
+// ========================================
+authRoute.get('/security/events', AuthMiddleware, authController.getSecurityEvents);
+authRoute.get('/security/login-history', AuthMiddleware, authController.getLoginHistory);
+authRoute.get('/security/summary', AuthMiddleware, authController.getSecuritySummary);
 
-// POST /auth/forgot-password - Request password reset
-router.post('/forgot-password',
-  passwordResetRateLimit,
-  authValidation.forgotPassword,
-  authController.forgotPassword
-);
+// ========================================
+// ⚙️ OTP SETTINGS
+// ========================================
+authRoute.get('/otp/settings', AuthMiddleware, authController.getOTPSettings);
+authRoute.put('/otp/settings', AuthMiddleware, authAccess.requireOTP('update_otp_settings'), authController.updateOTPSettings);
 
-// POST /auth/reset-password - Reset password
-router.post('/reset-password',
-  passwordResetRateLimit,
-  authValidation.resetPassword,
-  authController.resetPassword
-);
+// ========================================
+// 👤 PROFILE & SOCIAL ACCOUNTS
+// ========================================
+authRoute.put('/profile/:id', AuthMiddleware, authorize('users', 'update'), authController.updateProfile);
+authRoute.put('/profile-picture/:id', AuthMiddleware, authorize('users', 'update'), authController.updateProfilePicture);
+authRoute.put('/email/:id', AuthMiddleware, authorize('users', 'update'), authController.updateEmail);
+authRoute.put('/phone/:id', AuthMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
+authRoute.post('/social/link/:id', AuthMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
+authRoute.post('/social/unlink/:id', AuthMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
+authRoute.delete('/social/clear/:id', AuthMiddleware, authorize('users', 'update'), authController.clearAllSocialLinks);
 
-// POST /auth/verify-email - Verify email
-router.post('/verify-email/:token',
-  authValidation.verifyEmail,
-  authController.verifyEmail
-);
-
-// POST /auth/resend-verification - Resend email verification link
-router.post('/resend-verification',
-  resendVerificationRateLimit,
-  authValidation.resendVerification,
-  authController.resendVerification
-);
-
-// Protected routes (authentication required)
-router.use(authMiddleware);
-
-// POST /auth/logout - Logout current session
-router.post('/logout',
-  authorize('user', 'write'),
-  instanceCheckMiddleware,
-  authValidation.logout,
-  authController.logout
-);
-
-// POST /auth/logout-all - Logout all sessions
-router.post('/logout-all',
-  authorize('user', 'write'),
-  instanceCheckMiddleware,
-  authValidation.logoutAll,
-  authController.logoutAll
-);
-
-// GET /auth/profile - Get user profile
-router.get('/profile',
-  authorize('user', 'read'),
-  instanceCheckMiddleware,
-  authValidation.getProfile,
-  authController.getProfile
-);
-
-// GET /auth/auth-stats - Get authentication stats
-router.get('/auth-stats',
-  authorize('user', 'view'),
-  instanceCheckMiddleware,
-  authValidation.getAuthStats,
-  authController.getAuthStats
-);
-
-// POST /auth/generate-otp - Generate OTP
-router.post('/generate-otp',
-  authorize('user', 'write'),
-  instanceCheckMiddleware,
-  otpRateLimit,
-  authValidation.generateOTP,
-  authController.generateOTP
-);
-
-// POST /auth/verify-otp - Verify OTP
-router.post('/verify-otp',
-  authorize('user', 'write'),
-  instanceCheckMiddleware,
-  authValidation.verifyOTP,
-  authController.verifyOTP
-);
-
-// POST /auth/change-password - Change password
-router.post('/change-password',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.changePassword,
-  authController.changePassword
-);
-
-// POST /auth/enable-mfa - Enable MFA
-router.post('/enable-mfa',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.enableMFA,
-  authController.enableMFA
-);
-
-// POST /auth/confirm-mfa - Confirm MFA setup
-router.post('/confirm-mfa',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.confirmMFA,
-  authController.confirmMFA
-);
-
-// POST /auth/disable-mfa - Disable MFA
-router.post('/disable-mfa',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.disableMFA,
-  authController.disableMFA
-);
-
-// GET /auth/sessions - Get active sessions
-router.get('/sessions',
-  authorize('user', 'read'),
-  instanceCheckMiddleware,
-  authValidation.getActiveSessions,
-  authController.getActiveSessions
-);
-
-// POST /auth/revoke-session - Revoke a session
-router.post('/revoke-session',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.revokeSession,
-  authController.revokeSession
-);
-
-// GET /auth/devices - Get trusted devices
-router.get('/devices',
-  authorize('user', 'read'),
-  instanceCheckMiddleware,
-  authValidation.getDevices,
-  authController.getDevices
-);
-
-// POST /auth/remove-device - Remove a trusted device
-router.post('/remove-device',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.removeDevice,
-  authController.removeDevice
-);
-
-// POST /auth/trust-device - Trust a device
-router.post('/trust-device',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  authValidation.trustDevice,
-  authController.trustDevice
-);
-
-
-
-// POST /auth/update-profile - Update user profile
-router.post('/update-profile',
-  authorize('user', 'update'),
-  instanceCheckMiddleware,
-  updateProfileRateLimit,
-  authValidation.updateProfile,
-  authController.updateProfile
-);
-
-
+// ========================================
+// 📊 ADMIN ANALYTICS & REPORTS
+// ========================================
+authRoute.get('/admin/otp/analytics', AuthMiddleware, authorize('users', 'manage'), authController.getOTPAnalytics);
+authRoute.get('/admin/security/report', AuthMiddleware, authorize('users', 'manage'), authController.getSecurityReport);
 
 // ========================================
 // 📝 ROUTE DOCUMENTATION ENDPOINT
 // ========================================
+authRoute.get('/docs/routes', AuthMiddleware, authorize('auth', 'view'), (req, res) => {
+  const routes = {
+    public: [
+      'POST   /auth/register',
+      'POST   /auth/login',
+      'POST   /auth/verify-otp',
+      'POST   /auth/resend-otp',
+      'POST   /auth/forgot-password',
+      'POST   /auth/reset-password',
+      'POST   /auth/verify-user/:id'
+    ],
+    authenticated: [
+      'POST   /auth/logout',
+      'POST   /auth/logout-all',
+      'POST   /auth/refresh-token',
+      'POST   /auth/change-password'
+    ],
+    emailVerification: [
+      'POST   /auth/send-email-verification',
+      'POST   /auth/verify-email',
+      'POST   /auth/confirm-email'
+    ],
+    mfa: [
+      'POST   /auth/totp/setup',
+      'POST   /auth/totp/verify-setup',
+      'POST   /auth/totp/disable',
+      'POST   /auth/totp/backup-codes',
+      'POST   /auth/mfa/enable',
+      'POST   /auth/mfa/confirm',
+      'POST   /auth/mfa/verify'
+    ],
+    sessions: [
+      'GET    /auth/devices',
+      'POST   /auth/devices/trust',
+      'DELETE /auth/devices/remove',
+      'GET    /auth/sessions',
+      'POST   /auth/sessions/revoke',
+      'POST   /auth/sessions/invalidate-all',
+      'POST   /auth/sessions/revoke-token'
+    ],
+    security: [
+      'GET    /auth/security/events',
+      'GET    /auth/security/login-history',
+      'GET    /auth/security/summary'
+    ],
+    otpSettings: [
+      'GET    /auth/otp/settings',
+      'PUT    /auth/otp/settings'
+    ],
+    profile: [
+      'PUT    /auth/profile/:id',
+      'PUT    /auth/profile-picture/:id',
+      'PUT    /auth/email/:id',
+      'PUT    /auth/phone/:id'
+    ],
+    social: [
+      'POST   /auth/social/link/:id',
+      'POST   /auth/social/unlink/:id',
+      'DELETE /auth/social/clear/:id'
+    ],
+    admin: [
+      'GET    /auth/admin/otp/analytics',
+      'GET    /auth/admin/security/report'
+    ]
+  };
+  res.json({ success: true, data: routes, message: 'Auth API routes documentation' });
+});
 
-// GET /auth/docs/routes - Get all available routes (dev only)
-router.get('/docs/routes',
-  authMiddleware,
-  authorize('user', 'view'),
-  (req, res) => {
-    if (enviroment !== 'development') {
-      return res.status(404).json({
-        success: false,
-        message: 'Route documentation only available in development mode'
-      });
-    }
+// ========================================
+// 🚫 ERROR HANDLING
+// ========================================
+authRoute.use('*', (req, res) => {
+  res.status(404).json({ success: false, message: 'Endpoint not found', error: 'ENDPOINT_NOT_FOUND' });
+});
 
-    const routes = {
-      public: [
-        'POST   /auth/register                    - Register a new user (no auth, rate-limited)',
-        'POST   /auth/login                       - User login (no auth, rate-limited)',
-        'POST   /auth/verify-mfa                  - Verify MFA token (no auth, rate-limited)',
-        'POST   /auth/refresh-token               - Refresh access token (no auth)',
-        'POST   /auth/forgot-password             - Request password reset (no auth, rate-limited)',
-        'POST   /auth/reset-password              - Reset password (no auth, rate-limited)',
-        'POST   /auth/verify-email/:token                - Verify email (no auth)',
-        'POST   /auth/resend-verification         - Resend email verification link (no auth, rate-limited)'
-      ],
-      authenticated: [
-        'POST   /auth/logout                      - Logout current session (write, instance check)',
-        'POST   /auth/logout-all                  - Logout all sessions (write, instance check)',
-        'GET    /auth/profile                     - Get user profile (read, instance check)',
-        'GET    /auth/auth-stats                  - Get authentication stats (view, instance check)',
-        'POST   /auth/generate-otp                - Generate OTP (write, instance check, rate-limited)',
-        'POST   /auth/verify-otp                  - Verify OTP (write, instance check)',
-        'POST   /auth/change-password             - Change password (update, instance check)',
-        'POST   /auth/enable-mfa                  - Enable MFA (update, instance check)',
-        'POST   /auth/confirm-mfa                 - Confirm MFA setup (update, instance check)',
-        'POST   /auth/disable-mfa                 - Disable MFA (update, instance check)',
-        'GET    /auth/sessions                    - Get active sessions (read, instance check)',
-        'POST   /auth/revoke-session              - Revoke a session (update, instance check)',
-        'GET    /auth/devices                     - Get trusted devices (read, instance check)',
-        'POST   /auth/remove-device               - Remove a trusted device (update, instance check)',
-        'POST   /auth/trust-device                - Trust a device (update, instance check)',
-        'GET    /auth/failed-logins               - Get failed login attempts (view, instance check)',
-        'POST   /auth/update-profile              - Update user profile (update, instance check, rate-limited)',
-        'POST   /auth/lock-account                - Lock user account temporarily (update, instance check)'
-      ],
-      documentation: [
-        'GET    /auth/docs/routes                 - Get API route documentation (view, dev-only)'
-      ]
-    };
+authRoute.use((err, req, res, next) => {
+  console.error('Auth route error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
 
-    res.status(200).json({
-      success: true,
-      data: {
-        totalRoutes: Object.values(routes).flat().length,
-        categories: routes
-      },
-      message: 'Authentication API routes documentation'
-    });
-  }
-);
-
-module.exports = router;
+module.exports = authRoute;

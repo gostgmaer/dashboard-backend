@@ -1,6 +1,7 @@
 
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const zxcvbn = require('zxcvbn');
 
 /**
  * Generate secure random token
@@ -80,33 +81,70 @@ function isValidPhoneNumber(phone, countryCode = 'US') {
 /**
  * Password strength checker
  */
-function checkPasswordStrength(password) {
-  const checks = {
-    length: password.length >= 8,
-    lowercase: /[a-z]/.test(password),
-    uppercase: /[A-Z]/.test(password),
-    number: /\d/.test(password),
-    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
-    noCommon: !['password', '123456', 'qwerty', 'admin'].some(common => 
-      password.toLowerCase().includes(common)
-    )
-  };
+ function checkPasswordStrength(password) {
+        if (!password) {
+            return {
+                isValid: false,
+                score: 0,
+                checks: {
+                    minLength: false,
+                    hasUppercase: false,
+                    hasLowercase: false,
+                    hasNumbers: false,
+                    hasSpecialChars: false
+                },
+                feedback: ['Password is required']
+            };
+        }
 
-  const score = Object.values(checks).filter(Boolean).length;
-  
-  let strength;
-  if (score < 3) strength = 'weak';
-  else if (score < 5) strength = 'medium';
-  else if (score < 6) strength = 'strong';
-  else strength = 'very strong';
+        const checks = {
+            minLength: password.length >= 8,
+            hasUppercase: /[A-Z]/.test(password),
+            hasLowercase: /[a-z]/.test(password),
+            hasNumbers: /\d/.test(password),
+            hasSpecialChars: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+        };
 
-  return {
-    score,
-    strength,
-    checks,
-    isValid: score >= 4 // Require at least 4 criteria
-  };
-}
+        // Use zxcvbn for advanced password analysis
+        const analysis = zxcvbn(password);
+        
+        const feedback = [];
+        const suggestions = [];
+
+        if (!checks.minLength) {
+            feedback.push('Password must be at least 8 characters long');
+        }
+        if (!checks.hasUppercase) {
+            feedback.push('Password must contain at least one uppercase letter');
+        }
+        if (!checks.hasLowercase) {
+            feedback.push('Password must contain at least one lowercase letter');
+        }
+        if (!checks.hasNumbers) {
+            feedback.push('Password must contain at least one number');
+        }
+        if (!checks.hasSpecialChars) {
+            feedback.push('Password must contain at least one special character');
+        }
+
+        // Add zxcvbn feedback
+        if (analysis.feedback.suggestions.length > 0) {
+            suggestions.push(...analysis.feedback.suggestions);
+        }
+
+        const basicChecksValid = Object.values(checks).every(check => check === true);
+        const isValid = basicChecksValid && analysis.score >= 3; // zxcvbn score 3+ = strong
+
+        return {
+            isValid,
+            score: analysis.score,
+            checks,
+            feedback,
+            suggestions,
+            crackTime: analysis.crack_times_display.offline_slow_hashing_1e4_per_second,
+            warning: analysis.feedback.warning || null
+        };
+    }
 
 /**
  * Detect suspicious activity patterns
