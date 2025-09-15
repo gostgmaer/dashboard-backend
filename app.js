@@ -22,13 +22,14 @@ const contactsRoute = require('./src/routes/contact');
 const { categoryRoute } = require('./src/routes/categoriesRoute');
 const { cartRoutes } = require('./src/routes/cartRoutes');
 const BrandRoute = require('./src/routes/brandRouters');
-const authRoute = require('./src/routes/auth');
+// const authRoute = require('./src/routes/auth');
 const { attributeRouter } = require('./src/routes/attributeRoutes');
 const { attachmentRoutes } = require('./src/routes/attachmentsRoutes');
 const addressRoute = require('./src/routes/address');
 const {logRoutes} = require('./src/routes/logRoutes');
 const {roleRoute} = require('./src/routes/roleRoute');
 const { verifyEmailConnection } = require('./src/email');
+const authRoute = require('./src/routes/authRoute');
 
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
@@ -85,7 +86,7 @@ app.use('/api/permissins', checkRoute("permissionRoute", permissionRoute));
 app.use('/api/roles', checkRoute("RoleRoutes", roleRoute));
 app.use('/api/carts', checkRoute("cartRoutes", cartRoutes));
 app.use('/api/brands', checkRoute("BrandRoute", BrandRoute));
-app.use('/api/user', checkRoute("authRoute", authRoute));
+app.use('/api/auth', checkRoute("authRoute", authRoute));
 app.use('/api/attributes', checkRoute("attributeRouter", attributeRouter));
 app.use('/api/attachments', checkRoute("attachmentRoutes", attachmentRoutes));
 app.use('/api/address', checkRoute("addressRoute", addressRoute));
@@ -93,6 +94,7 @@ app.use('/api/logs', checkRoute("logRoute", logRoute));
 app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
+
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
 
 

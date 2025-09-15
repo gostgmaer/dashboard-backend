@@ -16,9 +16,11 @@ const SALT_ROUNDS = 10;
 // Environment variables with enhanced defaults
 const {
   JWT_SECRET = 'your-super-secret-jwt-key',
+  JWT_ID_SECRET="dasd98a7sd97as89d7a98sd7",
   JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
   JWT_EXPIRY = '15m',
   JWT_REFRESH_EXPIRY = '7d',
+  JWT_ID_EXPIRY = '30d',
   JWT_ALGORITHM = 'HS256',
   JWT_ISSUER = 'your-app-name',
   JWT_AUDIENCE = 'your-app-users',
@@ -44,8 +46,6 @@ const OTP_EXPIRY = parseInt(OTP_EXPIRY_MINUTES) * 60 * 1000;
 const SESSION_TIMEOUT = parseInt(SESSION_TIMEOUT_MINUTES) * 60 * 1000;
 const MAX_SESSIONS = parseInt(MAX_CONCURRENT_SESSIONS);
 
-const mongoose = require("mongoose");
-
 const userSchema = new mongoose.Schema(
   {
     // ─────────── Identity & Authentication ───────────
@@ -56,8 +56,8 @@ const userSchema = new mongoose.Schema(
     role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
 
     // ─────────── Personal Information ───────────
-    firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+    firstName: { type: String, trim: true },
+    lastName: { type: String, trim: true },
     dateOfBirth: { type: Date, default: null },
     gender: {
       type: String,
@@ -89,24 +89,28 @@ const userSchema = new mongoose.Schema(
     lockoutUntil: { type: Date, default: null },
     lastLoginAttempt: { type: Date, default: null },
     lastLogin: { type: Date, default: null },
-    loginHistory: [
-      {
-        loginTime: Date,
-        ipAddress: String,
-        userAgent: String,
-        successful: Boolean,
-        failureReason: String,
-      },
-    ],
-    securityEvents: [
-      {
-        event: String,
-        timestamp: { type: Date, default: Date.now },
-        ipAddress: String,
-        userAgent: String,
-        details: Object,
-      },
-    ],
+
+    loginHistory: [{
+      loginTime: Date,
+      ipAddress: String,
+      userAgent: String,
+      successful: Boolean,
+      failureReason: String,
+      deviceId: String,
+      otpUsed: { type: String, enum: ['totp', 'email', 'sms', 'backup', 'none'], default: 'none' }
+    }],
+
+    // Security Events & Audit Log
+    securityEvents: [{
+      event: { type: String, required: true },
+      description: { type: String, default: null },
+      severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+      timestamp: { type: Date, default: Date.now },
+      ipAddress: { type: String, default: null },
+      userAgent: { type: String, default: null },
+      deviceId: { type: String, default: null },
+      metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
+    }],
 
     // ─────────── Session & Tokens ───────────
     refreshTokens: [
@@ -133,8 +137,16 @@ const userSchema = new mongoose.Schema(
       }
     ],
     tokens: [{ token: { type: String } }],
+    // Password Reset
+    passwordReset: {
+      token: { type: String, default: null },
+      tokenExpiry: { type: Date, default: null },
+      attempts: { type: Number, default: 0 },
+      lastAttempt: { type: Date, default: null }
+    },
     resetToken: { type: String, default: null },
     resetTokenExpiration: { type: Date, default: null },
+
     tempPasswordActive: { type: Boolean, default: false },
 
     // ─────────── Two-Factor Authentication ───────────
@@ -147,6 +159,105 @@ const userSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
+
+
+
+    // Email Verification
+    emailVerificationTokens: [{
+      token: { type: String, required: true },
+      purpose: { type: String, enum: ['email_verification', 'email_change'], default: 'email_verification' },
+      expiresAt: { type: Date, required: true },
+      used: { type: Boolean, default: false },
+      createdAt: { type: Date, default: Date.now }
+    }],
+
+    // Enhanced OTP System
+    otpSettings: {
+      enabled: { type: Boolean, default: () => ENABLE_OTP_VERIFICATION === 'true' },
+      preferredMethod: { type: String, enum: ['totp', 'email', 'sms'], default: DEFAULT_OTP_METHOD },
+      allowFallback: { type: Boolean, default: true },
+      requireForLogin: { type: Boolean, default: true },
+      requireForSensitiveOps: { type: Boolean, default: true }
+    },
+
+    // Current OTP Session
+    currentOTP: {
+      code: { type: String, default: null },
+      hashedCode: { type: String, default: null },
+      type: { type: String, enum: ['totp', 'email', 'sms', 'backup'], default: null },
+      purpose: { type: String, enum: ['login', 'reset', 'verification', 'sensitive_op'], default: null },
+      expiresAt: { type: Date, default: null },
+      attempts: { type: Number, default: 0 },
+      maxAttempts: { type: Number, default: 3 },
+      lastSent: { type: Date, default: null },
+      verified: { type: Boolean, default: false }
+    },
+
+    // TOTP/2FA Configuration
+    twoFactorAuth: {
+      enabled: { type: Boolean, default: false },
+      secret: { type: String, default: null },
+      backupCodes: [{
+        code: { type: String, required: true },
+        used: { type: Boolean, default: false },
+        usedAt: { type: Date, default: null },
+        createdAt: { type: Date, default: Date.now }
+      }],
+      setupCompleted: { type: Boolean, default: false },
+      lastUsed: { type: Date, default: null }
+    },
+
+    // Login Security
+    loginSecurity: {
+      failedAttempts: { type: Number, default: 0 },
+      lockedUntil: { type: Date, default: null },
+      lastLoginAttempt: { type: Date, default: null },
+      consecutiveFailures: { type: Number, default: 0 },
+      suspiciousActivityDetected: { type: Boolean, default: false }
+    },
+
+    // Enhanced Token Management
+    authTokens: [{
+      token: { type: String, required: true },
+      type: { type: String, enum: ['access', 'refresh','id'], required: true },
+      deviceId: { type: String, required: true },
+      deviceInfo: {
+        name: { type: String, default: null },
+        type: { type: String, default: null },
+        os: { type: String, default: null },
+        browser: { type: String, default: null },
+        ipAddress: { type: String, default: null }
+      },
+      createdAt: { type: Date, default: Date.now },
+      expiresAt: { type: Date, required: true },
+      lastUsed: { type: Date, default: Date.now },
+      isRevoked: { type: Boolean, default: false },
+      revokedAt: { type: Date, default: null },
+      revokedReason: { type: String, default: null }
+    }],
+
+    // Device Management
+    knownDevices: [{
+      deviceId: { type: String, required: true, unique: true },
+      name: { type: String, default: null },
+      type: { type: String, default: null },
+      os: { type: String, default: null },
+      browser: { type: String, default: null },
+      firstSeen: { type: Date, default: Date.now },
+      lastSeen: { type: Date, default: Date.now },
+      isTrusted: { type: Boolean, default: false },
+      isActive: { type: Boolean, default: true },
+      fingerprint: { type: String, default: null },
+      location: {
+        country: { type: String, default: null },
+        region: { type: String, default: null },
+        city: { type: String, default: null },
+        coordinates: {
+          lat: { type: Number, default: null },
+          lng: { type: Number, default: null }
+        }
+      }
+    }],
 
     // ─────────── Relationships ───────────
     address: [{ type: mongoose.Schema.Types.ObjectId, ref: "Address" }],
@@ -166,7 +277,7 @@ const userSchema = new mongoose.Schema(
         connectedAt: { type: Date, default: Date.now },
       },
     ],
-    
+
     socialMedia: {
       facebook: { type: String, default: null },
       twitter: { type: String, default: null },
@@ -227,14 +338,31 @@ const userSchema = new mongoose.Schema(
 
 
 userSchema.virtual('fullName').get(function () {
-  return `${this.firstName} ${this.lastName}`;
+  if (!this.firstName) return null;
+  return this.lastName ? `${this.firstName} ${this.lastName}` : this.firstName;
 });
+
 userSchema.virtual('isLocked').get(function () {
   return !!(this.lockoutUntil && this.lockoutUntil > Date.now());
+});
+
+userSchema.virtual('hasActiveTOTP').get(function () {
+  return this.twoFactorAuth.enabled && this.twoFactorAuth.secret && this.twoFactorAuth.setupCompleted;
+});
+
+userSchema.virtual('availableOTPMethods').get(function () {
+  return otpService.getAvailableMethods(this);
 });
 userSchema.pre('save', function (next) {
   if (this.isModified('hash_password') && this.hash_password) {
     // Password will be hashed in the setPassword method
+  }
+  // Auto-verify user if both email and phone are verified (or phone not required)
+  if (this.isModified('emailVerified') || this.isModified('phoneVerified')) {
+    this.isVerified = this.emailVerified && (this.phoneVerified || !this.phoneNumber);
+    if (this.isVerified && this.status === 'pending') {
+      this.status = 'active';
+    }
   }
   next();
 });
@@ -242,7 +370,255 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
+
+  /**
+ * Generate JWT tokens
+ */
+  async generateTokens(deviceInfo = {}) {
+    try {
+      const deviceId = deviceInfo.deviceId || crypto.randomBytes(16).toString('hex');
+
+      // Clean up expired tokens
+      await User.cleanupExpiredTokens();
+
+      // Check session limit
+      const activeSessions = this.authTokens.filter(t =>
+        !t.isRevoked && t.expiresAt > new Date()
+      );
+
+      if (activeSessions.length >= MAX_SESSIONS) {
+        // Revoke oldest session
+        const oldestSession = activeSessions.sort((a, b) => a.createdAt - b.createdAt)[0];
+        oldestSession.isRevoked = true;
+        oldestSession.revokedAt = new Date();
+        oldestSession.revokedReason = 'session_limit_exceeded';
+      }
+
+
+      const accessToken = await this.generateAccessToken(deviceId)
+      const idToken = await this.generateIdToken(deviceId)
+      const refreshToken = await this.generateRefreshToken()
+
+      // Store tokens
+      const now = new Date();
+      const accessTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_EXPIRY));
+      const refreshTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_REFRESH_EXPIRY));
+      const idTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_ID_EXPIRY));
+
+
+      // console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
+
+
+      const deviceData = {
+        name: deviceInfo.name,
+        type: deviceInfo.type,
+        os: deviceInfo.os.name,
+        browser: deviceInfo.browser.name,
+        ipAddress: deviceInfo.ipAddress
+      }
+
+      this.authTokens.push({
+        token: accessToken,
+        type: 'access',
+        deviceId,
+        deviceInfo: deviceData,
+        expiresAt: accessTokenExpiry,
+        lastUsed: now
+      });
+      this.authTokens.push({
+        token: idToken,
+        type: 'id',
+        deviceId,
+        deviceInfo: deviceData,
+        expiresAt: idTokenExpiry,
+        lastUsed: now
+      });
+
+      this.authTokens.push({
+        token: refreshToken,
+        type: 'refresh',
+        deviceId,
+        deviceInfo: deviceData,
+        expiresAt: refreshTokenExpiry,
+        lastUsed: now
+      });
+
+      // Register/update device
+      await this.registerDevice(deviceInfo);
+
+      await this.save();
+
+      return {
+        accessToken,
+        refreshToken,
+        idToken,
+        idTokenExpiry,
+        accessTokenExpiresAt: accessTokenExpiry,
+        refreshTokenExpiresAt: refreshTokenExpiry,
+        deviceId
+      };
+    } catch (error) {
+      throw new Error(`Login failed: ${error.message}`);
+    }
+  },
+
+  async setupTOTP() {
+    try {
+      const setupData = await otpService.setupTOTP(this);
+
+      this.twoFactorAuth.secret = setupData.secret;
+      this.twoFactorAuth.enabled = false; // Will be enabled after verification
+      this.twoFactorAuth.setupCompleted = false;
+
+      await this.save();
+
+      return {
+        qrCode: setupData.qrCode,
+        manualEntryKey: setupData.manualEntryKey,
+        setupUri: setupData.setupUri
+      };
+    } catch (error) {
+      throw new Error(`TOTP setup failed: ${error.message}`);
+    }
+  }
+  ,
+  /**
+   * Verify TOTP setup and enable it
+   */
+  async verifyTOTPSetup(token) {
+    try {
+      const result = await otpService.verifyTOTPSetup(this, token);
+
+      if (result.success) {
+        this.twoFactorAuth.enabled = true;
+        this.twoFactorAuth.setupCompleted = true;
+        this.twoFactorAuth.backupCodes = result.backupCodes.map(code => ({
+          code: crypto.createHash('sha256').update(code).digest('hex'),
+          used: false,
+          createdAt: new Date()
+        }));
+
+        await this.save();
+        await this.logSecurityEvent('totp_enabled', 'TOTP authentication enabled', 'medium');
+
+        return {
+          success: true,
+          backupCodes: result.backupCodes
+        };
+      }
+
+      throw new Error('TOTP verification failed');
+    } catch (error) {
+      throw new Error(`TOTP setup verification failed: ${error.message}`);
+    }
+  },
+
+  /**
+   * Disable TOTP
+   */
+  async disableTOTP(token) {
+    try {
+      const isValid = await otpService.verifyTOTP(this, token);
+
+      if (!isValid) {
+        throw new Error('Invalid TOTP token');
+      }
+
+      this.twoFactorAuth.enabled = false;
+      this.twoFactorAuth.secret = null;
+      this.twoFactorAuth.setupCompleted = false;
+      this.twoFactorAuth.backupCodes = [];
+
+      await this.save();
+      await this.logSecurityEvent('totp_disabled', 'TOTP authentication disabled', 'high');
+
+      return { success: true };
+    } catch (error) {
+      throw new Error(`TOTP disable failed: ${error.message}`);
+    }
+  },
+
+  /**
+   * Generate OTP using configured method
+   */
+  async generateOTP(purpose = 'login', deviceInfo = {}, preferredMethod = null) {
+    try {
+      if (!otpService.isEnabled()) {
+        throw new Error('OTP verification is disabled');
+      }
+
+      const result = await otpService.sendOTP(this, purpose, deviceInfo, preferredMethod);
+
+      // Store OTP session info
+      this.currentOTP = {
+        type: result.type,
+        purpose,
+        expiresAt: result.expiresAt,
+        attempts: 0,
+        maxAttempts: 3,
+        lastSent: new Date(),
+        verified: false
+      };
+
+      await this.save();
+
+      return result;
+    } catch (error) {
+      throw new Error(`OTP generation failed: ${error.message}`);
+    }
+  },
+
+  /**
+   * Verify OTP
+   */
+  async verifyOTP(code, purpose = 'login', deviceInfo = {}) {
+    try {
+      const isValid = await otpService.verifyOTP(this, code, purpose, deviceInfo);
+
+      if (isValid) {
+        this.currentOTP.verified = true;
+        this.currentOTP.code = null;
+        this.currentOTP.hashedCode = null;
+
+        if (this.twoFactorAuth.enabled) {
+          this.twoFactorAuth.lastUsed = new Date();
+        }
+
+        await this.save();
+        await this.logSecurityEvent('otp_verified', `OTP verified for ${purpose}`, 'low');
+      }
+
+      return isValid;
+    } catch (error) {
+      if (this.currentOTP.attempts < this.currentOTP.maxAttempts) {
+        this.currentOTP.attempts += 1;
+        await this.save();
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Check if user needs OTP for operation
+   */
+  async requiresOTP(operation = 'login') {
+    if (!otpService.isEnabled()) {
+      return false;
+    }
+
+    switch (operation) {
+      case 'login':
+        return this.otpSettings.requireForLogin;
+      case 'sensitive_op':
+        return this.otpSettings.requireForSensitiveOps;
+      default:
+        return false;
+    }
+  },
+
+
   async getMyProfile() {
+
     await this.populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by']);
 
     // const Wishlist = mongoose.model('Wishlist');
@@ -324,6 +700,7 @@ userSchema.method({
       updatedAt: this.updatedAt,
     };
   },
+
 
   async authenticate(password) {
     return bcrypt.compare(password, this.hash_password);
@@ -568,6 +945,7 @@ userSchema.method({
     this.tempPasswordActive = false;
     // Invalidate all refresh tokens and sessions
     await this.invalidateAllSessions();
+    await this.revokeAllTokens('password_change')
     await this.save();
     return true;
   },
@@ -594,7 +972,7 @@ userSchema.method({
   },
 
   // Security Events
-  addSecurityEvent(event, ipAddress = null, userAgent = null, details = {}) {
+  async addSecurityEvent(event, ipAddress = null, userAgent = null, details = {}) {
     this.securityEvents.push({
       event,
       timestamp: new Date(),
@@ -610,23 +988,64 @@ userSchema.method({
   },
 
   // JWT Token Management
-  generateAccessToken() {
+
+  async generateIdToken(deviceId) {
+    const payload = {
+      // Standard OpenID claims
+      sub: this._id.toString(),
+      email: this.email,
+      emailVerified: this.emailVerified || false,
+      username: this.username,
+
+      // Personal info
+      firstName: this.firstName || null,
+      lastName: this.lastName || null,
+      fullName: this.fullName || null,
+      profileImage: this.profileImage || null,
+      phoneNumber: this.phoneNumber || null,
+      gender: this.gender || null,
+      dateOfBirth: this.dateOfBirth || null,
+      // Account info
+      lastLogin: this.lastLogin || null,
+      status: this.status || 'active',
+      // Preferences
+      locale: this.locale || 'en-US',
+      preferences: this.preferences || { theme: 'light', currency: 'USD' },
+      // System
+      role: this.role,
+      type: 'id',
+      deviceId,
+    };
+
+    return jwt.sign(payload, JWT_ID_SECRET, {
+      expiresIn: process.env.JWT_ID_EXPIRY || '30d',
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+  },
+
+
+
+  async generateAccessToken(deviceId) {
     const payload = {
       userId: this._id,
       username: this.username,
       email: this.email,
       role: this.role,
+      type: 'access',
+      deviceId: deviceId,
       permissions: this.permissions || []
     };
 
     return jwt.sign(payload, JWT_SECRET, {
       expiresIn: JWT_EXPIRY,
-      issuer: 'your-app-name',
-      audience: 'your-app-users'
+      algorithm: JWT_ALGORITHM,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE
     });
   },
 
-  generateRefreshToken() {
+  async generateRefreshToken() {
     const payload = {
       userId: this._id,
       tokenType: 'refresh'
@@ -634,8 +1053,8 @@ userSchema.method({
 
     return jwt.sign(payload, JWT_REFRESH_SECRET, {
       expiresIn: JWT_REFRESH_EXPIRY,
-      issuer: 'your-app-name',
-      audience: 'your-app-users'
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE
     });
   },
 
@@ -663,25 +1082,55 @@ userSchema.method({
     await this.save();
   },
 
-  async refreshAccessToken(refreshToken) {
-    const tokenData = this.refreshTokens.find(rt =>
-      rt.token === refreshToken && rt.isActive && rt.expiresAt > new Date()
-    );
 
-    if (!tokenData) {
-      throw new Error('Invalid or expired refresh token');
-    }
+
+  async refreshAccessToken(refreshToken) {
+
 
     try {
+      const tokenData = this.authTokens.find(t =>
+        t.token === refreshToken &&
+        !t.isRevoked &&
+        t.type === 'refresh' &&
+        t.expiresAt > new Date()
+      );
+      if (!tokenData) {
+        throw new Error('Invalid or expired refresh token');
+      }
       const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
       if (decoded.userId !== this._id.toString()) {
         throw new Error('Token mismatch');
       }
 
-      return this.generateAccessToken();
+      const token = this.generateAccessToken(decoded.deviceId)
+
+      // Add new token
+      const now = new Date();
+      const accessTokenExpiry = new Date(now.getTime() + this.parseTimeToMs(JWT_EXPIRY));
+
+      this.authTokens.push({
+        token: token,
+        type: 'access',
+        deviceId: decoded.deviceId,
+        deviceInfo: tokenData.deviceInfo,
+        expiresAt: accessTokenExpiry,
+        lastUsed: now
+      });
+
+      // Update refresh token last used
+      tokenData.lastUsed = now;
+
+      await this.save();
+      return {
+        accessToken: newAccessToken,
+        expiresAt: accessTokenExpiry
+      };
     } catch (error) {
-      throw new Error('Invalid refresh token');
+      throw new Error(`Token refresh failed: ${error.message}`);
     }
+
+
+
   },
 
   async revokeRefreshToken(token) {
@@ -698,13 +1147,21 @@ userSchema.method({
   },
 
   async generateResetPasswordToken() {
-    this.resetToken = crypto.randomBytes(20).toString('hex');
-    this.resetTokenExpiration = Date.now() + 3600000; // 1 hour
+    const t = crypto.randomBytes(32).toString('hex');
+    const time = new Date(Date.now() + 60 * 60 * 1000);
+    this.resetToken = t;
+    this.resetTokenExpiration = time; // 1 hour
+    this.passwordReset = {
+      token: t,
+      tokenExpiry: time, // 1 hour
+      attempts: 0,
+      lastAttempt: new Date()
+    };
     await this.save();
     return this.resetToken;
   },
   async checkResetTokenValidity(token) {
-    return this.resetToken === token && this.resetTokenExpiration > Date.now();
+    return this.passwordReset.token === token && this.passwordReset.tokenExpiry > Date.now();
   },
 
   async verifyEmail(token) {
@@ -805,23 +1262,114 @@ userSchema.method({
   // Email confirmation & reset
 
 
-  // Account security & sessions
+  // ========================================
+  // 🔐 SECURITY & DEVICE MANAGEMENT
+  // ========================================
+
+  /**
+   * Register or update device information
+   */
+  async registerDevice(deviceInfo) {
+    if (!deviceInfo.deviceId) {
+      return;
+    }
+
+    let device = this.knownDevices.find(d => d.deviceId === deviceInfo.deviceId);
+
+    if (device) {
+      // Update existing device
+      device.lastSeen = new Date();
+      if (deviceInfo.name) device.name = deviceInfo.name;
+      if (deviceInfo.type) device.type = deviceInfo.type;
+      if (deviceInfo.os) device.os = deviceInfo.os.name;
+      if (deviceInfo.browser) device.browser = deviceInfo.browser.name;
+    } else {
+      // Register new device
+      device = {
+        deviceId: deviceInfo.deviceId,
+        name: deviceInfo?.name || 'Unknown Device',
+        type: deviceInfo?.type || 'unknown',
+        os: deviceInfo?.os.name || 'unknown',
+        browser: deviceInfo?.browser.name || 'unknown',
+        firstSeen: new Date(),
+        lastSeen: new Date(),
+        isTrusted: false,
+        isActive: true,
+        fingerprint: deviceInfo.fingerprint || null
+      };
+      console.log(device);
+
+
+      this.knownDevices.push(device);
+
+      // Log new device
+      await this.logSecurityEvent('new_device_registered',
+        `New device registered: ${device.name}`, 'medium', deviceInfo);
+    }
+  },
+
+  /**
+   * Trust a device
+   */
+  async trustDevice(deviceId) {
+    const device = this.knownDevices.find(d => d.deviceId === deviceId);
+    if (device) {
+      device.isTrusted = true;
+      await this.save();
+      await this.logSecurityEvent('device_trusted', `Device trusted: ${device.name}`, 'low');
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Remove a device
+   */
+  async removeDevice(deviceId) {
+    // Revoke all tokens for this device
+    this.authTokens.forEach(token => {
+      if (token.deviceId === deviceId && !token.isRevoked) {
+        token.isRevoked = true;
+        token.revokedAt = new Date();
+        token.revokedReason = 'device_removed';
+      }
+    });
+
+    // Remove device
+    this.knownDevices = this.knownDevices.filter(d => d.deviceId !== deviceId);
+
+    await this.save();
+    await this.logSecurityEvent('device_removed', `Device removed: ${deviceId}`, 'medium');
+    return true;
+  },
 
 
 
-  async handleFailedLogin(ipAddress = null, userAgent = null) {
+
+  async handleFailedLogin(ipAddress = null, userAgent = null, deviceInfo = {}, reason = 'invalid_credentials') {
     this.failedLoginAttempts += 1;
     this.consecutiveFailedAttempts += 1;
     this.lastLoginAttempt = new Date();
+    this.loginSecurity.failedAttempts += 1;
+    this.loginSecurity.consecutiveFailures += 1;
+    this.loginSecurity.lastLoginAttempt = new Date();
 
     // Add to login history
     this.loginHistory.push({
       loginTime: new Date(),
-      ipAddress,
-      userAgent,
+      ipAddress: deviceInfo.ipAddress,
+      userAgent: deviceInfo.userAgent,
       successful: false,
-      failureReason: 'Invalid credentials'
+      failureReason: reason,
+      deviceId: deviceInfo.deviceId
     });
+
+    // Check if account should be locked
+    if (this.loginSecurity.consecutiveFailures >= MAX_ATTEMPTS) {
+      this.loginSecurity.lockedUntil = new Date(Date.now() + LOCK_TIME);
+      await this.logSecurityEvent('account_locked',
+        `Account locked due to ${MAX_ATTEMPTS} failed login attempts`, 'high', deviceInfo);
+    }
 
     // Lock account after max attempts
     if (this.consecutiveFailedAttempts >= MAX_ATTEMPTS) {
@@ -835,34 +1383,77 @@ userSchema.method({
         details: { reason: 'Too many failed login attempts', attempts: this.consecutiveFailedAttempts }
       });
     }
-
     await this.save();
+    await this.logSecurityEvent('login_failed', `Failed login: ${reason}`, 'medium', deviceInfo);
+
     return this.isLocked;
   },
 
 
+  async logSecurityEvent(event, description = null, severity = 'medium', metadata = {}) {
+    this.securityEvents.push({
+      event,
+      description,
+      severity,
+      timestamp: new Date(),
+      ipAddress: metadata.ipAddress,
+      userAgent: metadata.userAgent,
+      deviceId: metadata.deviceId,
+      metadata
+    });
 
-  async handleSuccessfulLogin(ipAddress = null, userAgent = null) {
+    // Keep only last 100 security events
+    if (this.securityEvents.length > 100) {
+      this.securityEvents = this.securityEvents.slice(-100);
+    }
+
+    await this.save();
+  },
+
+  async handleSuccessfulLogin(ipAddress = null, userAgent = null, deviceInfo = {}) {
     this.lastLogin = new Date();
     this.failedLoginAttempts = 0;
     this.consecutiveFailedAttempts = 0;
     this.lockoutUntil = null;
     this.lastLoginAttempt = new Date();
+    this.loginSecurity.failedAttempts = 0;
+    this.loginSecurity.consecutiveFailures = 0;
+    this.loginSecurity.lockedUntil = null;
+    this.loginSecurity.lastLoginAttempt = new Date();
 
     // Add to login history
     this.loginHistory.push({
       loginTime: new Date(),
-      ipAddress,
-      userAgent,
-      successful: true
+      ipAddress: deviceInfo.ipAddress,
+      userAgent: deviceInfo.userAgent,
+      successful: true,
+      deviceId: deviceInfo.deviceId,
+      otpUsed: this.currentOTP.type || 'none'
     });
-
     // Limit login history to last 50 entries
     if (this.loginHistory.length > 50) {
       this.loginHistory = this.loginHistory.slice(-50);
     }
-
+    await this.registerDevice(deviceInfo);
     await this.save();
+    await this.logSecurityEvent('login_success', 'Successful login', 'low', deviceInfo);
+
+  },
+
+  async parseTimeToMs(str) {
+    // e.g. '15m', '1h', '30s'
+    if (!str) return '15m';
+    const unit = str.slice(-1);
+    const num = parseInt(str.slice(0, -1), 10);
+    if (isNaN(num)) return NaN;
+
+    switch (unit) {
+      case 's': return num * 1000;
+      case 'm': return num * 60 * 1000;
+      case 'h': return num * 60 * 60 * 1000;
+      case 'd': return num * 24 * 60 * 60 * 1000;
+      default: return NaN;
+    }
   },
 
 
@@ -1056,15 +1647,36 @@ userSchema.method({
     return this.populate('address');
   },
 
-  // Security & Session Management
-  async invalidateAllSessions() {
-    this.tokens = [];
-    this.session = [];
-    await this.save();
-  },
+
   async revokeToken(token) {
     this.tokens = this.tokens.filter((t) => t.token !== token);
+    const tokenData = this.authTokens.find(t => t.token === token);
+    if (tokenData) {
+      tokenData.isRevoked = true;
+      tokenData.revokedAt = new Date();
+      tokenData.revokedReason = reason;
+      await this.save();
+    }
+    return true;
+
+  },
+
+  async revokeAllTokens(reason = 'user_logout_all') {
+    this.authTokens.forEach(token => {
+      if (!token.isRevoked) {
+        token.isRevoked = true;
+        token.revokedAt = new Date();
+        token.revokedReason = reason;
+      }
+    });
+
+    this.activeSessions.forEach(session => {
+      session.isActive = false;
+    });
+
     await this.save();
+    await this.logSecurityEvent('tokens_revoked_all', 'All tokens revoked', 'medium');
+    return true;
   },
 
   async updateLoginTimestamp() {
@@ -1165,6 +1777,22 @@ userSchema.method({
     };
   },
 });
+userSchema.statics.findFullyPopulatedById = async function (userId) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error('Invalid user ID');
+  }
+  return this.findById(userId).populate([
+    'role',
+    'address',
+    'orders',
+    'favoriteProducts',
+    'shoppingCart',
+    'wishList',
+    'referredBy',
+    'created_by',
+    'updated_by'
+  ]);
+};
 
 userSchema.statics.findActiveWithinDays = async function (days = 30) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -1432,10 +2060,6 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
     email = email.trim().toLowerCase();
     username = username.trim();
 
-
-
-
-
     // Role assignment with validation
     if (!roleId) {
       const defaultRole = await Role.findOne({ isDefault: true, isActive: true });
@@ -1470,6 +2094,10 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
     if (!password) {
       password = Math.random().toString(36).slice(-8);
       user.tempPasswordActive = true;
+    }
+    // Auto-generate referral code
+    if (!user.referralCode) {
+      user.referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
     }
     await user.setPassword(password);
     user.generateEmailVerificationToken();
@@ -1760,11 +2388,10 @@ userSchema.statics.findLockedAccounts = async function () {
     const user = await this.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      // Don't reveal if user exists for security
       return { success: true };
     }
 
-    const resetToken = user.generateResetPasswordToken();
+    const resetToken = await user.generateResetPasswordToken();
     await user.save();
 
     return { user, resetToken };
@@ -1785,7 +2412,7 @@ userSchema.statics.findLockedAccounts = async function () {
   },
 
 
-  userSchema.statics.authenticateUser = async function (identifier, password, ipAddress = null, userAgent = null) {
+  userSchema.statics.authenticateUser = async function (identifier, password, ipAddress = null, userAgent = null, deviceInfo = {}) {
     const user = await this.findOne({
       $or: [
         { email: identifier.toLowerCase() },
@@ -1799,27 +2426,70 @@ userSchema.statics.findLockedAccounts = async function () {
 
     // Check if account is locked
     if (user.isLocked) {
-      const lockTimeRemaining = Math.ceil((user.lockoutUntil - new Date()) / (1000 * 60));
+      const lockTimeRemaining = Math.ceil((user.loginSecurity.lockedUntil - new Date()) / (1000 * 60));
       throw new Error(`Account locked. Try again in ${lockTimeRemaining} minutes`);
     }
 
-    // Validate password
-    const isValidPassword = await user.validatePassword(password);
-
-    if (!isValidPassword) {
-      await user.handleFailedLogin(ipAddress, userAgent);
-      throw new Error('Invalid credentials');
-    }
-
-    // Check if user is active and verified for login
+    // Check if account is active
     if (user.status !== 'active') {
       throw new Error('Account is not active');
     }
 
-    await user.handleSuccessfulLogin(ipAddress, userAgent);
-    return user;
+    // Validate password
+    const isValidPassword = await user.validatePassword(password);
+    if (!isValidPassword) {
+      await user.handleFailedLogin(deviceInfo, 'invalid_password');
+      throw new Error('Invalid credentials');
+    }
+    // Check if OTP is required
+    const requiresOTP = user.requiresOTP('login') && otpService.isEnabled();
+
+    if (requiresOTP) {
+      // Return user with OTP requirement flag
+      return {
+        user,
+        requiresMFA: true,
+        availableMethods: user.availableOTPMethods
+      };
+    }
+
+
+    await user.handleSuccessfulLogin(deviceInfo);
+
+    return {
+      user,
+      requiresMFA: false
+    };
   };
 
+
+
+/**
+ * Verify user credentials with OTP
+ */
+userSchema.statics.authenticateWithOTP = async function (userId, otpCode, deviceInfo = {}) {
+  try {
+    const user = await this.findById(userId).populate('role');
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Verify OTP
+    const otpValid = await user.verifyOTP(otpCode, 'login', deviceInfo);
+
+    if (!otpValid) {
+      throw new Error('Invalid or expired OTP');
+    }
+
+    // Complete authentication
+    await user.handleSuccessfulLogin(deviceInfo);
+
+    return user;
+  } catch (error) {
+    throw error;
+  }
+};
 
 userSchema.statics.getSecurityReport = async function (timeframe = 30) {
   const startDate = new Date(Date.now() - (timeframe * 24 * 60 * 60 * 1000));
