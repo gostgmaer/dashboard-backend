@@ -15,26 +15,26 @@ const SALT_ROUNDS = 10;
 
 // Environment variables with enhanced defaults
 const {
-    JWT_SECRET = 'your-super-secret-jwt-key',
-    JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
-    JWT_EXPIRY = '15m',
-    JWT_REFRESH_EXPIRY = '7d',
-    JWT_ALGORITHM = 'HS256',
-    JWT_ISSUER = 'your-app-name',
-    JWT_AUDIENCE = 'your-app-users',
-     OTP_TYPE = 'email', // 'email' or 'sms'
-    OTP_EXPIRY_MINUTES = '5',
-    MAX_LOGIN_ATTEMPTS = '5',
-    LOCKOUT_TIME_MINUTES = '30',
-    OTP_SECRET = 'your-otp-secret',
-    ENABLE_OTP_VERIFICATION = 'false',
-    OTP_PRIORITY_ORDER = 'totp,email,sms',
-    DEFAULT_OTP_METHOD = 'totp',
-    
-    SESSION_TIMEOUT_MINUTES = '120',
-    MAX_CONCURRENT_SESSIONS = '3',
-    REQUIRE_DEVICE_VERIFICATION = 'false',
-    ENABLE_SUSPICIOUS_LOGIN_DETECTION = 'true'
+  JWT_SECRET = 'your-super-secret-jwt-key',
+  JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
+  JWT_EXPIRY = '15m',
+  JWT_REFRESH_EXPIRY = '7d',
+  JWT_ALGORITHM = 'HS256',
+  JWT_ISSUER = 'your-app-name',
+  JWT_AUDIENCE = 'your-app-users',
+  OTP_TYPE = 'email', // 'email' or 'sms'
+  OTP_EXPIRY_MINUTES = '5',
+  MAX_LOGIN_ATTEMPTS = '5',
+  LOCKOUT_TIME_MINUTES = '30',
+  OTP_SECRET = 'your-otp-secret',
+  ENABLE_OTP_VERIFICATION = 'false',
+  OTP_PRIORITY_ORDER = 'totp,email,sms',
+  DEFAULT_OTP_METHOD = 'totp',
+
+  SESSION_TIMEOUT_MINUTES = '120',
+  MAX_CONCURRENT_SESSIONS = '3',
+  REQUIRE_DEVICE_VERIFICATION = 'false',
+  ENABLE_SUSPICIOUS_LOGIN_DETECTION = 'true'
 } = process.env;
 
 
@@ -44,28 +44,31 @@ const OTP_EXPIRY = parseInt(OTP_EXPIRY_MINUTES) * 60 * 1000;
 const SESSION_TIMEOUT = parseInt(SESSION_TIMEOUT_MINUTES) * 60 * 1000;
 const MAX_SESSIONS = parseInt(MAX_CONCURRENT_SESSIONS);
 
+const mongoose = require("mongoose");
+
 const userSchema = new mongoose.Schema(
   {
-    // 🔹 Basic Info
+    // ─────────── Identity & Authentication ───────────
     username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 30 },
+    socialID: { type: String, default: null },
     email: { type: String, required: true, unique: true, lowercase: true },
+    hash_password: { type: String, required: false },
+    role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
+
+    // ─────────── Personal Information ───────────
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
-    profilePicture: { type: String, default: null },
     dateOfBirth: { type: Date, default: null },
-    gender: { type: String, enum: ['male', 'female', 'other', 'prefer_not_to_say'], default: null, trim: true },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other", "prefer_not_to_say"],
+      default: null,
+      trim: true,
+    },
     phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
+    profilePicture: { type: String, default: null },
 
-    // 🔹 Security & Authentication
-    hash_password: { type: String, required: false },
-    tempPasswordActive: { type: Boolean, default: false },
-    failedLoginAttempts: { type: Number, default: 0 },
-    consecutiveFailedAttempts: { type: Number, default: 0 },
-    lastLoginAttempt: { type: Date, default: null },
-    lockoutUntil: { type: Date, default: null },
-    lastLogin: { type: Date, default: null },
-
-    // 🔹 Verification
+    // ─────────── Verification & Security ───────────
     isVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
     phoneVerified: { type: Boolean, default: false },
@@ -73,71 +76,19 @@ const userSchema = new mongoose.Schema(
     emailVerificationExpiry: { type: Date, default: null },
     confirmToken: { type: String, default: null },
 
-    // 🔹 OTP (One-Time Passwords)
+    // OTP Management
     otpCode: { type: String, default: null },
     otpExpiry: { type: Date, default: null },
-    otpType: { type: String, enum: ['email', 'sms', 'login', 'reset', 'verification'], default: null },
+    otpType: { type: String, enum: ["email", "sms", "login", "reset", "verification"], default: null },
     otpAttempts: { type: Number, default: 0 },
     otpLastSent: { type: Date, default: null },
 
-    // 🔹 Tokens & Sessions
-    refreshTokens: [
-      {
-        token: { type: String, required: true },
-        createdAt: { type: Date, default: Date.now },
-        expiresAt: { type: Date, required: true },
-        userAgent: { type: String, default: null },
-        ipAddress: { type: String, default: null },
-        isActive: { type: Boolean, default: true },
-      },
-    ],
-    activeSessions: [
-      {
-        sessionId: String,
-        accessToken: String,
-        userAgent: String,
-        ipAddress: String,
-        createdAt: { type: Date, default: Date.now },
-        expiresAt: Date,
-        isActive: { type: Boolean, default: true },
-      },
-    ],
-    tokens: [{ token: { type: String } }],
-    resetToken: { type: String, default: null },
-    resetTokenExpiration: { type: Date, default: null },
-
-    // 🔹 2FA & Backup
-    twoFactorEnabled: { type: Boolean, default: false },
-    twoFactorSecret: { type: String, default: null },
-    backupCodes: [
-      {
-        code: String,
-        used: { type: Boolean, default: false },
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
-
-    // 🔹 Social Logins
-    socialID: { type: String, default: null },
-    socialAccounts: [
-      {
-        provider: { type: String, enum: ['google', 'facebook', 'twitter', 'github'] },
-        providerId: String,
-        email: String,
-        verified: { type: Boolean, default: false },
-        connectedAt: { type: Date, default: Date.now },
-      },
-    ],
-    socialMedia: {
-      facebook: { type: String, default: null },
-      twitter: { type: String, default: null },
-      instagram: { type: String, default: null },
-      linkedin: { type: String, default: null },
-      google: { type: String, default: null },
-      pinterest: { type: String, default: null },
-    },
-
-    // 🔹 User Activity
+    // Login & Security Events
+    failedLoginAttempts: { type: Number, default: 0 },
+    consecutiveFailedAttempts: { type: Number, default: 0 },
+    lockoutUntil: { type: Date, default: null },
+    lastLoginAttempt: { type: Date, default: null },
+    lastLogin: { type: Date, default: null },
     loginHistory: [
       {
         loginTime: Date,
@@ -157,34 +108,90 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // 🔹 Relationships
-    address: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
-    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
-    favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
-    shoppingCart: { type: mongoose.Schema.Types.ObjectId, ref: 'Cart' },
-    wishList: { type: mongoose.Schema.Types.ObjectId, ref: 'Wishlist' },
-    role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
-    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    // ─────────── Session & Tokens ───────────
+    refreshTokens: [
+      {
+        token: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true },
+        userAgent: { type: String, default: null },
+        ipAddress: { type: String, default: null },
+        isActive: { type: Boolean, default: true },
+      },
+    ],
+    // Session Management
+    activeSessions: [
+      {
+        sessionId: { type: String, required: true },
+        deviceId: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+        lastActivity: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true },
+        ipAddress: { type: String, default: null },
+        userAgent: { type: String, default: null },
+        isActive: { type: Boolean, default: true }
+      }
+    ],
+    tokens: [{ token: { type: String } }],
+    resetToken: { type: String, default: null },
+    resetTokenExpiration: { type: Date, default: null },
+    tempPasswordActive: { type: Boolean, default: false },
 
-    // 🔹 Preferences & Settings
+    // ─────────── Two-Factor Authentication ───────────
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, default: null },
+    backupCodes: [
+      {
+        code: String,
+        used: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // ─────────── Relationships ───────────
+    address: [{ type: mongoose.Schema.Types.ObjectId, ref: "Address" }],
+    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: "Order" }],
+    favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
+    shoppingCart: { type: mongoose.Schema.Types.ObjectId, ref: "Cart" },
+    wishList: { type: mongoose.Schema.Types.ObjectId, ref: "Wishlist" },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    // ─────────── Social Accounts ───────────
+    socialAccounts: [
+      {
+        provider: { type: String, enum: ["google", "facebook", "twitter", "github"] },
+        providerId: String,
+        email: String,
+        verified: { type: Boolean, default: false },
+        connectedAt: { type: Date, default: Date.now },
+      },
+    ],
+    
+    socialMedia: {
+      facebook: { type: String, default: null },
+      twitter: { type: String, default: null },
+      instagram: { type: String, default: null },
+      linkedin: { type: String, default: null },
+      google: { type: String, default: null },
+      pinterest: { type: String, default: null },
+    },
+
+    // ─────────── Preferences ───────────
     preferences: {
       newsletter: { type: Boolean, default: false },
       notifications: { type: Boolean, default: true },
-      language: { type: String, default: 'en' },
-      currency: { type: String, default: 'USD' },
-      theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+      language: { type: String, default: "en" },
+      currency: { type: String, default: "USD" },
+      theme: { type: String, enum: ["light", "dark"], default: "light" },
     },
     interests: { type: [String], default: [] },
-    shippingPreferences: {
-      deliveryMethod: { type: String, enum: ['standard', 'express'], default: 'standard' },
-      deliveryInstructions: { type: String, default: null },
-      preferredTime: { type: String, default: null },
-    },
 
-    // 🔹 Payment & Subscription
+    // ─────────── E-commerce Features ───────────
+    loyaltyPoints: { type: Number, default: 0 },
+    referralCode: { type: String },
     paymentMethods: [
       {
-        method: { type: String, enum: ['credit_card', 'paypal', 'bank_transfer'], required: true },
+        method: { type: String, enum: ["credit_card", "paypal", "bank_transfer"], required: true },
         details: {
           cardNumber: { type: String, default: null },
           expiryDate: { type: Date, default: null },
@@ -193,28 +200,30 @@ const userSchema = new mongoose.Schema(
         isDefault: { type: Boolean, default: false },
       },
     ],
-    subscriptionStatus: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
-    subscriptionType: { type: String, enum: ['free', 'premium', 'enterprise'], default: 'free' },
+    shippingPreferences: {
+      deliveryMethod: { type: String, enum: ["standard", "express"], default: "standard" },
+      deliveryInstructions: { type: String, default: null },
+      preferredTime: { type: String, default: null },
+    },
+    subscriptionStatus: { type: String, enum: ["active", "inactive"], default: "inactive" },
+    subscriptionType: { type: String, enum: ["free", "premium", "enterprise"], default: "free" },
 
-    // 🔹 Metadata & Audit
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    created_user_id: { type: String, default: null },
-    updated_user_id: { type: String, default: null },
+    // ─────────── Audit Fields ───────────
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'pending', 'banned', 'deleted', 'archived', 'draft'],
-      default: 'draft',
+      enum: ["active", "inactive", "pending", "banned", "deleted", "archived", "draft"],
+      default: "draft",
       trim: true,
     },
-    session: [{ type: Object }],
 
-    // 🔹 Loyalty & Referrals
-    loyaltyPoints: { type: Number, default: 0 },
-    referralCode: { type: String },
+    // Misc
+    session: [{ type: Object }],
   },
   { timestamps: true }
 );
+
 
 
 userSchema.virtual('fullName').get(function () {
