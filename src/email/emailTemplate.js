@@ -50,7 +50,7 @@ function otpEmailTemplate({ name, otp, expiryMinutes }) {
 }
 // utils/emailTemplates.js
 
-function welcomeEmailTemplate({ name }) {
+function welcomeEmailTemplate(data) {
   return `
   <!DOCTYPE html>
   <html lang="en">
@@ -62,7 +62,7 @@ function welcomeEmailTemplate({ name }) {
   <body style="font-family: Arial, sans-serif; background-color:#f6f9fc; padding:20px;">
     <div style="max-width:600px; margin:0 auto; background:#ffffff; padding:30px; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
       
-      <h1 style="color:#2c3e50; text-align:center;">🎉 Welcome, ${name || "User"}!</h1>
+      <h1 style="color:#2c3e50; text-align:center;">🎉 Welcome, ${data.name || "User"}!</h1>
       
       <p style="font-size:16px; color:#555; text-align:center;">
         We’re excited to have you on board. Thank you for signing up and joining our community!
@@ -768,4 +768,60 @@ function trustedDeviceAddedTemplate({ name, device, location }) {
   `;
 }
 
-module.exports = { otpEmailTemplate };
+module.exports = {
+  otpEmailTemplate,
+  welcomeEmailTemplate,
+  emailVerificationTemplate,
+  emailVerificationSuccessTemplate,
+  passwordResetRequestTemplate,
+  passwordResetSuccessTemplate,
+  passwordChangedSuccessTemplate,
+  accountLockedTemplate,
+  suspiciousLoginTemplate,
+  accountDeletedTemplate,
+  subscriptionUpdatedTemplate,
+  twoFactorCodeTemplate,
+  paymentFailedTemplate,
+  paymentSuccessTemplate,
+  orderConfirmationTemplate,
+  orderShippedTemplate,
+  orderDeliveredTemplate,
+  passwordExpiryReminderTemplate,
+  newsletterTemplate,
+  accountDeactivationWarningTemplate,
+  accountReactivatedTemplate,
+  roleUpdatedTemplate,
+  newDeviceLoginTemplate,
+  subscriptionRenewalReminderTemplate,
+  subscriptionCancelledTemplate,
+  giftCardReceivedTemplate,
+  reviewRequestTemplate,
+  cartAbandonmentTemplate,
+  loyaltyPointsEarnedTemplate,
+  dataExportRequestTemplate,
+  dataExportReadyTemplate,
+  policyUpdateTemplate,
+  trialExpiringTemplate,
+  trialExpiredTemplate,
+  invoiceGeneratedTemplate,
+  paymentRefundedTemplate,
+  maintenanceNoticeTemplate,
+  newFeatureAnnouncementTemplate,
+  birthdayGreetingTemplate,
+  twoFactorSetupTemplate,
+  twoFactorCodeTemplate,
+  backupCodesTemplate,
+  newDeviceApprovalTemplate,
+  emailChangedTemplate,
+  loginAlertTemplate,
+  sessionExpiredTemplate,
+  accountRecoveryTemplate,
+  accountReactivationTemplate,
+  accountSuspendedTemplate,
+  consentRequiredTemplate,
+  securitySettingsUpdatedTemplate,
+  failedLoginAttemptsTemplate,
+  accountVerifiedTemplate,
+  logoutAllDevicesTemplate,
+  trustedDeviceAddedTemplate
+};
