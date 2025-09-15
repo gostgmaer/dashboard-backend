@@ -8,11 +8,12 @@ const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
 const { APIError, formatResponse } = require('../utils/apiUtils');
-const { welcomeEmailTemplate } = require('../email/emailTemplates');
+// const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
 const DeviceDetector = require('../services/DeviceDetector');
 const otpService = require('../services/otpService');
+const { emailVerificationTemplate,welcomeEmailTemplate } = require('../email/emailTemplate');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -232,7 +233,12 @@ class authController {
       }
       // Authenticate user
       const authResult = await User.authenticateUser(identifier, password, deviceInfo);
-      const user = authResult.user;
+      let user = authResult.user;
+      user.verificationLink="asdasdad"
+      if (!user.emailVerified) {
+         await sendEmail(emailVerificationTemplate, user);
+        
+      }
 
       // const user = await User.findByEmail(email);
       if (!user) {
