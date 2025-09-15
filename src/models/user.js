@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const speakeasy = require('speakeasy');
 const Wishlist = require('./wishlist');
 const Cart = require('./cart');
 const Product = require('./products');
@@ -8,8 +10,39 @@ const Address = require('./address');
 const Order = require('./orders');
 const Role = require('./role');
 const { jwtSecret } = require('../config/setting');
-
+const otpService = require('../services/otpService');
 const SALT_ROUNDS = 10;
+
+// Environment variables with enhanced defaults
+const {
+    JWT_SECRET = 'your-super-secret-jwt-key',
+    JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
+    JWT_EXPIRY = '15m',
+    JWT_REFRESH_EXPIRY = '7d',
+    JWT_ALGORITHM = 'HS256',
+    JWT_ISSUER = 'your-app-name',
+    JWT_AUDIENCE = 'your-app-users',
+     OTP_TYPE = 'email', // 'email' or 'sms'
+    OTP_EXPIRY_MINUTES = '5',
+    MAX_LOGIN_ATTEMPTS = '5',
+    LOCKOUT_TIME_MINUTES = '30',
+    OTP_SECRET = 'your-otp-secret',
+    ENABLE_OTP_VERIFICATION = 'false',
+    OTP_PRIORITY_ORDER = 'totp,email,sms',
+    DEFAULT_OTP_METHOD = 'totp',
+    
+    SESSION_TIMEOUT_MINUTES = '120',
+    MAX_CONCURRENT_SESSIONS = '3',
+    REQUIRE_DEVICE_VERIFICATION = 'false',
+    ENABLE_SUSPICIOUS_LOGIN_DETECTION = 'true'
+} = process.env;
+
+
+const MAX_ATTEMPTS = parseInt(MAX_LOGIN_ATTEMPTS);
+const LOCK_TIME = parseInt(LOCKOUT_TIME_MINUTES) * 60 * 1000;
+const OTP_EXPIRY = parseInt(OTP_EXPIRY_MINUTES) * 60 * 1000;
+const SESSION_TIMEOUT = parseInt(SESSION_TIMEOUT_MINUTES) * 60 * 1000;
+const MAX_SESSIONS = parseInt(MAX_CONCURRENT_SESSIONS);
 
 const userSchema = new mongoose.Schema(
   {
@@ -27,6 +60,28 @@ const userSchema = new mongoose.Schema(
     favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     tempPasswordActive: { type: Boolean, default: false },
     profilePicture: { type: String, default: null },
+    isVerified: { type: Boolean, default: false },
+    emailVerified: { type: Boolean, default: false },
+    phoneVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String, default: null },
+    emailVerificationExpiry: { type: Date, default: null },
+    otpCode: { type: String, default: null },
+    otpExpiry: { type: Date, default: null },
+    otpType: { type: String, enum: ['email', 'sms', 'login', 'reset', 'verification'], default: null },
+    otpAttempts: { type: Number, default: 0 },
+    otpLastSent: { type: Date, default: null },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockoutUntil: { type: Date, default: null },
+    lastLoginAttempt: { type: Date, default: null },
+    consecutiveFailedAttempts: { type: Number, default: 0 },
+    refreshTokens: [{ token: { type: String, required: true }, createdAt: { type: Date, default: Date.now }, expiresAt: { type: Date, required: true }, userAgent: { type: String, default: null }, ipAddress: { type: String, default: null }, isActive: { type: Boolean, default: true } }],
+    activeSessions: [{ sessionId: String, accessToken: String, userAgent: String, ipAddress: String, createdAt: { type: Date, default: Date.now }, expiresAt: Date, isActive: { type: Boolean, default: true } }],
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, default: null },
+    backupCodes: [{ code: String, used: { type: Boolean, default: false }, createdAt: { type: Date, default: Date.now } }],
+    socialAccounts: [{ provider: { type: String, enum: ['google', 'facebook', 'twitter', 'github'] }, providerId: String, email: String, verified: { type: Boolean, default: false }, connectedAt: { type: Date, default: Date.now } }],
+    loginHistory: [{ loginTime: Date, ipAddress: String, userAgent: String, successful: Boolean, failureReason: String }],
+    securityEvents: [{ event: String, timestamp: { type: Date, default: Date.now }, ipAddress: String, userAgent: String, details: Object }],
     resetToken: { type: String, default: null },
     resetTokenExpiration: { type: Date, default: null },
     session: [{ type: Object }],
@@ -37,7 +92,6 @@ const userSchema = new mongoose.Schema(
     updated_user_id: { type: String, default: null },
     confirmToken: { type: String, default: null },
     role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
-    isVerified: { type: Boolean, default: false },
     tokens: [{ token: { type: String } }],
     socialMedia: { facebook: { type: String, default: null }, twitter: { type: String, default: null }, instagram: { type: String, default: null }, linkedin: { type: String, default: null }, google: { type: String, default: null }, pinterest: { type: String, default: null } },
     preferences: { newsletter: { type: Boolean, default: false }, notifications: { type: Boolean, default: true }, language: { type: String, default: 'en' }, currency: { type: String, default: 'USD' }, theme: { type: String, enum: ['light', 'dark'], default: 'light' } },
@@ -59,7 +113,15 @@ const userSchema = new mongoose.Schema(
 userSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
-
+userSchema.virtual('isLocked').get(function () {
+  return !!(this.lockoutUntil && this.lockoutUntil > Date.now());
+});
+userSchema.pre('save', function (next) {
+  if (this.isModified('hash_password') && this.hash_password) {
+    // Password will be hashed in the setPassword method
+  }
+  next();
+});
 // Common population logic for all get methods
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
@@ -381,22 +443,144 @@ userSchema.method({
     }
     throw new Error(`Field ${field} does not exist in schema`);
   },
-  async setPassword(password) {
-    this.hash_password = await bcrypt.hash(password, SALT_ROUNDS);
-    return this;
-  },
-  async validatePassword(password) {
-    return bcrypt.compare(password, this.hash_password);
-  },
+
   async changePassword(oldPassword, newPassword) {
-    const valid = await this.validatePassword(oldPassword);
-    if (!valid) throw new Error('Incorrect current password');
-    this.hash_password = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    if (!await this.validatePassword(oldPassword)) {
+      throw new Error('Current password is incorrect');
+    }
+    await this.setPassword(newPassword);
+    this.tempPasswordActive = false;
+    // Invalidate all refresh tokens and sessions
+    await this.invalidateAllSessions();
     await this.save();
     return true;
   },
 
-  // Email confirmation & reset
+  async resetPassword(token, newPassword) {
+    if (!this.resetToken || this.resetToken !== token) {
+      throw new Error('Invalid reset token');
+    }
+
+    if (this.resetTokenExpiration < new Date()) {
+      throw new Error('Reset token has expired');
+    }
+
+    await this.setPassword(newPassword);
+    this.resetToken = null;
+    this.resetTokenExpiration = null;
+    this.tempPasswordActive = false;
+
+    // Invalidate all sessions for security
+    await this.invalidateAllSessions();
+
+    await this.save();
+    return true;
+  },
+
+  // Security Events
+  addSecurityEvent(event, ipAddress = null, userAgent = null, details = {}) {
+    this.securityEvents.push({
+      event,
+      timestamp: new Date(),
+      ipAddress,
+      userAgent,
+      details
+    });
+
+    // Limit to last 100 security events
+    if (this.securityEvents.length > 100) {
+      this.securityEvents = this.securityEvents.slice(-100);
+    }
+  },
+
+  // JWT Token Management
+  generateAccessToken() {
+    const payload = {
+      userId: this._id,
+      username: this.username,
+      email: this.email,
+      role: this.role,
+      permissions: this.permissions || []
+    };
+
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRY,
+      issuer: 'your-app-name',
+      audience: 'your-app-users'
+    });
+  },
+
+  generateRefreshToken() {
+    const payload = {
+      userId: this._id,
+      tokenType: 'refresh'
+    };
+
+    return jwt.sign(payload, JWT_REFRESH_SECRET, {
+      expiresIn: JWT_REFRESH_EXPIRY,
+      issuer: 'your-app-name',
+      audience: 'your-app-users'
+    });
+  },
+
+  async storeRefreshToken(token, userAgent = null, ipAddress = null) {
+    const expiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+
+    this.refreshTokens.push({
+      token,
+      expiresAt,
+      userAgent,
+      ipAddress,
+      isActive: true
+    });
+
+    // Clean up expired tokens
+    this.refreshTokens = this.refreshTokens.filter(rt =>
+      rt.expiresAt > new Date() && rt.isActive
+    );
+
+    // Limit to 5 active refresh tokens
+    if (this.refreshTokens.length > 5) {
+      this.refreshTokens = this.refreshTokens.slice(-5);
+    }
+
+    await this.save();
+  },
+
+  async refreshAccessToken(refreshToken) {
+    const tokenData = this.refreshTokens.find(rt =>
+      rt.token === refreshToken && rt.isActive && rt.expiresAt > new Date()
+    );
+
+    if (!tokenData) {
+      throw new Error('Invalid or expired refresh token');
+    }
+
+    try {
+      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+      if (decoded.userId !== this._id.toString()) {
+        throw new Error('Token mismatch');
+      }
+
+      return this.generateAccessToken();
+    } catch (error) {
+      throw new Error('Invalid refresh token');
+    }
+  },
+
+  async revokeRefreshToken(token) {
+    this.refreshTokens = this.refreshTokens.map(rt =>
+      rt.token === token ? { ...rt, isActive: false } : rt
+    );
+    await this.save();
+  },
+
+  generateEmailVerificationToken() {
+    this.emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    this.emailVerificationExpiry = new Date(Date.now() + (24 * 60 * 60 * 1000)); // 24 hours
+    return this.emailVerificationToken;
+  },
+
   async generateResetPasswordToken() {
     this.resetToken = crypto.randomBytes(20).toString('hex');
     this.resetTokenExpiration = Date.now() + 3600000; // 1 hour
@@ -406,6 +590,29 @@ userSchema.method({
   async checkResetTokenValidity(token) {
     return this.resetToken === token && this.resetTokenExpiration > Date.now();
   },
+
+  async verifyEmail(token) {
+    if (!this.emailVerificationToken || this.emailVerificationToken !== token) {
+      throw new Error('Invalid verification token');
+    }
+
+    if (this.emailVerificationExpiry < new Date()) {
+      throw new Error('Verification token has expired');
+    }
+
+    this.emailVerified = true;
+    this.isVerified = this.emailVerified && (this.phoneVerified || !this.phoneNumber);
+    this.emailVerificationToken = null;
+    this.emailVerificationExpiry = null;
+    this.status = this.isVerified ? 'active' : 'pending';
+    this.confirmToken = null;
+    await this.save();
+    return true;
+  },
+
+
+
+
   async confirmEmail(token) {
     if (this.confirmToken !== token) throw new Error('Invalid confirmation token');
     this.isVerified = true;
@@ -414,13 +621,146 @@ userSchema.method({
     return true;
   },
 
+  // OTP Management
+  generateOTP(type = 'login') {
+    // Use crypto for secure OTP generation
+    const otp = crypto.randomInt(100000, 1000000).toString();
+
+    this.otpCode = crypto
+      .createHmac('sha256', OTP_SECRET)
+      .update(otp + this.email + Date.now())
+      .digest('hex')
+      .substring(0, 6)
+      .toUpperCase();
+
+    this.otpExpiry = new Date(Date.now() + OTP_EXPIRY);
+    this.otpType = type;
+    this.otpAttempts = 0;
+    this.otpLastSent = new Date();
+
+    return this.otpCode;
+  },
+
+  async validateOTP(inputOTP, type = 'login') {
+    if (!this.otpCode || !this.otpExpiry) {
+      throw new Error('No OTP found for this user');
+    }
+
+    if (this.otpExpiry < new Date()) {
+      this.clearOTP();
+      await this.save();
+      throw new Error('OTP has expired');
+    }
+
+    if (this.otpType !== type) {
+      throw new Error('OTP type mismatch');
+    }
+
+    if (this.otpAttempts >= 3) {
+      this.clearOTP();
+      await this.save();
+      throw new Error('Maximum OTP attempts exceeded');
+    }
+
+    if (this.otpCode !== inputOTP.toUpperCase()) {
+      this.otpAttempts += 1;
+      await this.save();
+      throw new Error('Invalid OTP');
+    }
+
+    // OTP is valid
+    this.clearOTP();
+    return true;
+  },
+
+  clearOTP() {
+    this.otpCode = null;
+    this.otpExpiry = null;
+    this.otpType = null;
+    this.otpAttempts = 0;
+  },
+
+  canSendOTP() {
+    if (!this.otpLastSent) return true;
+    const oneMinuteAgo = new Date(Date.now() - 60000);
+    return this.otpLastSent < oneMinuteAgo;
+  },
+
+  // Email confirmation & reset
+
+
   // Account security & sessions
+
+
+
+  async handleFailedLogin(ipAddress = null, userAgent = null) {
+    this.failedLoginAttempts += 1;
+    this.consecutiveFailedAttempts += 1;
+    this.lastLoginAttempt = new Date();
+
+    // Add to login history
+    this.loginHistory.push({
+      loginTime: new Date(),
+      ipAddress,
+      userAgent,
+      successful: false,
+      failureReason: 'Invalid credentials'
+    });
+
+    // Lock account after max attempts
+    if (this.consecutiveFailedAttempts >= MAX_ATTEMPTS) {
+      this.lockoutUntil = new Date(Date.now() + LOCK_TIME);
+
+      // Add security event
+      this.securityEvents.push({
+        event: 'account_locked',
+        ipAddress,
+        userAgent,
+        details: { reason: 'Too many failed login attempts', attempts: this.consecutiveFailedAttempts }
+      });
+    }
+
+    await this.save();
+    return this.isLocked;
+  },
+
+
+
+  async handleSuccessfulLogin(ipAddress = null, userAgent = null) {
+    this.lastLogin = new Date();
+    this.failedLoginAttempts = 0;
+    this.consecutiveFailedAttempts = 0;
+    this.lockoutUntil = null;
+    this.lastLoginAttempt = new Date();
+
+    // Add to login history
+    this.loginHistory.push({
+      loginTime: new Date(),
+      ipAddress,
+      userAgent,
+      successful: true
+    });
+
+    // Limit login history to last 50 entries
+    if (this.loginHistory.length > 50) {
+      this.loginHistory = this.loginHistory.slice(-50);
+    }
+
+    await this.save();
+  },
+
+
+
+
   async invalidateAllSessions() {
+    this.refreshTokens = [];
+    this.activeSessions = [];
     this.tokens = [];
     this.session = [];
     await this.save();
     return true;
   },
+
   async lockAccount(durationMs) {
     this.status = 'inactive';
     this.lockExpires = Date.now() + durationMs;
@@ -430,6 +770,9 @@ userSchema.method({
     if (this.lockExpires && this.lockExpires > Date.now()) throw new Error('Account still locked');
     this.status = 'active';
     this.lockExpires = null;
+    this.lockoutUntil = null;
+    this.failedLoginAttempts = 0;
+    this.consecutiveFailedAttempts = 0;
     await this.save();
   },
   async handleFailedLoginAttempt(maxAttempts = 5, lockDurationMs = 3600000) {
@@ -781,7 +1124,7 @@ userSchema.statics.getUsersByStatus = function (status) {
 
 // Get active users
 userSchema.statics.getActiveUsers = function () {
-  return this.find({ status: 'active' }).populate(populateFields);
+  return this.find({ status: 'active', isVerified: true }).populate(populateFields);
 };
 
 // Get verified users
@@ -963,19 +1306,19 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
   try {
     let { password, role: roleId, email, username, ...rest } = userData;
 
+    // Check uniqueness of email and username
+    const exists = await this.findOne({
+      $or: [{ email }, { username }],
+    });
+    if (exists) throw new Error('Email or username already registered');
+
+
     email = email.trim().toLowerCase();
     username = username.trim();
 
-    let tempPassword = null;
-    let tempPasswordActive = false;
-    if (!password) {
-      tempPassword = Math.random().toString(36).slice(-8);
-      password = tempPassword;
-      tempPasswordActive = true;
-    }
 
-    // Hash password
-    const hash_password = await bcrypt.hash(password, SALT_ROUNDS);
+
+
 
     // Role assignment with validation
     if (!roleId) {
@@ -987,23 +1330,7 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
       if (!roleExists) throw new Error('Assigned role does not exist or not active');
     }
 
-    // Check uniqueness of email and username
-    const exists = await this.findOne({
-      $or: [{ email }, { username }],
-    });
-    if (exists) throw new Error('Email or username already registered');
 
-    // Generate unique referral code if missing
-    //   if (!referralCode) {
-    //   let unique = false;
-    //   while (!unique) {
-    //     referralCode = crypto.randomBytes(4).toString('hex');
-    //     const used = await this.findOne({ referralCode });
-    //     if (!used) unique = true;
-    //   }
-    // }
-
-    // Generate email confirmation token (for verification flow)
     const confirmToken = jwt.sign(
       {
         email,
@@ -1015,64 +1342,162 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
     );
 
     // Create user doc including register metadata & security flags
-    const newUser = new this({
+    const user = new this({
       email,
       username,
-      hash_password,
       role: roleId,
-      tempPasswordActive,
-      isVerified: false,
       confirmToken,
       status: 'pending', // pending email verification
       ...rest,
     });
 
-    await newUser.save();
+    if (!password) {
+      password = Math.random().toString(36).slice(-8);
+      user.tempPasswordActive = true;
+    }
+    await user.setPassword(password);
+    user.generateEmailVerificationToken();
+    await user.save();
 
-    return {
-      user: newUser,
-      email,
-      tempPasswordActive,
-      tempPassword,
-      confirmToken,
-    };
+    return user;
   } catch (err) {
     throw err;
   }
 };
 
-// Get new user registrations count by day over last N days
-userSchema.statics.getRegistrationsOverTime = async function (days = 30) {
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  return this.aggregate([
-    { $match: { createdAt: { $gte: cutoff } } },
-    {
-      $group: {
-        _id: {
-          year: { $year: '$createdAt' },
-          month: { $month: '$createdAt' },
-          day: { $dayOfMonth: '$createdAt' },
-        },
-        count: { $sum: 1 },
-      },
-    },
-    {
-      $project: {
-        date: {
-          $dateFromParts: {
-            year: '$_id.year',
-            month: '$_id.month',
-            day: '$_id.day',
+userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login') {
+  const user = await this.findOne({
+    $or: [
+      { email: identifier.toLowerCase() },
+      { username: identifier }
+    ]
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.isLocked) {
+    throw new Error('Account is locked');
+  }
+
+  if (!user.canSendOTP()) {
+    throw new Error('Please wait before requesting another OTP');
+  }
+
+  const otp = user.generateOTP(type);
+  await user.save();
+
+  return { user, otp };
+},
+
+  userSchema.statics.verifyOTPLogin = async function (identifier, otp, ipAddress = null, userAgent = null) {
+    const user = await this.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { username: identifier }
+      ]
+    }).populate('role');
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    await user.validateOTP(otp, 'login');
+    await user.handleSuccessfulLogin(ipAddress, userAgent);
+    await user.save();
+
+    return user;
+  },
+
+  // Token Management
+  userSchema.statics.verifyAccessToken = async function (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const user = await this.findById(decoded.userId).populate('role');
+
+      if (!user || user.status !== 'active') {
+        throw new Error('User not found or inactive');
+      }
+
+      return { user, decoded };
+    } catch (error) {
+      throw new Error('Invalid or expired token');
+    }
+  },
+
+  userSchema.statics.verifyRefreshToken = async function (refreshToken) {
+    try {
+      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+      const user = await this.findById(decoded.userId);
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const tokenData = user.refreshTokens.find(rt =>
+        rt.token === refreshToken && rt.isActive && rt.expiresAt > new Date()
+      );
+
+      if (!tokenData) {
+        throw new Error('Invalid refresh token');
+      }
+
+      return user;
+    } catch (error) {
+      throw new Error('Invalid or expired refresh token');
+    }
+  },
+
+  userSchema.statics.verifyUserEmail = async function (token) {
+    const user = await this.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpiry: { $gt: new Date() }
+    });
+
+    if (!user) {
+      throw new Error('Invalid or expired verification token');
+    }
+
+    await user.verifyEmail(token);
+    return user;
+  },
+
+
+
+  // Get new user registrations count by day over last N days
+  userSchema.statics.getRegistrationsOverTime = async function (days = 30) {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    return this.aggregate([
+      { $match: { createdAt: { $gte: cutoff } } },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' },
           },
+          count: { $sum: 1 },
         },
-        count: 1,
-        _id: 0,
       },
-    },
-    { $sort: { date: 1 } },
-  ]);
-};
+      {
+        $project: {
+          date: {
+            $dateFromParts: {
+              year: '$_id.year',
+              month: '$_id.month',
+              day: '$_id.day',
+            },
+          },
+          count: 1,
+          _id: 0,
+        },
+      },
+      { $sort: { date: 1 } },
+    ]);
+  };
 
 // Get active user login counts by day over last N days
 userSchema.statics.getLoginActivityOverTime = async function (days = 30) {
@@ -1153,6 +1578,201 @@ userSchema.statics.getAverageOrdersPerUser = async function () {
   const result = await this.aggregate([{ $project: { orderCount: { $size: '$orders' } } }, { $group: { _id: null, avgOrders: { $avg: '$orderCount' } } }]);
   return result[0]?.avgOrders || 0;
 };
+
+
+
+userSchema.statics.findLockedAccounts = async function () {
+  return this.find({ lockoutUntil: { $gt: new Date() } }).populate('role');
+},
+
+  userSchema.statics.cleanupExpiredTokens = async function () {
+    const now = new Date();
+
+    // Clean up expired refresh tokens
+    await this.updateMany(
+      {},
+      {
+        $pull: {
+          refreshTokens: {
+            $or: [
+              { expiresAt: { $lt: now } },
+              { isActive: false }
+            ]
+          }
+        }
+      }
+    );
+
+    // Clean up expired OTPs
+    await this.updateMany(
+      { otpExpiry: { $lt: now } },
+      {
+        $unset: {
+          otpCode: 1,
+          otpExpiry: 1,
+          otpType: 1,
+          otpAttempts: 1
+        }
+      }
+    );
+
+    // Clean up expired verification tokens
+    await this.updateMany(
+      { emailVerificationExpiry: { $lt: now } },
+      {
+        $unset: {
+          emailVerificationToken: 1,
+          emailVerificationExpiry: 1
+        }
+      }
+    );
+
+    // Clean up expired reset tokens
+    await this.updateMany(
+      { resetTokenExpiration: { $lt: now } },
+      {
+        $unset: {
+          resetToken: 1,
+          resetTokenExpiration: 1
+        }
+      }
+    );
+  },
+
+  // Password Reset Flow
+  userSchema.statics.initiatePasswordReset = async function (email) {
+    const user = await this.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // Don't reveal if user exists for security
+      return { success: true };
+    }
+
+    const resetToken = user.generateResetPasswordToken();
+    await user.save();
+
+    return { user, resetToken };
+  },
+
+  userSchema.statics.completePasswordReset = async function (token, newPassword) {
+    const user = await this.findOne({
+      resetToken: token,
+      resetTokenExpiration: { $gt: new Date() }
+    });
+
+    if (!user) {
+      throw new Error('Invalid or expired reset token');
+    }
+
+    await user.resetPassword(token, newPassword);
+    return user;
+  },
+
+
+  userSchema.statics.authenticateUser = async function (identifier, password, ipAddress = null, userAgent = null) {
+    const user = await this.findOne({
+      $or: [
+        { email: identifier.toLowerCase() },
+        { username: identifier }
+      ]
+    }).populate('role');
+
+    if (!user) {
+      throw new Error('Invalid credentials');
+    }
+
+    // Check if account is locked
+    if (user.isLocked) {
+      const lockTimeRemaining = Math.ceil((user.lockoutUntil - new Date()) / (1000 * 60));
+      throw new Error(`Account locked. Try again in ${lockTimeRemaining} minutes`);
+    }
+
+    // Validate password
+    const isValidPassword = await user.validatePassword(password);
+
+    if (!isValidPassword) {
+      await user.handleFailedLogin(ipAddress, userAgent);
+      throw new Error('Invalid credentials');
+    }
+
+    // Check if user is active and verified for login
+    if (user.status !== 'active') {
+      throw new Error('Account is not active');
+    }
+
+    await user.handleSuccessfulLogin(ipAddress, userAgent);
+    return user;
+  };
+
+
+userSchema.statics.getSecurityReport = async function (timeframe = 30) {
+  const startDate = new Date(Date.now() - (timeframe * 24 * 60 * 60 * 1000));
+
+  const stats = await this.aggregate([
+    {
+      $match: {
+        'loginHistory.loginTime': { $gte: startDate }
+      }
+    },
+    {
+      $unwind: '$loginHistory'
+    },
+    {
+      $match: {
+        'loginHistory.loginTime': { $gte: startDate }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalLogins: { $sum: 1 },
+        successfulLogins: {
+          $sum: { $cond: ['$loginHistory.successful', 1, 0] }
+        },
+        failedLogins: {
+          $sum: { $cond: ['$loginHistory.successful', 0, 1] }
+        },
+        uniqueUsers: { $addToSet: '$_id' }
+      }
+    },
+    {
+      $project: {
+        totalLogins: 1,
+        successfulLogins: 1,
+        failedLogins: 1,
+        uniqueUsersCount: { $size: '$uniqueUsers' },
+        successRate: {
+          $multiply: [
+            { $divide: ['$successfulLogins', '$totalLogins'] },
+            100
+          ]
+        }
+      }
+    }
+  ]);
+
+  const lockedAccounts = await this.countDocuments({
+    lockoutUntil: { $gt: new Date() }
+  });
+
+  const unverifiedAccounts = await this.countDocuments({
+    emailVerified: false,
+    createdAt: { $lt: new Date(Date.now() - (7 * 24 * 60 * 60 * 1000)) }
+  });
+
+  return {
+    loginStats: stats[0] || {
+      totalLogins: 0,
+      successfulLogins: 0,
+      failedLogins: 0,
+      uniqueUsersCount: 0,
+      successRate: 0
+    },
+    lockedAccounts,
+    unverifiedAccounts,
+    timeframe
+  };
+}
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 

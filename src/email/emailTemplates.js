@@ -7,7 +7,7 @@ const { appUrl, applicaionName } = require("../config/setting");
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
 const welcomeEmailTemplate = (data) => {
-  const { username, email, attachments = [] } = data.user;
+  const { username, email, attachments = [] } = data;
   return {
     subject: `Welcome to Our App, ${username}!`,
     html: `
