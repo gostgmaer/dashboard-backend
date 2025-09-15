@@ -1,15 +1,26 @@
 {
-    "env": {
-      "node": true,
-      "es2021": true
-    },
-    "extends": ["airbnb-base"],
-    "parserOptions": {
-      "ecmaVersion": 12,
-      "sourceType": "module"
-    },
-    "rules": {
-      // Add or override rules here
-    }
+  "env": {
+    "node": true,
+    "es2021": true
+  },
+  "extends": ["airbnb-base"],
+  "parserOptions": {
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-dupe-keys": "error", // ❌ Disallow duplicate keys in object literals
+    "no-dupe-class-members": "error", // ❌ Disallow duplicate class members
+    "no-redeclare": "error", // ❌ Disallow redeclaring variables
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }], // ⚠ Warn for unused vars
+    "no-shadow": "error", // ❌ Prevent variable shadowing
+    "no-undef": "error", // ❌ Prevent use of undeclared variables
+    "no-unreachable": "error", // ❌ Prevent code after return/throw
+    "no-extra-semi": "error", // ❌ Prevent double semicolons
+    "consistent-return": "warn", // ⚠ Ensure return statements are consistent
+    "eqeqeq": ["error", "always"], // ❌ Enforce === over ==
+    "curly": ["error", "all"], // ❌ Require braces around if/else/while
+    "prefer-const": "error", // ❌ Require const if variable never reassigned
+    "object-shorthand": ["warn", "always"] // ⚠ Encourage cleaner object methods/props
   }
-  
+}

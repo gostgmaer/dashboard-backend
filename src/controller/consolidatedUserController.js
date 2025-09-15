@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const { APIError, formatResponse } = require('../utils/apiUtils');
 const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
+const { checkPasswordStrength } = require('../utils/security');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -137,20 +138,60 @@ class UserController {
 
     try {
 
-      const registrationMetadata = {
-        ip: req.ip,
-        userAgent: req.get('User-Agent'),
-      };
+      const { email, username, password, confirmPassword, ...otherData } = req.body;
+
+
+      // Validation
+      if (!email || !username || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email, username, and password are required'
+        });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Passwords do not match'
+        });
+      }
+
+      // Password strength check
+      const passwordStrength = checkPasswordStrength(password);
+      if (!passwordStrength.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password does not meet requirements',
+          passwordRequirements: passwordStrength.checks
+        });
+      }
+
+
 
       // Call schema method for registration
-      const { user, tempPassword, tempPasswordActive, confirmToken,email } =
-        await User.registerNewUser(
-          req.body,
-          registrationMetadata
-        );
+      // Register user
+      const registrationResult = await User.registerUserWithAuth({
+        email,
+        username,
+        password,
+        confirmPassword,
+        ...otherData
+      }, req.deviceInfo);
 
+
+      // Send verification email
+      try {
+        await otpService.sendEmailOTP(
+          email,
+          registrationResult.verificationToken.substring(0, 6), // Use first 6 chars as code
+          'email_verification'
+        );
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        // Don't fail registration if email fails
+      }
       // Send welcome email
-      const emailResult = await sendEmail(welcomeEmailTemplate, {user, tempPassword, tempPasswordActive, confirmToken,email});
+      const emailResult = await sendEmail(welcomeEmailTemplate, registrationResult);
 
       // Return response
       if (emailResult.success) {
@@ -519,48 +560,319 @@ class UserController {
    */
   static async login(req, res) {
     try {
-      const { email, password } = req.body;
+      const { identifier, password } = req.body;
 
-      if (!email || !password) {
-        return UserController.errorResponse(res, 'Email and password are required', 400);
+      if (!identifier || !password) {
+        return UserController.errorResponse(res, 'Email/username and password are required', 400);
       }
+      // Authenticate user
+      const authResult = await User.authenticateUser(
+        identifier,
+        password,
+        req.deviceInfo
+      );
+      const user = authResult.user;
 
-      const user = await User.findByEmail(email);
+      // const user = await User.findByEmail(email);
       if (!user) {
-        return UserController.errorResponse(res, 'Invalid email or password', 401);
+        return UserController.errorResponse(res, 'Invalid Email/username or password', 401);
+      }
+      // Check if MFA is required
+      if (authResult.requiresMFA) {
+        // Generate and send OTP
+        const otpResult = await user.generateOTP(
+          process.env.DEFAULT_OTP_TYPE || 'email',
+          'login',
+          req.deviceInfo
+        );
+
+        return res.status(200).json({
+          success: true,
+          requiresMFA: true,
+          message: 'MFA verification required',
+          otpSent: otpResult.success,
+          otpType: otpResult.type,
+          tempToken: generateSecureToken(), // Temporary token for MFA step
+          userId: user._id
+        });
       }
 
-      const valid = await user.validatePassword(password);
-      if (!valid) {
-        await user.handleFailedLoginAttempt();
-        return UserController.errorResponse(res, 'Invalid email or password', 401);
-      }
-
-      // Check account status
-      if (user.status === 'inactive') {
-        return UserController.errorResponse(res, 'Account is locked. Contact support.', 403);
-      }
-
-      if (user.status === 'banned') {
-        return UserController.errorResponse(res, 'Account has been banned', 403);
-      }
-
-      await user.updateLastLogin();
-      await user.resetFailedLogins();
-
-      // Generate JWT token (implement based on your JWT setup)
-      const userData = UserController.enrichUser(user);
-      delete userData.hash_password;
+      const tokens = await user.generateTokens(req.deviceInfo);
 
       return UserController.standardResponse(
         res,
         true,
-        { user: userData },
+        {
+          user: {
+            id: user._id,
+            email: user.email,
+            username: user.username,
+            fullName: user.fullName,
+            role: user.role?.name,
+            isVerified: user.isVerified
+          },
+          tokens,
+          requiresMFA: false
+        },
         'Login successful'
       );
     } catch (error) {
       console.error('Login error:', error);
-      return UserController.errorResponse(res, 'Login failed', 500, error.message);
+      return UserController.errorResponse(res, 'Login failed', 401, error.message);
+    }
+  }
+
+  /**
+ * MFA verification - Step 2
+ */
+  async verifyMFA(req, res) {
+    try {
+      const { userId, mfaCode, tempToken } = req.body;
+
+      if (!userId || !mfaCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID and MFA code are required'
+        });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      // Verify MFA code
+      const isValid = await user.verifyOTP(mfaCode, 'login', req.deviceInfo);
+
+      if (!isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired MFA code'
+        });
+      }
+
+      // Complete authentication
+      const tokens = await user.generateTokens(req.deviceInfo);
+      await user.registerDevice(req.deviceInfo);
+      await user.updateLastLogin();
+
+      res.status(200).json({
+        success: true,
+        message: 'Authentication successful',
+        data: {
+          user: {
+            id: user._id,
+            email: user.email,
+            username: user.username,
+            fullName: user.fullName,
+            role: user.role?.name,
+            isVerified: user.isVerified
+          },
+          tokens
+        }
+      });
+
+    } catch (error) {
+      res.status(401).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Logout
+   */
+  async logout(req, res) {
+    try {
+      const user = req.user;
+      const token = req.token;
+
+      // Revoke current token
+      await user.revokeToken(token);
+
+      // Log logout event
+      await user.logAuthEvent('logout', req.deviceInfo, true);
+
+      res.status(200).json({
+        success: true,
+        message: 'Logout successful'
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Logout failed'
+      });
+    }
+  }
+
+  /**
+   * Logout from all devices
+   */
+  async logoutAll(req, res) {
+    try {
+      const user = req.user;
+
+      // Revoke all tokens
+      await user.revokeAllTokens();
+
+      // Log security event
+      await user.logAuthEvent('logout_all_devices', req.deviceInfo, true);
+
+      res.status(200).json({
+        success: true,
+        message: 'Logged out from all devices'
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to logout from all devices'
+      });
+    }
+  }
+
+  /**
+   * Refresh access token
+   */
+  async refreshToken(req, res) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Refresh token is required'
+        });
+      }
+
+      // Find user by refresh token
+      const user = await User.findOne({
+        'tokens.refreshToken': refreshToken,
+        'tokens.isRevoked': false
+      });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid refresh token'
+        });
+      }
+
+      // Generate new tokens
+      const tokens = await user.refreshToken(refreshToken);
+
+      res.status(200).json({
+        success: true,
+        message: 'Token refreshed successfully',
+        data: { tokens }
+      });
+
+    } catch (error) {
+      res.status(401).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Generate OTP
+   */
+  async generateOTP(req, res) {
+    try {
+      const { type = process.env.DEFAULT_OTP_TYPE || 'email', purpose = 'login' } = req.body;
+      const user = req.user;
+
+      const otpResult = await user.generateOTP(type, purpose, req.deviceInfo);
+
+      // Send OTP via appropriate channel
+      let sendResult;
+      switch (type) {
+        case 'email':
+          sendResult = await otpService.sendEmailOTP(
+            user.email,
+            otpResult.code || '000000',
+            purpose
+          );
+          break;
+        case 'sms':
+          if (!user.phoneNumber) {
+            throw new Error('Phone number not configured');
+          }
+          sendResult = await otpService.sendSMSOTP(
+            user.phoneNumber,
+            otpResult.code || '000000',
+            purpose
+          );
+          break;
+        case 'voice':
+          if (!user.phoneNumber) {
+            throw new Error('Phone number not configured');
+          }
+          sendResult = await otpService.sendVoiceOTP(
+            user.phoneNumber,
+            otpResult.code || '000000'
+          );
+          break;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `OTP sent via ${type}`,
+        data: {
+          type,
+          expiresAt: otpResult.expiresAt,
+          sent: sendResult?.success || false
+        }
+      });
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Verify OTP
+   */
+  async verifyOTP(req, res) {
+    try {
+      const { code, purpose = 'login' } = req.body;
+      const user = req.user;
+
+      if (!code) {
+        return res.status(400).json({
+          success: false,
+          message: 'OTP code is required'
+        });
+      }
+
+      const isValid = await user.verifyOTP(code, purpose, req.deviceInfo);
+
+      if (isValid) {
+        res.status(200).json({
+          success: true,
+          message: 'OTP verified successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid or expired OTP code'
+        });
+      }
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
     }
   }
 
@@ -570,35 +882,172 @@ class UserController {
   static async changePassword(req, res) {
     try {
       const { id } = req.params;
-      const { oldPassword, newPassword } = req.body;
 
-      if (!oldPassword || !newPassword) {
-        return UserController.errorResponse(res, 'Old and new passwords are required', 400);
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+      const user = req.user;
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'All fields are required'
+        });
       }
 
-      const user = await User.findById(id);
-      if (!user) {
-        return UserController.errorResponse(res, 'User not found', 404);
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'New passwords do not match'
+        });
       }
 
-      const success = await user.changePassword(oldPassword, newPassword);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { success },
-        'Password updated successfully'
-      );
+      // Password strength check
+      const passwordStrength = checkPasswordStrength(newPassword);
+      if (!passwordStrength.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password does not meet requirements',
+          passwordRequirements: passwordStrength.checks
+        });
+      }
+
+      const result = await user.changePassword(currentPassword, newPassword);
+
+      if (result) {
+        // Log password change
+        await user.logAuthEvent('password_change', req.deviceInfo, true);
+
+        return UserController.standardResponse(
+          res,
+          true,
+          result,
+          'Password changed successfully'
+        )
+      }
+
+
     } catch (error) {
       console.error('Change password error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to change password', 500);
     }
   }
 
+
   /**
-   * GENERATE RESET PASSWORD TOKEN
+  * Enable MFA
+  */
+  static async enableMFA(req, res) {
+    try {
+      const { method = 'totp' } = req.body;
+      const user = req.user;
+
+      if (user.mfaEnabled) {
+        return res.status(400).json({
+          success: false,
+          message: 'MFA is already enabled'
+        });
+      }
+
+      const mfaSetup = await user.enableMFA(method);
+
+      res.status(200).json({
+        success: true,
+        message: 'MFA setup initiated',
+        data: mfaSetup
+      });
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Confirm MFA setup
    */
-  static async generateResetToken(req, res) {
+  static async confirmMFA(req, res) {
+    try {
+      const { code } = req.body;
+      const user = req.user;
+
+      if (!code) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification code is required'
+        });
+      }
+
+      const result = await user.confirmMFASetup(code);
+
+      if (result) {
+        await user.logAuthEvent('mfa_enabled', req.deviceInfo, true);
+
+        res.status(200).json({
+          success: true,
+          message: 'MFA enabled successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid verification code'
+        });
+      }
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Disable MFA
+   */
+  static async disableMFA(req, res) {
+    try {
+      const { code } = req.body;
+      const user = req.user;
+
+      if (!user.mfaEnabled) {
+        return res.status(400).json({
+          success: false,
+          message: 'MFA is not enabled'
+        });
+      }
+
+      if (!code) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification code is required'
+        });
+      }
+
+      const result = await user.disableMFA(code);
+
+      if (result) {
+        await user.logAuthEvent('mfa_disabled', req.deviceInfo, true);
+
+        res.status(200).json({
+          success: true,
+          message: 'MFA disabled successfully'
+        });
+      }
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+
+  /**
+   * Initiate password reset
+   */
+  async forgotPassword(req, res) {
     try {
       const { email } = req.body;
 
@@ -611,17 +1060,21 @@ class UserController {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      const token = await user.generateResetPasswordToken();
+      const result = await User.initiatePasswordReset(email, req.deviceInfo);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { token },
-        'Reset token generated successfully'
-      );
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        data: {
+          otpType: result.otpType
+        }
+      });
+
     } catch (error) {
-      console.error('Generate reset token error:', error);
-      return UserController.errorResponse(res, 'Failed to generate reset token', 500, error.message);
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
     }
   }
 
@@ -630,7 +1083,21 @@ class UserController {
    */
   static async resetPassword(req, res) {
     try {
-      const { token, newPassword } = req.body;
+       const { email, otpCode, newPassword, confirmPassword } = req.body;
+        if (!email || !otpCode || !newPassword || !confirmPassword|| !token) {
+        return res.status(400).json({
+          success: false,
+          message: 'All fields are required'
+        });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Passwords do not match'
+        });
+      }
+
 
       if (!token || !newPassword) {
         return UserController.errorResponse(res, 'Token and new password are required', 400);
@@ -690,6 +1157,219 @@ class UserController {
     } catch (error) {
       console.error('Confirm email error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to confirm email', 400);
+    }
+  }
+
+  /**
+   * Get active sessions
+   */
+  static async getActiveSessions(req, res) {
+    try {
+      const user = req.user;
+      const now = new Date();
+
+      const activeSessions = user.tokens
+        .filter(token => !token.isRevoked && token.expiresAt > now)
+        .map(token => ({
+          tokenId: token._id,
+          deviceId: token.deviceId,
+          ipAddress: token.ipAddress,
+          createdAt: token.createdAt,
+          expiresAt: token.expiresAt,
+          isCurrent: token.token === req.token
+        }));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          activeSessions,
+          totalSessions: activeSessions.length,
+          maxSessions: user.concurrentSessionLimit
+        }
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve active sessions'
+      });
+    }
+  }
+
+  /**
+   * Revoke specific session
+   */
+  static async revokeSession(req, res) {
+    try {
+      const { tokenId } = req.body;
+      const user = req.user;
+
+      if (!tokenId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token ID is required'
+        });
+      }
+
+      const tokenData = user.tokens.find(t => t._id.toString() === tokenId);
+      if (!tokenData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Session not found'
+        });
+      }
+
+      await user.revokeToken(tokenData.token);
+
+      res.status(200).json({
+        success: true,
+        message: 'Session revoked successfully'
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to revoke session'
+      });
+    }
+  }
+
+  /**
+   * Get user devices
+   */
+  static async getDevices(req, res) {
+    try {
+      const user = req.user;
+
+      const devices = user.devices.map(device => ({
+        deviceId: device.deviceId,
+        deviceName: device.deviceName,
+        deviceType: device.deviceType,
+        browser: device.browser,
+        os: device.os,
+        location: device.location,
+        lastUsed: device.lastUsed,
+        isActive: device.isActive,
+        isTrusted: device.isTrusted,
+        registeredAt: device.registeredAt
+      }));
+
+      res.status(200).json({
+        success: true,
+        data: { devices }
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve devices'
+      });
+    }
+  }
+
+  /**
+   * Remove device
+   */
+  static async removeDevice(req, res) {
+    try {
+      const { deviceId } = req.body;
+      const user = req.user;
+
+      if (!deviceId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Device ID is required'
+        });
+      }
+
+      await user.removeDevice(deviceId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Device removed successfully'
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to remove device'
+      });
+    }
+  }
+
+  /**
+   * Trust device
+   */
+  static async trustDevice(req, res) {
+    try {
+      const { deviceId } = req.body;
+      const user = req.user;
+
+      if (!deviceId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Device ID is required'
+        });
+      }
+
+      await user.trustDevice(deviceId);
+
+      res.status(200).json({
+        success: true,
+        message: 'Device trusted successfully'
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to trust device'
+      });
+    }
+  }
+
+  static async verifyEmail(req, res) {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification token is required'
+        });
+      }
+
+      const user = await User.findOne({
+        'emailVerificationTokens.token': token
+      });
+
+      if (!user) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired verification token'
+        });
+      }
+
+      const result = await user.verifyEmailWithToken(token);
+
+      if (result) {
+        await user.logAuthEvent('email_verified', req.deviceInfo || {}, true);
+
+        res.status(200).json({
+          success: true,
+          message: 'Email verified successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Email verification failed'
+        });
+      }
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
     }
   }
 
