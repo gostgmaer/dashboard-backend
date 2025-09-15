@@ -46,69 +46,176 @@ const MAX_SESSIONS = parseInt(MAX_CONCURRENT_SESSIONS);
 
 const userSchema = new mongoose.Schema(
   {
+    // 🔹 Basic Info
     username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 30 },
-    socialID: { type: String, default: null },
     email: { type: String, required: true, unique: true, lowercase: true },
-    hash_password: { type: String, required: false },
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
+    profilePicture: { type: String, default: null },
     dateOfBirth: { type: Date, default: null },
     gender: { type: String, enum: ['male', 'female', 'other', 'prefer_not_to_say'], default: null, trim: true },
     phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
-    address: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
-    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
-    favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+
+    // 🔹 Security & Authentication
+    hash_password: { type: String, required: false },
     tempPasswordActive: { type: Boolean, default: false },
-    profilePicture: { type: String, default: null },
+    failedLoginAttempts: { type: Number, default: 0 },
+    consecutiveFailedAttempts: { type: Number, default: 0 },
+    lastLoginAttempt: { type: Date, default: null },
+    lockoutUntil: { type: Date, default: null },
+    lastLogin: { type: Date, default: null },
+
+    // 🔹 Verification
     isVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
     phoneVerified: { type: Boolean, default: false },
     emailVerificationToken: { type: String, default: null },
     emailVerificationExpiry: { type: Date, default: null },
+    confirmToken: { type: String, default: null },
+
+    // 🔹 OTP (One-Time Passwords)
     otpCode: { type: String, default: null },
     otpExpiry: { type: Date, default: null },
     otpType: { type: String, enum: ['email', 'sms', 'login', 'reset', 'verification'], default: null },
     otpAttempts: { type: Number, default: 0 },
     otpLastSent: { type: Date, default: null },
-    failedLoginAttempts: { type: Number, default: 0 },
-    lockoutUntil: { type: Date, default: null },
-    lastLoginAttempt: { type: Date, default: null },
-    consecutiveFailedAttempts: { type: Number, default: 0 },
-    refreshTokens: [{ token: { type: String, required: true }, createdAt: { type: Date, default: Date.now }, expiresAt: { type: Date, required: true }, userAgent: { type: String, default: null }, ipAddress: { type: String, default: null }, isActive: { type: Boolean, default: true } }],
-    activeSessions: [{ sessionId: String, accessToken: String, userAgent: String, ipAddress: String, createdAt: { type: Date, default: Date.now }, expiresAt: Date, isActive: { type: Boolean, default: true } }],
-    twoFactorEnabled: { type: Boolean, default: false },
-    twoFactorSecret: { type: String, default: null },
-    backupCodes: [{ code: String, used: { type: Boolean, default: false }, createdAt: { type: Date, default: Date.now } }],
-    socialAccounts: [{ provider: { type: String, enum: ['google', 'facebook', 'twitter', 'github'] }, providerId: String, email: String, verified: { type: Boolean, default: false }, connectedAt: { type: Date, default: Date.now } }],
-    loginHistory: [{ loginTime: Date, ipAddress: String, userAgent: String, successful: Boolean, failureReason: String }],
-    securityEvents: [{ event: String, timestamp: { type: Date, default: Date.now }, ipAddress: String, userAgent: String, details: Object }],
+
+    // 🔹 Tokens & Sessions
+    refreshTokens: [
+      {
+        token: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true },
+        userAgent: { type: String, default: null },
+        ipAddress: { type: String, default: null },
+        isActive: { type: Boolean, default: true },
+      },
+    ],
+    activeSessions: [
+      {
+        sessionId: String,
+        accessToken: String,
+        userAgent: String,
+        ipAddress: String,
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: Date,
+        isActive: { type: Boolean, default: true },
+      },
+    ],
+    tokens: [{ token: { type: String } }],
     resetToken: { type: String, default: null },
     resetTokenExpiration: { type: Date, default: null },
-    session: [{ type: Object }],
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    status: { type: String, enum: ['active', 'inactive', 'pending', 'banned', 'deleted', 'archived', 'draft'], default: 'draft', trim: true },
-    created_user_id: { type: String, default: null },
-    updated_user_id: { type: String, default: null },
-    confirmToken: { type: String, default: null },
-    role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
-    tokens: [{ token: { type: String } }],
-    socialMedia: { facebook: { type: String, default: null }, twitter: { type: String, default: null }, instagram: { type: String, default: null }, linkedin: { type: String, default: null }, google: { type: String, default: null }, pinterest: { type: String, default: null } },
-    preferences: { newsletter: { type: Boolean, default: false }, notifications: { type: Boolean, default: true }, language: { type: String, default: 'en' }, currency: { type: String, default: 'USD' }, theme: { type: String, enum: ['light', 'dark'], default: 'light' } },
-    interests: { type: [String], default: [] },
-    lastLogin: { type: Date, default: null },
-    loyaltyPoints: { type: Number, default: 0 },
-    referralCode: { type: String },
-    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // 🔹 2FA & Backup
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorSecret: { type: String, default: null },
+    backupCodes: [
+      {
+        code: String,
+        used: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // 🔹 Social Logins
+    socialID: { type: String, default: null },
+    socialAccounts: [
+      {
+        provider: { type: String, enum: ['google', 'facebook', 'twitter', 'github'] },
+        providerId: String,
+        email: String,
+        verified: { type: Boolean, default: false },
+        connectedAt: { type: Date, default: Date.now },
+      },
+    ],
+    socialMedia: {
+      facebook: { type: String, default: null },
+      twitter: { type: String, default: null },
+      instagram: { type: String, default: null },
+      linkedin: { type: String, default: null },
+      google: { type: String, default: null },
+      pinterest: { type: String, default: null },
+    },
+
+    // 🔹 User Activity
+    loginHistory: [
+      {
+        loginTime: Date,
+        ipAddress: String,
+        userAgent: String,
+        successful: Boolean,
+        failureReason: String,
+      },
+    ],
+    securityEvents: [
+      {
+        event: String,
+        timestamp: { type: Date, default: Date.now },
+        ipAddress: String,
+        userAgent: String,
+        details: Object,
+      },
+    ],
+
+    // 🔹 Relationships
+    address: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
+    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
+    favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     shoppingCart: { type: mongoose.Schema.Types.ObjectId, ref: 'Cart' },
     wishList: { type: mongoose.Schema.Types.ObjectId, ref: 'Wishlist' },
-    paymentMethods: [{ method: { type: String, enum: ['credit_card', 'paypal', 'bank_transfer'], required: true }, details: { cardNumber: { type: String, default: null }, expiryDate: { type: Date, default: null }, holderName: { type: String, default: null } }, isDefault: { type: Boolean, default: false } }],
-    shippingPreferences: { deliveryMethod: { type: String, enum: ['standard', 'express'], default: 'standard' }, deliveryInstructions: { type: String, default: null }, preferredTime: { type: String, default: null } },
+    role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // 🔹 Preferences & Settings
+    preferences: {
+      newsletter: { type: Boolean, default: false },
+      notifications: { type: Boolean, default: true },
+      language: { type: String, default: 'en' },
+      currency: { type: String, default: 'USD' },
+      theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    },
+    interests: { type: [String], default: [] },
+    shippingPreferences: {
+      deliveryMethod: { type: String, enum: ['standard', 'express'], default: 'standard' },
+      deliveryInstructions: { type: String, default: null },
+      preferredTime: { type: String, default: null },
+    },
+
+    // 🔹 Payment & Subscription
+    paymentMethods: [
+      {
+        method: { type: String, enum: ['credit_card', 'paypal', 'bank_transfer'], required: true },
+        details: {
+          cardNumber: { type: String, default: null },
+          expiryDate: { type: Date, default: null },
+          holderName: { type: String, default: null },
+        },
+        isDefault: { type: Boolean, default: false },
+      },
+    ],
     subscriptionStatus: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
     subscriptionType: { type: String, enum: ['free', 'premium', 'enterprise'], default: 'free' },
+
+    // 🔹 Metadata & Audit
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    created_user_id: { type: String, default: null },
+    updated_user_id: { type: String, default: null },
+    status: {
+      type: String,
+      enum: ['active', 'inactive', 'pending', 'banned', 'deleted', 'archived', 'draft'],
+      default: 'draft',
+      trim: true,
+    },
+    session: [{ type: Object }],
+
+    // 🔹 Loyalty & Referrals
+    loyaltyPoints: { type: Number, default: 0 },
+    referralCode: { type: String },
   },
   { timestamps: true }
 );
+
 
 userSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
