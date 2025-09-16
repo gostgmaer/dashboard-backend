@@ -194,7 +194,8 @@ class authController {
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
 
       if (emaildata.success) {
-        // Return response
+      
+        
         return authController.standardResponse(res, true, {
           user: {
             email: user.email,
@@ -242,7 +243,7 @@ class authController {
       }
 
      
-      if (user.emailVerified) {
+      if (!user.emailVerified) {
          await user.generateEmailVerificationToken()
         await sendEmail(emailVerificationTemplate, user);
       }
@@ -264,6 +265,7 @@ class authController {
               id: user._id,
               email: user.email,
               username: user.username,
+               image:user.profilePicture,
               fullName: user.fullName,
               role: user.role?.name,
               isVerified: user.isVerified,
@@ -301,6 +303,7 @@ class authController {
             id: user._id,
             email: user.email,
             username: user.username,
+             image:user.profilePicture,
             hasActiveTOTP: user.hasActiveTOTP
           }
         }, 'MFA verification required', 200);
@@ -318,6 +321,7 @@ class authController {
           user: {
             id: user._id,
             email: user.email,
+            image:user.profilePicture,
             username: user.username,
             fullName: user.fullName,
             role: user.role?.name,
