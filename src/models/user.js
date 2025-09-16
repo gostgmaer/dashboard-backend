@@ -397,7 +397,7 @@ userSchema.method({
 
       const accessToken = await this.generateAccessToken(deviceId)
       const idToken = await this.generateIdToken(deviceId)
-      const refreshToken = await this.generateRefreshToken()
+      const refreshToken = await this.generateRefreshToken(deviceId)
 
       // Store tokens
       const now = new Date();
@@ -619,6 +619,28 @@ userSchema.method({
 
   async getMyProfile() {
 
+    await this.populate(['role']);
+
+
+    return {
+      id: this._id,
+      fullName: this.fullName,
+      email: this.email,
+      username: this.username,
+      dateOfBirth: this.dateOfBirth,
+      gender: this.gender,
+      phoneNumber: this.phoneNumber,
+      image: this.profilePicture,
+      role: this.role ? this.role.name : null,
+      loyaltyPoints: this.loyaltyPoints,
+      isVerified: this.isVerified,
+      preferences: this.preferences,
+      accountStatus: this.status,
+    };
+  },
+
+   async getMyProfileStatistics() {
+
     await this.populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by']);
 
     // const Wishlist = mongoose.model('Wishlist');
@@ -700,7 +722,6 @@ userSchema.method({
       updatedAt: this.updatedAt,
     };
   },
-
 
   async authenticate(password) {
     return bcrypt.compare(password, this.hash_password);
@@ -1061,10 +1082,11 @@ userSchema.method({
     });
   },
 
-  async generateRefreshToken() {
+  async generateRefreshToken(deviceId) {
     const payload = {
       userId: this._id,
-      tokenType: 'refresh'
+      tokenType: 'refresh',
+      deviceId
     };
 
     return jwt.sign(payload, JWT_REFRESH_SECRET, {
@@ -1118,11 +1140,11 @@ userSchema.method({
         throw new Error('Token mismatch');
       }
 
-      const token = this.generateAccessToken(decoded.deviceId)
+      const token = await this.generateAccessToken(decoded.deviceId)
 
       // Add new token
       const now = new Date();
-      const accessTokenExpiry = new Date(now.getTime() + this.parseTimeToMs(JWT_EXPIRY));
+      const accessTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_EXPIRY));
 
       this.authTokens.push({
         token: token,
@@ -1138,7 +1160,7 @@ userSchema.method({
 
       await this.save();
       return {
-        accessToken: newAccessToken,
+        accessToken: token,
         expiresAt: accessTokenExpiry
       };
     } catch (error) {

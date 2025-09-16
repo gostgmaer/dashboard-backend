@@ -1,4 +1,5 @@
 const User = require('../models/user');
+const jwt = require('jsonwebtoken');
 const Order = require('../models/orders');
 const Product = require('../models/products');
 const mongoose = require('mongoose');
@@ -2137,6 +2138,17 @@ class authController {
 
 
       return authController.standardResponse(res, true, user, 'Devices retrieved successfully');
+
+    } catch (error) {
+      console.error('Get devices error:', error);
+      return authController.errorResponse(res,
+        'Failed to retrieve devices', 500, error.message);
+    }
+  }
+    static async getProfile(req, res) {
+    try {
+      const user = await req.user.getMyProfile();
+      return authController.standardResponse(res, true, user, 'Profile Fetch successfully');
 
     } catch (error) {
       console.error('Get devices error:', error);

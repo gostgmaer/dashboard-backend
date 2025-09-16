@@ -334,7 +334,7 @@ router.put('/:id/profile',
 );
 
 // GET /api/users/profile - Get profile
-router.get('/profile',
+router.get('/profile/staticstics',
   authMiddleware,
   UserController.getMyProfileStatisticsController
 );

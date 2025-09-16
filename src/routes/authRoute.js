@@ -66,7 +66,8 @@ authRoute.post('/mfa/verify', AuthMiddleware, authController.verifyMFA);
 // ========================================
 // 📱 DEVICE & SESSION MANAGEMENT
 // ========================================
-authRoute.get('/profile', AuthMiddleware, authController.findFullyPopulatedById);
+authRoute.get('/profile-date', AuthMiddleware, authController.findFullyPopulatedById);
+authRoute.get('/profile', AuthMiddleware, authController.getProfile);
 authRoute.get('/devices', AuthMiddleware, authController.getDevices);
 authRoute.post('/devices/trust', AuthMiddleware, authAccess.requireOTP('trust_device'), authController.trustDevice);
 authRoute.delete('/devices/remove', AuthMiddleware, authAccess.requireOTP('remove_device'), authController.removeDevice);
