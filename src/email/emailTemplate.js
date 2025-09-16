@@ -1,4 +1,4 @@
-const { appUrl, applicaionName } = require("../config/setting");
+const { appUrl, applicaionName, frontendUrl, } = require("../config/setting");
 
 /**
  * Welcome email template for new users.
@@ -100,7 +100,9 @@ function welcomeEmailTemplate(data) {
 
 // utils/emailTemplates.js
 
-function emailVerificationTemplate({ name, verificationLink }) {
+function emailVerificationTemplate({ id, emailVerificationToken }) {
+
+  const verificationUrl = `${frontendUrl}/verify-email/${emailVerificationToken}?id=${id}`;
   return `
   <!DOCTYPE html>
   <html lang="en">
@@ -119,7 +121,7 @@ function emailVerificationTemplate({ name, verificationLink }) {
       </p>
 
       <div style="margin:30px 0; text-align:center;">
-        <a href="${verificationLink}" 
+        <a href="${verificationUrl}" 
            style="background:#2c3e50; color:#fff; padding:12px 24px; text-decoration:none; border-radius:6px; font-size:16px;">
           Verify Email
         </a>
@@ -128,7 +130,7 @@ function emailVerificationTemplate({ name, verificationLink }) {
       <p style="font-size:14px; color:#777;">
         Or copy and paste this link into your browser:  
         <br/>
-        <a href="${verificationLink}" style="color:#2c3e50;">${verificationLink}</a>
+        <a href="${verificationUrl}" style="color:#2c3e50;">${verificationUrl}</a>
       </p>
 
       <p style="margin-top:30px; font-size:14px; color:#777;">

@@ -13,7 +13,7 @@ const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
 const DeviceDetector = require('../services/DeviceDetector');
 const otpService = require('../services/otpService');
-const { emailVerificationTemplate,welcomeEmailTemplate } = require('../email/emailTemplate');
+const { emailVerificationTemplate, welcomeEmailTemplate } = require('../email/emailTemplate');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -159,12 +159,12 @@ class authController {
       }
 
       // Password strength check
-      const passwordStrength = checkPasswordStrength(password);
-      if (!passwordStrength.isValid) {
+      const {checks,feedback,isValid,suggestions,warning,score} = checkPasswordStrength(password);
+      if (!isValid) {
         return res.status(400).json({
           success: false,
           message: 'Password does not meet requirements',
-          passwordRequirements: passwordStrength.checks,
+          passwordRequirements: checks,feedback,suggestions,warning,score
         });
       }
 
@@ -208,7 +208,7 @@ class authController {
       }
       else {
         return authController.errorResponse(res,
-          'Registration successful but failed to send welcome email', 500, emaildata.error);
+          'Registration successful but failed to send welcome email Please Activate Your Account', 500, emaildata.error);
       }
 
     }
@@ -234,15 +234,17 @@ class authController {
       // Authenticate user
       const authResult = await User.authenticateUser(identifier, password, deviceInfo);
       let user = authResult.user;
-      user.verificationLink="asdasdad"
-      if (!user.emailVerified) {
-         await sendEmail(emailVerificationTemplate, user);
-        
-      }
+
 
       // const user = await User.findByEmail(email);
       if (!user) {
         return authController.errorResponse(res, 'Invalid Email/username or password', 401);
+      }
+
+     
+      if (user.emailVerified) {
+         await user.generateEmailVerificationToken()
+        await sendEmail(emailVerificationTemplate, user);
       }
 
       // Check if MFA/OTP is required
@@ -955,6 +957,56 @@ class authController {
    * CONFIRM EMAIL
    */
 
+
+
+  static async verifyAccount(req, res) {
+    try {
+      const user = req.user;
+      const deviceInfo = DeviceDetector.detectDevice(req);
+
+      // 0. Account already verified
+      if (user.accountVerified) {
+        return authController.errorResponse(res, 'Account is already verified.', 400);
+      }
+
+      // 1. Priority: Email
+      if (user.email && !user.emailVerified) {
+        const result = await user.sendEmailVerification(deviceInfo);
+        return authController.standardResponse(res, true, {
+          verificationType: 'email',
+          destination: result.destination,
+          expiresAt: result.expiresAt
+        }, 'Email verification sent');
+      }
+
+      // 2. Next: OTP
+      if (user.otpConfig && user.otpConfig.enableOTP) {
+        const result = await user.generateOTP('email_verification', deviceInfo, 'email');
+        return authController.standardResponse(res, true, {
+          verificationType: 'otp',
+          destination: result.destination,
+          expiresAt: result.expiresAt
+        }, 'OTP verification initiated');
+      }
+
+      // 3. Last: Phone
+      if (user.phone && !user.phoneVerified) {
+        const result = await user.sendPhoneVerification(deviceInfo);
+        return authController.standardResponse(res, true, {
+          verificationType: 'phone',
+          destination: result.destination,
+          expiresAt: result.expiresAt
+        }, 'Phone verification sent');
+      }
+
+      return authController.errorResponse(res, 'No valid verification method available.', 400);
+    } catch (error) {
+      console.error('Verify account error:', error);
+      return authController.errorResponse(res, error.message || 'Failed to verify account', 500);
+    }
+  }
+
+
   static async sendEmailVerification(req, res) {
     try {
       const user = req.user;
@@ -964,14 +1016,15 @@ class authController {
         return authController.errorResponse(res,
           'Email is already verified', 400);
       }
+      if (user.email && !user.emailVerified) {
+        await user.sendEmailVerification()
+        await sendEmail(emailVerificationTemplate, user);
 
-      const result = await user.generateOTP('email_verification', deviceInfo, 'email');
+        return authController.standardResponse(res, true, {
+          verificationSent: true,
+        }, 'Email verification sent successfully');
+      }
 
-      return authController.standardResponse(res, true, {
-        verificationSent: true,
-        destination: result.destination,
-        expiresAt: result.expiresAt
-      }, 'Email verification sent successfully');
 
     } catch (error) {
       console.error('Send email verification error:', error);

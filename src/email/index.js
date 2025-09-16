@@ -71,18 +71,18 @@ const nodemailer = require('nodemailer');
          pass: options.pass || mailPassword,
        },
        // Explicitly support Brevo's auth mechanisms
-       authMethod: (options.service || mailService) ? undefined : 'LOGIN', // Force LOGIN for Brevo
-       pool: emailPool,
-       maxConnections: emailMaxConnections,
-       maxMessages: emailMaxMessages,
-       rateLimit: emailRateLimit,
-       rateDelta: emailRateDelta,
-       connectionTimeout: emailConnectionTimeout,
-       greetingTimeout: emailGreetingTimeout,
-       tls: {
-         rejectUnauthorized: emailTlsRejectUnauthorized,
-         minVersion: emailTlsMinVersion,
-       },
+      //  authMethod: (options.service || mailService),  // Force LOGIN for Brevo
+      //  pool: emailPool,
+      //  maxConnections: emailMaxConnections,
+      //  maxMessages: emailMaxMessages,
+      //  rateLimit: emailRateLimit,
+      //  rateDelta: emailRateDelta,
+      //  connectionTimeout: emailConnectionTimeout,
+      //  greetingTimeout: emailGreetingTimeout,
+      //  tls: {
+      //    rejectUnauthorized: emailTlsRejectUnauthorized,
+      //    minVersion: emailTlsMinVersion,
+      //  },
        logger: emailDebug ? console : false,
        debug: emailDebug,
      };

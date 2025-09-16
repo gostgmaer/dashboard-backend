@@ -2334,6 +2334,90 @@ class UserController {
     }
   }
 
+    // Activate user
+  static async activateUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user._id;
+      
+      // Check if admin has permission
+      if (!req.user.role || req.user.role.name !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Admin role required.'
+        });
+      }
+      
+      const user = await User.adminActivateUser(userId, adminId, reason);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'User activated successfully',
+        data: {
+          userId: user._id,
+          username: user.username,
+          email: user.email,
+          status: user.status,
+          updatedAt: user.updatedAt
+        }
+      });
+      
+    } catch (error) {
+      console.error('Activate user error:', error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to activate user'
+      });
+    }
+  }
+  
+  // Deactivate user
+  static async deactivateUser(req, res) {
+    try {
+      const { userId } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user._id;
+      
+      // Check if admin has permission
+      if (!req.user.role || req.user.role.name !== 'admin') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Admin role required.'
+        });
+      }
+      
+      // Prevent self-deactivation
+      if (userId === adminId.toString()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot deactivate your own account'
+        });
+      }
+      
+      const user = await User.adminDeactivateUser(userId, adminId, reason);
+      
+      return res.status(200).json({
+        success: true,
+        message: 'User deactivated successfully',
+        data: {
+          userId: user._id,
+          username: user.username,
+          email: user.email,
+          status: user.status,
+          updatedAt: user.updatedAt
+        }
+      });
+      
+    } catch (error) {
+      console.error('Deactivate user error:', error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Failed to deactivate user'
+      });
+    }
+  }
+
   /**
    * REACTIVATE ACCOUNT
    */

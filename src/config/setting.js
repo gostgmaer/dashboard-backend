@@ -37,6 +37,7 @@ const applicaionName = process.env.APPLICATION_NAME;
 
 const host = process.env.LOGINHOST;
 const loginPath = process.env.CLIENTLOGINPAGE;
+const frontendUrl = process.env.FRONTEND_URL;
 const resetPath = process.env.CLIENTRESETPASSURL;
 const confirmPath = process.env.CLIENTCONFIRMURL;
 
@@ -133,7 +134,7 @@ module.exports = {
   mailchimpList,
   applicaionName,paypalMode,
   host,
-  loginPath,
+  loginPath,frontendUrl,
   resetPath,
   confirmPath,enviroment,
   refressSecret,
