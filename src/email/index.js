@@ -156,7 +156,8 @@ const nodemailer = require('nodemailer');
          await transporter.verify();
          console.log('✅ Email service is ready');
          metrics.connectionSuccesses++;
-         return { success: true, message: 'Email service connection verified', metrics };
+         return "✅ Email service connection verified"
+        //  return { success: true, message: 'Email service connection verified', metrics };
        } catch (error) {
          attempts++;
          metrics.connectionFailures++;
