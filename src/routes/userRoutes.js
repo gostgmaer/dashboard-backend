@@ -3,10 +3,10 @@ const router = express.Router();
 const UserController = require('../controller/consolidatedUserController');
 const { body, query, param, validationResult } = require('express-validator');
 const authMiddleware = require('../middleware/auth');
-const  authorize  = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
+const authorize = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
-   const User = require('../models/user'); 
+const User = require('../models/user');
 /**
  * 🚀 CONSOLIDATED USER ROUTES
  * 
@@ -184,6 +184,9 @@ const userValidation = {
     validate
   ]
 };
+
+
+
 
 // ========================================
 // 📋 CRUD OPERATIONS
@@ -671,6 +674,8 @@ router.put('/:id/deactivate',
   UserController.deactivateAccount
 );
 
+
+
 // PUT /api/users/:id/reactivate - Reactivate account
 router.put('/:id/reactivate',
   authMiddleware,
@@ -680,6 +685,12 @@ router.put('/:id/reactivate',
   validate,
   UserController.reactivateAccount
 );
+
+router.patch('/:userId/activate', authMiddleware,
+  authorize('users', 'manage'), UserController.activateUser);
+router.patch('/:userId/deactivate', authMiddleware,
+  authorize('users', 'manage'), UserController.deactivateUser);
+
 
 // PUT /api/users/:id/lock - Lock account
 router.put('/:id/lock',
@@ -1391,14 +1402,14 @@ router.post('/:id/notify',
 const routeOrderMiddleware = (req, res, next) => {
   const path = req.path.toLowerCase();
   if (path.startsWith('/authentication/') ||
-      path.startsWith('/search/') ||
-      path.startsWith('/filter/') ||
-      path.startsWith('/analytics/') ||
-      path.startsWith('/bulk/') ||
-      path.startsWith('/export/') ||
-      path.startsWith('/import/') ||
-      path === '/advanced-search' ||
-      path === '/profile') {
+    path.startsWith('/search/') ||
+    path.startsWith('/filter/') ||
+    path.startsWith('/analytics/') ||
+    path.startsWith('/bulk/') ||
+    path.startsWith('/export/') ||
+    path.startsWith('/import/') ||
+    path === '/advanced-search' ||
+    path === '/profile') {
     return next();
   }
 
@@ -1441,7 +1452,7 @@ router.get('/docs/routes',
     const routes = {
       crud: [
         'POST   /api/users                             - Create new user (write)',
-      ' POST /api/users/register - Register new user Write',
+        ' POST /api/users/register - Register new user Write',
         'GET    /api/users                             - Get all users with filtering (read)',
         'GET    /api/users/:id                         - Get single user by ID (read, instance check)',
         'PUT    /api/users/:id                         - Update user (update, instance check)',
@@ -1502,8 +1513,10 @@ router.get('/docs/routes',
       ],
       accountStatus: [
         'PUT    /api/users/:id/status                  - Update status (update, instance check)',
-        'PUT    /api/users/:id/deactivate              - Deactivate account (update, instance check)',
+       
         'PUT    /api/users/:id/reactivate              - Reactivate account (update, instance check)',
+         'PUT    /api/users/:id/deactivate              - Deactivate account (update, instance check)',
+        'PUT    /api/users/:id/activate              - activate account (update, instance check)',
         'PUT    /api/users/:id/lock                    - Lock account (update, instance check)',
         'PUT    /api/users/:id/unlock                  - Unlock account (update, instance check)'
       ],

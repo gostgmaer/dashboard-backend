@@ -16,7 +16,7 @@ const SALT_ROUNDS = 10;
 // Environment variables with enhanced defaults
 const {
   JWT_SECRET = 'your-super-secret-jwt-key',
-  JWT_ID_SECRET="dasd98a7sd97as89d7a98sd7",
+  JWT_ID_SECRET = "dasd98a7sd97as89d7a98sd7",
   JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
   JWT_EXPIRY = '15m',
   JWT_REFRESH_EXPIRY = '7d',
@@ -219,7 +219,7 @@ const userSchema = new mongoose.Schema(
     // Enhanced Token Management
     authTokens: [{
       token: { type: String, required: true },
-      type: { type: String, enum: ['access', 'refresh','id'], required: true },
+      type: { type: String, enum: ['access', 'refresh', 'id'], required: true },
       deviceId: { type: String, required: true },
       deviceInfo: {
         name: { type: String, default: null },
@@ -816,6 +816,22 @@ userSchema.method({
     }
     throw new Error('Insufficient loyalty points');
   },
+  // async sendEmailVerification(deviceInfo) {
+  //   const user = this;
+  //   user.generateEmailVerificationToken()
+  //   // Delete old tokens of this type for user
+  //   await this.emailVerificationTokens.deleteMany({ userId: user._id, type: 'email_verification' });
+  //   // Save new token
+  //   await this.emailVerificationTokens.create({
+  //     userId: user._id,
+  //     token: user.emailVerificationToken,
+  //     type: 'email_verification',
+  //     expiresAt: user.emailVerificationExpiry,
+  //     deviceInfo: deviceInfo || null,
+  //   });
+  //   return this.user
+  // },
+
 
   // Mark user as verified
   async verifyUser() {
@@ -1614,11 +1630,50 @@ userSchema.method({
     this.deactivationReason = reason || 'No reason provided';
     await this.save();
   },
+
+  async deactivateUser(adminId, reason) {
+    if (this.status === 'inactive') {
+      throw new Error('User is already inactive');
+    }
+    this.status = 'inactive';
+
+    this.updated_by = adminId;
+    await this.revokeAllTokens('admin_deactivation');
+    this.deactivationReason = reason || 'No reason provided';
+    await this.logSecurityEvent('account_deactivated',
+      `Account deactivated by admin: ${reason || 'No reason provided'}`,
+      'high',
+      { adminId, reason }
+    );
+    await this.save();
+    return this;
+  },
+
   async reactivateAccount() {
     this.status = 'active';
     this.deactivationReason = null;
     await this.save();
   },
+
+  async activateUser(adminId, reason = null) {
+    if (this.status === 'active') {
+      throw new Error('User is already active');
+    }
+    this.deactivationReason = null;
+    this.status = 'active';
+    this.updated_by = adminId;
+
+    // Log security event
+    await this.logSecurityEvent('account_activated',
+      `Account activated by admin: ${reason || 'No reason provided'}`,
+      'medium',
+      { adminId, reason }
+    );
+
+    await this.save();
+    return this;
+  },
+
   async deleteAccount() {
     this.status = 'deleted';
     this.email = null;
@@ -2489,6 +2544,25 @@ userSchema.statics.authenticateWithOTP = async function (userId, otpCode, device
   } catch (error) {
     throw error;
   }
+};
+
+
+userSchema.statics.adminActivateUser = async function (userId, adminId, reason = null) {
+  const user = await this.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return await user.activateUser(adminId, reason);
+};
+
+userSchema.statics.adminDeactivateUser = async function(userId, adminId, reason = null) {
+  const user = await this.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  return await user.deactivateUser(adminId, reason);
 };
 
 userSchema.statics.getSecurityReport = async function (timeframe = 30) {
