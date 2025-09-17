@@ -93,7 +93,7 @@ const permissionValidation = {
 // POST /api/permission - Create a new permission
 router.post('/',
   authMiddleware,
-  authorize('permission', 'write'),
+  // authorize('permission', 'write'),
   permissionValidation.create,
   permissionController.createPermission
 );
@@ -101,7 +101,7 @@ router.post('/',
 // GET /api/permission - Get all permissions (with optional filters)
 router.get('/',
   authMiddleware,
-  authorize('permission', 'read'),
+  // authorize('permission', 'read'),
   permissionValidation.query,
   permissionController.getPermissions
 );
@@ -124,7 +124,7 @@ router.put('/:id',
 // PATCH /api/permission/:id - Update a permission by ID
 router.patch('/:id',
   authMiddleware,
-  authorize('permission', 'update'),
+  // authorize('permission', 'update'),
   permissionValidation.update,
   permissionController.updatePermission
 );

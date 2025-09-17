@@ -82,7 +82,7 @@ app.use('/api/categories', checkRoute("categoryRoute", categoryRoute));
 app.use('/api/settings', checkRoute("settingRoute", settingRoute));
 app.use('/api/reviews', checkRoute("reviewRoute", reviewRoute));
 app.use('/api/orders', checkRoute("orderRoutes", orderRoutes));
-app.use('/api/permissins', checkRoute("permissionRoute", permissionRoute));
+app.use('/api/permission', checkRoute("permissionRoute", permissionRoute));
 app.use('/api/roles', checkRoute("RoleRoutes", roleRoute));
 app.use('/api/carts', checkRoute("cartRoutes", cartRoutes));
 app.use('/api/brands', checkRoute("BrandRoute", BrandRoute));

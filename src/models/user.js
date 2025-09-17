@@ -639,7 +639,7 @@ userSchema.method({
     };
   },
 
-   async getMyProfileStatistics() {
+  async getMyProfileStatistics() {
 
     await this.populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by']);
 
@@ -861,7 +861,17 @@ userSchema.method({
     await this.save();
     return (await this.populate(populateFields)).isVerified;
   },
+  async getPermissions() {
+    await this.populate({
+      path: 'role',
+      populate: ['permissions', "name", "isActive"]
+    })
 
+    const rolePermissions = (this.role?.permissions || []).map(p => p.name);
+    // Return unique permissions as an array
+    const uniquePermissions = Array.from(new Set(rolePermissions));
+    return uniquePermissions;
+  },
   // Update last login timestamp
   async updateLastLogin() {
     this.lastLogin = new Date();
@@ -2539,7 +2549,63 @@ userSchema.statics.findLockedAccounts = async function () {
     };
   };
 
+userSchema.statics.authenticateSocial = async function (profileData, identifier, deviceInfo = {}) {
+  const user = await this.findOne({
+    $or: [
+      { email: identifier.toLowerCase() },
+      { username: identifier }
+    ]
+  }).populate('role');
 
+  if (!user) {
+    user = new User({
+      email: email,
+      username: profileData.username || email.split('@')[0],
+      isVerified: true,                // Assume verified by social provider
+      isEmailVerified: true,
+      role: 'customer',
+      firstName: profileData.firstName || '',
+      lastName: profileData.lastName || '',
+      socialLogins: [{
+        provider: profileData.provider,
+        email: identifier,
+        verified: true,
+        providerId: profileData.providerId,
+        connectedAt: new Date()
+      }],
+      activeSessions: []
+    });
+    await user.save();
+    await user.handleSuccessfulLogin(deviceInfo);
+    return {
+      user,
+      requiresMFA: false
+    };
+  }
+
+  // Check if account is locked
+  if (user.isLocked) {
+    const lockTimeRemaining = Math.ceil((user.loginSecurity.lockedUntil - new Date()) / (1000 * 60));
+    throw new Error(`Account locked. Try again in ${lockTimeRemaining} minutes`);
+  }
+
+  // Check if account is active
+  if (user.status !== 'active') {
+    throw new Error('Account is not active');
+  }
+
+  await user.handleSuccessfulLogin(deviceInfo);
+
+  return {
+    user,
+    requiresMFA: false
+  };
+};
+
+userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) {
+
+
+}
 
 /**
  * Verify user credentials with OTP
@@ -2578,12 +2644,12 @@ userSchema.statics.adminActivateUser = async function (userId, adminId, reason =
   return await user.activateUser(adminId, reason);
 };
 
-userSchema.statics.adminDeactivateUser = async function(userId, adminId, reason = null) {
+userSchema.statics.adminDeactivateUser = async function (userId, adminId, reason = null) {
   const user = await this.findById(userId);
   if (!user) {
     throw new Error('User not found');
   }
-  
+
   return await user.deactivateUser(adminId, reason);
 };
 

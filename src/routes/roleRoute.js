@@ -104,8 +104,8 @@ router.post('/',
 // GET /api/role - Get all roles (with optional activeOnly or search query)
 router.get('/', 
   authMiddleware,
-  authorize('roles', 'read'),
-  roleValidation.query,
+  // authorize('roles', 'read'),
+  // roleValidation.query,
   roleController.getAll
 );
 

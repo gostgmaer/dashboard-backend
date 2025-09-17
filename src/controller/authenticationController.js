@@ -52,6 +52,7 @@ class authController {
   static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
     return res.status(statusCode).json({
       success,
+      statusCode,
       data,
       message,
       ...meta,
@@ -61,6 +62,7 @@ class authController {
   static errorResponse(res, message, statusCode = 500, error = null) {
     return res.status(statusCode).json({
       success: false,
+      statusCode,
       message,
       error: process.env.NODE_ENV === 'development' ? error : undefined,
     });
@@ -160,12 +162,12 @@ class authController {
       }
 
       // Password strength check
-      const {checks,feedback,isValid,suggestions,warning,score} = checkPasswordStrength(password);
+      const { checks, feedback, isValid, suggestions, warning, score } = checkPasswordStrength(password);
       if (!isValid) {
         return res.status(400).json({
           success: false,
           message: 'Password does not meet requirements',
-          passwordRequirements: checks,feedback,suggestions,warning,score
+          passwordRequirements: checks, feedback, suggestions, warning, score
         });
       }
 
@@ -195,8 +197,8 @@ class authController {
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
 
       if (emaildata.success) {
-      
-        
+
+
         return authController.standardResponse(res, true, {
           user: {
             email: user.email,
@@ -243,9 +245,9 @@ class authController {
         return authController.errorResponse(res, 'Invalid Email/username or password', 401);
       }
 
-     
+
       if (!user.emailVerified) {
-         await user.generateEmailVerificationToken()
+        await user.generateEmailVerificationToken()
         await sendEmail(emailVerificationTemplate, user);
       }
 
@@ -266,7 +268,7 @@ class authController {
               id: user._id,
               email: user.email,
               username: user.username,
-               image:user.profilePicture,
+              image: user.profilePicture,
               fullName: user.fullName,
               role: user.role?.name,
               isVerified: user.isVerified,
@@ -304,7 +306,7 @@ class authController {
             id: user._id,
             email: user.email,
             username: user.username,
-             image:user.profilePicture,
+            image: user.profilePicture,
             hasActiveTOTP: user.hasActiveTOTP
           }
         }, 'MFA verification required', 200);
@@ -322,7 +324,7 @@ class authController {
           user: {
             id: user._id,
             email: user.email,
-            image:user.profilePicture,
+            image: user.profilePicture,
             username: user.username,
             fullName: user.fullName,
             role: user.role?.name,
@@ -339,7 +341,45 @@ class authController {
       return authController.errorResponse(res, error.message, 500, error.message);
     }
   }
+  static async socialLogin(req, res) {
+    try {
+      const { identifier, profileData, deviceTrust = false } = req.body;
+      const deviceInfo = DeviceDetector.detectDevice(req);
 
+     
+      // Authenticate user
+      const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
+      let user = authResult.user;
+
+      const tokens = await user.generateTokens(deviceInfo);
+      if (deviceTrust) {
+        await user.trustDevice(deviceInfo.deviceId);
+      }
+
+      return authController.standardResponse(
+        res,
+        true,
+        {
+          user: {
+            id: user._id,
+            email: user.email,
+            image: user.profilePicture,
+            username: user.username,
+            fullName: user.fullName,
+            role: user.role?.name,
+            isVerified: user.isVerified,
+            hasActiveTOTP: user.hasActiveTOTP
+          },
+          tokens,
+          requiresMFA: false,
+        },
+        'Login successful'
+      );
+    } catch (error) {
+      console.error('Login error:', error);
+      return authController.errorResponse(res, error.message, 500, error.message);
+    }
+  }
   /**
    * VERIFY OTP and complete login
    */
@@ -1904,6 +1944,23 @@ class authController {
   // 🔍 SECURITY & MONITORING
   // ========================================
 
+  //Permission
+
+  static async getUserPermissionsController(req, res) {
+    try {
+      const permissions = await req.user.getPermissions();
+      return res.status(200).json({
+        success: true,
+        permissions
+      });
+    } catch (error) {
+      return res.status(404).json({
+        success: false,
+        message: error.message || 'Failed to fetch permissions'
+      });
+    }
+  }
+
   /**
    * GET SECURITY EVENTS
    */
@@ -2145,7 +2202,7 @@ class authController {
         'Failed to retrieve devices', 500, error.message);
     }
   }
-    static async getProfile(req, res) {
+  static async getProfile(req, res) {
     try {
       const user = await req.user.getMyProfile();
       return authController.standardResponse(res, true, user, 'Profile Fetch successfully');

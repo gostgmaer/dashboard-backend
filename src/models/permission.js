@@ -9,23 +9,15 @@ const ACTIONS = {
 const permissionSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, trim: true },
-    // e.g., "product:create", "order:approve"
-
     description: { type: String, trim: true },
-    // Human-readable description
-
     category: { type: String, trim: true },
-    isDefault: { type: Boolean, default: true },
-    // e.g., "Product Management", "Order Management"
-
+    isDefault: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     action: {
       type: String,
       enum: Object.values(ACTIONS),
       required: true
     },
-    // Can disable a permission without deleting
-
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
   },
@@ -158,6 +150,47 @@ permissionSchema.statics.getGroupedByCategory = async function () {
   }, {});
 };
 
+
+permissionSchema.statics.getStatistics = async function () {
+  return this.aggregate([
+    {
+      $group: {
+        _id: {
+          category: "$category",
+          action: "$action",
+          isActive: "$isActive"
+        },
+        count: { $sum: 1 }
+      }
+    },
+    {
+      $group: {
+        _id: "$_id.category",
+        actions: {
+          $push: {
+            action: "$_id.action",
+            isActive: "$_id.isActive",
+            count: "$count"
+          }
+        },
+        totalCount: { $sum: "$count" }
+      }
+    },
+    {
+      $project: {
+        category: "$_id",
+        actions: 1,
+        totalCount: 1,
+        _id: 0
+      }
+    },
+    {
+      $sort: { category: 1 }
+    }
+  ]);
+};
+
+
 // Search by partial match in name or description
 permissionSchema.statics.search = function (keyword) {
   return this.find({
@@ -167,6 +200,51 @@ permissionSchema.statics.search = function (keyword) {
     ]
   });
 };
+
+
+permissionSchema.statics.createPermission = async function (data) {
+  if (!data.name || !data.action) {
+    throw new Error('Name and action are required to create permission');
+  }
+
+  const payload = {
+    ...data,
+    name: `${data.name}:${data.action}`,
+  };
+
+  const existing = await this.findOne({ name: payload.name, action: payload.action, category: payload.category });
+  if (existing) {
+    throw new Error('Permission name must be unique');
+  }
+
+  const permission = new this(payload);
+  return permission.save();
+};
+
+
+permissionSchema.statics.updatePermissionById = async function (permissionId, data) {
+  if (!permissionId) {
+    throw new Error('Permission ID is required');
+  }
+  if (!data.name || !data.action) {
+    throw new Error('Name and action are required to update permission');
+  }
+
+  const updatedPayload = {
+    ...data,
+    name: `${data.name}:${data.action}`
+  };
+
+  // Check if name is unique for other documents
+  const existing = await this.findOne({ name: updatedPayload.name, _id: { $ne: permissionId } });
+  if (existing) {
+    throw new Error('Permission name must be unique');
+  }
+
+  return this.findByIdAndUpdate(permissionId, updatedPayload, { new: true });
+};
+
+
 
 const Permission = mongoose.model("Permission", permissionSchema);
 module.exports = Permission;
