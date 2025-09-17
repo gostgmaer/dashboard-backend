@@ -10,7 +10,7 @@ const attachmentSchema = new mongoose.Schema(
     fileSize: { type: Number, required: true },
     fileUrl: { type: String, required: true, trim: true },
     thumbnailUrl: { type: String, trim: true },
- isDeleted: { type: Boolean, default: true },
+ isDeleted: { type: Boolean, default: false},
     // Metadata
     storageType: { type: String, enum: ["local", "s3", "cloudinary", "gcs"], default: "local" },
     checksum: { type: String, trim: true },

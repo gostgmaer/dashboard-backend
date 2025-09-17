@@ -13,7 +13,7 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       index: true, // Faster lookup for product reviews
     },
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false},
     rating: {
       type: Number,
       min: 1,

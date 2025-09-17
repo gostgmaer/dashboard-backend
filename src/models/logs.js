@@ -17,7 +17,7 @@ const logSchema = new mongoose.Schema({
     response_headers: { type: Object, default: {} },
     response_body: { type: Object, default: null },
     user_agent: { type: String, default: null },
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false},
     device_metadata: { type: Object, default: {} },
     location: { type: Object, default: {} },
     process_time_ms: { type: Number, default: null },

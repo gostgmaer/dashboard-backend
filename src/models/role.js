@@ -44,7 +44,7 @@ const roleSchema = new mongoose.Schema(
     description: { type: String, trim: true },
     permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
     isDefault: { type: Boolean, default: false },
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false},
     isActive: { type: Boolean, default: true },
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" }

@@ -137,7 +137,7 @@ const userSchema = new mongoose.Schema(
       }
     ],
     tokens: [{ token: { type: String } }],
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false },
     // Password Reset
     passwordReset: {
       token: { type: String, default: null },

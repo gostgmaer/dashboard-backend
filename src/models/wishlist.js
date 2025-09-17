@@ -40,7 +40,7 @@ const wishlistSchema = new mongoose.Schema(
       ref: 'User',
      
     },
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false},
     updated_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

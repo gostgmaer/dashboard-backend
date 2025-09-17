@@ -7,7 +7,7 @@ const contactUsSchema = new mongoose.Schema(
     email: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, trim: true },
     company: { type: String, trim: true },
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false},
     subject: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
