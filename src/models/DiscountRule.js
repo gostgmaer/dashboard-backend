@@ -19,7 +19,7 @@ const discountRuleSchema = new mongoose.Schema({
   maxStock: { type: Number, min: 0 },
   minPrice: { type: Number, min: 0 },
   maxPrice: { type: Number, min: 0 },
-
+ isDeleted: { type: Boolean, default: true },
   // Scheduling
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },

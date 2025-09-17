@@ -48,6 +48,7 @@ const productSchema = new mongoose.Schema(
     shortDescription: { type: String },
     material: { type: String },
     color: { type: String },
+     isDeleted: { type: Boolean, default: true },
     size: { type: String },
     ageGroup: { type: String },
     gender: { type: String },

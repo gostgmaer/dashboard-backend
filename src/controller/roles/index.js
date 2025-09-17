@@ -1,5 +1,5 @@
 const { StatusCodes, ReasonPhrases } = require('http-status-codes');
-const  Role  = require('../../models/role');
+const Role = require('../../models/role');
 const User = require('../../models/user');
 /**
  * Create a new role
@@ -68,6 +68,43 @@ const getAll = async (req, res) => {
   }
 };
 
+
+const getRoleStatistics = async (req, res) => {
+  try {
+    const options = {
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 10,
+      sortBy: req.query.sortBy || "name",
+      sortOrder: req.query.sortOrder || "asc",
+      search: req.query.search || "",
+      isActive: req.query.isActive !== undefined ? req.query.isActive === "true" : null,
+      includePermissionDetails: req.query.includePermissionDetails !== "false",
+
+      // extra filters
+      createdBy: req.query.createdBy || null,
+      updatedBy: req.query.updatedBy || null,
+      isDefault: req.query.isDefault !== undefined ? req.query.isDefault === "true" : null,
+      createdFrom: req.query.createdFrom || null,
+      createdTo: req.query.createdTo || null,
+      updatedFrom: req.query.updatedFrom || null,
+      updatedTo: req.query.updatedTo || null,
+    };
+
+    const result = await Role.getRoleStatistics(options);
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error("Error in getRoleStatistics:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch role statistics",
+      error: error.message
+    });
+  }
+}
 /**
  * Get single role with permissions
  */
@@ -713,7 +750,7 @@ module.exports = {
   getRoleWithPermissions,
   importRoles,
   exportRoles,
-
+  getRoleStatistics,
   setDefaultRole,
   getDefaultRole,
   isRoleInUse,

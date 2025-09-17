@@ -103,9 +103,15 @@ router.get('/',
   authMiddleware,
   // authorize('permission', 'read'),
   permissionValidation.query,
-  permissionController.getPermissions
+  permissionController.getAllPermissions
 );
 
+router.get('/states',
+  authMiddleware,
+  // authorize('permission', 'read'),
+  permissionValidation.query,
+  permissionController.getGroupedPermissions
+);
 // GET /api/permission/:id - Get a single permission by ID
 router.get('/:id',
   authMiddleware,
@@ -132,7 +138,7 @@ router.patch('/:id',
 // DELETE /api/permission/:id - Soft-delete (deactivate) a permission by ID
 router.delete('/:id',
   authMiddleware,
-  authorize('permission', 'delete'),
+  // authorize('permission', 'delete'),
   param('id').isMongoId().withMessage('Invalid permission ID'),
   permissionController.deletePermission
 );

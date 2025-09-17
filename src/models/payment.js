@@ -11,6 +11,7 @@ const paymentSchema = new mongoose.Schema({
     unique: true,
     index: true
   },
+   isDeleted: { type: Boolean, default: true },
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
