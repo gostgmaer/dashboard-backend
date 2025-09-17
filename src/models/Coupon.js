@@ -11,7 +11,7 @@ const promoCodeSchema = new mongoose.Schema({
   categoryIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
   brandIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Brand' }],
   tags: [{ type: String, trim: true }],
- isDeleted: { type: Boolean, default: true },
+ isDeleted: { type: Boolean, default: false},
   // Order-level constraints
   minOrderValue: { type: Number, min: 0 },
   customerLimit: { type: Number, min: 0 }, // per-customer max uses (optional)

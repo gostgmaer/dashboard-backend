@@ -14,7 +14,7 @@ const categorySchema = new mongoose.Schema(
     parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
     images: [],
     descriptions: String,
- isDeleted: { type: Boolean, default: true },
+ isDeleted: { type: Boolean, default: false},
     // Audit fields
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

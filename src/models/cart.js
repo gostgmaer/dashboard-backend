@@ -10,7 +10,7 @@ const cartItemSchema = new Schema({
     required: [true, 'Product is required'],
     index: true
   },
-   isDeleted: { type: Boolean, default: true },
+   isDeleted: { type: Boolean, default: false},
   quantity: {
     type: Number,
     required: [true, 'Quantity is required'],

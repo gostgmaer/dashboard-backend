@@ -11,7 +11,7 @@ const brandSchema = new mongoose.Schema(
       default: "pending",
       trim: true,
     },
-     isDeleted: { type: Boolean, default: true },
+     isDeleted: { type: Boolean, default: false},
     images: [
       {
         url: { type: String, required: true },

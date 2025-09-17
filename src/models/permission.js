@@ -19,7 +19,7 @@ const permissionSchema = new mongoose.Schema(
     category: { type: String, trim: true },
     isDefault: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
-    isDeleted: { type: Boolean, default: true },
+    isDeleted: { type: Boolean, default: false},
     action: {
       type: String,
       enum: Object.values(ACTIONS),
