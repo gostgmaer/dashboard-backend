@@ -9,6 +9,7 @@ const addressSchema = new mongoose.Schema(
       required: [true, 'User is required'],
       index: true,
     },
+     isDeleted: { type: Boolean, default: true },
     label: {
       type: String,
       default: 'home',

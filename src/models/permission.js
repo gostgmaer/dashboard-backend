@@ -4,8 +4,14 @@ const ACTIONS = {
   WRITE: 'write',
   MODIFY: 'modify',
   DELETE: 'delete',
-  MANAGE: 'manage'
+  MANAGE: 'full'
 };
+
+
+const allowedFilterFields = ['name', 'action', 'category', 'isActive']; // whitelist filterable fields
+const allowedSortFields = ['name', 'category', 'createdAt', 'updatedAt','action'];
+const defaultExcludeFields = ['__v', 'createdBy', 'updatedBy', 'isDeleted']; // fields to exclude by default
+
 const permissionSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, trim: true },
@@ -13,6 +19,7 @@ const permissionSchema = new mongoose.Schema(
     category: { type: String, trim: true },
     isDefault: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    isDeleted: { type: Boolean, default: true },
     action: {
       type: String,
       enum: Object.values(ACTIONS),
@@ -100,6 +107,113 @@ permissionSchema.methods.toAPIResponse = function () {
 };
 
 // ===== Static Methods =====
+
+permissionSchema.statics.getAll = async function (options = {}) {
+  const {
+    filter = {},
+    page = 1,
+    limit = 50,
+    isDeleted=false,
+    sort = { createdAt: -1 },
+    selectFields = null, // comma separated string of fields or array of fields
+    search = null, // string keyword for text search on allowed fields
+  } = options;
+
+  // Basic safety and sanitization
+  const safeLimit = Math.min(Math.max(limit, 1), 100);
+  const safePage = Math.max(page, 1);
+  const skip = (safePage - 1) * safeLimit;
+
+  // Start with base filter excluding soft deleted documents
+  const baseFilter = {
+    $or: [
+      { isDeleted: isDeleted },
+      { isDeleted: { $exists: false } }
+    ]
+  };
+
+  // Build final filter by including only allowed fields and values
+  const finalFilter = { ...baseFilter };
+  for (const key of Object.keys(filter)) {
+    if (allowedFilterFields.includes(key)) {
+      finalFilter[key] = filter[key];
+    }
+  }
+
+  // Add full text-like search on selected fields using regex (case insensitive)
+  if (search) {
+    const regex = new RegExp(search, 'i');
+    finalFilter.$or = [
+      { name: regex },
+      // { category: regex },
+      { action: regex }
+    ];
+  }
+
+  // Validate sorting
+  let sortOptions = {};
+  if (typeof sort === 'string') {
+    // comma separated "field:direction"
+    sort.split(',').forEach(fieldStr => {
+      const [field, dir] = fieldStr.split(':').map(s => s.trim());
+      if (allowedSortFields.includes(field)) {
+        sortOptions[field] = dir === 'asc' ? 1 : -1;
+      }
+    });
+  } else if (typeof sort === 'object' && !Array.isArray(sort)) {
+    for (const [field, dir] of Object.entries(sort)) {
+      if (allowedSortFields.includes(field) && (dir === 1 || dir === -1)) {
+        sortOptions[field] = dir;
+      }
+    }
+  }
+  if (Object.keys(sortOptions).length === 0) {
+    sortOptions = { createdAt: -1 }; // default
+  }
+
+  // Select fields with exclusion of default fields, override if specified by client
+  let projection = {};
+  if (selectFields) {
+    let fieldsArray = Array.isArray(selectFields) ? selectFields : selectFields.split(',').map(f => f.trim());
+    fieldsArray = fieldsArray.filter(f => !defaultExcludeFields.includes(f));
+    for (const field of fieldsArray) {
+      projection[field] = 1;
+    }
+  } else {
+    // Default exclude sensitive/internal fields
+    for (const field of defaultExcludeFields) {
+      projection[field] = 0;
+    }
+  }
+
+  try {
+    // Query data with pagination, sorting, and projection
+    const query = this.find(finalFilter).skip(skip).limit(safeLimit).sort(sortOptions).select(projection);
+
+    const data = await query.lean();
+    const totalCount = await this.countDocuments(finalFilter);
+
+    // Optional caching placeholder:
+    // cache.set(cacheKey, { data, totalCount }, cacheTTL);
+
+    return {
+      data,
+      pagination: {
+        total: totalCount,
+        page: safePage,
+        limit: safeLimit,
+        pages: Math.ceil(totalCount / safeLimit),
+      }
+    };
+  } catch (error) {
+    // Enhance error to give clearer message based on error type
+    if (error.name === 'CastError') {
+      throw new Error('Invalid query parameter');
+    }
+    throw new Error(`Failed to get permissions: ${error.message}`);
+  }
+};
+
 
 // Get permissions by category
 permissionSchema.statics.getByCategory = function (category) {
@@ -244,6 +358,37 @@ permissionSchema.statics.updatePermissionById = async function (permissionId, da
   return this.findByIdAndUpdate(permissionId, updatedPayload, { new: true });
 };
 
+
+permissionSchema.statics.getPermissionsGroupedByCategoryAndAction = async function () {
+  const permissions = await this.find({ isActive: true, category: { $exists: true, $ne: '' } })
+    .select('name action category isActive')  // isActive of permission
+    .lean();
+
+  // Group by category, collect action info under each category
+  const grouped = permissions.reduce((acc, perm) => {
+    const cat = perm.category || 'Uncategorized';
+    if (!acc[cat]) acc[cat] = {
+      actions: [],
+      isActive: true,  // Since this permission is active, category considered active
+    };
+    acc[cat].actions.push({
+      id: perm._id,
+      name: perm.name,
+      action: perm.action
+    });
+    return acc;
+  }, {});
+
+  // Convert to array and keep only active categories per presence of active permissions
+  const result = Object.entries(grouped)
+    .filter(([_, val]) => val.isActive) // keep only if active category
+    .map(([category, val]) => ({
+      category,
+      action: val.actions
+    }));
+
+  return { permissions: result };
+};
 
 
 const Permission = mongoose.model("Permission", permissionSchema);

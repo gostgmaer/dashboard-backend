@@ -9,6 +9,7 @@ const CartItemSchema = new mongoose.Schema(
       ref: "Product",
       required: [true, "Product reference is required"],
     },
+     isDeleted: { type: Boolean, default: true },
     quantity: {
       type: Number,
       required: [true, "Quantity is required"],

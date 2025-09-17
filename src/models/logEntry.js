@@ -14,7 +14,7 @@ const activityLogSchema = new mongoose.Schema(
     entityId: { type: mongoose.Schema.Types.ObjectId },              // entity _id
     subEntity: { type: String },                                     // e.g., "CartItem", "PaymentMethod"
     subEntityId: { type: mongoose.Schema.Types.ObjectId },
-
+ isDeleted: { type: Boolean, default: true },
     // Request Metadata
     ipAddress: { type: String },
     userAgent: { type: String },

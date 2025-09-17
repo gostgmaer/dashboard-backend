@@ -83,7 +83,7 @@ const FilterOptions = (params,model) => {
 
 
   }
-  let statusFilter = { status: { $ne: "INACTIVE" } };
+  let statusFilter = { status: { $ne: "INACTIVE" },iact };
 
   if (query.status != "" && query.status) {
     statusFilter = { ...statusFilter, status: query.status };

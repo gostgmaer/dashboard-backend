@@ -55,6 +55,57 @@ const getPermissions = async (req, res) => {
   }
 };
 
+const getAllPermissions = async (req, res) => {
+  try {
+    // Extract parameters from query or body (support both GET query and POST body)
+    const {
+      filter = {},
+      page = 1,
+      limit = 50,
+      sortBy ,
+      sortDesc ,
+      isDeleted = false,
+      sort = 'createdAt:desc',
+      selectFields = null,
+      search = null,
+    } = req.method === 'GET' ? req.query : req.body;
+
+    const sortkey = (sortBy && sortDesc) ? `${sortBy}:${sortDesc=='false'?'asc':'desc'}`:'createdAt:desc'
+    // Parse JSON fields if they come as strings in query params
+    const parsedFilter = typeof filter === 'string' ? JSON.parse(filter) : filter;
+    const parsedSelectFields = typeof selectFields === 'string'
+      ? selectFields.split(',').map(f => f.trim())
+      : selectFields;
+
+    // Call the model static method
+    const data = await Permission.getAll({
+      filter: parsedFilter,
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      sort:sortkey,
+      isDeleted,
+      selectFields: parsedSelectFields,
+      search,
+    });
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error fetching permissions:', error);
+    res.status(400).json({ error: error.message || 'Failed to fetch permissions' });
+  }
+};
+
+
+const getGroupedPermissions = async (req, res) => {
+  try {
+    const data = await Permission.getPermissionsGroupedByCategoryAndAction();
+    res.status(200).json({ data, success: true });
+  } catch (error) {
+    console.error('Error fetching grouped permissions:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
 // ===== GET SINGLE =====
 const getSinglePermission = async (req, res) => {
   try {
@@ -429,7 +480,7 @@ module.exports = {
   getPermissions,
   getSinglePermission,
   updatePermission,
-  getPermissionAPIResponse,
+  getPermissionAPIResponse, getGroupedPermissions,
   deletePermission,
   togglePermissionActive,
   bulkCreatePermissions,
@@ -439,5 +490,5 @@ module.exports = {
   getPermissionsGrouped,
   searchPermissions,
   getActivePermissions,
-  changePermissionCategory,
+  changePermissionCategory, getAllPermissions
 };

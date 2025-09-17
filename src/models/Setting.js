@@ -5,7 +5,7 @@ const settingSchema = new mongoose.Schema(
   {
     siteName: { type: String, required: true, trim: true },
     siteKey: { type: String, required: true, unique: true, trim: true },
-
+ isDeleted: { type: Boolean, default: true },
     name: { type: String, trim: true },
 
     contactInfo: {
