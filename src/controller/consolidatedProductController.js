@@ -36,9 +36,9 @@ class ProductController {
 
     static calculateFinalPrice(product) {
         if (!product.basePrice) return 0;
-        
+
         let finalPrice = product.basePrice;
-        
+
         // Apply discount if active
         if (product.discount && product.discountStartDate && product.discountEndDate) {
             const now = new Date();
@@ -46,12 +46,12 @@ class ProductController {
                 finalPrice = product.basePrice - (product.basePrice * product.discount / 100);
             }
         }
-        
+
         // Apply sale price if lower
         if (product.salePrice && product.salePrice < finalPrice) {
             finalPrice = product.salePrice;
         }
-        
+
         return Math.max(0, Math.round(finalPrice * 100) / 100);
     }
 
@@ -64,7 +64,7 @@ class ProductController {
 
     static getDiscountPercent(product) {
         if (!product.discount || !product.discountStartDate || !product.discountEndDate) return 0;
-        
+
         const now = new Date();
         if (now >= new Date(product.discountStartDate) && now <= new Date(product.discountEndDate)) {
             return product.discount;
@@ -78,7 +78,7 @@ class ProductController {
 
     static enrichProduct(product, includeCalculated = true) {
         const productObj = product.toObject ? product.toObject() : product;
-        
+
         if (includeCalculated) {
             return {
                 ...productObj,
@@ -88,7 +88,7 @@ class ProductController {
                 isLowStock: this.isLowStock(productObj)
             };
         }
-        
+
         return productObj;
     }
 
@@ -160,16 +160,16 @@ class ProductController {
             ]);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(product), 
-                'Product created successfully', 
+                res,
+                true,
+                ProductController.enrichProduct(product),
+                'Product created successfully',
                 201
             );
 
         } catch (error) {
             console.error('Create product error:', error);
-            
+
             if (error.code === 11000) {
                 const field = Object.keys(error.keyPattern)[0];
                 return ProductController.errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
@@ -209,12 +209,12 @@ class ProductController {
 
             // Build query filters
             const filters = { deletedAt: { $exists: false } };
-            
+
             // Apply specific filters
             if (status) filters.status = status;
             if (productType) filters.productType = productType;
             if (category) filters.categories = category;
-            
+
             // Price range filter
             if (minPrice || maxPrice) {
                 filters.basePrice = {};
@@ -298,7 +298,7 @@ class ProductController {
             });
 
             // Enrich products with calculated fields
-            const enrichedProducts = result.results.map(product => 
+            const enrichedProducts = result.results.map(product =>
                 ProductController.enrichProduct(product)
             );
 
@@ -319,15 +319,29 @@ class ProductController {
             };
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                response, 
+                res,
+                true,
+                response,
                 `Retrieved ${enrichedProducts.length} products`
             );
 
         } catch (error) {
             console.error('Error in getProducts:', error);
             return ProductController.errorResponse(res, 'Failed to fetch products', 500, error.message);
+        }
+    }
+
+
+    static async getAdvanceProductSearch(req, res) {
+
+        try {
+            const result = await Product.advancedFilter(req.query);
+            res.status(200).json(result);
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
         }
     }
 
@@ -384,9 +398,9 @@ class ProductController {
             };
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProduct, 
+                res,
+                true,
+                enrichedProduct,
                 'Product retrieved successfully'
             );
 
@@ -471,15 +485,15 @@ class ProductController {
             }
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(product), 
+                res,
+                true,
+                ProductController.enrichProduct(product),
                 'Product updated successfully'
             );
 
         } catch (error) {
             console.error('Failed to update product:', error);
-            
+
             if (error.code === 11000) {
                 const field = Object.keys(error.keyPattern)[0];
                 return ProductController.errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
@@ -509,9 +523,9 @@ class ProductController {
             let result;
             if (permanent === 'true') {
                 // Permanent delete
-                result = await Product.findOneAndDelete({ 
-                    _id: id, 
-                    deletedAt: { $exists: false } 
+                result = await Product.findOneAndDelete({
+                    _id: id,
+                    deletedAt: { $exists: false }
                 });
             } else {
                 // Soft delete using model method
@@ -520,9 +534,9 @@ class ProductController {
             }
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { id: result._id }, 
+                res,
+                true,
+                { id: result._id },
                 permanent === 'true' ? 'Product permanently deleted' : 'Product deleted successfully'
             );
 
@@ -554,9 +568,9 @@ class ProductController {
 
             let result;
             if (permanent) {
-                result = await Product.deleteMany({ 
-                    _id: { $in: validIds }, 
-                    deletedAt: { $exists: false } 
+                result = await Product.deleteMany({
+                    _id: { $in: validIds },
+                    deletedAt: { $exists: false }
                 });
             } else {
                 await Product.bulkDelete(validIds);
@@ -564,14 +578,14 @@ class ProductController {
             }
 
             return ProductController.standardResponse(
-                res, 
-                true, 
+                res,
+                true,
                 {
                     deletedCount: result.deletedCount || validIds.length,
                     ids: validIds
-                }, 
-                permanent ? 
-                    `Permanently deleted ${result.deletedCount || validIds.length} products` : 
+                },
+                permanent ?
+                    `Permanently deleted ${result.deletedCount || validIds.length} products` :
                     `Deleted ${validIds.length} products successfully`
             );
 
@@ -604,13 +618,13 @@ class ProductController {
             const result = await Product.bulkUpdateStatus(validIds, status);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
+                res,
+                true,
                 {
                     matchedCount: result.matchedCount,
                     modifiedCount: result.modifiedCount,
                     status: status
-                }, 
+                },
                 `Updated ${result.modifiedCount} product statuses successfully`
             );
 
@@ -638,13 +652,13 @@ class ProductController {
             const result = await Product.bulkUpdateStock(updates);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
+                res,
+                true,
                 {
                     matchedCount: result.matchedCount,
                     modifiedCount: result.modifiedCount,
                     updates: updates.length
-                }, 
+                },
                 `Updated ${result.modifiedCount} product stocks successfully`
             );
 
@@ -671,7 +685,7 @@ class ProductController {
             }
 
             let products;
-            
+
             if (category || priceMin || priceMax || sort !== 'relevance') {
                 // Advanced search with filters
                 const searchQuery = {
@@ -719,18 +733,18 @@ class ProductController {
                 products = await Product.searchProducts(keyword, Number(limit));
             }
 
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
+                res,
+                true,
                 {
                     products: enrichedProducts,
                     searchQuery: keyword,
                     filters: { category, priceMin, priceMax, sort }
-                }, 
+                },
                 `Found ${enrichedProducts.length} products for "${keyword}"`
             );
 
@@ -748,14 +762,14 @@ class ProductController {
             const { limit = 10 } = req.query;
 
             const products = await Product.getFeaturedProducts(Number(limit));
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} featured products`
             );
 
@@ -771,14 +785,14 @@ class ProductController {
     static async getLowStockProducts(req, res) {
         try {
             const products = await Product.getLowStockProducts();
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Found ${enrichedProducts.length} low stock products`
             );
 
@@ -794,14 +808,14 @@ class ProductController {
     static async getOutOfStockProducts(req, res) {
         try {
             const products = await Product.getOutOfStockProducts();
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Found ${enrichedProducts.length} out-of-stock products`
             );
 
@@ -823,14 +837,14 @@ class ProductController {
             }
 
             const products = await Product.getByCategory(categoryId);
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} products from category`
             );
 
@@ -850,14 +864,14 @@ class ProductController {
 
             const tagArray = tags.split(',');
             const products = await Product.getProductsByTag(tagArray, Number(limit));
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} products with tags: ${tagArray.join(', ')}`
             );
 
@@ -875,14 +889,14 @@ class ProductController {
             const { days = 30, limit = 10 } = req.query;
 
             const products = await Product.getNewArrivals(Number(days), Number(limit));
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} new arrivals from last ${days} days`
             );
 
@@ -904,14 +918,14 @@ class ProductController {
                 Number(maxPrice) === Infinity ? Number.MAX_SAFE_INTEGER : Number(maxPrice),
                 Number(limit)
             );
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} products in price range $${minPrice} - $${maxPrice}`
             );
 
@@ -929,14 +943,14 @@ class ProductController {
             const { limit = 10 } = req.query;
 
             const products = await Product.getTopSelling(Number(limit));
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} top-selling products`
             );
 
@@ -954,14 +968,14 @@ class ProductController {
             const { limit = 10 } = req.query;
 
             const products = await Product.getMostViewed(Number(limit));
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} most-viewed products`
             );
 
@@ -977,14 +991,14 @@ class ProductController {
     static async getActiveDiscountProducts(req, res) {
         try {
             const products = await Product.getActiveDiscountProducts();
-            const enrichedProducts = products.map(product => 
+            const enrichedProducts = products.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Found ${enrichedProducts.length} products with active discounts`
             );
 
@@ -1008,9 +1022,9 @@ class ProductController {
             const averageRating = await Product.getAverageRatingByCategory(categoryId);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { categoryId, averageRating }, 
+                res,
+                true,
+                { categoryId, averageRating },
                 `Retrieved average rating for category: ${averageRating.toFixed(2)}`
             );
 
@@ -1034,13 +1048,13 @@ class ProductController {
             const result = await Product.archiveOldProducts(new Date(beforeDate));
 
             return ProductController.standardResponse(
-                res, 
-                true, 
+                res,
+                true,
                 {
                     matchedCount: result.matchedCount,
                     modifiedCount: result.modifiedCount,
                     beforeDate: beforeDate
-                }, 
+                },
                 `Archived ${result.modifiedCount} old products successfully`
             );
 
@@ -1073,9 +1087,9 @@ class ProductController {
             const images = product.getSimplifiedImages();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                images, 
+                res,
+                true,
+                images,
                 `Retrieved ${images.length} simplified images`
             );
 
@@ -1105,9 +1119,9 @@ class ProductController {
             const finalPrice = product.getFinalPrice(Number(quantity));
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { finalPrice, quantity: Number(quantity) }, 
+                res,
+                true,
+                { finalPrice, quantity: Number(quantity) },
                 `Final price calculated for quantity ${quantity}`
             );
 
@@ -1136,9 +1150,9 @@ class ProductController {
             const stockStatus = product.getStockStatus();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { stockStatus }, 
+                res,
+                true,
+                { stockStatus },
                 `Stock status retrieved: ${stockStatus}`
             );
 
@@ -1168,9 +1182,9 @@ class ProductController {
             await product.save();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(product), 
+                res,
+                true,
+                ProductController.enrichProduct(product),
                 'Product marked as out of stock'
             );
 
@@ -1200,12 +1214,12 @@ class ProductController {
             await product.save();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     views: product.views,
                     analyticsViews: product.analytics?.views || 0
-                }, 
+                },
                 'Product views incremented'
             );
 
@@ -1218,7 +1232,7 @@ class ProductController {
     /**
      * INCREMENT SOLD COUNT
      */
-   
+
     /**
      * CHECK IF DISCOUNT IS ACTIVE
      */
@@ -1238,14 +1252,14 @@ class ProductController {
             const isActive = product.isDiscountActive();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     isDiscountActive: isActive,
                     discount: product.discount,
                     discountStartDate: product.discountStartDate,
                     discountEndDate: product.discountEndDate
-                }, 
+                },
                 `Discount is ${isActive ? 'active' : 'inactive'}`
             );
 
@@ -1274,9 +1288,9 @@ class ProductController {
             const seoData = product.getSEOData();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                seoData, 
+                res,
+                true,
+                seoData,
                 'SEO data retrieved successfully'
             );
 
@@ -1310,13 +1324,13 @@ class ProductController {
             const bulkPrice = product.getBulkDiscountPrice(Number(quantity));
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     bulkPrice,
                     quantity: Number(quantity),
                     savings: (product.basePrice * Number(quantity)) - bulkPrice
-                }, 
+                },
                 `Bulk discount price calculated for quantity ${quantity}`
             );
 
@@ -1345,14 +1359,14 @@ class ProductController {
             const isPurchasable = product.isPurchasable();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     isPurchasable,
                     isAvailable: product.isAvailable,
                     stock: product.inventory,
                     purchaseLimit: product.purchaseLimit
-                }, 
+                },
                 `Product is ${isPurchasable ? 'purchasable' : 'not purchasable'}`
             );
 
@@ -1390,9 +1404,9 @@ class ProductController {
             await product.reduceStock(quantity);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(product), 
+                res,
+                true,
+                ProductController.enrichProduct(product),
                 `Stock reduced by ${quantity} successfully`
             );
 
@@ -1426,9 +1440,9 @@ class ProductController {
             await product.restock(quantity);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(product), 
+                res,
+                true,
+                ProductController.enrichProduct(product),
                 `Product restocked with ${quantity} units successfully`
             );
 
@@ -1457,12 +1471,12 @@ class ProductController {
             const isFeatured = await product.toggleFeatured();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     isFeatured,
                     productId: id
-                }, 
+                },
                 `Product ${isFeatured ? 'featured' : 'unfeatured'} successfully`
             );
 
@@ -1490,14 +1504,14 @@ class ProductController {
             }
 
             const relatedProducts = await product.getRelatedProducts().limit(parseInt(limit));
-            const enrichedProducts = relatedProducts.map(product => 
+            const enrichedProducts = relatedProducts.map(product =>
                 ProductController.enrichProduct(product)
             );
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} related products`
             );
 
@@ -1526,12 +1540,12 @@ class ProductController {
             const isBundle = product.isPartOfBundle();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     isPartOfBundle: isBundle,
                     bundleContents: product.bundleContents || []
-                }, 
+                },
                 `Product is ${isBundle ? 'part of a bundle' : 'not part of a bundle'}`
             );
 
@@ -1560,12 +1574,12 @@ class ProductController {
             const discountPercent = product.getActiveDiscountPercent();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     discountPercent,
                     isActive: discountPercent > 0
-                }, 
+                },
                 `Active discount: ${discountPercent}%`
             );
 
@@ -1599,12 +1613,12 @@ class ProductController {
             await product.addReview(reviewId);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     reviewId,
                     totalReviews: product.reviews.length
-                }, 
+                },
                 'Review added successfully'
             );
 
@@ -1631,17 +1645,17 @@ class ProductController {
                 return ProductController.errorResponse(res, 'Product not found', 404);
             }
 
-            await product.applyPromotion({ 
-                discount, 
-                salePrice, 
+            await product.applyPromotion({
+                discount,
+                salePrice,
                 startDate: startDate ? new Date(startDate) : undefined,
                 endDate: endDate ? new Date(endDate) : undefined
             });
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(product), 
+                res,
+                true,
+                ProductController.enrichProduct(product),
                 'Promotion applied successfully'
             );
 
@@ -1670,13 +1684,13 @@ class ProductController {
             const isPreOrder = product.isPreOrderAvailable();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     isPreOrderAvailable: isPreOrder,
                     preOrder: product.preOrder,
                     preOrderDate: product.preOrderDate
-                }, 
+                },
                 `Pre-order is ${isPreOrder ? 'available' : 'not available'}`
             );
 
@@ -1705,13 +1719,13 @@ class ProductController {
             const totalPrice = await product.getBundleTotalPrice();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { 
+                res,
+                true,
+                {
                     totalPrice,
                     isBundle: product.isPartOfBundle(),
                     bundleContents: product.bundleContents || []
-                }, 
+                },
                 `Bundle total price: $${totalPrice.toFixed(2)}`
             );
 
@@ -1744,9 +1758,9 @@ class ProductController {
             const ratingStatistics = product.ratingStatistics;
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ratingStatistics, 
+                res,
+                true,
+                ratingStatistics,
                 `Rating statistics: ${ratingStatistics.averageRating.toFixed(2)}/5 from ${ratingStatistics.totalReviews} reviews`
             );
 
@@ -1775,9 +1789,9 @@ class ProductController {
             const stockStatus = product.stockStatus;
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                { stockStatus }, 
+                res,
+                true,
+                { stockStatus },
                 `Virtual stock status: ${stockStatus}`
             );
 
@@ -1799,9 +1813,9 @@ class ProductController {
             const report = Product.generateSchemaReport();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                report, 
+                res,
+                true,
+                report,
                 'Schema report generated successfully'
             );
 
@@ -1819,9 +1833,9 @@ class ProductController {
             const statistics = await Product.generateDatabaseStatistics();
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                statistics, 
+                res,
+                true,
+                statistics,
                 'Database statistics generated successfully'
             );
 
@@ -1851,9 +1865,9 @@ class ProductController {
                 return ProductController.errorResponse(res, 'Valid quantity is required', 400);
             }
 
-            const product = await Product.findOne({ 
-                _id: id, 
-                deletedAt: { $exists: false } 
+            const product = await Product.findOne({
+                _id: id,
+                deletedAt: { $exists: false }
             });
 
             if (!product) {
@@ -1899,9 +1913,9 @@ class ProductController {
             ]);
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                ProductController.enrichProduct(updatedProduct), 
+                res,
+                true,
+                ProductController.enrichProduct(updatedProduct),
                 `Stock updated successfully. New stock: ${newStock}`
             );
 
@@ -1927,32 +1941,32 @@ class ProductController {
 
             const sortObj = sortOptions[sortBy] || { views: -1 };
 
-            const products = await Product.find({ 
+            const products = await Product.find({
                 deletedAt: { $exists: false },
                 status: 'active'
             })
-            .populate([
-                { path: 'categories', select: 'name slug' },
-                { path: 'brand', select: 'name logo' }
-            ])
-            .sort(sortObj)
-            .limit(parseInt(limit));
+                .populate([
+                    { path: 'categories', select: 'name slug' },
+                    { path: 'brand', select: 'name logo' }
+                ])
+                .sort(sortObj)
+                .limit(parseInt(limit));
 
             const enrichedProducts = products.map(product => ({
                 ...ProductController.enrichProduct(product),
                 analytics: product.analytics,
                 performance: {
-                    conversionRate: product.analytics?.conversions && product.analytics?.views ? 
+                    conversionRate: product.analytics?.conversions && product.analytics?.views ?
                         ((product.analytics.conversions / product.analytics.views) * 100).toFixed(2) + '%' : '0%',
-                    clickThroughRate: product.analytics?.clicks && product.analytics?.views ? 
+                    clickThroughRate: product.analytics?.clicks && product.analytics?.views ?
                         ((product.analytics.clicks / product.analytics.views) * 100).toFixed(2) + '%' : '0%'
                 }
             }));
 
             return ProductController.standardResponse(
-                res, 
-                true, 
-                enrichedProducts, 
+                res,
+                true,
+                enrichedProducts,
                 `Retrieved ${enrichedProducts.length} products with analytics sorted by ${sortBy}`
             );
 
@@ -1962,342 +1976,344 @@ class ProductController {
         }
     }
 
-      // 1. Favorites / Wishlist
-  static async addFavorite(req, res) {
-    try {
-      const user = await User.findById(req.user.id);
-      if (!user) return res.status(404).json({ success:false,message:'User not found' });
-      const pid = req.params.id;
-      if (!mongoose.Types.ObjectId.isValid(pid)) return res.status(400).json({ success:false,message:'Invalid product ID' });
-      if (!user.wishlist.includes(pid)) {
-        user.wishlist.push(pid);
-        await user.save();
-      }
-      res.json({ success:true,message:'Added to favorites', data:user.wishlist });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to add favorite', error:err.message });
-    }
-  }
-
-  static async removeFavorite(req, res) {
-    try {
-      const user = await User.findById(req.user.id);
-      user.wishlist = user.wishlist.filter(pid => pid.toString()!==req.params.id);
-      await user.save();
-      res.json({ success:true,message:'Removed from favorites', data:user.wishlist });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to remove favorite', error:err.message });
-    }
-  }
-
-  static async listFavorites(req, res) {
-    try {
-      const user = await User.findById(req.user.id)
-        .populate({ path:'wishlist', select:'title basePrice mainImage' });
-      res.json({ success:true,data:user.wishlist });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to fetch favorites', error:err.message });
-    }
-  }
-
-  // 2. Recommendations
-  static async getRecommendations(req, res) {
-    try {
-      const { id } = req.params;
-      const p = await Product.findById(id).lean();
-      if (!p) return res.status(404).json({ success:false,message:'Product not found' });
-      const recs = await Product.find({ categories:{ $in:p.categories }, _id:{ $ne:id }, status:'active' })
-        .sort({ soldCount:-1 })
-        .limit(10)
-        .select('title basePrice mainImage');
-      res.json({ success:true,data:recs });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to fetch recommendations', error:err.message });
-    }
-  }
-
-  // 3. Import/Export CSV
-  static async importCSV(req, res) {
-    try {
-      if (!req.file) return res.status(400).json({ success:false,message:'CSV file required' });
-      const results = [];
-      fs.createReadStream(req.file.path)
-        .pipe(csv())
-        .on('data', data => results.push(data))
-        .on('end', async () => {
-          const ops = results.map(item => ({
-            updateOne:{ filter:{ sku:item.sku }, update:{ $set:item }, upsert:true }
-          }));
-          await Product.bulkWrite(ops);
-          fs.unlinkSync(req.file.path);
-          res.json({ success:true,message:`Imported ${results.length} products` });
-        });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Import failed', error:err.message });
-    }
-  }
-
-  static async exportCSV(req, res) {
-    try {
-      const products = await Product.find({ deletedAt:{ $exists:false } }).lean();
-      const fields = Object.keys(products[0]||{});
-      const parser = new Parser({ fields });
-      const csvData = parser.parse(products);
-      res.header('Content-Type','text/csv');
-      res.attachment('products_export.csv');
-      res.send(csvData);
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Export failed', error:err.message });
-    }
-  }
-
-  // 4. Review Moderation
-  static async approveReview(req, res) {
-    try {
-      const { id, reviewId } = req.params;
-      if (!mongoose.Types.ObjectId.isValid(id)||!mongoose.Types.ObjectId.isValid(reviewId)) {
-        return res.status(400).json({ success:false,message:'Invalid ID format' });
-      }
-      const p = await Product.findById(id);
-      if (!p) return res.status(404).json({ success:false,message:'Product not found' });
-      const r = p.reviews.id(reviewId);
-      if (!r) return res.status(404).json({ success:false,message:'Review not found' });
-      r.approved = true;
-      await p.save();
-      res.json({ success:true,message:'Review approved' });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Approval failed', error:err.message });
-    }
-  }
-
-  static async removeReview(req, res) {
-    try {
-      const { id, reviewId } = req.params;
-      const p = await Product.findById(id);
-      p.reviews.id(reviewId).remove();
-      await p.save();
-      res.json({ success:true,message:'Review removed' });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Removal failed', error:err.message });
-    }
-  }
-
-  // 5. Inventory Alerts
-  static async lowStockAlerts(req, res) {
-    try {
-      const threshold = Number(req.query.threshold)||5;
-      const prods = await Product.find({ inventory:{ $lte:threshold }, deletedAt:{ $exists:false } })
-        .select('title inventory lowStockThreshold');
-      res.json({ success:true,data:prods });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to fetch alerts', error:err.message });
-    }
-  }
-
-  static async sendLowStockEmails(req, res) {
-    res.json({ success:true,message:'Emails triggered (stub)' });
-  }
-
-  // 6. Bulk Price Updates & Flash Sales
-  static async bulkPriceUpdate(req, res) {
-    try {
-      const { ids, type, amount } = req.body;
-      if (!['percentage','fixed'].includes(type)||!Array.isArray(ids)||typeof amount!=='number') {
-        return res.status(400).json({ success:false,message:'Invalid input' });
-      }
-      const ops = ids.map(id => ({
-        updateOne:{
-          filter:{ _id:id },
-          update: type==='percentage'
-            ? { $mul:{ basePrice:(100-amount)/100 } }
-            : { $inc:{ basePrice:-amount } }
+    // 1. Favorites / Wishlist
+    static async addFavorite(req, res) {
+        try {
+            const user = await User.findById(req.user.id);
+            if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+            const pid = req.params.id;
+            if (!mongoose.Types.ObjectId.isValid(pid)) return res.status(400).json({ success: false, message: 'Invalid product ID' });
+            if (!user.wishlist.includes(pid)) {
+                user.wishlist.push(pid);
+                await user.save();
+            }
+            res.json({ success: true, message: 'Added to favorites', data: user.wishlist });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to add favorite', error: err.message });
         }
-      }));
-      await Product.bulkWrite(ops);
-      res.json({ success:true,message:'Bulk price update applied' });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Bulk update failed', error:err.message });
-    }
-  }
-
-  static async scheduleFlashSale(req, res) {
-    res.json({ success:true,message:'Flash sale scheduled (stub)' });
-  }
-
-  // 7. Extended Analytics
-  static async salesMetrics(req, res) {
-    try {
-      const from=new Date(req.query.from), to=new Date(req.query.to);
-      const metrics = await Order.aggregate([
-        { $match:{ createdAt:{ $gte:from, $lte:to } } },
-        { $unwind:'$items' },
-        { $group:{
-            _id:'$items.productId',
-            totalUnits:{ $sum:'$items.quantity' },
-            revenue:{ $sum:{ $multiply:['$items.quantity','$items.price'] } }
-          }
-        },
-        { $lookup:{ from:'products', localField:'_id', foreignField:'_id', as:'product' } },
-        { $unwind:'$product' },
-        { $project:{
-            _id:0, productId:'$_id', title:'$product.title', totalUnits:1, revenue:1
-          }
-        },
-        { $sort:{ revenue:-1 } }
-      ]);
-      res.json({ success:true,data:metrics });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to fetch sales metrics', error:err.message });
-    }
-  }
-
-  static async popularity(req, res) {
-    try {
-      const limit=Number(req.query.limit)||10;
-      const prods=await Product.find({ deletedAt:{ $exists:false } })
-        .sort({ views:-1 })
-        .limit(limit)
-        .select('title views soldCount');
-      res.json({ success:true,data:prods });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to fetch popularity metrics', error:err.message });
-    }
-  }
-
-  // 8. Category & Tag Management
-  static async upsertCategory(req, res) {
-    try {
-      const Category = require('../models/Category');
-      const { id } = req.params;
-      let cat;
-      if (id) {
-        cat = await Category.findByIdAndUpdate(id, req.body, { new:true, runValidators:true });
-      } else {
-        cat = new Category(req.body);
-        await cat.save();
-      }
-      res.json({ success:true,data:cat });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Category upsert failed', error:err.message });
-    }
-  }
-
-  static async listCategories(req, res) {
-    try {
-      const Category = require('../models/Category');
-      const cats = await Category.find().sort({ name:1 });
-      res.json({ success:true,data:cats });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to list categories', error:err.message });
-    }
-  }
-
-  // 9. Downloadable Files
-  static async listDownloads(req, res) {
-    try {
-      const { id } = req.params;
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ success:false,message:'Invalid product ID' });
-      }
-      const product = await Product.findById(id).select('downloadableFiles');
-      if (!product) {
-        return res.status(404).json({ success:false,message:'Product not found' });
-      }
-      res.json({ success:true, data: product.downloadableFiles });
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to list downloads', error:err.message });
-    }
-  }
-
-  // Increment product views
-static async incrementViews (req, res) {
-  try {
-    const { id } = req.params;
-
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
     }
 
-    product.incrementViews();
-    await product.save();
-
-    res.json({
-      message: "Product views incremented",
-      views: product.views,
-    });
-  } catch (err) {
-    console.error("Error incrementing views:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Increment sold count & decrease stock
-static async incrementSold  (req, res) {
-  try {
-    const { id } = req.params;
-    const { quantity = 1 } = req.body;
-
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    static async removeFavorite(req, res) {
+        try {
+            const user = await User.findById(req.user.id);
+            user.wishlist = user.wishlist.filter(pid => pid.toString() !== req.params.id);
+            await user.save();
+            res.json({ success: true, message: 'Removed from favorites', data: user.wishlist });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to remove favorite', error: err.message });
+        }
     }
 
-    if (product.stock < quantity) {
-      return res.status(400).json({ message: "Not enough stock" });
+    static async listFavorites(req, res) {
+        try {
+            const user = await User.findById(req.user.id)
+                .populate({ path: 'wishlist', select: 'title basePrice mainImage' });
+            res.json({ success: true, data: user.wishlist });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to fetch favorites', error: err.message });
+        }
     }
 
-    product.incrementSold(quantity);
-    await product.save();
-
-    res.json({
-      message: "Product sold count incremented",
-      soldCount: product.soldCount,
-      stock: product.stock,
-    });
-  } catch (err) {
-    console.error("Error incrementing sold count:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Check if discount is active
-
-
-static async checkBundleStatus(req, res) {
-    try {
-      const { id } = req.params;
-
-      const isBundle = await Product.isPartOfBundle(id);
-
-      return res.json({
-        message: "Bundle status checked",
-        isBundle,
-      });
-    } catch (err) {
-      console.error("Error checking bundle status:", err);
-      return res.status(500).json({ message: "Server error" });
+    // 2. Recommendations
+    static async getRecommendations(req, res) {
+        try {
+            const { id } = req.params;
+            const p = await Product.findById(id).lean();
+            if (!p) return res.status(404).json({ success: false, message: 'Product not found' });
+            const recs = await Product.find({ categories: { $in: p.categories }, _id: { $ne: id }, status: 'active' })
+                .sort({ soldCount: -1 })
+                .limit(10)
+                .select('title basePrice mainImage');
+            res.json({ success: true, data: recs });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to fetch recommendations', error: err.message });
+        }
     }
-  }
-  static async downloadFile(req, res) {
-    try {
-      const { id, fileIndex } = req.params;
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ success:false,message:'Invalid product ID' });
-      }
-      const product = await Product.findById(id).select('downloadableFiles');
-      if (!product) {
-        return res.status(404).json({ success:false,message:'Product not found' });
-      }
-      const file = product.downloadableFiles[Number(fileIndex)];
-      if (!file) {
-        return res.status(404).json({ success:false,message:'File not found' });
-      }
-      return res.redirect(file.url);
-    } catch(err) {
-      res.status(500).json({ success:false,message:'Failed to download file', error:err.message });
+
+    // 3. Import/Export CSV
+    static async importCSV(req, res) {
+        try {
+            if (!req.file) return res.status(400).json({ success: false, message: 'CSV file required' });
+            const results = [];
+            fs.createReadStream(req.file.path)
+                .pipe(csv())
+                .on('data', data => results.push(data))
+                .on('end', async () => {
+                    const ops = results.map(item => ({
+                        updateOne: { filter: { sku: item.sku }, update: { $set: item }, upsert: true }
+                    }));
+                    await Product.bulkWrite(ops);
+                    fs.unlinkSync(req.file.path);
+                    res.json({ success: true, message: `Imported ${results.length} products` });
+                });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Import failed', error: err.message });
+        }
     }
-  }
+
+    static async exportCSV(req, res) {
+        try {
+            const products = await Product.find({ deletedAt: { $exists: false } }).lean();
+            const fields = Object.keys(products[0] || {});
+            const parser = new Parser({ fields });
+            const csvData = parser.parse(products);
+            res.header('Content-Type', 'text/csv');
+            res.attachment('products_export.csv');
+            res.send(csvData);
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Export failed', error: err.message });
+        }
+    }
+
+    // 4. Review Moderation
+    static async approveReview(req, res) {
+        try {
+            const { id, reviewId } = req.params;
+            if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(reviewId)) {
+                return res.status(400).json({ success: false, message: 'Invalid ID format' });
+            }
+            const p = await Product.findById(id);
+            if (!p) return res.status(404).json({ success: false, message: 'Product not found' });
+            const r = p.reviews.id(reviewId);
+            if (!r) return res.status(404).json({ success: false, message: 'Review not found' });
+            r.approved = true;
+            await p.save();
+            res.json({ success: true, message: 'Review approved' });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Approval failed', error: err.message });
+        }
+    }
+
+    static async removeReview(req, res) {
+        try {
+            const { id, reviewId } = req.params;
+            const p = await Product.findById(id);
+            p.reviews.id(reviewId).remove();
+            await p.save();
+            res.json({ success: true, message: 'Review removed' });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Removal failed', error: err.message });
+        }
+    }
+
+    // 5. Inventory Alerts
+    static async lowStockAlerts(req, res) {
+        try {
+            const threshold = Number(req.query.threshold) || 5;
+            const prods = await Product.find({ inventory: { $lte: threshold }, deletedAt: { $exists: false } })
+                .select('title inventory lowStockThreshold');
+            res.json({ success: true, data: prods });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to fetch alerts', error: err.message });
+        }
+    }
+
+    static async sendLowStockEmails(req, res) {
+        res.json({ success: true, message: 'Emails triggered (stub)' });
+    }
+
+    // 6. Bulk Price Updates & Flash Sales
+    static async bulkPriceUpdate(req, res) {
+        try {
+            const { ids, type, amount } = req.body;
+            if (!['percentage', 'fixed'].includes(type) || !Array.isArray(ids) || typeof amount !== 'number') {
+                return res.status(400).json({ success: false, message: 'Invalid input' });
+            }
+            const ops = ids.map(id => ({
+                updateOne: {
+                    filter: { _id: id },
+                    update: type === 'percentage'
+                        ? { $mul: { basePrice: (100 - amount) / 100 } }
+                        : { $inc: { basePrice: -amount } }
+                }
+            }));
+            await Product.bulkWrite(ops);
+            res.json({ success: true, message: 'Bulk price update applied' });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Bulk update failed', error: err.message });
+        }
+    }
+
+    static async scheduleFlashSale(req, res) {
+        res.json({ success: true, message: 'Flash sale scheduled (stub)' });
+    }
+
+    // 7. Extended Analytics
+    static async salesMetrics(req, res) {
+        try {
+            const from = new Date(req.query.from), to = new Date(req.query.to);
+            const metrics = await Order.aggregate([
+                { $match: { createdAt: { $gte: from, $lte: to } } },
+                { $unwind: '$items' },
+                {
+                    $group: {
+                        _id: '$items.productId',
+                        totalUnits: { $sum: '$items.quantity' },
+                        revenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } }
+                    }
+                },
+                { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'product' } },
+                { $unwind: '$product' },
+                {
+                    $project: {
+                        _id: 0, productId: '$_id', title: '$product.title', totalUnits: 1, revenue: 1
+                    }
+                },
+                { $sort: { revenue: -1 } }
+            ]);
+            res.json({ success: true, data: metrics });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to fetch sales metrics', error: err.message });
+        }
+    }
+
+    static async popularity(req, res) {
+        try {
+            const limit = Number(req.query.limit) || 10;
+            const prods = await Product.find({ deletedAt: { $exists: false } })
+                .sort({ views: -1 })
+                .limit(limit)
+                .select('title views soldCount');
+            res.json({ success: true, data: prods });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to fetch popularity metrics', error: err.message });
+        }
+    }
+
+    // 8. Category & Tag Management
+    static async upsertCategory(req, res) {
+        try {
+            const Category = require('../models/Category');
+            const { id } = req.params;
+            let cat;
+            if (id) {
+                cat = await Category.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
+            } else {
+                cat = new Category(req.body);
+                await cat.save();
+            }
+            res.json({ success: true, data: cat });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Category upsert failed', error: err.message });
+        }
+    }
+
+    static async listCategories(req, res) {
+        try {
+            const Category = require('../models/Category');
+            const cats = await Category.find().sort({ name: 1 });
+            res.json({ success: true, data: cats });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to list categories', error: err.message });
+        }
+    }
+
+    // 9. Downloadable Files
+    static async listDownloads(req, res) {
+        try {
+            const { id } = req.params;
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({ success: false, message: 'Invalid product ID' });
+            }
+            const product = await Product.findById(id).select('downloadableFiles');
+            if (!product) {
+                return res.status(404).json({ success: false, message: 'Product not found' });
+            }
+            res.json({ success: true, data: product.downloadableFiles });
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to list downloads', error: err.message });
+        }
+    }
+
+    // Increment product views
+    static async incrementViews(req, res) {
+        try {
+            const { id } = req.params;
+
+            const product = await Product.findById(id);
+            if (!product) {
+                return res.status(404).json({ message: "Product not found" });
+            }
+
+            product.incrementViews();
+            await product.save();
+
+            res.json({
+                message: "Product views incremented",
+                views: product.views,
+            });
+        } catch (err) {
+            console.error("Error incrementing views:", err);
+            res.status(500).json({ message: "Server error" });
+        }
+    };
+
+    // Increment sold count & decrease stock
+    static async incrementSold(req, res) {
+        try {
+            const { id } = req.params;
+            const { quantity = 1 } = req.body;
+
+            const product = await Product.findById(id);
+            if (!product) {
+                return res.status(404).json({ message: "Product not found" });
+            }
+
+            if (product.stock < quantity) {
+                return res.status(400).json({ message: "Not enough stock" });
+            }
+
+            product.incrementSold(quantity);
+            await product.save();
+
+            res.json({
+                message: "Product sold count incremented",
+                soldCount: product.soldCount,
+                stock: product.stock,
+            });
+        } catch (err) {
+            console.error("Error incrementing sold count:", err);
+            res.status(500).json({ message: "Server error" });
+        }
+    };
+
+    // Check if discount is active
+
+
+    static async checkBundleStatus(req, res) {
+        try {
+            const { id } = req.params;
+
+            const isBundle = await Product.isPartOfBundle(id);
+
+            return res.json({
+                message: "Bundle status checked",
+                isBundle,
+            });
+        } catch (err) {
+            console.error("Error checking bundle status:", err);
+            return res.status(500).json({ message: "Server error" });
+        }
+    }
+    static async downloadFile(req, res) {
+        try {
+            const { id, fileIndex } = req.params;
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({ success: false, message: 'Invalid product ID' });
+            }
+            const product = await Product.findById(id).select('downloadableFiles');
+            if (!product) {
+                return res.status(404).json({ success: false, message: 'Product not found' });
+            }
+            const file = product.downloadableFiles[Number(fileIndex)];
+            if (!file) {
+                return res.status(404).json({ success: false, message: 'File not found' });
+            }
+            return res.redirect(file.url);
+        } catch (err) {
+            res.status(500).json({ success: false, message: 'Failed to download file', error: err.message });
+        }
+    }
 }
 
 module.exports = ProductController;

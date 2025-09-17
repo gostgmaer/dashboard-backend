@@ -157,6 +157,10 @@ router.get('/',
   productValidation.query,
   ProductController.getProducts
 );
+router.get('/all',
+  productValidation.query,
+  ProductController.getAdvanceProductSearch
+);
 
 // GET /api/products/:identifier - Get single product by ID or slug
 router.get('/:identifier',

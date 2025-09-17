@@ -33,14 +33,16 @@ authRoute.post('/register', authLimiter, authController.registerUser);
 authRoute.post('/login', authLimiter, authController.login);
 authRoute.post('/verify-otp', authLimiter, authController.verifyOTPAndLogin);
 authRoute.post('/resend-otp', authLimiter, authController.resendOTP);
+authRoute.post('/social-auth', authLimiter, authController.socialLogin);
 authRoute.post('/forgot-password', authLimiter, authController.forgotPassword);
 authRoute.post('/reset-password/:token', authLimiter, authController.resetPassword);
-authRoute.post('/verify-user/:id', AuthMiddleware, authorize('users', 'update'), authController.verifyUser);
+authRoute.post('/verify-user/:id', AuthMiddleware,authorize('users', 'update'), authController.verifyUser);
 
 // ========================================
 // 🔐 AUTHENTICATED ENDPOINTS
 // ========================================
 authRoute.post('/logout', AuthMiddleware, authController.logout);
+authRoute.get('/permissions', AuthMiddleware, authController.getUserPermissionsController);
 authRoute.post('/logout-all', AuthMiddleware, authAccess.requireOTP('logout_all'), authController.logoutAll);
 authRoute.post('/refresh-token', authController.refreshToken);
 authRoute.post('/change-password', AuthMiddleware, authAccess.requireOTP('change_password'), authController.changePassword);
@@ -66,7 +68,7 @@ authRoute.post('/mfa/verify', AuthMiddleware, authController.verifyMFA);
 // ========================================
 // 📱 DEVICE & SESSION MANAGEMENT
 // ========================================
-authRoute.get('/profile-date', AuthMiddleware, authController.findFullyPopulatedById);
+authRoute.get('/profile-data', AuthMiddleware, authController.findFullyPopulatedById);
 authRoute.get('/profile', AuthMiddleware, authController.getProfile);
 authRoute.get('/devices', AuthMiddleware, authController.getDevices);
 authRoute.post('/devices/trust', AuthMiddleware, authAccess.requireOTP('trust_device'), authController.trustDevice);
@@ -122,6 +124,7 @@ authRoute.get('/docs/routes', AuthMiddleware, authorize('auth', 'view'), (req, r
     ],
     authenticated: [
       'POST   /auth/logout',
+       'GET   /auth/permissions',
       'POST   /auth/logout-all',
       'POST   /auth/refresh-token',
       'POST   /auth/change-password'

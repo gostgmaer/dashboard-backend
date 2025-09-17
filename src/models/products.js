@@ -11,6 +11,26 @@ const variantSchema = new mongoose.Schema({
   attributes: { type: Map, of: String } // e.g., color: 'red', size: 'M'
 });
 
+const DEFAULT_SEARCH_FIELDS = [
+  'title',
+  'shortDescription',
+  'tags',
+  'sku',
+  'vendor',
+  'manufacturer',
+  'model',
+  'overview',
+  'metaTitle',
+  'metaDescription',
+  'seo_info.title',
+  'seo_info.description',
+  'descriptions.content',
+  'features',
+  'specifications.color',
+  'customAttributes.material',
+  'categoryName',
+  'brandName'
+];
 
 
 const productSchema = new mongoose.Schema(
@@ -615,146 +635,166 @@ productSchema.statics.generateSchemaReport = function () {
   };
 };
 
-productSchema.statics.generateDatabaseStatistics = async function () {
-  const [
-    totalProducts,
-    statusCounts,
-    productTypeCounts,
-    availabilityCounts,
-    priceStats,
-    stockStats,
-    discountStats,
-    reviewStats,
-    categoryStats,
-    tagStats,
-    bundleStats,
-    featuredStats,
-    ecoFriendlyStats,
-    giftCardStats,
-    preOrderStats,
-    subscriptionStats
-  ] = await Promise.all([
-    this.countDocuments({ deletedAt: { $exists: false } }),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      { $group: { _id: '$productType', count: { $sum: 1 } } }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      { $group: { _id: '$availability', count: { $sum: 1 } } }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      {
-        $group: {
-          _id: null,
-          avgPrice: { $avg: '$price' },
-          minPrice: { $min: '$price' },
-          maxPrice: { $max: '$price' },
-          totalPrice: { $sum: '$price' }
-        }
-      }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false }, trackInventory: 'yes' } },
-      {
-        $group: {
-          _id: null,
-          totalStock: { $sum: '$stock' },
-          avgStock: { $avg: '$stock' },
-          minStock: { $min: '$stock' },
-          maxStock: { $max: '$stock' },
-          lowStockCount: { $sum: { $cond: [{ $lte: ['$currentStockLevel', '$lowStockLevel'] }, 1, 0] } },
-          outOfStockCount: { $sum: { $cond: [{ $eq: ['$isAvailable', false] }, 1, 0] } }
-        }
-      }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false }, discount: { $gt: 0 }, discountStartDate: { $lte: new Date() }, discountEndDate: { $gte: new Date() } } },
-      {
-        $group: {
-          _id: null,
-          discountedProducts: { $sum: 1 },
-          avgDiscount: { $avg: '$discount' },
-          maxDiscount: { $max: '$discount' },
-          totalDiscountedValue: { $sum: { $multiply: ['$price', '$discount', 0.01] } }
-        }
-      }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      { $lookup: { from: 'reviews', localField: 'reviews', foreignField: '_id', as: 'reviewsData' } },
-      {
-        $group: {
-          _id: null,
-          totalReviews: { $sum: { $size: '$reviewsData' } },
-          avgRating: { $avg: { $avg: '$reviewsData.rating' } }
-        }
-      }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      { $unwind: '$categories' },
-      { $group: { _id: '$categories', count: { $sum: 1 } } },
-      { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'categoryData' } },
-      { $project: { _id: 0, categoryId: '$_id', categoryName: { $arrayElemAt: ['$categoryData.name', 0] }, count: 1 } }
-    ]),
-    this.aggregate([
-      { $match: { deletedAt: { $exists: false } } },
-      { $unwind: '$tags' },
-      { $group: { _id: '$tags', count: { $sum: 1 } } }
-    ]),
-    this.countDocuments({ productBundle: true, deletedAt: { $exists: false } }),
-    this.countDocuments({ isFeatured: true, deletedAt: { $exists: false } }),
-    this.countDocuments({ ecoFriendly: true, deletedAt: { $exists: false } }),
-    this.countDocuments({ isGiftCard: true, deletedAt: { $exists: false } }),
-    this.countDocuments({ preOrder: true, deletedAt: { $exists: false } }),
-    this.countDocuments({ isSubscription: true, deletedAt: { $exists: false } })
-  ]);
 
-  return {
-    totalProducts,
-    statusDistribution: statusCounts.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
-    productTypeDistribution: productTypeCounts.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
-    availabilityDistribution: availabilityCounts.reduce((acc, a) => ({ ...acc, [a._id]: a.count }), {}),
-    priceStatistics: priceStats[0] ? {
-      averagePrice: priceStats[0].avgPrice,
-      minPrice: priceStats[0].minPrice,
-      maxPrice: priceStats[0].maxPrice,
-      totalPrice: priceStats[0].totalPrice
-    } : { averagePrice: 0, minPrice: 0, maxPrice: 0, totalPrice: 0 },
-    stockStatistics: stockStats[0] ? {
-      totalStock: stockStats[0].totalStock,
-      averageStock: stockStats[0].avgStock,
-      minStock: stockStats[0].minStock,
-      maxStock: stockStats[0].maxStock,
-      lowStockCount: stockStats[0].lowStockCount,
-      outOfStockCount: stockStats[0].outOfStockCount
-    } : { totalStock: 0, averageStock: 0, minStock: 0, maxStock: 0, lowStockCount: 0, outOfStockCount: 0 },
-    discountStatistics: discountStats[0] ? {
-      discountedProducts: discountStats[0].discountedProducts,
-      averageDiscount: discountStats[0].avgDiscount,
-      maxDiscount: discountStats[0].maxDiscount,
-      totalDiscountedValue: discountStats[0].totalDiscountedValue
-    } : { discountedProducts: 0, averageDiscount: 0, maxDiscount: 0, totalDiscountedValue: 0 },
-    reviewStatistics: reviewStats[0] ? {
-      totalReviews: reviewStats[0].totalReviews,
-      averageRating: reviewStats[0].avgRating || 0
-    } : { totalReviews: 0, averageRating: 0 },
-    categoryDistribution: categoryStats,
-    tagDistribution: tagStats.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
-    bundleStatistics: { bundleProducts: bundleStats },
-    featuredStatistics: { featuredProducts: featuredStats },
-    ecoFriendlyStatistics: { ecoFriendlyProducts: ecoFriendlyStats },
-    giftCardStatistics: { giftCardProducts: giftCardStats },
-    preOrderStatistics: { preOrderProducts: preOrderStats },
-    subscriptionStatistics: { subscriptionProducts: subscriptionStats }
+
+
+productSchema.statics.advancedFilter = async function (queryParams = {}) {
+  try {
+    const params = this._validateAndSanitizeParams(queryParams);
+    const pipeline = this._buildAdvancedPipeline(params);
+
+    // Execute with timeout and memory limits
+    const results = await this.aggregate(pipeline)
+      .maxTimeMS(30000) // 30 second timeout
+      .allowDiskUse(true) // Allow disk usage for large datasets
+      .exec();
+
+    return this._formatFilterResults(results[0], params);
+  } catch (error) {
+    throw new Error(`Advanced filtering failed: ${error.message}`);
+  }
+},
+
+  productSchema.statics.generateDatabaseStatistics = async function () {
+    const [
+      totalProducts,
+      statusCounts,
+      productTypeCounts,
+      availabilityCounts,
+      priceStats,
+      stockStats,
+      discountStats,
+      reviewStats,
+      categoryStats,
+      tagStats,
+      bundleStats,
+      featuredStats,
+      ecoFriendlyStats,
+      giftCardStats,
+      preOrderStats,
+      subscriptionStats
+    ] = await Promise.all([
+      this.countDocuments({ deletedAt: { $exists: false } }),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $group: { _id: '$productType', count: { $sum: 1 } } }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $group: { _id: '$availability', count: { $sum: 1 } } }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        {
+          $group: {
+            _id: null,
+            avgPrice: { $avg: '$price' },
+            minPrice: { $min: '$price' },
+            maxPrice: { $max: '$price' },
+            totalPrice: { $sum: '$price' }
+          }
+        }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false }, trackInventory: 'yes' } },
+        {
+          $group: {
+            _id: null,
+            totalStock: { $sum: '$stock' },
+            avgStock: { $avg: '$stock' },
+            minStock: { $min: '$stock' },
+            maxStock: { $max: '$stock' },
+            lowStockCount: { $sum: { $cond: [{ $lte: ['$currentStockLevel', '$lowStockLevel'] }, 1, 0] } },
+            outOfStockCount: { $sum: { $cond: [{ $eq: ['$isAvailable', false] }, 1, 0] } }
+          }
+        }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false }, discount: { $gt: 0 }, discountStartDate: { $lte: new Date() }, discountEndDate: { $gte: new Date() } } },
+        {
+          $group: {
+            _id: null,
+            discountedProducts: { $sum: 1 },
+            avgDiscount: { $avg: '$discount' },
+            maxDiscount: { $max: '$discount' },
+            totalDiscountedValue: { $sum: { $multiply: ['$price', '$discount', 0.01] } }
+          }
+        }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $lookup: { from: 'reviews', localField: 'reviews', foreignField: '_id', as: 'reviewsData' } },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: { $size: '$reviewsData' } },
+            avgRating: { $avg: { $avg: '$reviewsData.rating' } }
+          }
+        }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $unwind: '$categories' },
+        { $group: { _id: '$categories', count: { $sum: 1 } } },
+        { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'categoryData' } },
+        { $project: { _id: 0, categoryId: '$_id', categoryName: { $arrayElemAt: ['$categoryData.name', 0] }, count: 1 } }
+      ]),
+      this.aggregate([
+        { $match: { deletedAt: { $exists: false } } },
+        { $unwind: '$tags' },
+        { $group: { _id: '$tags', count: { $sum: 1 } } }
+      ]),
+      this.countDocuments({ productBundle: true, deletedAt: { $exists: false } }),
+      this.countDocuments({ isFeatured: true, deletedAt: { $exists: false } }),
+      this.countDocuments({ ecoFriendly: true, deletedAt: { $exists: false } }),
+      this.countDocuments({ isGiftCard: true, deletedAt: { $exists: false } }),
+      this.countDocuments({ preOrder: true, deletedAt: { $exists: false } }),
+      this.countDocuments({ isSubscription: true, deletedAt: { $exists: false } })
+    ]);
+
+    return {
+      totalProducts,
+      statusDistribution: statusCounts.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
+      productTypeDistribution: productTypeCounts.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
+      availabilityDistribution: availabilityCounts.reduce((acc, a) => ({ ...acc, [a._id]: a.count }), {}),
+      priceStatistics: priceStats[0] ? {
+        averagePrice: priceStats[0].avgPrice,
+        minPrice: priceStats[0].minPrice,
+        maxPrice: priceStats[0].maxPrice,
+        totalPrice: priceStats[0].totalPrice
+      } : { averagePrice: 0, minPrice: 0, maxPrice: 0, totalPrice: 0 },
+      stockStatistics: stockStats[0] ? {
+        totalStock: stockStats[0].totalStock,
+        averageStock: stockStats[0].avgStock,
+        minStock: stockStats[0].minStock,
+        maxStock: stockStats[0].maxStock,
+        lowStockCount: stockStats[0].lowStockCount,
+        outOfStockCount: stockStats[0].outOfStockCount
+      } : { totalStock: 0, averageStock: 0, minStock: 0, maxStock: 0, lowStockCount: 0, outOfStockCount: 0 },
+      discountStatistics: discountStats[0] ? {
+        discountedProducts: discountStats[0].discountedProducts,
+        averageDiscount: discountStats[0].avgDiscount,
+        maxDiscount: discountStats[0].maxDiscount,
+        totalDiscountedValue: discountStats[0].totalDiscountedValue
+      } : { discountedProducts: 0, averageDiscount: 0, maxDiscount: 0, totalDiscountedValue: 0 },
+      reviewStatistics: reviewStats[0] ? {
+        totalReviews: reviewStats[0].totalReviews,
+        averageRating: reviewStats[0].avgRating || 0
+      } : { totalReviews: 0, averageRating: 0 },
+      categoryDistribution: categoryStats,
+      tagDistribution: tagStats.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
+      bundleStatistics: { bundleProducts: bundleStats },
+      featuredStatistics: { featuredProducts: featuredStats },
+      ecoFriendlyStatistics: { ecoFriendlyProducts: ecoFriendlyStats },
+      giftCardStatistics: { giftCardProducts: giftCardStats },
+      preOrderStatistics: { preOrderProducts: preOrderStats },
+      subscriptionStatistics: { subscriptionProducts: subscriptionStats }
+    };
   };
-};
 
 // Audit Logging
 productSchema.pre('save', function (next) {
@@ -876,6 +916,695 @@ productSchema.methods.exportProductData = function () {
   return JSON.stringify(this.toObject());
 };
 
+
+productSchema.statics = {
+
+  /**
+   * MAIN FILTERING METHOD - Enterprise Level
+   * Handles all advanced filtering, search, pagination, sorting with performance optimization
+   */
+  async advancedFilter(queryParams = {}) {
+    try {
+      const params = this._validateAndSanitizeParams(queryParams);
+      const pipeline = this._buildAdvancedPipeline(params);
+
+      // Execute with timeout and memory limits
+      const results = await this.aggregate(pipeline)
+        .maxTimeMS(30000) // 30 second timeout
+        .allowDiskUse(true) // Allow disk usage for large datasets
+        .exec();
+
+      return this._formatFilterResults(results[0], params);
+    } catch (error) {
+      throw new Error(`Advanced filtering failed: ${error.message}`);
+    }
+  },
+
+  /**
+   * PARAMETER VALIDATION & SANITIZATION
+   * Comprehensive input validation with security measures
+   */
+  _validateAndSanitizeParams(params) {
+    const {
+      // Pagination
+      page = 1,
+      limit = 20,
+
+      // Sorting
+      sort,
+
+      // Search
+      search,
+      searchFields,
+      searchMode = 'fuzzy',
+
+      // Filtering
+      filters = {},
+
+      // Advanced options
+      facets = false,
+      aggregations = false,
+      projection,
+      includeInactive = false,
+      includeStats = false,
+
+      // Performance options
+      lean = true,
+      explain = false,
+      timeout = 30000
+    } = params;
+
+    // Validate and sanitize pagination
+    const validatedPage = Math.max(1, Math.min(parseInt(page) || 1, 10000));
+    const validatedLimit = Math.max(1, Math.min(parseInt(limit) || 20, 1000));
+
+    // Validate sort fields
+    const allowedSortFields = [
+      'title', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice',
+      'createdAt', 'updatedAt', 'publishDate', 'lastRestocked',
+      'soldCount', 'views', 'total_view', 'inventory',
+      'reviews.averageRating', 'reviews.totalReviews',
+      'analytics.views', 'analytics.clicks', 'analytics.conversions',
+      'discountValue', 'loyaltyPoints'
+    ];
+
+    const validatedSort = this._parseSort(sort, allowedSortFields);
+
+    // Validate search parameters
+    const validatedSearch = search ? String(search).trim().substring(0, 200) : null;
+    const validatedSearchFields = this._validateSearchFields(searchFields);
+
+    // Validate and sanitize filters
+    const validatedFilters = this._validateFilters(filters, includeInactive);
+
+    // Validate projection
+    const validatedProjection = this._validateProjection(projection);
+
+    return {
+      page: validatedPage,
+      limit: validatedLimit,
+      sort: validatedSort,
+      search: validatedSearch,
+      searchFields: validatedSearchFields,
+      searchMode,
+      filters: validatedFilters,
+      facets: Boolean(facets),
+      aggregations: Boolean(aggregations),
+      projection: validatedProjection,
+      includeInactive: Boolean(includeInactive),
+      includeStats: Boolean(includeStats),
+      lean: Boolean(lean),
+      explain: Boolean(explain),
+      timeout: Math.min(parseInt(timeout) || 30000, 60000)
+    };
+  },
+
+  /**
+   * SORT PARSING
+   * Advanced sort parsing with multiple fields and directions
+   */
+  _parseSort(sortParam, allowedFields) {
+    if (!sortParam) return { createdAt: -1 };
+
+    const sortObj = {};
+    const sortFields = String(sortParam).split(',');
+
+    for (const field of sortFields) {
+      let cleanField = field.trim();
+      let direction = 1;
+
+      // Handle direction prefixes
+      if (cleanField.startsWith('-')) {
+        direction = -1;
+        cleanField = cleanField.substring(1);
+      } else if (cleanField.startsWith('+')) {
+        cleanField = cleanField.substring(1);
+      }
+
+      // Validate field name
+      if (allowedFields.includes(cleanField)) {
+        sortObj[cleanField] = direction;
+      }
+    }
+
+    return Object.keys(sortObj).length > 0 ? sortObj : { createdAt: -1 };
+  },
+
+  /**
+   * SEARCH FIELDS VALIDATION
+   * Validate and sanitize searchable fields
+   */
+  _validateSearchFields(fields) {
+
+
+
+    // const allowedSearchFields = [
+    //   'title', 'shortDescription', 'descriptions', 'tags', 'sku',
+    //   'brand', 'manufacturer', 'model', 'features', 'overview',
+    //   'metaTitle', 'metaDescription', 'seo_info.title', 'seo_info.description'
+    // ];
+
+    if (!fields) {
+      // 2. Fallback to DEFAULT_SEARCH_FIELDS when none provided
+      return DEFAULT_SEARCH_FIELDS;
+    }
+
+    const fieldArray = Array.isArray(fields) ? fields : fields.split(',');
+    return fieldArray
+      .map(f => f.trim())
+      .filter(f => DEFAULT_SEARCH_FIELDS.includes(f))
+      .slice(0, 10); // Limit to 10 search fields
+  },
+
+  /**
+   * COMPREHENSIVE FILTER VALIDATION
+   * Validate all possible filter types with security checks
+   */
+  _validateFilters(filters, includeInactive) {
+    if (!filters || typeof filters !== 'object') return {};
+
+    const validatedFilters = {};
+
+    // Status filtering (security critical)
+    if (!includeInactive) {
+      validatedFilters.status = { $in: ['active', 'published'] };
+      validatedFilters.isAvailable = true;
+    }
+
+    // Filter validation map
+    const filterValidators = {
+      // Basic text fields
+      status: (val) => ['active', 'inactive', 'draft', 'pending', 'archived', 'published'].includes(val) ? val : null,
+      productType: (val) => ['physical', 'digital', 'service'].includes(val) ? val : null,
+      visibility: (val) => ['public', 'private', 'password'].includes(val) ? val : null,
+      availability: (val) => typeof val === 'string' ? val : null,
+
+      // ObjectId references
+      category: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
+      brand: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
+      createdBy: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
+
+      // Categories array
+      categories: (val) => {
+        const ids = Array.isArray(val) ? val : [val];
+        const validIds = ids.filter(id => mongoose.isValidObjectId(id))
+          .map(id => new mongoose.Types.ObjectId(id))
+          .slice(0, 50);
+        return validIds.length ? { $in: validIds } : null;
+      },
+
+      // Price range filters
+      basePrice: (val) => this._parseRange(val),
+      salePrice: (val) => this._parseRange(val),
+      comparePrice: (val) => this._parseRange(val),
+      retailPrice: (val) => this._parseRange(val),
+      costPrice: (val) => this._parseRange(val),
+      discountValue: (val) => this._parseRange(val),
+
+      // Boolean filters
+      isFeatured: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      trending: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      newArrival: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      bestseller: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      onSale: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      isAvailable: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      ecoFriendly: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      limitedEdition: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      preOrder: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      backorder: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      discontinued: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      isGiftCard: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      productBundle: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      giftWrappingAvailable: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      isSubscription: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      virtualProduct: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      virtualTryOnEnabled: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+      augmentedRealityEnabled: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+
+      // Numeric range filters
+      inventory: (val) => this._parseRange(val),
+      soldCount: (val) => this._parseRange(val),
+      views: (val) => this._parseRange(val),
+      total_view: (val) => this._parseRange(val),
+      weight: (val) => this._parseRange(val),
+      shippingWeight: (val) => this._parseRange(val),
+      loyaltyPoints: (val) => this._parseRange(val),
+      purchaseLimit: (val) => this._parseRange(val),
+      returnPeriod: (val) => this._parseRange(val),
+
+      // Rating filters
+      'reviews.averageRating': (val) => this._parseRange(val, 0, 5),
+      'reviews.totalReviews': (val) => this._parseRange(val),
+
+      // Analytics filters
+      'analytics.views': (val) => this._parseRange(val),
+      'analytics.clicks': (val) => this._parseRange(val),
+      'analytics.conversions': (val) => this._parseRange(val),
+
+      // Array filters
+      tags: (val) => {
+        const tags = Array.isArray(val) ? val : [val];
+        return tags.length ? { $in: tags.slice(0, 50) } : null;
+      },
+      features: (val) => {
+        const features = Array.isArray(val) ? val : [val];
+        return features.length ? { $in: features.slice(0, 20) } : null;
+      },
+      certifications: (val) => {
+        const certs = Array.isArray(val) ? val : [val];
+        return certs.length ? { $in: certs.slice(0, 20) } : null;
+      },
+      allergens: (val) => {
+        const allergens = Array.isArray(val) ? val : [val];
+        return allergens.length ? { $in: allergens.slice(0, 20) } : null;
+      },
+
+      // String filters with exact/partial matching
+      vendor: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
+      manufacturer: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
+      model: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
+      material: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
+      color: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
+      size: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
+      ageGroup: (val) => typeof val === 'string' ? val.trim() : null,
+      gender: (val) => typeof val === 'string' ? val.trim() : null,
+      season: (val) => typeof val === 'string' ? val.trim() : null,
+      occasion: (val) => typeof val === 'string' ? val.trim() : null,
+      style: (val) => typeof val === 'string' ? val.trim() : null,
+      pattern: (val) => typeof val === 'string' ? val.trim() : null,
+
+      // Date filters
+      createdAt: (val) => this._parseDateRange(val),
+      updatedAt: (val) => this._parseDateRange(val),
+      publishDate: (val) => this._parseDateRange(val),
+      expiryDate: (val) => this._parseDateRange(val),
+      lastRestocked: (val) => this._parseDateRange(val),
+      discountStartDate: (val) => this._parseDateRange(val),
+      discountEndDate: (val) => this._parseDateRange(val),
+      preOrderDate: (val) => this._parseDateRange(val),
+
+      // Custom attributes (Map field)
+      customAttributes: (val) => {
+        if (typeof val !== 'object') return null;
+        const customFilters = {};
+        for (const [key, value] of Object.entries(val)) {
+          if (key.length <= 50 && typeof value === 'string' && value.length <= 200) {
+            customFilters[`customAttributes.${key}`] = new RegExp(value, 'i');
+          }
+        }
+        return Object.keys(customFilters).length ? customFilters : null;
+      },
+
+      // Specifications (Map field)
+      specifications: (val) => {
+        if (typeof val !== 'object') return null;
+        const specFilters = {};
+        for (const [key, value] of Object.entries(val)) {
+          if (key.length <= 50 && typeof value === 'string' && value.length <= 200) {
+            specFilters[`specifications.${key}`] = new RegExp(value, 'i');
+          }
+        }
+        return Object.keys(specFilters).length ? specFilters : null;
+      }
+    };
+
+    // Apply filters
+    for (const [key, value] of Object.entries(filters)) {
+      if (filterValidators[key]) {
+        const validatedValue = filterValidators[key](value);
+        if (validatedValue !== null && validatedValue !== undefined) {
+          if (key === 'customAttributes' || key === 'specifications') {
+            Object.assign(validatedFilters, validatedValue);
+          } else {
+            validatedFilters[key] = validatedValue;
+          }
+        }
+      }
+    }
+
+    return validatedFilters;
+  },
+
+  /**
+   * RANGE PARSER
+   * Parse min/max range values with validation
+   */
+  _parseRange(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+    if (!value) return null;
+
+    const range = {};
+
+    if (typeof value === 'object') {
+      if (typeof value.min === 'number' && value.min >= min) {
+        range.$gte = value.min;
+      }
+      if (typeof value.max === 'number' && value.max <= max) {
+        range.$lte = value.max;
+      }
+    } else if (typeof value === 'number' && value >= min && value <= max) {
+      range.$eq = value;
+    }
+
+    return Object.keys(range).length > 0 ? range : null;
+  },
+
+  /**
+   * DATE RANGE PARSER
+   * Parse date range filters with validation
+   */
+  _parseDateRange(value) {
+    if (!value) return null;
+
+    const range = {};
+
+    if (typeof value === 'object') {
+      if (value.start) {
+        const startDate = new Date(value.start);
+        if (!isNaN(startDate.getTime())) {
+          range.$gte = startDate;
+        }
+      }
+      if (value.end) {
+        const endDate = new Date(value.end);
+        if (!isNaN(endDate.getTime())) {
+          range.$lte = endDate;
+        }
+      }
+    }
+
+    return Object.keys(range).length > 0 ? range : null;
+  },
+
+  /**
+   * PROJECTION VALIDATION
+   * Validate and sanitize field projection
+   */
+  _validateProjection(projection) {
+    if (!projection) return null;
+
+    const allowedFields = [
+      '_id', 'title', 'sku', 'productType', 'category', 'subcategory',
+      'vendor', 'manufacturer', 'model', 'shortDescription', 'material',
+      'color', 'size', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice',
+      'discount', 'discountType', 'discountValue', 'inventory', 'mainImage',
+      'images', 'status', 'isAvailable', 'isFeatured', 'trending', 'newArrival',
+      'bestseller', 'onSale', 'reviews', 'tags', 'brand', 'createdAt', 'updatedAt'
+    ];
+
+    const projectionObj = {};
+    const fields = typeof projection === 'string' ? projection.split(',') : [];
+
+    for (const field of fields) {
+      const cleanField = field.trim();
+      if (allowedFields.includes(cleanField)) {
+        projectionObj[cleanField] = 1;
+      }
+    }
+
+    return Object.keys(projectionObj).length > 0 ? projectionObj : null;
+  },
+
+  /**
+   * ADVANCED AGGREGATION PIPELINE BUILDER
+   * Build comprehensive aggregation pipeline with all features
+   */
+  _buildAdvancedPipeline(params) {
+    const {
+      page, limit, sort, search, searchFields, searchMode, filters,
+      facets, aggregations, projection, includeStats, explain
+    } = params;
+
+    const pipeline = [];
+
+    // 1. Initial match stage (performance critical - most restrictive first)
+    if (Object.keys(filters).length > 0) {
+      pipeline.push({ $match: filters });
+    }
+
+    // 2. Text/fuzzy search stage
+    if (search) {
+      const searchStage = this._buildSearchStage(search, searchFields, searchMode);
+      if (searchStage) {
+        pipeline.push(searchStage);
+      }
+    }
+
+    // 3. Lookups for referenced collections (optimized order)
+    pipeline.push(
+      // Category lookup
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'category',
+          foreignField: '_id',
+          as: 'categoryInfo',
+          pipeline: [{ $project: { name: 1, slug: 1, image: 1 } }]
+        }
+      },
+      // Brand lookup  
+      {
+        $lookup: {
+          from: 'brands',
+          localField: 'brand',
+          foreignField: '_id',
+          as: 'brandInfo',
+          pipeline: [{ $project: { name: 1, logo: 1, slug: 1 } }]
+        }
+      }
+    );
+
+    // 4. Add computed fields
+    pipeline.push({
+      $addFields: {
+        finalPrice: {
+          $cond: {
+            if: { $and: [{ $ne: ['$salePrice', null] }, { $gt: ['$salePrice', 0] }] },
+            then: '$salePrice',
+            else: '$basePrice'
+          }
+        },
+        hasDiscount: {
+          $cond: {
+            if: { $and: [{ $ne: ['$salePrice', null] }, { $lt: ['$salePrice', '$basePrice'] }] },
+            then: true,
+            else: false
+          }
+        },
+        discountPercentage: {
+          $cond: {
+            if: { $and: [{ $ne: ['$salePrice', null] }, { $lt: ['$salePrice', '$basePrice'] }] },
+            then: {
+              $round: [
+                { $multiply: [{ $divide: [{ $subtract: ['$basePrice', '$salePrice'] }, '$basePrice'] }, 100] },
+                2
+              ]
+            },
+            else: 0
+          }
+        },
+        stockStatus: {
+          $cond: {
+            if: { $eq: ['$inventory', 0] },
+            then: 'out-of-stock',
+            else: {
+              $cond: {
+                if: { $lte: ['$inventory', '$lowStockThreshold'] },
+                then: 'low-stock',
+                else: 'in-stock'
+              }
+            }
+          }
+        },
+        categoryName: { $arrayElemAt: ['$categoryInfo.name', 0] },
+        brandName: { $arrayElemAt: ['$brandInfo.name', 0] }
+      }
+    });
+
+    // 5. Faceted aggregation using $facet
+    const facetStages = {
+      // Main data with pagination
+      data: [
+        ...(projection ? [{ $project: projection }] : []),
+        { $sort: sort },
+        { $skip: (page - 1) * limit },
+        { $limit: limit }
+      ],
+
+      // Total count
+      totalCount: [{ $count: 'count' }]
+    };
+
+    // Add facets if requested
+    if (facets) {
+      facetStages.facets = [
+        {
+          $group: {
+            _id: null,
+            categories: {
+              $addToSet: {
+                $cond: {
+                  if: { $ne: ['$categoryInfo', []] },
+                  then: {
+                    _id: '$category',
+                    name: { $arrayElemAt: ['$categoryInfo.name', 0] },
+                    count: 1
+                  },
+                  else: '$$REMOVE'
+                }
+              }
+            },
+            brands: {
+              $addToSet: {
+                $cond: {
+                  if: { $ne: ['$brandInfo', []] },
+                  then: {
+                    _id: '$brand',
+                    name: { $arrayElemAt: ['$brandInfo.name', 0] },
+                    count: 1
+                  },
+                  else: '$$REMOVE'
+                }
+              }
+            },
+            priceRange: {
+              $push: {
+                min: { $min: '$basePrice' },
+                max: { $max: '$basePrice' },
+                avg: { $avg: '$basePrice' }
+              }
+            },
+            productTypes: { $addToSet: '$productType' },
+            avgRating: { $avg: '$reviews.averageRating' },
+            totalProducts: { $sum: 1 },
+            inStock: { $sum: { $cond: [{ $gt: ['$inventory', 0] }, 1, 0] } },
+            onSale: { $sum: { $cond: ['$onSale', 1, 0] } },
+            featured: { $sum: { $cond: ['$isFeatured', 1, 0] } }
+          }
+        }
+      ];
+    }
+
+    // Add aggregations if requested
+    if (aggregations) {
+      facetStages.aggregations = [
+        {
+          $group: {
+            _id: null,
+            totalRevenue: { $sum: { $multiply: ['$basePrice', '$soldCount'] } },
+            avgPrice: { $avg: '$basePrice' },
+            totalInventory: { $sum: '$inventory' },
+            totalSold: { $sum: '$soldCount' },
+            avgRating: { $avg: '$reviews.averageRating' },
+            totalViews: { $sum: '$views' },
+            conversionRate: {
+              $cond: {
+                if: { $gt: ['$views', 0] },
+                then: { $divide: ['$soldCount', '$views'] },
+                else: 0
+              }
+            }
+          }
+        }
+      ];
+    }
+
+    // Add stats if requested
+    if (includeStats) {
+      facetStages.stats = [
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+            avgPrice: { $avg: '$basePrice' },
+            totalInventory: { $sum: '$inventory' }
+          }
+        }
+      ];
+    }
+
+    pipeline.push({ $facet: facetStages });
+
+    return pipeline;
+  },
+
+  /**
+   * BUILD SEARCH STAGE
+   * Advanced search implementation with multiple modes
+   */
+  _buildSearchStage(search, searchFields, searchMode) {
+    const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+
+    const searchConditions = searchFields.map(field => {
+      if (field === 'descriptions') {
+        return { 'descriptions.content': searchRegex };
+      } else if (field.includes('.')) {
+        return { [field]: searchRegex };
+      } else {
+        return { [field]: searchRegex };
+      }
+    });
+
+    if (searchMode === 'exact') {
+      return {
+        $match: {
+          $or: searchFields.map(field => ({ [field]: search }))
+        }
+      };
+    } else if (searchMode === 'fuzzy') {
+      return {
+        $match: {
+          $or: searchConditions
+        }
+      };
+    } else {
+      // Default partial matching
+      return {
+        $match: {
+          $or: searchConditions
+        }
+      };
+    }
+  },
+
+  /**
+   * FORMAT FILTER RESULTS
+   * Format aggregation results into standardized response
+   */
+  _formatFilterResults(result, params) {
+    const data = result?.data || [];
+    const totalCount = result?.totalCount?.[0]?.count || 0;
+    const facets = result?.facets?.[0] || null;
+    const aggregations = result?.aggregations?.[0] || null;
+    const stats = result?.stats || null;
+
+    const totalPages = Math.ceil(totalCount / params.limit);
+    const hasNextPage = params.page < totalPages;
+    const hasPrevPage = params.page > 1;
+
+    return {
+      success: true,
+      data,
+      pagination: {
+        currentPage: params.page,
+        totalPages,
+        totalItems: totalCount,
+        itemsPerPage: params.limit,
+        hasNextPage,
+        hasPrevPage,
+        nextPage: hasNextPage ? params.page + 1 : null,
+        prevPage: hasPrevPage ? params.page - 1 : null
+      },
+      filters: params.filters,
+      sort: params.sort,
+      search: params.search,
+      ...(facets && { facets }),
+      ...(aggregations && { aggregations }),
+      ...(stats && { stats })
+    };
+  },
+
+
+}
 
 
 

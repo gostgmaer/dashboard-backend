@@ -4,20 +4,29 @@ const Permission = require('../../models/permission');
 // ===== CREATE =====
 const createPermission = async (req, res) => {
   try {
-    const permission = new Permission(req.body);
-    const saved = await permission.save();
-    res.status(201).json({
-      statusCode: 201,
-      status: 'Created',
-      results: { id: saved.id },
+    const { name, description, category, isDefault, isActive, action, created_by } = req.body;
+
+    // Basic validation for required fields
+    if (!name || !action) {
+      return res.status(400).json({
+        success: false,
+        message: "'name' and 'action' are required fields.",
+        error: 'VALIDATION_ERROR'
+      });
+    }
+    const permission = await Permission.createPermission(req.body);
+
+    return res.status(201).json({
+      success: true,
       message: 'Permission created successfully',
+      data: permission
     });
   } catch (error) {
-    res.status(400).json({
-      statusCode: 400,
-      status: 'Bad Request',
-      results: null,
-      message: error.message,
+    console.error('Create permission error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create permission',
+      error: error.code || 'INTERNAL_SERVER_ERROR'
     });
   }
 };
@@ -77,27 +86,29 @@ const getSinglePermission = async (req, res) => {
 // ===== UPDATE =====
 const updatePermission = async (req, res) => {
   try {
-    const updated = await Permission.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updated) {
+    const { id } = req.params;
+
+    const updatedPermission = await Permission.updatePermissionById(id, req.body);
+
+    if (!updatedPermission) {
       return res.status(404).json({
-        statusCode: 404,
-        status: 'Not Found',
-        results: null,
+        success: false,
         message: 'Permission not found',
+        error: 'NOT_FOUND'
       });
     }
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: updated,
+
+    return res.status(200).json({
+      success: true,
       message: 'Permission updated successfully',
+      data: updatedPermission
     });
   } catch (error) {
-    res.status(500).json({
-      statusCode: 500,
-      status: 'Internal Server Error',
-      results: null,
-      message: error.message,
+    console.error('Update permission error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update permission',
+      error: error.code || 'INTERNAL_SERVER_ERROR'
     });
   }
 };
