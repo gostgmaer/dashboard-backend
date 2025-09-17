@@ -281,11 +281,11 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
   }
 
   if (createdBy) {
-    filter.created_by = createdBy; // ObjectId
+    filter.created_by = createdBy;
   }
 
   if (updatedBy) {
-    filter.updated_by = updatedBy; // ObjectId
+    filter.updated_by = updatedBy;
   }
 
   if (createdFrom || createdTo) {
@@ -300,11 +300,11 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     if (updatedTo) filter.updatedAt.$lte = new Date(updatedTo);
   }
 
-  // Calculate pagination
+  // Pagination & sorting
   const skip = (page - 1) * limit;
   const sortDirection = sortOrder === 'desc' ? -1 : 1;
 
-  // 🔽 the rest of your existing logic stays the same...
+  // Fetch roles
   const roles = await this.find(filter)
     .populate('permissions')
     .populate('created_by', 'name email')
@@ -313,48 +313,38 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     .skip(skip)
     .limit(limit);
 
-  // Get total count for pagination
   const totalRoles = await this.countDocuments(filter);
 
-  // Get user counts for each role
+  // Count users per role
   const User = mongoose.model('User');
-  const roleIds = roles.map(role => role._id);
+  const roleIds = roles.map(r => r._id);
   const userCounts = await User.aggregate([
     { $match: { role: { $in: roleIds } } },
     { $group: { _id: '$role', userCount: { $sum: 1 } } }
   ]);
-
-  // Create user count lookup
   const userCountMap = {};
   userCounts.forEach(uc => {
     userCountMap[uc._id.toString()] = uc.userCount;
   });
 
-  // Get permission categories and statistics
+  // Permission stats if required
   let permissionStats = {};
   let categoryStats = {};
-
   if (includePermissionDetails) {
     const allPermissions = await Permission.find({});
-
-    // Group permissions by category
     const permissionsByCategory = allPermissions.reduce((acc, perm) => {
-      const category = perm.category || 'uncategorized';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(perm);
+      const cat = perm.category || 'uncategorized';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(perm);
       return acc;
     }, {});
-
-    // Calculate category statistics
-    categoryStats = Object.keys(permissionsByCategory).reduce((acc, category) => {
-      acc[category] = {
-        totalPermissions: permissionsByCategory[category].length,
-        activePermissions: permissionsByCategory[category].filter(p => p.isActive !== false).length
+    Object.keys(permissionsByCategory).forEach(cat => {
+      const perms = permissionsByCategory[cat];
+      categoryStats[cat] = {
+        totalPermissions: perms.length,
+        activePermissions: perms.filter(p => p.isActive !== false).length
       };
-      return acc;
-    }, {});
-
-    // Calculate overall permission statistics
+    });
     permissionStats = {
       totalPermissions: allPermissions.length,
       totalCategories: Object.keys(permissionsByCategory).length,
@@ -362,16 +352,15 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     };
   }
 
-  // Format role data with statistics
+  // Format roles with statistics + `per` key
   const formattedRoles = roles.map(role => {
     const roleObj = role.toObject();
     const userCount = userCountMap[role._id.toString()] || 0;
 
-    // Group role permissions by category
-    const rolePermissionsByCategory = role.permissions.reduce((acc, perm) => {
-      const category = perm.category || 'uncategorized';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(perm);
+    const permsByCat = role.permissions.reduce((acc, perm) => {
+      const cat = perm.category || 'uncategorized';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(perm);
       return acc;
     }, {});
 
@@ -379,28 +368,33 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
       ...roleObj,
       userCount,
       permissionsCount: role.permissions.length,
-      permissionsByCategory: rolePermissionsByCategory,
-      categoriesCount: Object.keys(rolePermissionsByCategory).length,
+      per: role.permissions.map(p => p._id.toString()),
+      permissionsByCategory: permsByCat,
+      categoriesCount: Object.keys(permsByCat).length,
       statistics: {
         isInUse: userCount > 0,
         permissionDensity: role.permissions.length,
-        categorySpread: Object.keys(rolePermissionsByCategory).length
+        categorySpread: Object.keys(permsByCat).length
       }
     };
   });
 
   // Overall statistics
   const overallStats = {
-    totalRoles: totalRoles,
+    totalRoles,
     activeRoles: await this.countDocuments({ isActive: true }),
     inactiveRoles: await this.countDocuments({ isActive: false }),
     defaultRole: await this.findOne({ isDefault: true }, 'name'),
     rolesInUse: formattedRoles.filter(r => r.userCount > 0).length,
     unusedRoles: formattedRoles.filter(r => r.userCount === 0).length,
-    totalUsersAssigned: Object.values(userCountMap).reduce((sum, count) => sum + count, 0),
-    avgPermissionsPerRole: formattedRoles.length > 0
-      ? Math.round(formattedRoles.reduce((sum, role) => sum + role.permissionsCount, 0) / formattedRoles.length)
-      : 0
+    totalUsersAssigned: Object.values(userCountMap).reduce((sum, c) => sum + c, 0),
+    avgPermissionsPerRole:
+      formattedRoles.length > 0
+        ? Math.round(
+            formattedRoles.reduce((sum, r) => sum + r.permissionsCount, 0) /
+            formattedRoles.length
+          )
+        : 0
   };
 
   return {
@@ -415,14 +409,10 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     },
     overallStatistics: overallStats,
     permissionStatistics: permissionStats,
-    filters: {
-      search,
-      isActive,
-      sortBy,
-      sortOrder
-    }
+    filters: { search, isActive, sortBy, sortOrder }
   };
 };
+
 
 
 const Role = mongoose.model("Role", roleSchema);
