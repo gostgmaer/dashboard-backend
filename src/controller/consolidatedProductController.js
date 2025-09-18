@@ -95,17 +95,19 @@ class ProductController {
     static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
         return res.status(statusCode).json({
             success,
+            status: statusCode,
             data,
             message,
-            ...meta
+            ...meta,
         });
     }
 
     static errorResponse(res, message, statusCode = 500, error = null) {
         return res.status(statusCode).json({
             success: false,
+            status: statusCode,
             message,
-            error: process.env.NODE_ENV === 'development' ? error : undefined
+            error: process.env.NODE_ENV === 'development' ? error : undefined,
         });
     }
 
@@ -294,7 +296,7 @@ class ProductController {
                 page: Number(page),
                 limit: Number(limit),
                 filters,
-                sort: sortObj,populateOptions
+                sort: sortObj, populateOptions
             });
 
             // Enrich products with calculated fields
@@ -319,10 +321,7 @@ class ProductController {
             };
 
             return ProductController.standardResponse(
-                res,
-                true,
-                response,
-                `Retrieved ${enrichedProducts.length} products`
+                res, true, response, "User found"
             );
 
         } catch (error) {
@@ -1134,7 +1133,7 @@ class ProductController {
     /**
      * GET STOCK STATUS
      */
-    static async getStockStatus(req, res) {
+    static async getStockStatusData(req, res) {
         try {
             const { id } = req.params;
 
