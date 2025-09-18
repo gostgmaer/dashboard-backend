@@ -92,6 +92,7 @@ class UserController {
     if (includeCalculated) {
       return {
         ...userObj,
+        fullName:user.fullName,
         userScore: this.calculateUserScore(userObj),
         activityLevel: this.getUserActivityLevel(userObj),
         profileCompleteness: this.calculateProfileCompleteness(userObj),
@@ -100,7 +101,7 @@ class UserController {
       };
     }
 
-    return userObj;
+    return {...userObj,fullName:user.fullName };
   }
 
   static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
@@ -347,51 +348,53 @@ class UserController {
       });
 
       // Enrich users with calculated fields
-      const u = result.items.map(user =>
+      const data = result.items.map(user =>
         UserController.enrichUser(user)
       );
 
-      const response = {
-        users: {
-          theme: u.preferences.theme || '',
-          language: u.preferences.language || '',
-          currency: u.preferences.currency || 'USD',
-          notifications: u.preferences.notifications,
-          newsletter: u.preferences.newsletter,
-          username: u.username,
-          email: u.email,
-          id: u._id,
-          fullName: u.fullName || null,
-          firstName: u.firstName || null,
-          lastName: u.lastName || null,
-          role: u.role?._id || null,
-          rolename: u.role?.name || null,
-          dateOfBirth: u.dateOfBirth || null,
-          gender: u.gender || null,
-          phoneNumber: u.phoneNumber || null,
-          profilePicture: u.profilePicture || null,
-          isVerified: u.isVerified,
-          emailVerified: u.emailVerified,
-          socialMedia: u.socialMedia,
-          phoneVerified: u.phoneVerified,
-          failedLoginAttempts: u.failedLoginAttempts,
-          consecutiveFailedAttempts: u.consecutiveFailedAttempts,
-          lockoutUntil: u.lockoutUntil,
-          lastLoginAttempt: u.lastLoginAttempt,
-          twoFactorEnabled: u.otpSettings.enable || false,
-          addresscount: Array.isArray(u.address) ? u.address.length : 0,
-          interests: u.interests || [],
-          loyaltyPoints: u.loyaltyPoints,
-          subscriptionStatus: u.subscriptionStatus,
-          subscriptionType: u.subscriptionType,
-          status: u.status,
-          referralCode: u.referralCode,
-          userScore: u.userScore,
-          activityLevel: u.activityLevel,
-          profileCompleteness: u.profileCompleteness,
-          accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24))
-        },
-        pagination: {
+    const  response = {
+        users: data.map(u => {
+          return {
+            id:u._id,
+            theme: u.preferences?.theme || '',
+            language: u.preferences?.language || '',
+            currency: u.preferences?.currency || 'USD',
+            notifications: u.preferences?.notifications,
+            newsletter: u.preferences?.newsletter,
+            username: u.username,
+            email: u.email,
+            id: u._id,
+            fullName: u.fullName || null,
+            firstName: u.firstName || null,
+            lastName: u.lastName || null,
+            role: u.role?._id || null,
+            rolename: u.role?.name || null,
+            dateOfBirth: u.dateOfBirth || null,
+            gender: u.gender || null,
+            phoneNumber: u.phoneNumber || null,
+            profilePicture: u.profilePicture || null,
+            isVerified: u.isVerified,
+            emailVerified: u.emailVerified,
+            socialMedia: u.socialMedia,
+            phoneVerified: u.phoneVerified,
+            failedLoginAttempts: u.failedLoginAttempts,
+            consecutiveFailedAttempts: u.consecutiveFailedAttempts,
+            lockoutUntil: u.lockoutUntil,
+            lastLoginAttempt: u.lastLoginAttempt,
+            twoFactorEnabled: u.otpSettings?.enable || false,
+            addresscount: Array.isArray(u.address) ? u.address.length : 0,
+            interests: u.interests || [],
+            loyaltyPoints: u.loyaltyPoints,
+            subscriptionStatus: u.subscriptionStatus,
+            subscriptionType: u.subscriptionType,
+            status: u.status,
+            referralCode: u.referralCode,
+            userScore: u.userScore,
+            activityLevel: u.activityLevel,
+            profileCompleteness: u.profileCompleteness,
+            accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24))
+          }
+        }), pagination: {
           currentPage: result.page,
           totalPages: result.pages,
           totalUsers: result.total,
@@ -403,13 +406,14 @@ class UserController {
           applied: Object.keys(filters).length - 1,
           search: search || null
         }
-      };
+      }
+
 
       return UserController.standardResponse(
         res,
         true,
         response,
-        `Retrieved ${enrichedUsers.length} users`
+        `Retrieved ${result.total} users`
       );
     } catch (error) {
       console.error('Error in getUsers:', error);
