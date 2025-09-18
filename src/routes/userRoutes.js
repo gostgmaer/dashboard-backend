@@ -45,9 +45,9 @@ const bulkOperationLimiter = rateLimit({
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const userId = req.params.id || req.params.userId;
-    if (userId && !req.user.isSuperadmin) { // Superadmin bypass already in authorize
+    if (userId && !req.user.role.name=="super_admin") { // Superadmin bypass already in authorize
       if (req.user.id !== userId) { // Restrict to own user data unless authorized
-        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s data' });
+        return res.status(403).json({ success: false, message: 'Forbidden: Cannot Access/Update another user\'s data' });
       }
       const user = await User.findById(userId);
       if (!user && req.method !== 'POST') { // Allow POST for creation
@@ -224,13 +224,13 @@ router.get('/',
 );
 
 // GET /api/users/:id - Get single user by ID
-router.get('/:id',
+router.get('/:identifier',
   authMiddleware,
   authorize('users', 'read'),
   instanceCheckMiddleware,
-  param('id').isMongoId().withMessage('Invalid user ID'),
+  param('identifier').isMongoId().withMessage('Invalid user ID'),
   validate,
-  UserController.getUserById
+  UserController.getUserByIdentifier
 );
 
 // PUT /api/users/:id - Update user
