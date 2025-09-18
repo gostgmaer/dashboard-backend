@@ -52,6 +52,23 @@ const productSchema = new mongoose.Schema(
     size: { type: String },
     ageGroup: { type: String },
     gender: { type: String },
+    stockActivityLog: [{
+      operation: { type: String, enum: ['reduce', 'restore', 'restock', 'auto_restock'] },
+      quantity: { type: Number },
+      previousStock: { type: Number },
+      currentStock: { type: Number },
+      reason: { type: String },
+      timestamp: { type: Date, default: Date.now },
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }
+    }],
+
+    // Enhanced low stock threshold
+    lowStockThreshold: { type: Number, min: 0, default: 10 },
+
+    // Auto-restock settings
+    autoRestockEnabled: { type: Boolean, default: false },
+    autoRestockQuantity: { type: Number, min: 0 },
+    autoRestockThreshold: { type: Number, min: 0 },
     season: { type: String },
     occasion: { type: String },
     style: { type: String },
@@ -245,10 +262,10 @@ productSchema.virtual('ratingStatistics').get(function () {
 
 
 // Enhanced stock status with more detail
-productSchema.virtual('detailedStockStatus').get(function() {
+productSchema.virtual('detailedStockStatus').get(function () {
   const totalStock = this.inventory + this.getVariantsStock();
   const threshold = this.lowStockThreshold || 10;
-  
+
   if (!this.isAvailable || totalStock <= 0) {
     return {
       status: 'out-of-stock',
@@ -273,52 +290,52 @@ productSchema.virtual('detailedStockStatus').get(function() {
 });
 
 // Calculate total value of inventory
-productSchema.virtual('inventoryValue').get(function() {
+productSchema.virtual('inventoryValue').get(function () {
   const totalStock = this.inventory + this.getVariantsStock();
   const price = this.costPrice || this.basePrice || 0;
   return totalStock * price;
 });
 
 // Get profit margin
-productSchema.virtual('profitMargin').get(function() {
+productSchema.virtual('profitMargin').get(function () {
   if (!this.costPrice || !this.basePrice) return 0;
   return ((this.basePrice - this.costPrice) / this.basePrice) * 100;
 });
 
 // Calculate discount savings
-productSchema.virtual('discountSavings').get(function() {
+productSchema.virtual('discountSavings').get(function () {
   if (!this.comparePrice || !this.basePrice) return 0;
   return this.comparePrice - this.basePrice;
 });
 
 // Get SEO score (basic calculation)
-productSchema.virtual('seoScore').get(function() {
+productSchema.virtual('seoScore').get(function () {
   let score = 0;
-  
+
   // Title optimization (30 points)
   if (this.title && this.title.length >= 10 && this.title.length <= 60) score += 30;
-  
+
   // Meta description (25 points)
   if (this.metaDescription && this.metaDescription.length >= 120 && this.metaDescription.length <= 160) score += 25;
-  
+
   // Images (20 points)
   if (this.mainImage) score += 10;
   if (this.images && this.images.length >= 3) score += 10;
-  
+
   // Tags (15 points)
   if (this.tags && this.tags.length >= 3) score += 15;
-  
+
   // SEO info (10 points)
   if (this.seo_info && this.seo_info.slug) score += 10;
-  
+
   return Math.min(score, 100);
 });
 
 // Get product performance metrics
-productSchema.virtual('performanceMetrics').get(function() {
+productSchema.virtual('performanceMetrics').get(function () {
   const conversionRate = this.views > 0 ? (this.soldCount / this.views) * 100 : 0;
   const revenuePerView = this.views > 0 ? (this.soldCount * this.basePrice) / this.views : 0;
-  
+
   return {
     conversionRate: parseFloat(conversionRate.toFixed(2)),
     revenuePerView: parseFloat(revenuePerView.toFixed(2)),
@@ -328,34 +345,34 @@ productSchema.virtual('performanceMetrics').get(function() {
 });
 
 // Get availability timeline
-productSchema.virtual('availabilityTimeline').get(function() {
+productSchema.virtual('availabilityTimeline').get(function () {
   const timeline = [];
-  
+
   if (this.publishDate) {
     timeline.push({ event: 'published', date: new Date(this.publishDate) });
   }
-  
+
   if (this.preOrder && this.preOrderDate) {
     timeline.push({ event: 'preorder-available', date: this.preOrderDate });
   }
-  
+
   if (this.discountStartDate) {
     timeline.push({ event: 'sale-starts', date: this.discountStartDate });
   }
-  
+
   if (this.discountEndDate) {
     timeline.push({ event: 'sale-ends', date: this.discountEndDate });
   }
-  
+
   if (this.expiryDate) {
     timeline.push({ event: 'expires', date: new Date(this.expiryDate) });
   }
-  
+
   return timeline.sort((a, b) => a.date - b.date);
 });
 
 // Get shipping information summary
-productSchema.virtual('shippingInfo').get(function() {
+productSchema.virtual('shippingInfo').get(function () {
   return {
     requiresShipping: this.shipping?.requiresShipping || true,
     weight: this.getProductWeight(),
@@ -384,7 +401,7 @@ productSchema.statics.bulkDelete = function (ids) {
 };
 
 
-productSchema.pre('save', async function(next) {
+productSchema.pre('save', async function (next) {
   try {
 
 
@@ -392,41 +409,41 @@ productSchema.pre('save', async function(next) {
     if (!this.sku) {
       this.sku = await this.generateUniqueSKU();
     }
-    
+
     // Auto-generate slug from title
     if (this.isModified('title') || !this.seo_info.slug) {
       this.seo_info.slug = this.generateSlug();
     }
-    
+
     // Calculate sale price if discount is active
     if (this.isModified('basePrice') || this.isModified('discountValue') || this.isModified('discountType')) {
       this.calculateAndSetSalePrice();
     }
-    
+
     // Update meta fields if not provided
     if (!this.metaTitle && this.title) {
       this.metaTitle = this.title.length > 60 ? this.title.substring(0, 57) + '...' : this.title;
     }
-    
+
     if (!this.metaDescription && this.shortDescription) {
-      this.metaDescription = this.shortDescription.length > 160 ? 
+      this.metaDescription = this.shortDescription.length > 160 ?
         this.shortDescription.substring(0, 157) + '...' : this.shortDescription;
     }
-    
+
     // Auto-set product flags based on data
     this.autoSetProductFlags();
-    
+
     // Validate business rules
     await this.validateBusinessRules();
-    
+
     // Update search keywords
     this.updateSearchKeywords();
-    
+
     // Set last modified by
     if (this.isModified() && !this.isNew) {
       this.updatedAt = new Date();
     }
-    
+
     next();
   } catch (error) {
     next(error);
@@ -434,28 +451,529 @@ productSchema.pre('save', async function(next) {
 });
 
 
+productSchema.pre('save', async function (next) {
+  try {
+    // Only run enhancements on new documents or when specific fields are modified
+    const isNewProduct = this.isNew;
+    const isModified = this.isModified();
+
+    if (!isNewProduct && !isModified) {
+      return next();
+    }
+
+    // 1. Generate unique identifiers
+    await this.generateUniqueIdentifiers();
+
+    // 2. Auto-generate and optimize content
+    await this.generateAndOptimizeContent();
+
+    // 3. Calculate and update pricing
+    this.calculateAndUpdatePricing();
+
+    // 4. Auto-set product flags and categories
+    await this.autoSetProductFlags();
+
+    // 5. Validate business rules
+    await this.validateBusinessRules();
+
+    // 6. Update search and SEO data
+    this.updateSearchAndSEOData();
+
+    // 7. Process images and media
+    await this.processImages();
+
+    // 8. Update timestamps and metadata
+    this.updateMetadata();
+
+    // 9. Trigger notifications for important changes
+    await this.triggerChangeNotifications();
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+productSchema.pre('save', function (next) {
+  // Validate required fields based on product type
+  if (this.productType === 'physical') {
+    if (!this.weight && !this.shippingWeight) {
+      return next(new Error('Physical products must have weight information'));
+    }
+  }
+
+  if (this.productType === 'digital') {
+    if (!this.digitalDownloadLink && !this.downloadableFiles?.length) {
+      return next(new Error('Digital products must have download information'));
+    }
+  }
+
+  next();
+});
+
+// Validate inventory changes
+productSchema.pre('save', function (next) {
+  if (this.isModified('inventory') && this.trackInventory === 'yes') {
+    const oldInventory = this.get('inventory', Number, true); // Get original value
+    const newInventory = this.inventory;
+
+    // Log significant inventory changes
+    if (Math.abs(oldInventory - newInventory) > 10) {
+      console.log(`Significant inventory change for ${this.sku}: ${oldInventory} → ${newInventory}`);
+    }
+  }
+
+  next();
+});
+
+// Generate unique SKU and slug
+productSchema.methods.generateUniqueIdentifiers = async function () {
+  // Generate SKU if not provided
+  if (!this.sku) {
+    this.sku = await this.generateUniqueSKU();
+  }
+
+  // Auto-generate slug from title
+  if (this.isModified('title') || !this.seo_info?.slug) {
+    if (!this.seo_info) this.seo_info = {};
+    this.seo_info.slug = await this.generateUniqueSlug();
+  }
+};
+
+// Generate unique SKU with business logic
+productSchema.methods.generateUniqueSKU = async function () {
+  // Get brand/category prefix
+  let prefix = 'PRD';
+
+  if (this.brand) {
+    const Brand = mongoose.model('Brand');
+    const brand = await Brand.findById(this.brand).select('name code');
+    prefix = brand?.code || brand?.name?.substring(0, 3).toUpperCase() || 'PRD';
+  } else if (this.categories && this.categories.length > 0) {
+    const Category = mongoose.model('Category');
+    const category = await Category.findById(this.categories[0]).select('name code');
+    prefix = category?.code || category?.name?.substring(0, 3).toUpperCase() || 'CAT';
+  }
+
+  // Generate SKU with timestamp and random component
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+
+  let sku = `${prefix}-${timestamp}-${random}`;
+
+  // Ensure uniqueness
+  const existing = await this.constructor.findOne({ sku });
+  if (existing) {
+    return this.generateUniqueSKU(); // Recursive call with different timestamp
+  }
+
+  return sku;
+};
+
+// Generate unique slug
+productSchema.methods.generateUniqueSlug = async function () {
+  if (!this.title) return '';
+
+  let baseSlug = this.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+
+  let slug = baseSlug;
+  let counter = 1;
+
+  // Ensure uniqueness
+  while (await this.constructor.findOne({ 'seo_info.slug': slug, _id: { $ne: this._id } })) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
+  return slug;
+};
+
+// Generate and optimize content
+productSchema.methods.generateAndOptimizeContent = async function () {
+  // Auto-generate meta title if not provided
+  if (!this.metaTitle && this.title) {
+    this.metaTitle = this.title.length > 60 ?
+      this.title.substring(0, 57) + '...' : this.title;
+  }
+
+  // Auto-generate meta description if not provided
+  if (!this.metaDescription && this.shortDescription) {
+    this.metaDescription = this.shortDescription.length > 160 ?
+      this.shortDescription.substring(0, 157) + '...' : this.shortDescription;
+  } else if (!this.metaDescription && this.descriptions?.content) {
+    const plainText = this.descriptions.content.replace(/<[^>]*>/g, '');
+    this.metaDescription = plainText.length > 160 ?
+      plainText.substring(0, 157) + '...' : plainText;
+  }
+
+  // Generate short description from full description if missing
+  if (!this.shortDescription && this.descriptions?.content) {
+    const plainText = this.descriptions.content.replace(/<[^>]*>/g, '');
+    this.shortDescription = plainText.length > 200 ?
+      plainText.substring(0, 197) + '...' : plainText;
+  }
+};
+
+// Calculate and update all pricing fields
+productSchema.methods.calculateAndUpdatePricing = function () {
+  // Calculate sale price from discount
+  if (this.isModified('basePrice') || this.isModified('discountValue') || this.isModified('discountType')) {
+    this.calculateAndSetSalePrice();
+  }
+
+  // Set retail price if not provided
+  if (!this.retailPrice && this.basePrice) {
+    this.retailPrice = this.basePrice;
+  }
+
+  // Calculate tax amount if tax rate is provided
+  if (this.taxRate && this.basePrice) {
+    this.taxAmount = this.basePrice * (this.taxRate / 100);
+  }
+
+  // Validate pricing logic
+  this.validatePricing();
+};
+
+// Calculate and set sale price based on discount
+productSchema.methods.calculateAndSetSalePrice = function () {
+  if (this.discountType && this.discountType !== 'none' && this.discountValue > 0) {
+    if (this.discountType === 'percentage') {
+      this.salePrice = this.basePrice - (this.basePrice * (this.discountValue / 100));
+    } else if (this.discountType === 'fixed') {
+      this.salePrice = Math.max(0, this.basePrice - this.discountValue);
+    }
+
+    // Round to 2 decimal places
+    this.salePrice = Math.round(this.salePrice * 100) / 100;
+  } else {
+    this.salePrice = undefined;
+  }
+};
+
+// Validate pricing business rules
+productSchema.methods.validatePricing = function () {
+  if (this.salePrice && this.salePrice >= this.basePrice) {
+    this.salePrice = this.basePrice * 0.95; // Ensure 5% minimum discount
+  }
+
+  if (this.comparePrice && this.comparePrice < this.basePrice) {
+    this.comparePrice = this.basePrice * 1.2; // Set compare price 20% higher
+  }
+};
+
+// Auto-set product flags based on data and business rules
+productSchema.methods.autoSetProductFlags = async function () {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+
+  // Auto-set new arrival flag
+  if (this.createdAt && this.createdAt >= thirtyDaysAgo) {
+    this.newArrival = true;
+  } else if (this.newArrival && this.createdAt < thirtyDaysAgo) {
+    this.newArrival = false;
+  }
+
+  // Auto-set bestseller flag based on sold count relative to age
+  const daysSinceCreated = this.createdAt ?
+    (now - this.createdAt) / (1000 * 60 * 60 * 24) : 0;
+  const dailyAverageSales = daysSinceCreated > 0 ? this.soldCount / daysSinceCreated : 0;
+
+  if (dailyAverageSales > 1 && this.soldCount >= 50) {
+    this.bestseller = true;
+  }
+
+  // Auto-set on sale flag
+  if (this.salePrice && this.salePrice < this.basePrice) {
+    this.onSale = true;
+  } else {
+    this.onSale = false;
+  }
+
+  // Auto-set trending flag based on recent views and sales
+  if (this.analytics?.views > 1000 || (this.views > 500 && this.updatedAt >= sevenDaysAgo)) {
+    this.trending = true;
+  }
+
+  // Auto-set featured flag for high-performing products
+  if (this.bestseller && this.reviews?.averageRating >= 4.5) {
+    this.isFeatured = true;
+  }
+
+  // Auto-categorize based on attributes
+  await this.autoCategorizeBusiness();
+};
+
+// Auto-categorization based on product attributes
+productSchema.methods.autoCategorizeBusiness = async function () {
+  // Set ecoFriendly flag based on attributes
+  const ecoKeywords = ['organic', 'eco', 'sustainable', 'bamboo', 'recycled', 'biodegradable'];
+  const productText = `${this.title} ${this.shortDescription} ${this.tags?.join(' ')}`.toLowerCase();
+
+  if (ecoKeywords.some(keyword => productText.includes(keyword))) {
+    this.ecoFriendly = true;
+  }
+
+  // Set gift wrapping based on category or price
+  if (this.basePrice > 25 && (this.occasion === 'gift' || this.tags?.includes('gift'))) {
+    this.giftWrappingAvailable = true;
+  }
+
+  // Set shipping requirements
+  if (!this.shipping) this.shipping = {};
+
+  if (this.productType === 'digital') {
+    this.shipping.requiresShipping = false;
+    this.virtualProduct = true;
+  }
+
+  // Set age restrictions for certain categories
+  const restrictedKeywords = ['alcohol', 'tobacco', 'adult', '18+'];
+  if (restrictedKeywords.some(keyword => productText.includes(keyword))) {
+    this.ageRestriction = '18+';
+  }
+};
+
+// Comprehensive business rules validation
+productSchema.methods.validateBusinessRules = async function () {
+  const errors = [];
+  const warnings = [];
+
+  // Price validation
+  if (this.salePrice && this.salePrice >= this.basePrice) {
+    errors.push('Sale price cannot be greater than or equal to base price');
+  }
+
+  if (this.costPrice && this.basePrice && this.costPrice >= this.basePrice) {
+    warnings.push(`Negative margin detected: Cost (${this.costPrice}) >= Price (${this.basePrice})`);
+  }
+
+  // Inventory validation
+  if (this.trackInventory === 'yes' && this.inventory < 0) {
+    errors.push('Inventory cannot be negative when tracking is enabled');
+  }
+
+  if (this.maxOrderQuantity && this.minOrderQuantity && this.maxOrderQuantity < this.minOrderQuantity) {
+    errors.push('Maximum order quantity cannot be less than minimum order quantity');
+  }
+
+  // Date validation
+  if (this.discountStartDate && this.discountEndDate && this.discountStartDate >= this.discountEndDate) {
+    errors.push('Discount start date must be before end date');
+  }
+
+  if (this.publishDate && this.expiryDate && new Date(this.publishDate) >= new Date(this.expiryDate)) {
+    errors.push('Publish date must be before expiry date');
+  }
+
+  // Variant validation
+  if (this.variants && this.variants.length > 0) {
+    const skus = this.variants.map(v => v.sku).filter(Boolean);
+    const duplicateSkus = skus.filter((sku, index) => skus.indexOf(sku) !== index);
+    if (duplicateSkus.length > 0) {
+      errors.push(`Duplicate variant SKUs found: ${duplicateSkus.join(', ')}`);
+    }
+  }
+
+  // Content validation
+  if (!this.title || this.title.length < 3) {
+    errors.push('Product title must be at least 3 characters long');
+  }
+
+  if (this.metaDescription && this.metaDescription.length > 160) {
+    warnings.push('Meta description exceeds 160 characters');
+  }
+
+  // Log warnings
+  if (warnings.length > 0) {
+    console.warn(`Product ${this.sku} warnings:`, warnings);
+  }
+
+  // Throw errors
+  if (errors.length > 0) {
+    throw new Error(`Validation failed: ${errors.join(', ')}`);
+  }
+};
+
+// Update search keywords and SEO data
+productSchema.methods.updateSearchAndSEOData = function () {
+  const keywords = new Set();
+
+  // Extract keywords from various fields
+  const extractKeywords = (text) => {
+    if (!text) return;
+    return text.toLowerCase()
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'man', 'men', 'put', 'say', 'she', 'too', 'use'].includes(word))
+      .forEach(word => keywords.add(word));
+  };
+
+  extractKeywords(this.title);
+  extractKeywords(this.shortDescription);
+  extractKeywords(this.metaDescription);
+
+  if (this.descriptions?.content) {
+    const plainText = this.descriptions.content.replace(/<[^>]*>/g, '');
+    extractKeywords(plainText);
+  }
+
+  if (this.tags) {
+    this.tags.forEach(tag => keywords.add(tag.toLowerCase()));
+  }
+
+  if (this.features) {
+    this.features.forEach(feature => extractKeywords(feature));
+  }
+
+  // Store keywords (limit to top 50)
+  const keywordArray = Array.from(keywords).slice(0, 50);
+
+  if (!this.seo_info) this.seo_info = {};
+  if (!this.seo_info.keywords || this.isModified('title') || this.isModified('tags')) {
+    this.seo_info.keywords = keywordArray.join(', ');
+  }
+
+  // Generate structured data
+  this.generateStructuredData();
+};
+
+// Generate JSON-LD structured data
+productSchema.methods.generateStructuredData = function () {
+  const structuredData = {
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    name: this.title,
+    description: this.shortDescription,
+    sku: this.sku,
+    image: this.mainImage ? [this.mainImage] : [],
+    offers: {
+      '@type': 'Offer',
+      url: `${process.env.SITE_URL}/products/${this.seo_info?.slug}`,
+      priceCurrency: process.env.CURRENCY || 'USD',
+      price: this.salePrice || this.basePrice,
+      availability: this.isAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      seller: {
+        '@type': 'Organization',
+        name: process.env.COMPANY_NAME || 'Your Store'
+      }
+    }
+  };
+
+  if (this.brand) {
+    structuredData.brand = {
+      '@type': 'Brand',
+      name: this.brandName || 'Brand'
+    };
+  }
+
+  if (this.reviews?.averageRating) {
+    structuredData.aggregateRating = {
+      '@type': 'AggregateRating',
+      ratingValue: this.reviews.averageRating,
+      reviewCount: this.reviews.totalReviews || 0
+    };
+  }
+
+  if (!this.seo_info) this.seo_info = {};
+  this.seo_info.structuredData = JSON.stringify(structuredData);
+};
+
+// Process and optimize images
+productSchema.methods.processImages = async function () {
+  // Ensure main image is set
+  if (!this.mainImage && this.images && this.images.length > 0) {
+    this.mainImage = this.images[0].url || this.images[0];
+  }
+
+  // Add alt text to images if missing
+  if (this.images && this.images.length > 0) {
+    this.images = this.images.map((img, index) => {
+      if (typeof img === 'string') {
+        return {
+          url: img,
+          alt: `${this.title} - Image ${index + 1}`,
+          isPrimary: index === 0
+        };
+      } else if (img && typeof img === 'object' && !img.alt) {
+        img.alt = `${this.title} - Image ${index + 1}`;
+      }
+      return img;
+    });
+  }
+};
+
+// Update metadata and timestamps
+productSchema.methods.updateMetadata = function () {
+  // Set updated timestamp
+  if (this.isModified() && !this.isNew) {
+    this.updatedAt = new Date();
+  }
+
+  // Track what fields were modified
+  if (!this.isNew) {
+    const modifiedFields = this.modifiedPaths();
+    this.lastModifiedFields = modifiedFields;
+  }
+
+  // Update view tracking if this is a new product
+  if (this.isNew) {
+    this.views = 0;
+    this.total_view = 0;
+    this.soldCount = 0;
+  }
+};
+
+// Trigger notifications for important changes
+productSchema.methods.triggerChangeNotifications = async function () {
+  if (this.isNew) {
+    // New product notification
+    console.log(`New product created: ${this.title} (${this.sku})`);
+    // Trigger webhook or notification service
+    // await notificationService.sendNewProductAlert(this);
+  } else {
+    // Check for important field changes
+    const importantFields = ['basePrice', 'inventory', 'status', 'isAvailable'];
+    const modifiedImportantFields = importantFields.filter(field => this.isModified(field));
+
+    if (modifiedImportantFields.length > 0) {
+      console.log(`Important product changes for ${this.title}:`, modifiedImportantFields);
+      // Trigger webhook or notification service
+      // await notificationService.sendProductUpdateAlert(this, modifiedImportantFields);
+    }
+
+    // Stock alerts
+    if (this.isModified('inventory') && this.inventory <= (this.lowStockThreshold || 0)) {
+      await this.triggerLowStockAlert();
+    }
+  }
+};
+
+
 
 /* 🔹 Instance Methods */
 
 // Generate unique SKU
-productSchema.methods.generateUniqueSKU = async function() {
+productSchema.methods.generateUniqueSKU = async function () {
   const prefix = this.brand ? this.brand.toString().substring(0, 3).toUpperCase() : 'PRD';
   const timestamp = Date.now().toString().slice(-6);
   const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-  
+
   let sku = `${prefix}-${timestamp}-${random}`;
-  
+
   // Ensure uniqueness
   const existing = await this.constructor.findOne({ sku });
   if (existing) {
     return this.generateUniqueSKU(); // Recursive call
   }
-  
+
   return sku;
 };
 
 // Calculate and set sale price
-productSchema.methods.calculateAndSetSalePrice = function() {
+productSchema.methods.calculateAndSetSalePrice = function () {
   if (this.discountType && this.discountType !== 'none' && this.discountValue > 0) {
     if (this.discountType === 'percentage') {
       this.salePrice = this.basePrice - (this.basePrice * (this.discountValue / 100));
@@ -468,62 +986,81 @@ productSchema.methods.calculateAndSetSalePrice = function() {
 };
 
 // Auto-set product flags
-productSchema.methods.autoSetProductFlags = function() {
+productSchema.methods.autoSetProductFlags = function () {
   const now = new Date();
   const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
-  
+
   // Auto-set new arrival flag
   if (this.createdAt && this.createdAt >= thirtyDaysAgo) {
     this.newArrival = true;
   } else if (this.newArrival && this.createdAt < thirtyDaysAgo) {
     this.newArrival = false;
   }
-  
+
   // Auto-set bestseller flag based on sold count
   if (this.soldCount >= 100) { // Configure threshold as needed
     this.bestseller = true;
   }
-  
+
   // Auto-set on sale flag
   if (this.salePrice && this.salePrice < this.basePrice) {
     this.onSale = true;
   } else {
     this.onSale = false;
   }
-  
+
   // Auto-set trending flag based on recent views
   if (this.analytics && this.analytics.views > 1000) { // Configure threshold
     this.trending = true;
   }
 };
 
+// Auto-restock when stock hits threshold
+productSchema.methods.autoRestock = async function (restockQuantity) {
+  if (this.needsRestock()) {
+    await this.restock(restockQuantity);
+
+    // Log auto-restock activity
+    await this.logStockActivity({
+      operation: 'auto_restock',
+      quantity: restockQuantity,
+      previousStock: this.inventory - restockQuantity,
+      currentStock: this.inventory,
+      reason: 'auto_restock_triggered'
+    });
+
+    console.log(`Auto-restocked product ${this.title} with ${restockQuantity} units`);
+    return true;
+  }
+  return false;
+};
 // Validate business rules
-productSchema.methods.validateBusinessRules = async function() {
+productSchema.methods.validateBusinessRules = async function () {
   const errors = [];
-  
+
   // Price validation
   if (this.salePrice && this.salePrice >= this.basePrice) {
     errors.push('Sale price cannot be greater than or equal to base price');
   }
-  
+
   if (this.costPrice && this.basePrice && this.costPrice >= this.basePrice) {
     console.warn(`Product ${this.sku}: Cost price (${this.costPrice}) >= Base price (${this.basePrice}). Negative margin detected.`);
   }
-  
+
   // Stock validation
   if (this.trackInventory === 'yes' && this.inventory < 0) {
     errors.push('Inventory cannot be negative when tracking is enabled');
   }
-  
+
   // Date validation
   if (this.discountStartDate && this.discountEndDate && this.discountStartDate >= this.discountEndDate) {
     errors.push('Discount start date must be before end date');
   }
-  
+
   if (this.publishDate && this.expiryDate && new Date(this.publishDate) >= new Date(this.expiryDate)) {
     errors.push('Publish date must be before expiry date');
   }
-  
+
   // Variant validation
   if (this.variants && this.variants.length > 0) {
     const skus = this.variants.map(v => v.sku);
@@ -532,27 +1069,27 @@ productSchema.methods.validateBusinessRules = async function() {
       errors.push(`Duplicate variant SKUs found: ${duplicateSkus.join(', ')}`);
     }
   }
-  
+
   if (errors.length > 0) {
     throw new Error(`Validation failed: ${errors.join(', ')}`);
   }
 };
 
 // Update search keywords
-productSchema.methods.updateSearchKeywords = function() {
+productSchema.methods.updateSearchKeywords = function () {
   const keywords = [];
-  
+
   // Extract keywords from various fields
   if (this.title) keywords.push(...this.title.toLowerCase().split(/\s+/));
   if (this.shortDescription) keywords.push(...this.shortDescription.toLowerCase().split(/\s+/));
   if (this.tags) keywords.push(...this.tags.map(tag => tag.toLowerCase()));
   if (this.features) keywords.push(...this.features.map(f => f.toLowerCase().split(/\s+/)).flat());
-  
+
   // Remove duplicates and short words
   const uniqueKeywords = [...new Set(keywords)]
     .filter(word => word.length > 2)
     .slice(0, 50); // Limit to 50 keywords
-  
+
   // Store in seo_info for search optimization
   if (!this.seo_info.keywords || this.isModified('title') || this.isModified('tags')) {
     this.seo_info.keywords = uniqueKeywords.join(', ');
@@ -560,21 +1097,495 @@ productSchema.methods.updateSearchKeywords = function() {
 };
 
 // Advanced price calculations
-productSchema.methods.getPriceWithTax = function(quantity = 1) {
+productSchema.methods.getPriceWithTax = function (quantity = 1, taxRate = null) {
   const basePrice = this.getFinalPrice(quantity);
-  const tax = this.getTaxAmount();
-  return basePrice + tax;
+  const applicableTaxRate = taxRate || this.taxRate || 0;
+  const tax = basePrice * (applicableTaxRate / 100);
+
+  return {
+    basePrice,
+    quantity,
+    subtotal: basePrice,
+    taxRate: applicableTaxRate,
+    taxAmount: tax,
+    total: basePrice + tax,
+    formatted: {
+      subtotal: `$${basePrice.toFixed(2)}`,
+      tax: `$${tax.toFixed(2)}`,
+      total: `$${(basePrice + tax).toFixed(2)}`
+    }
+  };
+};
+
+// Comprehensive price breakdown with all possible discounts and fees
+productSchema.methods.getCompletePriceBreakdown = function (quantity = 1, options = {}) {
+  const {
+    discountCode = null,
+    shippingRequired = true,
+    taxRate = null,
+    loyaltyDiscount = 0
+  } = options;
+
+  const basePrice = this.basePrice * quantity;
+  const productDiscount = this.isDiscountActive() ? (basePrice * (this.discount / 100)) : 0;
+  const salePrice = this.salePrice ? (this.salePrice * quantity) : null;
+  const finalPrice = this.getFinalPrice(quantity);
+
+  // Apply bulk discount
+  const bulkDiscountPrice = this.getBulkDiscountPrice ? this.getBulkDiscountPrice(quantity) : finalPrice;
+  const bulkDiscount = finalPrice - (bulkDiscountPrice * quantity);
+
+  // Loyalty discount
+  const loyaltyDiscountAmount = finalPrice * (loyaltyDiscount / 100);
+
+  const subtotalAfterDiscounts = finalPrice - bulkDiscount - loyaltyDiscountAmount;
+  const tax = this.getTaxAmount() * quantity;
+  const shipping = shippingRequired ? this.calculateShipping() : 0;
+
+  const total = subtotalAfterDiscounts + tax + shipping;
+
+  return {
+    original: {
+      basePrice,
+      quantity,
+      unitPrice: this.basePrice
+    },
+    discounts: {
+      productDiscount,
+      bulkDiscount,
+      loyaltyDiscount: loyaltyDiscountAmount,
+      totalDiscount: productDiscount + bulkDiscount + loyaltyDiscountAmount
+    },
+    pricing: {
+      subtotal: subtotalAfterDiscounts,
+      tax,
+      shipping,
+      total
+    },
+    savings: {
+      amount: basePrice - total,
+      percentage: basePrice > 0 ? ((basePrice - total) / basePrice * 100).toFixed(2) : 0
+    },
+    formatted: {
+      subtotal: `$${subtotalAfterDiscounts.toFixed(2)}`,
+      tax: `$${tax.toFixed(2)}`,
+      shipping: shipping > 0 ? `$${shipping.toFixed(2)}` : 'FREE',
+      total: `$${total.toFixed(2)}`,
+      savings: `$${(basePrice - total).toFixed(2)}`
+    }
+  };
+};
+
+// Advanced stock checking with detailed availability information
+productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 1, variantId = null) {
+  const result = {
+    productId: this._id,
+    requestedQuantity,
+    timestamp: new Date()
+  };
+
+  if (!this.trackInventory || this.trackInventory === 'no') {
+    return {
+      ...result,
+      available: true,
+      status: 'unlimited',
+      message: 'Stock tracking disabled - unlimited availability'
+    };
+  }
+
+  let availableStock = 0;
+  let variant = null;
+
+  if (variantId) {
+    variant = this.variants.id(variantId);
+    if (!variant) {
+      return {
+        ...result,
+        available: false,
+        status: 'variant_not_found',
+        message: 'Requested variant not found'
+      };
+    }
+    availableStock = variant.inventory || 0;
+  } else {
+    availableStock = this.inventory || 0;
+  }
+
+  // Check various availability scenarios
+  if (requestedQuantity <= availableStock) {
+    return {
+      ...result,
+      available: true,
+      status: 'in_stock',
+      availableStock,
+      message: `${availableStock} units available`,
+      canFulfillImmediately: true,
+      estimatedShipDate: this.getEstimatedShipDate()
+    };
+  } else if (this.allowBackorder) {
+    const backorderQuantity = requestedQuantity - availableStock;
+    return {
+      ...result,
+      available: true,
+      status: 'backorder_available',
+      availableStock,
+      backorderQuantity,
+      message: `${availableStock} in stock, ${backorderQuantity} on backorder`,
+      canFulfillImmediately: false,
+      estimatedShipDate: this.getBackorderShipDate(),
+      partialFulfillment: availableStock > 0
+    };
+  } else {
+    return {
+      ...result,
+      available: false,
+      status: 'insufficient_stock',
+      availableStock,
+      shortfall: requestedQuantity - availableStock,
+      message: `Insufficient stock. Available: ${availableStock}, Requested: ${requestedQuantity}`,
+      suggestedQuantity: availableStock,
+      estimatedRestockDate: this.getEstimatedRestockDate()
+    };
+  }
+};
+
+// Get estimated shipping dates
+productSchema.methods.getEstimatedShipDate = function () {
+  const handlingDays = this.shipping?.handlingTime || 1;
+  const shipDate = new Date();
+  shipDate.setDate(shipDate.getDate() + handlingDays);
+
+  // Skip weekends
+  while (shipDate.getDay() === 0 || shipDate.getDay() === 6) {
+    shipDate.setDate(shipDate.getDate() + 1);
+  }
+
+  return shipDate;
+};
+
+// Get backorder shipping estimate
+productSchema.methods.getBackorderShipDate = function () {
+  const leadTime = this.leadTime || 14; // Default 2 weeks
+  const shipDate = new Date();
+  shipDate.setDate(shipDate.getDate() + leadTime);
+  return shipDate;
+};
+
+// Get estimated restock date
+productSchema.methods.getEstimatedRestockDate = function () {
+  if (this.restockDate) {
+    return new Date(this.restockDate);
+  }
+
+  // Estimate based on sales velocity
+  const averageDailySales = this.soldCount / 90; // Last 90 days
+  if (averageDailySales > 0) {
+    const daysToRestock = Math.ceil(50 / averageDailySales); // Assume 50 unit restock
+    const restockDate = new Date();
+    restockDate.setDate(restockDate.getDate() + daysToRestock);
+    return restockDate;
+  }
+
+  return null;
+};
+
+// Generate comprehensive product recommendations
+productSchema.methods.getAdvancedRecommendations = async function (options = {}) {
+  const {
+    limit = 8,
+    types = ['related', 'cross_sell', 'up_sell', 'similar'],
+    userContext = null
+  } = options;
+
+  const recommendations = {};
+
+  // Related products (same category/brand)
+  if (types.includes('related')) {
+    recommendations.related = await this.constructor.find({
+      $and: [
+        { _id: { $ne: this._id } },
+        { status: 'active' },
+        { isAvailable: true },
+        {
+          $or: [
+            { categories: { $in: this.categories } },
+            { brand: this.brand },
+            { tags: { $in: this.tags || [] } }
+          ]
+        }
+      ]
+    })
+      .sort({ soldCount: -1, reviews: -1 })
+      .limit(Math.ceil(limit / types.length))
+      .select('title basePrice salePrice mainImage slug soldCount reviews averageRating');
+  }
+
+  // Cross-sell products (accessories, complementary items)
+  if (types.includes('cross_sell')) {
+    recommendations.crossSell = await this.constructor.find({
+      _id: { $in: this.crossSells || [] }
+    })
+      .populate('reviews')
+      .limit(Math.ceil(limit / types.length));
+  }
+
+  // Up-sell products (higher price, similar category)
+  if (types.includes('up_sell')) {
+    recommendations.upSell = await this.constructor.find({
+      $and: [
+        { _id: { $ne: this._id } },
+        { categories: { $in: this.categories } },
+        { basePrice: { $gt: this.basePrice } },
+        { status: 'active' },
+        { isAvailable: true }
+      ]
+    })
+      .sort({ basePrice: 1 })
+      .limit(Math.ceil(limit / types.length));
+  }
+
+  // Similar products (ML-based or attribute matching)
+  if (types.includes('similar')) {
+    const similarityQuery = {
+      $and: [
+        { _id: { $ne: this._id } },
+        { status: 'active' },
+        { isAvailable: true }
+      ]
+    };
+
+    // Add similarity criteria
+    if (this.color) similarityQuery.$and.push({ color: this.color });
+    if (this.material) similarityQuery.$and.push({ material: this.material });
+    if (this.style) similarityQuery.$and.push({ style: this.style });
+
+    recommendations.similar = await this.constructor.find(similarityQuery)
+      .limit(Math.ceil(limit / types.length));
+  }
+
+  // Personalized recommendations based on user context
+  if (userContext && types.includes('personalized')) {
+    // This would integrate with your user behavior tracking
+    recommendations.personalized = await this.getPersonalizedRecommendations(userContext);
+  }
+
+  return recommendations;
+};
+
+// Clone product with advanced options
+productSchema.methods.cloneProductAdvanced = async function (options = {}) {
+  const {
+    newTitle = null,
+    priceAdjustment = 0,
+    categoryOverride = null,
+    includeInventory = false,
+    includeReviews = false,
+    customFields = {}
+  } = options;
+
+  const clonedData = this.toObject();
+
+  // Remove unique fields
+  delete clonedData._id;
+  delete clonedData.sku;
+  delete clonedData.seo_info.slug;
+  delete clonedData.createdAt;
+  delete clonedData.updatedAt;
+
+  // Reset performance metrics
+  clonedData.soldCount = 0;
+  clonedData.views = 0;
+  clonedData.total_view = 0;
+
+  // Handle inventory
+  if (!includeInventory) {
+    clonedData.inventory = 0;
+    if (clonedData.variants) {
+      clonedData.variants.forEach(variant => {
+        variant.inventory = 0;
+      });
+    }
+  }
+
+  // Handle reviews
+  if (!includeReviews) {
+    clonedData.reviews = {
+      type: [],
+      averageRating: 0,
+      totalReviews: 0
+    };
+  }
+
+  // Apply customizations
+  if (newTitle) {
+    clonedData.title = newTitle;
+  } else {
+    clonedData.title += ' (Copy)';
+  }
+
+  if (priceAdjustment !== 0) {
+    clonedData.basePrice += priceAdjustment;
+    if (clonedData.salePrice) clonedData.salePrice += priceAdjustment;
+  }
+
+  if (categoryOverride) {
+    clonedData.categories = Array.isArray(categoryOverride) ? categoryOverride : [categoryOverride];
+    clonedData.category = Array.isArray(categoryOverride) ? categoryOverride[0] : categoryOverride;
+  }
+
+  // Apply custom fields
+  Object.assign(clonedData, customFields);
+
+  // Clone variants with new SKUs
+  if (clonedData.variants && clonedData.variants.length > 0) {
+    clonedData.variants = clonedData.variants.map(variant => ({
+      ...variant,
+      sku: `${variant.sku}-CLONE-${Date.now()}`,
+      inventory: includeInventory ? variant.inventory : 0
+    }));
+  }
+
+  const clonedProduct = new this.constructor(clonedData);
+  return await clonedProduct.save();
+};
+
+// Export product data for various platforms
+productSchema.methods.exportForPlatform = function (platform = 'general', options = {}) {
+  const baseData = {
+    id: this._id,
+    title: this.title,
+    description: this.shortDescription || this.metaDescription,
+    price: this.getFinalPrice(),
+    currency: process.env.CURRENCY || 'USD',
+    availability: this.isAvailable ? 'in stock' : 'out of stock',
+    condition: 'new',
+    brand: this.brandName,
+    sku: this.sku,
+    images: this.images?.map(img => img.url || img).filter(Boolean) || [],
+    categories: this.categoryName
+  };
+
+  switch (platform.toLowerCase()) {
+    case 'google':
+      return {
+        ...baseData,
+        google_product_category: this.categoryName,
+        product_type: this.productType,
+        gtin: this.productUPCEAN,
+        mpn: this.manufacturerPartNumber,
+        custom_label_0: this.isFeatured ? 'featured' : 'regular',
+        custom_label_1: this.newArrival ? 'new' : 'existing',
+        shipping_weight: this.getProductWeight(),
+        shipping: [{
+          country: 'US',
+          service: 'Standard',
+          price: `${this.calculateShipping()} USD`
+        }]
+      };
+
+    case 'facebook':
+      return {
+        ...baseData,
+        product_catalog_id: process.env.FB_CATALOG_ID,
+        inventory: this.inventory,
+        sale_price: this.salePrice ? `${this.salePrice} ${baseData.currency}` : undefined,
+        sale_price_effective_date: this.discountStartDate && this.discountEndDate ?
+          `${this.discountStartDate.toISOString()}/${this.discountEndDate.toISOString()}` : undefined
+      };
+
+    case 'amazon':
+      return {
+        ...baseData,
+        item_sku: this.sku,
+        item_name: this.title,
+        external_product_id: this.productUPCEAN,
+        external_product_id_type: this.productUPCEAN ? 'UPC' : 'EAN',
+        manufacturer: this.manufacturer,
+        part_number: this.manufacturerPartNumber,
+        bullet_point1: this.features?.[0],
+        bullet_point2: this.features?.[1],
+        bullet_point3: this.features?.[2],
+        generic_keywords: this.tags?.join(', ')
+      };
+
+    case 'shopify':
+      return {
+        title: this.title,
+        body_html: this.descriptions?.content,
+        vendor: this.vendor || this.manufacturer,
+        product_type: this.productType,
+        tags: this.tags?.join(', '),
+        published: this.status === 'active',
+        variants: this.variants?.map(v => ({
+          sku: v.sku,
+          price: v.price,
+          inventory_quantity: v.inventory,
+          weight: this.weight
+        })) || [{
+          sku: this.sku,
+          price: this.basePrice,
+          inventory_quantity: this.inventory,
+          weight: this.weight
+        }]
+      };
+
+    default:
+      return baseData;
+  }
+};
+
+// Advanced analytics and reporting
+productSchema.methods.getAnalyticsReport = function (dateRange = {}) {
+  const { startDate, endDate } = dateRange;
+  const now = new Date();
+  const start = startDate ? new Date(startDate) : new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const end = endDate ? new Date(endDate) : now;
+
+  // Filter analytics data by date range if available
+  const relevantAnalytics = this.detailedAnalytics?.filter(
+    interaction => new Date(interaction.timestamp) >= start && new Date(interaction.timestamp) <= end
+  ) || [];
+
+  const report = {
+    period: {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+      days: Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+    },
+    interactions: relevantAnalytics.reduce((acc, interaction) => {
+      acc[interaction.type] = (acc[interaction.type] || 0) + 1;
+      return acc;
+    }, {}),
+    performance: {
+      views: this.views || 0,
+      sold: this.soldCount || 0,
+      revenue: (this.soldCount || 0) * (this.basePrice || 0),
+      conversionRate: this.views > 0 ? ((this.soldCount / this.views) * 100).toFixed(2) : 0
+    },
+    inventory: {
+      current: this.inventory || 0,
+      turnoverRate: this.inventory > 0 ? (this.soldCount / this.inventory).toFixed(2) : 'N/A',
+      daysOfInventory: this.soldCount > 0 ? Math.ceil((this.inventory || 0) / (this.soldCount / 90)) : 'N/A'
+    },
+    pricing: {
+      currentPrice: this.getFinalPrice(),
+      averageOrderValue: this.soldCount > 0 ? (this.soldCount * this.basePrice) / this.soldCount : this.basePrice,
+      profitMargin: this.costPrice ? (((this.basePrice - this.costPrice) / this.basePrice) * 100).toFixed(2) : 'N/A'
+    }
+  };
+
+  return report;
 };
 
 // Get price breakdown
-productSchema.methods.getPriceBreakdown = function(quantity = 1) {
+productSchema.methods.getPriceBreakdown = function (quantity = 1) {
   const basePrice = this.basePrice * quantity;
   const discount = this.isDiscountActive() ? (basePrice * (this.discount / 100)) : 0;
   const salePrice = this.salePrice ? (this.salePrice * quantity) : null;
   const finalPrice = this.getFinalPrice(quantity);
   const tax = this.getTaxAmount() * quantity;
   const shipping = this.calculateShipping();
-  
+
   return {
     basePrice,
     discount,
@@ -587,13 +1598,13 @@ productSchema.methods.getPriceBreakdown = function(quantity = 1) {
 };
 
 // Check stock availability for order
-productSchema.methods.checkStockAvailability = function(requestedQuantity, variantId = null) {
+productSchema.methods.checkStockAvailability = function (requestedQuantity, variantId = null) {
   if (!this.trackInventory || this.trackInventory === 'no') {
     return { available: true, message: 'Stock tracking disabled' };
   }
-  
+
   let availableStock;
-  
+
   if (variantId) {
     const variant = this.variants.id(variantId);
     if (!variant) {
@@ -603,26 +1614,26 @@ productSchema.methods.checkStockAvailability = function(requestedQuantity, varia
   } else {
     availableStock = this.inventory;
   }
-  
+
   if (requestedQuantity <= availableStock) {
     return { available: true, stock: availableStock };
   } else if (this.allowBackorder) {
-    return { 
-      available: true, 
-      backorder: true, 
-      availableStock, 
-      backorderQuantity: requestedQuantity - availableStock 
+    return {
+      available: true,
+      backorder: true,
+      availableStock,
+      backorderQuantity: requestedQuantity - availableStock
     };
   } else {
-    return { 
-      available: false, 
-      message: `Insufficient stock. Available: ${availableStock}, Requested: ${requestedQuantity}` 
+    return {
+      available: false,
+      message: `Insufficient stock. Available: ${availableStock}, Requested: ${requestedQuantity}`
     };
   }
 };
 
 // Generate product recommendations
-productSchema.methods.getRecommendations = async function(limit = 5) {
+productSchema.methods.getRecommendations = async function (limit = 5) {
   // Get related products by category and tags
   const relatedProducts = await this.constructor.find({
     $and: [
@@ -638,15 +1649,15 @@ productSchema.methods.getRecommendations = async function(limit = 5) {
       }
     ]
   })
-  .sort({ soldCount: -1, views: -1 })
-  .limit(limit)
-  .select('title basePrice salePrice mainImage slug soldCount reviews');
-  
+    .sort({ soldCount: -1, views: -1 })
+    .limit(limit)
+    .select('title basePrice salePrice mainImage slug soldCount reviews');
+
   return relatedProducts;
 };
 
 // Export product data for external systems
-productSchema.methods.exportForFeed = function(format = 'google') {
+productSchema.methods.exportForFeed = function (format = 'google') {
   const baseData = {
     id: this._id,
     title: this.title,
@@ -659,7 +1670,7 @@ productSchema.methods.exportForFeed = function(format = 'google') {
     condition: 'new',
     gtin: this.productUPCEAN
   };
-  
+
   if (format === 'google') {
     return {
       ...baseData,
@@ -668,7 +1679,7 @@ productSchema.methods.exportForFeed = function(format = 'google') {
       custom_label_0: this.isFeatured ? 'featured' : 'regular'
     };
   }
-  
+
   if (format === 'facebook') {
     return {
       ...baseData,
@@ -676,29 +1687,29 @@ productSchema.methods.exportForFeed = function(format = 'google') {
       category: this.categoryName
     };
   }
-  
+
   return baseData;
 };
 
 // Clone product with variations
-productSchema.methods.cloneProduct = async function(overrides = {}) {
+productSchema.methods.cloneProduct = async function (overrides = {}) {
   const clonedData = this.toObject();
-  
+
   // Remove fields that should be unique
   delete clonedData._id;
   delete clonedData.sku;
   delete clonedData.seo_info.slug;
   delete clonedData.createdAt;
   delete clonedData.updatedAt;
-  
+
   // Reset counters
   clonedData.soldCount = 0;
   clonedData.views = 0;
   clonedData.total_view = 0;
-  
+
   // Apply overrides
   Object.assign(clonedData, overrides);
-  
+
   // Clone variants with new SKUs
   if (clonedData.variants && clonedData.variants.length > 0) {
     clonedData.variants = clonedData.variants.map(variant => ({
@@ -706,20 +1717,20 @@ productSchema.methods.cloneProduct = async function(overrides = {}) {
       sku: `${variant.sku}-CLONE-${Date.now()}`
     }));
   }
-  
+
   const clonedProduct = new this.constructor(clonedData);
   return await clonedProduct.save();
 };
 
 // Update stock when order is placed
-productSchema.methods.updateStockOnOrder = async function(quantity, operation = 'reduce') {
+productSchema.methods.updateStockOnOrder = async function (quantity, operation = 'reduce') {
   try {
     if (!this.trackInventory || this.trackInventory === 'no') {
       return { success: true, message: 'Inventory tracking disabled' };
     }
 
     const originalStock = this.inventory;
-    
+
     if (operation === 'reduce') {
       if (quantity > this.inventory && !this.allowBackorder) {
         throw new Error(`Insufficient stock. Available: ${this.inventory}, Requested: ${quantity}`);
@@ -733,7 +1744,7 @@ productSchema.methods.updateStockOnOrder = async function(quantity, operation = 
 
     // Update availability status
     await this.updateAvailabilityStatus();
-    
+
     // Log stock activity
     await this.logStockActivity({
       operation,
@@ -744,7 +1755,7 @@ productSchema.methods.updateStockOnOrder = async function(quantity, operation = 
     });
 
     await this.save();
-    
+
     return {
       success: true,
       previousStock: originalStock,
@@ -755,14 +1766,14 @@ productSchema.methods.updateStockOnOrder = async function(quantity, operation = 
     throw new Error(`Stock update failed: ${error.message}`);
   }
 };
-productSchema.methods.updateVariantStock = async function(variantId, quantity, operation = 'reduce') {
+productSchema.methods.updateVariantStock = async function (variantId, quantity, operation = 'reduce') {
   const variant = this.variants.id(variantId);
   if (!variant) {
     throw new Error('Variant not found');
   }
 
   const originalStock = variant.inventory;
-  
+
   if (operation === 'reduce') {
     if (quantity > variant.inventory && !this.allowBackorder) {
       throw new Error(`Insufficient variant stock. Available: ${variant.inventory}, Requested: ${quantity}`);
@@ -775,9 +1786,9 @@ productSchema.methods.updateVariantStock = async function(variantId, quantity, o
   // Update main product stock (sum of all variants)
   this.inventory = this.getVariantsStock();
   await this.updateAvailabilityStatus();
-  
+
   await this.save();
-  
+
   return {
     success: true,
     variantId,
@@ -788,31 +1799,31 @@ productSchema.methods.updateVariantStock = async function(variantId, quantity, o
 };
 
 // Bulk stock update for multiple products/variants
-productSchema.statics.bulkStockUpdate = async function(stockUpdates) {
+productSchema.statics.bulkStockUpdate = async function (stockUpdates) {
   const session = await mongoose.startSession();
   session.startTransaction();
-  
+
   try {
     const results = [];
-    
+
     for (const update of stockUpdates) {
       const { productId, variantId, quantity, operation } = update;
       const product = await this.findById(productId).session(session);
-      
+
       if (!product) {
         throw new Error(`Product not found: ${productId}`);
       }
-      
+
       let result;
       if (variantId) {
         result = await product.updateVariantStock(variantId, quantity, operation);
       } else {
         result = await product.updateStockOnOrder(quantity, operation);
       }
-      
+
       results.push({ productId, ...result });
     }
-    
+
     await session.commitTransaction();
     return { success: true, results };
   } catch (error) {
@@ -824,19 +1835,19 @@ productSchema.statics.bulkStockUpdate = async function(stockUpdates) {
 };
 
 // Log stock activities for audit trail
-productSchema.methods.logStockActivity = async function(activity) {
+productSchema.methods.logStockActivity = async function (activity) {
   // This would typically save to a separate StockActivity collection
   // For now, we'll add it to product analytics
   if (!this.stockActivityLog) {
     this.stockActivityLog = [];
   }
-  
+
   this.stockActivityLog.push({
     ...activity,
     timestamp: new Date(),
     productId: this._id
   });
-  
+
   // Keep only last 100 entries to prevent document bloat
   if (this.stockActivityLog.length > 100) {
     this.stockActivityLog = this.stockActivityLog.slice(-100);
@@ -844,9 +1855,9 @@ productSchema.methods.logStockActivity = async function(activity) {
 };
 
 // Update availability status based on current stock
-productSchema.methods.updateAvailabilityStatus = async function() {
+productSchema.methods.updateAvailabilityStatus = async function () {
   const totalStock = this.inventory + this.getVariantsStock();
-  
+
   if (totalStock <= 0) {
     this.isAvailable = false;
     this.availability = 'Out of Stock';
@@ -857,7 +1868,7 @@ productSchema.methods.updateAvailabilityStatus = async function() {
     this.isAvailable = true;
     this.availability = 'In Stock';
   }
-  
+
   // Trigger low stock alerts
   if (totalStock <= (this.lowStockThreshold || 0) && totalStock > 0) {
     await this.triggerLowStockAlert();
@@ -865,21 +1876,21 @@ productSchema.methods.updateAvailabilityStatus = async function() {
 };
 
 // Trigger low stock alert (webhook/notification)
-productSchema.methods.triggerLowStockAlert = async function() {
+productSchema.methods.triggerLowStockAlert = async function () {
   // Implementation would depend on your notification system
   console.log(`Low stock alert for product: ${this.title} (ID: ${this._id}), Stock: ${this.inventory}`);
-  
+
   // You could emit an event here for your notification service
   // eventEmitter.emit('lowStock', { product: this });
 };
 
 
-productSchema.methods.applyDiscountCode = async function(discountCode, quantity = 1) {
+productSchema.methods.applyDiscountCode = async function (discountCode, quantity = 1) {
   try {
     // This assumes you have a DiscountCode model
     const DiscountCode = mongoose.model('DiscountCode');
-    const discount = await DiscountCode.findOne({ 
-      code: discountCode, 
+    const discount = await DiscountCode.findOne({
+      code: discountCode,
       isActive: true,
       startDate: { $lte: new Date() },
       endDate: { $gte: new Date() }
@@ -918,65 +1929,65 @@ productSchema.methods.applyDiscountCode = async function(discountCode, quantity 
 };
 
 // Check if discount is applicable to this product
-productSchema.methods.isDiscountApplicable = function(discount) {
+productSchema.methods.isDiscountApplicable = function (discount) {
   // Check product-specific discounts
   if (discount.applicableProducts && discount.applicableProducts.length > 0) {
     return discount.applicableProducts.includes(this._id.toString());
   }
-  
+
   // Check category-specific discounts
   if (discount.applicableCategories && discount.applicableCategories.length > 0) {
     const productCategories = this.categories.map(cat => cat.toString());
-    return discount.applicableCategories.some(cat => 
+    return discount.applicableCategories.some(cat =>
       productCategories.includes(cat.toString())
     );
   }
-  
+
   // Check brand-specific discounts
   if (discount.applicableBrands && discount.applicableBrands.length > 0) {
     return discount.applicableBrands.includes(this.brand?.toString());
   }
-  
+
   // Check tag-based discounts
   if (discount.applicableTags && discount.applicableTags.length > 0) {
     return this.tags.some(tag => discount.applicableTags.includes(tag));
   }
-  
+
   // Check minimum purchase amount
   if (discount.minimumPurchaseAmount && this.getFinalPrice() < discount.minimumPurchaseAmount) {
     return false;
   }
-  
+
   // Check excluded products/categories
   if (discount.excludedProducts && discount.excludedProducts.includes(this._id.toString())) {
     return false;
   }
-  
+
   if (discount.excludedCategories && discount.excludedCategories.length > 0) {
     const productCategories = this.categories.map(cat => cat.toString());
     if (discount.excludedCategories.some(cat => productCategories.includes(cat.toString()))) {
       return false;
     }
   }
-  
+
   // If no specific rules, discount applies globally
   return discount.isGlobal || true;
 };
 
 // Calculate discount amount based on discount type
-productSchema.methods.calculateDiscountAmount = function(discount, basePrice, quantity) {
+productSchema.methods.calculateDiscountAmount = function (discount, basePrice, quantity) {
   switch (discount.type) {
     case 'percentage':
       const percentageDiscount = basePrice * (discount.value / 100);
       return Math.min(percentageDiscount, discount.maxDiscountAmount || percentageDiscount);
-      
+
     case 'fixed':
       return Math.min(discount.value, basePrice);
-      
+
     case 'buy_x_get_y':
       const freeItems = Math.floor(quantity / discount.buyQuantity) * discount.getQuantity;
       return freeItems * (this.basePrice || 0);
-      
+
     case 'tiered':
       // Implement tiered discount logic
       for (const tier of discount.tiers || []) {
@@ -985,7 +1996,7 @@ productSchema.methods.calculateDiscountAmount = function(discount, basePrice, qu
         }
       }
       return 0;
-      
+
     default:
       return 0;
   }
@@ -1098,7 +2109,65 @@ productSchema.methods.exportProductData = function () {
   return JSON.stringify(this.toObject());
 };
 
+// Get best applicable discount for product
+productSchema.methods.getBestApplicableDiscount = async function (availableDiscounts, quantity = 1) {
+  let bestDiscount = null;
+  let maxSavings = 0;
 
+  for (const discount of availableDiscounts) {
+    if (this.isDiscountApplicable(discount)) {
+      const basePrice = this.getFinalPrice(quantity);
+      const savingsAmount = this.calculateDiscountAmount(discount, basePrice, quantity);
+
+      if (savingsAmount > maxSavings) {
+        maxSavings = savingsAmount;
+        bestDiscount = {
+          ...discount,
+          savingsAmount,
+          finalPrice: basePrice - savingsAmount
+        };
+      }
+    }
+  }
+
+  return bestDiscount;
+};
+
+// Apply automatic discounts based on product properties
+productSchema.methods.applyAutomaticDiscounts = async function () {
+  const automaticDiscounts = [];
+
+  // Clearance discount for old inventory
+  const daysSinceCreated = (new Date() - this.createdAt) / (1000 * 60 * 60 * 24);
+  if (daysSinceCreated > 90 && !this.discount) {
+    automaticDiscounts.push({
+      type: 'clearance',
+      reason: 'Old inventory clearance',
+      discountPercentage: 20
+    });
+  }
+
+  // Low stock urgency discount
+  if (this.inventory <= (this.lowStockThreshold || 0) && this.inventory > 0) {
+    automaticDiscounts.push({
+      type: 'low_stock',
+      reason: 'Low stock urgency',
+      discountPercentage: 15
+    });
+  }
+
+  // Slow-moving inventory discount
+  const averageDailySales = this.soldCount / Math.max(daysSinceCreated, 1);
+  if (averageDailySales < 0.1 && daysSinceCreated > 30) {
+    automaticDiscounts.push({
+      type: 'slow_moving',
+      reason: 'Slow-moving inventory',
+      discountPercentage: 25
+    });
+  }
+
+  return automaticDiscounts;
+};
 // Get simplified images
 productSchema.methods.getSimplifiedImages = function () {
   return this.images.map((image) => ({ url: image.url, name: image.name }));
@@ -1173,12 +2242,10 @@ productSchema.methods.getBulkDiscountPrice = function (quantity) {
   }
   return this.calculateFinalPrice();
 };
-
 // Check if product is available for purchase
 productSchema.methods.isPurchasable = function () {
   return this.isAvailable && (!this.purchaseLimit || this.stock > 0);
 };
-
 // Reduce stock after purchase
 productSchema.methods.reduceStock = async function (quantity) {
   if (this.trackInventory === 'yes') {
@@ -1194,7 +2261,6 @@ productSchema.methods.reduceStock = async function (quantity) {
   }
   return this;
 };
-
 // Restock product
 productSchema.methods.restock = async function (quantity) {
   this.stock += quantity;
@@ -1207,24 +2273,20 @@ productSchema.methods.restock = async function (quantity) {
   await this.save();
   return this;
 };
-
 // Toggle featured status
 productSchema.methods.toggleFeatured = async function () {
   this.isFeatured = !this.isFeatured;
   await this.save();
   return this.isFeatured;
 };
-
 // Get related products (populated)
 productSchema.methods.getRelatedProducts = function () {
   return Product.find({ _id: { $in: this.relatedProducts } });
 };
-
 // Check if product is part of a bundle
 productSchema.methods.isPartOfBundle = function () {
   return this.productBundle && this.bundleContents && this.bundleContents.length > 0;
 };
-
 // Get active discount percentage
 productSchema.methods.getActiveDiscountPercent = function () {
   if (this.isDiscountActive()) {
@@ -1238,7 +2300,6 @@ productSchema.methods.getStockStatus = function () {
   if (this.isLowStock()) return 'Low Stock';
   return 'In Stock';
 };
-
 productSchema.methods.addReview = async function (reviewId) {
   if (!this.reviews.includes(reviewId)) {
     this.reviews.push(reviewId);
@@ -1246,7 +2307,6 @@ productSchema.methods.addReview = async function (reviewId) {
   }
   return this;
 };
-
 productSchema.methods.applyPromotion = async function ({ discount, salePrice, startDate, endDate }) {
   if (discount) this.discount = discount;
   if (salePrice) this.salePrice = salePrice;
@@ -1255,7 +2315,6 @@ productSchema.methods.applyPromotion = async function ({ discount, salePrice, st
   await this.save();
   return this;
 };
-
 productSchema.methods.isPreOrderAvailable = function () {
   return this.preOrder && (!this.preOrderDate || new Date() <= this.preOrderDate);
 };
@@ -1287,7 +2346,6 @@ productSchema.methods.getFinalPrice = function (quantity = 1) {
   }
   return Math.max(0, finalPrice);
 };
-
 productSchema.methods.reduceStock = async function (quantity) {
   try {
     if (quantity <= 0) throw new Error('Quantity must be positive');
@@ -1307,15 +2365,14 @@ productSchema.methods.reduceStock = async function (quantity) {
     throw new Error(`Failed to reduce stock: ${error.message}`);
   }
 };
-
 // Track product interaction
-productSchema.methods.trackInteraction = async function(type, metadata = {}) {
+productSchema.methods.trackInteraction = async function (type, metadata = {}) {
   const interaction = {
     type, // 'view', 'click', 'add_to_cart', 'purchase', 'share'
     timestamp: new Date(),
     metadata
   };
-  
+
   // Update counters
   switch (type) {
     case 'view':
@@ -1330,34 +2387,33 @@ productSchema.methods.trackInteraction = async function(type, metadata = {}) {
       this.analytics.conversions += 1;
       break;
   }
-  
+
   // Store detailed analytics (you might want to use a separate collection for this)
   if (!this.detailedAnalytics) {
     this.detailedAnalytics = [];
   }
-  
+
   this.detailedAnalytics.push(interaction);
-  
+
   // Keep only last 1000 interactions to prevent document bloat
   if (this.detailedAnalytics.length > 1000) {
     this.detailedAnalytics = this.detailedAnalytics.slice(-1000);
   }
-  
+
   await this.save();
 };
-
 // Get analytics summary
-productSchema.methods.getAnalyticsSummary = function(days = 30) {
+productSchema.methods.getAnalyticsSummary = function (days = 30) {
   const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const recentInteractions = this.detailedAnalytics?.filter(
     interaction => new Date(interaction.timestamp) >= cutoffDate
   ) || [];
-  
+
   const summary = recentInteractions.reduce((acc, interaction) => {
     acc[interaction.type] = (acc[interaction.type] || 0) + 1;
     return acc;
   }, {});
-  
+
   return {
     period: `${days} days`,
     interactions: summary,
@@ -1370,21 +2426,67 @@ productSchema.methods.getAnalyticsSummary = function(days = 30) {
    📌 Static Methods
    ========================= */
 
-   
+// Apply brand-wide discount
+productSchema.statics.applyBrandDiscount = async function (brandId, discountData) {
+  const products = await this.find({
+    brand: brandId,
+    isDeleted: false,
+    status: 'active'
+  });
+
+  const results = [];
+
+  for (const product of products) {
+    try {
+      await product.applyPromotion(discountData);
+      results.push({ productId: product._id, success: true });
+    } catch (error) {
+      results.push({ productId: product._id, success: false, error: error.message });
+    }
+  }
+
+  return {
+    totalProcessed: products.length,
+    successful: results.filter(r => r.success).length,
+    failed: results.filter(r => !r.success).length,
+    results
+  };
+};
+// Remove expired discounts
+productSchema.statics.removeExpiredDiscounts = async function () {
+  const now = new Date();
+  return await this.updateMany(
+    {
+      discountEndDate: { $lt: now },
+      $or: [
+        { discount: { $gt: 0 } },
+        { salePrice: { $exists: true, $ne: null } }
+      ]
+    },
+    {
+      $unset: {
+        discount: "",
+        salePrice: "",
+        discountStartDate: "",
+        discountEndDate: ""
+      }
+    }
+  );
+};
 // Batch operations
-productSchema.statics.batchStatusUpdate = async function(productIds, status, updateData = {}) {
+productSchema.statics.batchStatusUpdate = async function (productIds, status, updateData = {}) {
   const session = await mongoose.startSession();
   session.startTransaction();
-  
+
   try {
     const updateObj = { status, updatedAt: new Date(), ...updateData };
-    
+
     const result = await this.updateMany(
       { _id: { $in: productIds } },
       { $set: updateObj },
       { session }
     );
-    
+
     await session.commitTransaction();
     return result;
   } catch (error) {
@@ -1394,9 +2496,8 @@ productSchema.statics.batchStatusUpdate = async function(productIds, status, upd
     session.endSession();
   }
 };
-
 // Advanced search with AI-like features
-productSchema.statics.intelligentSearch = async function(query, options = {}) {
+productSchema.statics.intelligentSearch = async function (query, options = {}) {
   const {
     page = 1,
     limit = 20,
@@ -1404,10 +2505,10 @@ productSchema.statics.intelligentSearch = async function(query, options = {}) {
     filters = {},
     userContext = {}
   } = options;
-  
+
   // Build search pipeline
   const pipeline = [];
-  
+
   // Text search stage
   if (query) {
     pipeline.push({
@@ -1416,7 +2517,7 @@ productSchema.statics.intelligentSearch = async function(query, options = {}) {
         ...filters
       }
     });
-    
+
     // Add relevance score
     pipeline.push({
       $addFields: {
@@ -1424,7 +2525,7 @@ productSchema.statics.intelligentSearch = async function(query, options = {}) {
       }
     });
   }
-  
+
   // Personalization based on user context
   if (userContext.previousPurchases) {
     pipeline.push({
@@ -1439,7 +2540,7 @@ productSchema.statics.intelligentSearch = async function(query, options = {}) {
       }
     });
   }
-  
+
   // Sorting
   const sortStage = {};
   switch (sortBy) {
@@ -1462,18 +2563,18 @@ productSchema.statics.intelligentSearch = async function(query, options = {}) {
       sortStage.personalizedScore = -1;
       sortStage.relevanceScore = -1;
   }
-  
+
   pipeline.push({ $sort: sortStage });
-  
+
   // Pagination
   pipeline.push(
     { $skip: (page - 1) * limit },
     { $limit: limit }
   );
-  
+
   const results = await this.aggregate(pipeline);
   const total = await this.countDocuments({ $text: { $search: query }, ...filters });
-  
+
   return {
     results,
     pagination: {
@@ -1484,53 +2585,42 @@ productSchema.statics.intelligentSearch = async function(query, options = {}) {
     }
   };
 };
-
 // Search products by keyword
 productSchema.statics.searchProducts = function (keyword, limit = 20) {
   return this.find({ $text: { $search: keyword } }).limit(limit);
 };
-
 // Get featured products
 productSchema.statics.getFeaturedProducts = function (limit = 10) {
   return this.find({ isFeatured: true, status: 'active' }).limit(limit);
 };
-
 // Get low stock products
 productSchema.statics.getLowStockProducts = function () {
   return this.find({ $expr: { $lte: ["$currentStockLevel", "$lowStockLevel"] } });
 };
-
 // Get out of stock products
 productSchema.statics.getOutOfStockProducts = function () {
   return this.find({ isAvailable: false });
 };
-
 // Bulk update status
 productSchema.statics.bulkUpdateStatus = function (ids, status) {
   return this.updateMany({ _id: { $in: ids } }, { $set: { status } });
 };
-
 // Bulk delete products
 productSchema.statics.bulkDelete = function (ids) {
   return this.deleteMany({ _id: { $in: ids } });
 };
-
 // Get products by category
 productSchema.statics.getByCategory = function (categoryId) {
   return this.find({ categories: categoryId, status: 'active' });
 };
-
 // Get top selling products
 productSchema.statics.getTopSelling = function (limit = 10) {
   return this.find({}).sort({ soldCount: -1 }).limit(limit);
 };
-
 // Get most viewed products
 productSchema.statics.getMostViewed = function (limit = 10) {
   return this.find({}).sort({ views: -1 }).limit(limit);
 };
-
-
 // Paginated product list with filters
 productSchema.statics.getPaginatedProducts = async function ({
   page = 1,
@@ -1546,7 +2636,6 @@ productSchema.statics.getPaginatedProducts = async function ({
   ]);
   return { results, total, page, pages: Math.ceil(total / limit) };
 };
-
 // Update stock in bulk
 productSchema.statics.bulkUpdateStock = function (updates) {
   const bulkOps = updates.map(u => ({
@@ -1557,7 +2646,6 @@ productSchema.statics.bulkUpdateStock = function (updates) {
   }));
   return this.bulkWrite(bulkOps);
 };
-
 // Get products with active discounts
 productSchema.statics.getActiveDiscountProducts = function () {
   const now = new Date();
@@ -1567,8 +2655,6 @@ productSchema.statics.getActiveDiscountProducts = function () {
     discountEndDate: { $gte: now }
   });
 };
-
-
 productSchema.statics.getProductsByTag = function (tags, limit = 20) {
   return this.find({ tags: { $in: Array.isArray(tags) ? tags : [tags] }, status: 'active' }).limit(limit);
 };
@@ -1594,12 +2680,11 @@ productSchema.statics.getAverageRatingByCategory = async function (categoryId) {
   const ratings = products.map(p => p.ratingStatistics.averageRating).filter(r => r > 0);
   return ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
 };
-
 // Apply category-wide discount
-productSchema.statics.applyCategoryDiscount = async function(categoryId, discountData) {
+productSchema.statics.applyCategoryDiscount = async function (categoryId, discountData) {
   const products = await this.find({ categories: categoryId, isDeleted: false });
   const results = [];
-  
+
   for (const product of products) {
     try {
       await product.applyPromotion(discountData);
@@ -1608,33 +2693,30 @@ productSchema.statics.applyCategoryDiscount = async function(categoryId, discoun
       results.push({ productId: product._id, success: false, error: error.message });
     }
   }
-  
+
   return results;
 };
-
 // Remove expired discounts
-productSchema.statics.removeExpiredDiscounts = async function() {
+productSchema.statics.removeExpiredDiscounts = async function () {
   const now = new Date();
   return await this.updateMany(
-    { 
+    {
       discountEndDate: { $lt: now },
       $or: [
         { discount: { $gt: 0 } },
         { salePrice: { $exists: true, $ne: null } }
       ]
     },
-    { 
-      $unset: { 
-        discount: "", 
-        salePrice: "", 
-        discountStartDate: "", 
-        discountEndDate: "" 
+    {
+      $unset: {
+        discount: "",
+        salePrice: "",
+        discountStartDate: "",
+        discountEndDate: ""
       }
     }
   );
 };
-
-
 productSchema.statics.generateSchemaReport = function () {
   const schemaFields = Object.entries(this.schema.paths).map(([path, field]) => ({
     name: path,
@@ -1673,10 +2755,6 @@ productSchema.statics.generateSchemaReport = function () {
     }
   };
 };
-
-
-
-
 productSchema.statics.advancedFilter = async function (queryParams = {}) {
   try {
     const params = this._validateAndSanitizeParams(queryParams);
@@ -1693,7 +2771,6 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
     throw new Error(`Advanced filtering failed: ${error.message}`);
   }
 },
-
   productSchema.statics.generateDatabaseStatistics = async function () {
     const [
       totalProducts,
@@ -1834,10 +2911,6 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
       subscriptionStatistics: { subscriptionProducts: subscriptionStats }
     };
   };
-
-
-
-
 productSchema.static.advancedFilter = async function (queryParams = {}) {
   try {
     const params = this._validateAndSanitizeParams(queryParams);
@@ -1854,7 +2927,7 @@ productSchema.static.advancedFilter = async function (queryParams = {}) {
     throw new Error(`Advanced filtering failed: ${error.message}`);
   }
 }
-productSchema.static._validateAndSanitizeParams = async function ( params) {
+productSchema.static._validateAndSanitizeParams = async function (params) {
   const {
     // Pagination
     page = 1,
@@ -1928,7 +3001,6 @@ productSchema.static._validateAndSanitizeParams = async function ( params) {
     timeout: Math.min(parseInt(timeout) || 30000, 60000)
   };
 }
-
 productSchema.static._parseSort = async function (sortParam, allowedFields) {
   if (!sortParam) return { createdAt: -1 };
 
@@ -1955,7 +3027,6 @@ productSchema.static._parseSort = async function (sortParam, allowedFields) {
 
   return Object.keys(sortObj).length > 0 ? sortObj : { createdAt: -1 };
 }
-
 productSchema.static._validateSearchFields = async function (fields) {
 
 
@@ -1976,7 +3047,6 @@ productSchema.static._validateSearchFields = async function (fields) {
     .filter(f => DEFAULT_SEARCH_FIELDS.includes(f))
     .slice(0, 10); // Limit to 10 search fields
 }
-
 productSchema.static._validateFilters = async function (filters, includeInactive) {
   if (!filters || typeof filters !== 'object') return {};
 
@@ -2159,7 +3229,6 @@ productSchema.static._parseRange = async function (value, min = 0, max = Number.
 
   return Object.keys(range).length > 0 ? range : null;
 }
-
 productSchema.static._parseDateRange = async function (value) {
   if (!value) return null;
 
@@ -2182,7 +3251,6 @@ productSchema.static._parseDateRange = async function (value) {
 
   return Object.keys(range).length > 0 ? range : null;
 }
-
 productSchema.static._validateProjection = async function (projection) {
   if (!projection) return null;
 
@@ -2207,7 +3275,6 @@ productSchema.static._validateProjection = async function (projection) {
 
   return Object.keys(projectionObj).length > 0 ? projectionObj : null;
 }
-
 productSchema.static._buildAdvancedPipeline = async function (params) {
 
   const {
@@ -2407,7 +3474,6 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
 
   return pipeline;
 }
-
 productSchema.static._buildSearchStage = async function (search, searchFields, searchMode) {
   const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
@@ -2442,7 +3508,6 @@ productSchema.static._buildSearchStage = async function (search, searchFields, s
     };
   }
 }
-
 productSchema.statics._formatFilterResults = async function (result, params) {
   const data = result?.data || [];
   const totalCount = result?.totalCount?.[0]?.count || 0;
