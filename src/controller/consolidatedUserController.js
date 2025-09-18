@@ -272,7 +272,7 @@ class UserController {
     try {
       const {
         page = 1,
-        limit = 20,
+        limit = 10,
         sort = 'createdAt',
         order = 'desc',
         search,
