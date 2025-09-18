@@ -93,7 +93,7 @@ const permissionValidation = {
 // POST /api/permission - Create a new permission
 router.post('/',
   authMiddleware,
-  // authorize('permission', 'write'),
+  authorize('permission', 'write'),
   permissionValidation.create,
   permissionController.createPermission
 );
@@ -101,14 +101,14 @@ router.post('/',
 // GET /api/permission - Get all permissions (with optional filters)
 router.get('/',
   authMiddleware,
-  // authorize('permission', 'read'),
+  authorize('permission', 'read'),
   permissionValidation.query,
   permissionController.getAllPermissions
 );
 
 router.get('/states',
   authMiddleware,
-  // authorize('permission', 'read'),
+  authorize('permission', 'read'),
   permissionValidation.query,
   permissionController.getGroupedPermissions
 );
@@ -130,7 +130,7 @@ router.put('/:id',
 // PATCH /api/permission/:id - Update a permission by ID
 router.patch('/:id',
   authMiddleware,
-  // authorize('permission', 'update'),
+  authorize('permission', 'update'),
   permissionValidation.update,
   permissionController.updatePermission
 );
@@ -138,7 +138,7 @@ router.patch('/:id',
 // DELETE /api/permission/:id - Soft-delete (deactivate) a permission by ID
 router.delete('/:id',
   authMiddleware,
-  // authorize('permission', 'delete'),
+  authorize('permission', 'delete'),
   param('id').isMongoId().withMessage('Invalid permission ID'),
   permissionController.deletePermission
 );

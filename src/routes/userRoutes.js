@@ -665,7 +665,7 @@ router.put('/:id/status',
 );
 
 // PUT /api/users/:id/deactivate - Deactivate account
-router.put('/:id/deactivate',
+router.put('/:id/deactivate-account',
   authMiddleware,
   authorize('users', 'update'),
   instanceCheckMiddleware,
@@ -677,7 +677,7 @@ router.put('/:id/deactivate',
 
 
 // PUT /api/users/:id/reactivate - Reactivate account
-router.put('/:id/reactivate',
+router.put('/:id/reactivate-account',
   authMiddleware,
   authorize('users', 'update'),
   instanceCheckMiddleware,
