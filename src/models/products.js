@@ -2624,14 +2624,15 @@ productSchema.statics.getMostViewed = function (limit = 10) {
 // Paginated product list with filters
 productSchema.statics.getPaginatedProducts = async function ({
   page = 1,
-  limit = 20,
+  limit = 10,
   filters = {},
+  populateOptions,
   sort = { createdAt: -1 }
 }) {
   const skip = (page - 1) * limit;
   const query = { ...filters, deletedAt: { $exists: false } }; // Added deletedAt filter
   const [results, total] = await Promise.all([
-    this.find(query).sort(sort).skip(skip).limit(limit),
+    this.find(query).sort(sort).skip(skip).limit(limit).populate(populateOptions),
     this.countDocuments(query)
   ]);
   return { results, total, page, pages: Math.ceil(total / limit) };
