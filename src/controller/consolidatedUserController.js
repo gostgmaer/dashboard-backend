@@ -106,17 +106,19 @@ class UserController {
   static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
     return res.status(statusCode).json({
       success,
+      status: statusCode,
       data,
       message,
-      ...meta
+      ...meta,
     });
   }
 
   static errorResponse(res, message, statusCode = 500, error = null) {
     return res.status(statusCode).json({
       success: false,
+      status: statusCode,
       message,
-      error: process.env.NODE_ENV === 'development' ? error : undefined
+      error: process.env.NODE_ENV === 'development' ? error : undefined,
     });
   }
 
@@ -345,12 +347,50 @@ class UserController {
       });
 
       // Enrich users with calculated fields
-      const enrichedUsers = result.items.map(user =>
+      const u = result.items.map(user =>
         UserController.enrichUser(user)
       );
 
       const response = {
-        users: enrichedUsers,
+        users: {
+          theme: u.preferences.theme || '',
+          language: u.preferences.language || '',
+          currency: u.preferences.currency || 'USD',
+          notifications: u.preferences.notifications,
+          newsletter: u.preferences.newsletter,
+          username: u.username,
+          email: u.email,
+          id: u._id,
+          fullName: u.fullName || null,
+          firstName: u.firstName || null,
+          lastName: u.lastName || null,
+          role: u.role?._id || null,
+          rolename: u.role?.name || null,
+          dateOfBirth: u.dateOfBirth || null,
+          gender: u.gender || null,
+          phoneNumber: u.phoneNumber || null,
+          profilePicture: u.profilePicture || null,
+          isVerified: u.isVerified,
+          emailVerified: u.emailVerified,
+          socialMedia: u.socialMedia,
+          phoneVerified: u.phoneVerified,
+          failedLoginAttempts: u.failedLoginAttempts,
+          consecutiveFailedAttempts: u.consecutiveFailedAttempts,
+          lockoutUntil: u.lockoutUntil,
+          lastLoginAttempt: u.lastLoginAttempt,
+          twoFactorEnabled: u.otpSettings.enable || false,
+          addresscount: Array.isArray(u.address) ? u.address.length : 0,
+          interests: u.interests || [],
+          loyaltyPoints: u.loyaltyPoints,
+          subscriptionStatus: u.subscriptionStatus,
+          subscriptionType: u.subscriptionType,
+          status: u.status,
+          referralCode: u.referralCode,
+          userScore: u.userScore,
+          activityLevel: u.activityLevel,
+          profileCompleteness: u.profileCompleteness,
+          accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24))
+        },
         pagination: {
           currentPage: result.page,
           totalPages: result.pages,
@@ -374,6 +414,72 @@ class UserController {
     } catch (error) {
       console.error('Error in getUsers:', error);
       return UserController.errorResponse(res, 'Failed to fetch users', 500, error.message);
+    }
+  }
+
+
+  static async getUserByIdentifier(req, res) {
+    try {
+      const { identifier } = req.params;
+
+      if (!identifier) {
+        return res.status(400).json({ error: "Identifier parameter is required" });
+      }
+
+      let u = await User.findUserFullDetails(identifier);
+
+      if (!u) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      u = UserController.enrichUser(u)
+      const data = {
+        theme: u.preferences.theme || '',
+        language: u.preferences.language || '',
+        currency: u.preferences.currency || 'USD',
+        notifications: u.preferences.notifications,
+        newsletter: u.preferences.newsletter,
+        username: u.username,
+        email: u.email,
+        id: u._id,
+        fullName: u.fullName || null,
+        firstName: u.firstName || null,
+        lastName: u.lastName || null,
+        role: u.role?._id || null,
+        rolename: u.role?.name || null,
+        dateOfBirth: u.dateOfBirth || null,
+        gender: u.gender || null,
+        phoneNumber: u.phoneNumber || null,
+        profilePicture: u.profilePicture || null,
+        isVerified: u.isVerified,
+        emailVerified: u.emailVerified,
+        socialMedia: u.socialMedia,
+        phoneVerified: u.phoneVerified,
+        failedLoginAttempts: u.failedLoginAttempts,
+        consecutiveFailedAttempts: u.consecutiveFailedAttempts,
+        lockoutUntil: u.lockoutUntil,
+        lastLoginAttempt: u.lastLoginAttempt,
+        twoFactorEnabled: u.otpSettings.enable || false,
+        addresscount: Array.isArray(u.address) ? u.address.length : 0,
+        interests: u.interests || [],
+        loyaltyPoints: u.loyaltyPoints,
+        subscriptionStatus: u.subscriptionStatus,
+        subscriptionType: u.subscriptionType,
+        status: u.status,
+        referralCode: u.referralCode,
+        userScore: u.userScore,
+        activityLevel: u.activityLevel,
+        profileCompleteness: u.profileCompleteness,
+        accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24))
+      }
+      return UserController.standardResponse(
+        res,
+        true,
+        UserController.enrichUser(data),
+        'User created successfully',
+        200
+      );
+    } catch (error) {
+      return UserController.errorResponse(res, 'Failed to Fetch user', 500, error.message);
     }
   }
 
@@ -1083,8 +1189,8 @@ class UserController {
    */
   static async resetPassword(req, res) {
     try {
-       const { email, otpCode, newPassword, confirmPassword } = req.body;
-        if (!email || !otpCode || !newPassword || !confirmPassword|| !token) {
+      const { email, otpCode, newPassword, confirmPassword } = req.body;
+      if (!email || !otpCode || !newPassword || !confirmPassword || !token) {
         return res.status(400).json({
           success: false,
           message: 'All fields are required'
@@ -2334,13 +2440,13 @@ class UserController {
     }
   }
 
-    // Activate user
+  // Activate user
   static async activateUser(req, res) {
     try {
       const { userId } = req.params;
       const { reason } = req.body;
       const adminId = req.user._id;
-      
+
       // Check if admin has permission
       if (!req.user.role || req.user.role.name !== 'admin') {
         return res.status(403).json({
@@ -2348,9 +2454,9 @@ class UserController {
           message: 'Access denied. Admin role required.'
         });
       }
-      
+
       const user = await User.adminActivateUser(userId, adminId, reason);
-      
+
       return res.status(200).json({
         success: true,
         message: 'User activated successfully',
@@ -2362,7 +2468,7 @@ class UserController {
           updatedAt: user.updatedAt
         }
       });
-      
+
     } catch (error) {
       console.error('Activate user error:', error);
       return res.status(400).json({
@@ -2371,14 +2477,14 @@ class UserController {
       });
     }
   }
-  
+
   // Deactivate user
   static async deactivateUser(req, res) {
     try {
       const { userId } = req.params;
       const { reason } = req.body;
       const adminId = req.user._id;
-      
+
       // Check if admin has permission
       if (!req.user.role || req.user.role.name !== 'admin') {
         return res.status(403).json({
@@ -2386,7 +2492,7 @@ class UserController {
           message: 'Access denied. Admin role required.'
         });
       }
-      
+
       // Prevent self-deactivation
       if (userId === adminId.toString()) {
         return res.status(400).json({
@@ -2394,9 +2500,9 @@ class UserController {
           message: 'Cannot deactivate your own account'
         });
       }
-      
+
       const user = await User.adminDeactivateUser(userId, adminId, reason);
-      
+
       return res.status(200).json({
         success: true,
         message: 'User deactivated successfully',
@@ -2408,7 +2514,7 @@ class UserController {
           updatedAt: user.updatedAt
         }
       });
-      
+
     } catch (error) {
       console.error('Deactivate user error:', error);
       return res.status(400).json({

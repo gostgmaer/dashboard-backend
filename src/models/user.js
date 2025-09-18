@@ -137,7 +137,7 @@ const userSchema = new mongoose.Schema(
       }
     ],
     tokens: [{ token: { type: String } }],
-     isDeleted: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false },
     // Password Reset
     passwordReset: {
       token: { type: String, default: null },
@@ -2722,6 +2722,49 @@ userSchema.statics.getSecurityReport = async function (timeframe = 30) {
     timeframe
   };
 }
+userSchema.statics.findUserFullDetails = async function (identifier) {
+
+
+  let filter = {};
+
+  // Check if identifier is a valid ObjectId
+  if (mongoose.Types.ObjectId.isValid(identifier)) {
+    filter.id = identifier;
+  } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) { // basic email regex
+    filter.email = identifier.toLowerCase();
+  } else {
+    filter.username = identifier;
+  }
+  let user = null;
+
+  if (filter.id) {
+    user = await this.findById(filter.id).populate([
+      "role",
+      "address",
+      "orders",
+      "favoriteProducts",
+      "shoppingCart",
+      "wishList",
+      "referredBy",
+    ]).lean({ virtual: true });
+    return user;
+  }
+  user = await this.findOne(filter)
+    .populate([
+      "role",
+      "address",
+      "orders",
+      "favoriteProducts",
+      "shoppingCart",
+      "wishList",
+      "referredBy",
+    ])
+    .lean({ virtual: true });
+
+  if (!user) return null;
+
+  return user;
+};
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
