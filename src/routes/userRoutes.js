@@ -223,6 +223,11 @@ router.get('/',
   UserController.getUsers
 );
 
+// GET /api/users/profile - Get profile
+router.get('/profile',
+  authMiddleware,
+  UserController.getMyProfileStatisticsController
+);
 // GET /api/users/:id - Get single user by ID
 router.get('/:identifier',
   authMiddleware,
@@ -333,11 +338,7 @@ router.put('/:id/profile',
   UserController.updateProfile
 );
 
-// GET /api/users/profile - Get profile
-router.get('/profile/staticstics',
-  authMiddleware,
-  UserController.getMyProfileStatisticsController
-);
+
 
 // PUT /api/users/:id/profile/picture - Update profile picture
 router.put('/:id/profile/picture',

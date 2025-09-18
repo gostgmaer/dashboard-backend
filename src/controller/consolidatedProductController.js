@@ -196,7 +196,7 @@ class ProductController {
 
             const {
                 page = 1,
-                limit = 20,
+                limit = 10,
                 sort = 'createdAt',
                 order = 'desc',
                 search,
@@ -268,9 +268,9 @@ class ProductController {
 
             // Default population for list view (minimal for performance)
             const defaultPopulate = [
-                { path: 'categories', select: 'name slug' },
-                { path: 'brand', select: 'name logo' },
-                { path: 'createdBy', select: 'name email' }
+
+                'category',
+                'brand'
             ];
 
             // Custom population if specified
@@ -320,8 +320,12 @@ class ProductController {
                 }
             };
 
+
             return ProductController.standardResponse(
-                res, true, response, "User found"
+                res,
+                true,
+                response,
+                `Retrieved ${enrichedProducts.length} products`
             );
 
         } catch (error) {

@@ -52,6 +52,7 @@
     "razorpay": "^2.9.4",
     "redis": "^4.7.1",
     "shortid": "^2.2.16",
+    "slugify": "^1.6.6",
     "speakeasy": "^2.0.0",
     "stripe": "^14.5.0",
     "twilio": "^5.9.0",

@@ -374,12 +374,215 @@ userSchema.method({
 
   /**
  * Generate JWT tokens
+ * 
+ * 
  */
+
+
+  // Instance methods to add to userSchema.method():
+
+  // Create session for this user
+  async createSession(sessionData) {
+    const {
+      sessionId = crypto.randomUUID(),
+      deviceId,
+      ipAddress,
+      userAgent,
+      expiresAt = new Date(Date.now() + SESSION_TIMEOUT)
+    } = sessionData;
+
+    // Clean expired sessions first
+    await this.cleanupExpiredSessions();
+
+    // Check session limit
+    const activeSessionsCount = this.activeSessions.filter(s => s.isActive).length;
+    if (activeSessionsCount >= MAX_SESSIONS) {
+      // Deactivate oldest active session
+      const oldestSession = this.activeSessions
+        .filter(s => s.isActive)
+        .sort((a, b) => a.createdAt - b.createdAt)[0];
+
+      if (oldestSession) {
+        oldestSession.isActive = false;
+        await this.logSecurityEvent('session_expired',
+          'Session deactivated due to limit exceeded', 'medium');
+      }
+    }
+
+    // Add new session
+    const newSession = {
+      sessionId,
+      deviceId: deviceId || crypto.randomUUID(),
+      createdAt: new Date(),
+      lastActivity: new Date(),
+      expiresAt,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+      isActive: true
+    };
+
+    this.activeSessions.push(newSession);
+    await this.save();
+
+    await this.logSecurityEvent('session_created',
+      `New session created: ${sessionId}`, 'low', { sessionId, deviceId });
+
+    return newSession;
+  },
+
+  // Update session activity
+  async updateSessionActivity(sessionId) {
+    const session = this.activeSessions.find(s =>
+      s.sessionId === sessionId && s.isActive
+    );
+
+    if (!session) {
+      throw new Error('Session not found or inactive');
+    }
+
+    // Check if session expired
+    if (session.expiresAt < new Date()) {
+      session.isActive = false;
+      await this.save();
+      throw new Error('Session expired');
+    }
+
+    session.lastActivity = new Date();
+    await this.save();
+    return session;
+  },
+
+  // Deactivate specific session
+  async deactivateSession(sessionId, reason = 'user_logout') {
+    const session = this.activeSessions.find(s => s.sessionId === sessionId);
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    session.isActive = false;
+    await this.save();
+
+    await this.logSecurityEvent('session_deactivated',
+      `Session deactivated: ${reason}`, 'low', { sessionId, reason });
+
+    return true;
+  },
+
+  // Deactivate all sessions
+  async deactivateAllSessions(reason = 'user_logout_all') {
+    this.activeSessions.forEach(session => {
+      session.isActive = false;
+    });
+
+    await this.save();
+
+    await this.logSecurityEvent('all_sessions_deactivated',
+      `All sessions deactivated: ${reason}`, 'medium', { reason });
+
+    return true;
+  },
+
+  // Get user's active sessions
+  async getActiveSessions() {
+    await this.cleanupExpiredSessions();
+    return this.activeSessions.filter(session => session.isActive);
+  },
+
+  // Clean up expired sessions for this user
+  async cleanupExpiredSessions() {
+    const now = new Date();
+    let hasExpiredSessions = false;
+
+    this.activeSessions.forEach(session => {
+      if (session.expiresAt < now && session.isActive) {
+        session.isActive = false;
+        hasExpiredSessions = true;
+      }
+    });
+
+    // Remove inactive sessions older than 30 days
+    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+    const initialLength = this.activeSessions.length;
+
+    this.activeSessions = this.activeSessions.filter(session =>
+      session.isActive || session.createdAt > thirtyDaysAgo
+    );
+
+    if (hasExpiredSessions || this.activeSessions.length < initialLength) {
+      await this.save();
+    }
+
+    return this.activeSessions.filter(s => s.isActive);
+  },
+
+  // Check if session exists and is active
+  async isSessionActive(sessionId) {
+    await this.cleanupExpiredSessions();
+
+    const session = this.activeSessions.find(s =>
+      s.sessionId === sessionId && s.isActive
+    );
+
+    return !!session;
+  },
+
+  // Get session info
+  async getSessionInfo(sessionId) {
+    const session = this.activeSessions.find(s => s.sessionId === sessionId);
+
+    if (!session) {
+      return null;
+    }
+
+    return {
+      sessionId: session.sessionId,
+      deviceId: session.deviceId,
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+      expiresAt: session.expiresAt,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      isActive: session.isActive,
+      timeRemaining: session.isActive ?
+        Math.max(0, session.expiresAt - new Date()) : 0
+    };
+  },
+
+  // Extend session expiry
+  async extendSession(sessionId, additionalTime = SESSION_TIMEOUT) {
+    const session = this.activeSessions.find(s =>
+      s.sessionId === sessionId && s.isActive
+    );
+
+    if (!session) {
+      throw new Error('Session not found or inactive');
+    }
+
+    session.expiresAt = new Date(Date.now() + additionalTime);
+    session.lastActivity = new Date();
+    await this.save();
+
+    return session;
+  },
+
+  // Instance method to clean up expired authTokens
+  async removeExpiredAuthTokens() {
+    const now = new Date();
+    const originalCount = this.authTokens.length;
+    this.authTokens = this.authTokens.filter(token => token.expiresAt > now);
+    if (this.authTokens.length !== originalCount) {
+      await this.save();
+    }
+    return this.authTokens;
+  },
+
   async generateTokens(deviceInfo = {}) {
     try {
       const deviceId = deviceInfo.deviceId || crypto.randomBytes(16).toString('hex');
 
       // Clean up expired tokens
+      this.removeExpiredAuthTokens()
       await User.cleanupExpiredTokens();
 
       // Check session limit
@@ -621,8 +824,6 @@ userSchema.method({
   async getMyProfile() {
 
     await this.populate(['role']);
-
-
     return {
       id: this._id,
       fullName: this.fullName,
@@ -692,6 +893,8 @@ userSchema.method({
       phoneNumber: this.phoneNumber,
       profilePicture: this.profilePicture,
       role: this.role ? this.role.name : null,
+      status: this.status,
+      referralCode: this.referralCode,
       address: this.address,
       orderCount: this.orders.length,
       favoriteProductsCount: this.favoriteProducts.length,
@@ -2420,6 +2623,8 @@ userSchema.statics.findLockedAccounts = async function () {
   userSchema.statics.cleanupExpiredTokens = async function () {
     const now = new Date();
 
+
+
     // Clean up expired refresh tokens
     await this.updateMany(
       {},
@@ -2500,7 +2705,7 @@ userSchema.statics.findLockedAccounts = async function () {
   },
 
 
-  userSchema.statics.authenticateUser = async function (identifier, password, ipAddress = null, userAgent = null, deviceInfo = {}) {
+  userSchema.statics.authenticateUser = async function (identifier, password, deviceInfo) {
     const user = await this.findOne({
       $or: [
         { email: identifier.toLowerCase() },
@@ -2541,9 +2746,8 @@ userSchema.statics.findLockedAccounts = async function () {
       };
     }
 
-
     await user.handleSuccessfulLogin(deviceInfo);
-
+    await user.createSession(deviceInfo);
     return {
       user,
       requiresMFA: false
@@ -2765,6 +2969,114 @@ userSchema.statics.findUserFullDetails = async function (identifier) {
 
   return user;
 };
+
+// Create a new active session
+userSchema.statics.createActiveSession = async function (userId, sessionData) {
+  const {
+    sessionId,
+    deviceId,
+    ipAddress,
+    userAgent,
+    expiresAt = new Date(Date.now() + SESSION_TIMEOUT)
+  } = sessionData;
+
+  const user = await this.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Remove expired sessions before adding new one
+  await user.cleanupExpiredSessions();
+
+  // Check if session limit reached
+  const activeSessionsCount = user.activeSessions.filter(s => s.isActive).length;
+  if (activeSessionsCount >= MAX_SESSIONS) {
+    // Deactivate oldest session
+    const oldestSession = user.activeSessions
+      .filter(s => s.isActive)
+      .sort((a, b) => a.createdAt - b.createdAt)[0];
+
+    if (oldestSession) {
+      oldestSession.isActive = false;
+    }
+  }
+
+  // Add new session
+  user.activeSessions.push({
+    sessionId,
+    deviceId,
+    createdAt: new Date(),
+    lastActivity: new Date(),
+    expiresAt,
+    ipAddress,
+    userAgent,
+    isActive: true
+  });
+
+  await user.save();
+  return user.activeSessions[user.activeSessions.length - 1];
+};
+
+// Get all active sessions for a user
+userSchema.statics.getActiveSessions = async function (userId) {
+  const user = await this.findById(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  await user.cleanupExpiredSessions();
+  return user.activeSessions.filter(session => session.isActive);
+};
+
+// Cleanup expired sessions across all users
+userSchema.statics.cleanupAllExpiredSessions = async function () {
+  const now = new Date();
+
+  await this.updateMany(
+    {},
+    {
+      $pull: {
+        activeSessions: {
+          $or: [
+            { expiresAt: { $lt: now } },
+            { isActive: false }
+          ]
+        }
+      }
+    }
+  );
+};
+
+// Get session statistics
+userSchema.statics.getSessionStatistics = async function () {
+  const stats = await this.aggregate([
+    { $unwind: '$activeSessions' },
+    { $match: { 'activeSessions.isActive': true } },
+    {
+      $group: {
+        _id: null,
+        totalActiveSessions: { $sum: 1 },
+        uniqueUsers: { $addToSet: '$_id' },
+        avgSessionsPerUser: { $avg: { $size: '$activeSessions' } }
+      }
+    },
+    {
+      $project: {
+        totalActiveSessions: 1,
+        uniqueActiveUsers: { $size: '$uniqueUsers' },
+        avgSessionsPerUser: 1,
+        _id: 0
+      }
+    }
+  ]);
+
+  return stats[0] || {
+    totalActiveSessions: 0,
+    uniqueActiveUsers: 0,
+    avgSessionsPerUser: 0
+  };
+};
+
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
