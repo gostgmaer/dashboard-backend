@@ -322,8 +322,11 @@ const toggleActive = async (req, res) => {
 
 // Get all active roles
 const getActiveRole = async (req, res) => {
+
+  console.log(req);
+  
   try {
-    const roles = await Role.getActiveRoles().populate('permissions');
+    const roles = await Role.getActiveRoles();
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       status: ReasonPhrases.OK,
