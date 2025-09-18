@@ -119,7 +119,7 @@ authRoute.get('/docs/routes', AuthMiddleware, authorize('auth', 'view'), (req, r
       'POST   /auth/verify-otp',
       'POST   /auth/resend-otp',
       'POST   /auth/forgot-password',
-      'POST   /auth/reset-password',
+      'POST   /auth/reset-password/:token',
       'POST   /auth/verify-user/:id'
     ],
     authenticated: [
