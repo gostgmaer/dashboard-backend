@@ -358,7 +358,7 @@ router.get('/:id/stock/status',
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
-  ProductController.getStockStatus
+  ProductController.getStockStatusData
 );
 
 // PUT /api/products/:id/stock/mark-out - Mark as out of stock
