@@ -185,12 +185,12 @@ class ProductController {
     static async getProducts(req, res) {
         try {
             // Check if getPaginatedProducts exists
-            if (!Product.getPaginatedProducts) {
-                console.error('Product.getPaginatedProducts is undefined. Check products.js import and static method definition.');
-                return ProductController.errorResponse(res, 'Server configuration error: getPaginatedProducts method not found', 500, {
-                    availableMethods: Object.keys(Product.schema?.statics || {})
-                });
-            }
+            // if (!Product.getPaginatedProducts) {
+            //     console.error('Product.getPaginatedProducts is undefined. Check products.js import and static method definition.');
+            //     return ProductController.errorResponse(res, 'Server configuration error: getPaginatedProducts method not found', 500, {
+            //         availableMethods: Object.keys(Product.schema?.statics || {})
+            //     });
+            // }
 
             const {
                 page = 1,
@@ -294,7 +294,7 @@ class ProductController {
                 page: Number(page),
                 limit: Number(limit),
                 filters,
-                sort: sortObj,
+                sort: sortObj,populateOptions
             });
 
             // Enrich products with calculated fields
