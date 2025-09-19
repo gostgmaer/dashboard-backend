@@ -14,7 +14,8 @@ const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
 const DeviceDetector = require('../services/DeviceDetector');
 const otpService = require('../services/otpService');
-const { emailVerificationTemplate, welcomeEmailTemplate } = require('../email/emailTemplate');
+const { emailVerificationTemplate, welcomeEmailTemplate,passwordResetRequestTemplate } = require('../email/emailTemplate');
+const { removeKeysFromObject } = require('../utils/helper');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -124,12 +125,14 @@ class authController {
 
   static calculateSecurityScore(user) {
     let score = 0;
+
     if (user.emailVerified) score += 20;
     if (user.phoneVerified) score += 15;
     if (user.hasActiveTOTP) score += 30;
     if (user.knownDevices?.every((d) => d.isTrusted)) score += 15;
     if (user.loginSecurity?.failedAttempts === 0) score += 10;
-    if (user.hash_password) score += 10; // Has password set
+    if (user.isActive) score += 10; // ✅ Account is active
+
     return Math.min(score, 100);
   }
 
@@ -346,7 +349,7 @@ class authController {
       const { identifier, profileData, deviceTrust = false } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
 
-     
+
       // Authenticate user
       const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
       let user = authResult.user;
@@ -906,9 +909,9 @@ class authController {
       }
 
       const result = await User.initiatePasswordReset(email, req.deviceInfo);
-      // Send reset email (implement your email service)
+      await sendEmail(passwordResetRequestTemplate, result.user);
       try {
-        // await sendPasswordResetEmail(user.email, resetToken);
+ 
         console.log(`Password reset token for ${user.email}: ${result.resetToken}`);
       } catch (error) {
         console.error('Failed to send reset email:', error);
@@ -917,7 +920,7 @@ class authController {
       await user.logSecurityEvent('password_reset_requested',
         'Password reset requested', 'medium', deviceInfo);
 
-      return authController.standardResponse(res, true, result,
+      return authController.standardResponse(res, true,
         'If this email is registered, you will receive a password reset link');
 
     } catch (error) {
@@ -2202,6 +2205,20 @@ class authController {
         'Failed to retrieve devices', 500, error.message);
     }
   }
+
+  static async getUserSetting(req, res) {
+    try {
+      const user = await User.fetchUserSettings(req.user.id);
+
+      return authController.standardResponse(res, true, authController.enrichUser(user), 'Account Setting Fetch successfully');
+
+    } catch (error) {
+      console.error('Get devices error:', error);
+      return authController.errorResponse(res,
+        'Failed to retrieve devices', 500, error.message);
+    }
+  }
+
   static async getProfile(req, res) {
     try {
       const user = await req.user.getMyProfile();

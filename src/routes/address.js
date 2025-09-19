@@ -3,7 +3,7 @@ const addressRoute = express.Router();
 const addressController = require('../controller/addresses/address');
 const { body, query, param, validationResult } = require('express-validator');
 const authMiddleware = require('../middleware/auth'); // Uncommented
-const  authorize  = require('../middleware/authorize');// Assuming authorize is exported from auth middleware
+const authorize = require('../middleware/authorize');// Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting'); // Assumed from userRoutes.js
 const Address = require('../models/address');
@@ -42,7 +42,7 @@ const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const addressId = req.params.id || req.params.addressId1;
     if (addressId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
-   
+
       const address = await Address.findById(addressId);
       if (!address) {
         return res.status(404).json({ success: false, message: 'Address not found' });
@@ -52,7 +52,7 @@ const instanceCheckMiddleware = async (req, res, next) => {
       }
     }
     if (req.params.addressId2 && !req.user.isSuperadmin) {
-     
+
       const address = await Address.findById(req.params.addressId2);
       if (!address) {
         return res.status(404).json({ success: false, message: 'Second address not found' });
@@ -85,20 +85,19 @@ const validate = (req, res, next) => {
 
 const addressValidation = {
   create: [
-    body('street').notEmpty().withMessage('Street is required').trim().escape(),
+    body('addressLine1').notEmpty().withMessage('Street is required').trim().escape(),
     body('city').notEmpty().withMessage('City is required').trim().escape(),
     body('country').notEmpty().withMessage('Country is required').trim().escape(),
-    body('zipCode').notEmpty().withMessage('ZIP code is required').trim().escape(),
-    body('userId').isMongoId().withMessage('Valid user ID is required'),
+    body('postalCode').notEmpty().withMessage('ZIP code is required').trim().escape(),
     validate
   ],
 
   update: [
     param('id').isMongoId().withMessage('Invalid address ID'),
-    body('street').optional().notEmpty().withMessage('Street cannot be empty').trim().escape(),
+    body('addressLine1').optional().notEmpty().withMessage('Street cannot be empty').trim().escape(),
     body('city').optional().notEmpty().withMessage('City cannot be empty').trim().escape(),
     body('country').optional().notEmpty().withMessage('Country cannot be empty').trim().escape(),
-    body('zipCode').optional().notEmpty().withMessage('ZIP code cannot be empty').trim().escape(),
+    body('postalCode').optional().notEmpty().withMessage('ZIP code cannot be empty').trim().escape(),
     validate
   ],
 
@@ -192,11 +191,10 @@ const addressValidation = {
 
   batchCreate: [
     body('addresses').isArray({ min: 1 }).withMessage('Addresses array is required'),
-    body('addresses.*.street').notEmpty().withMessage('Street is required').trim().escape(),
+    body('addresses.*.addressLine1').notEmpty().withMessage('Street is required').trim().escape(),
     body('addresses.*.city').notEmpty().withMessage('City is required').trim().escape(),
     body('addresses.*.country').notEmpty().withMessage('Country is required').trim().escape(),
-    body('addresses.*.zipCode').notEmpty().withMessage('ZIP code is required').trim().escape(),
-    body('addresses.*.userId').isMongoId().withMessage('Valid user ID is required'),
+    body('addresses.*.postalCode').notEmpty().withMessage('ZIP code is required').trim().escape(),
     validate
   ],
 
@@ -211,7 +209,7 @@ const addressValidation = {
 // ========================================
 
 // POST /addresses - Create a new address
-addressRoute.post('/addresses',
+addressRoute.post('/',
   authMiddleware,
   authorize('addresses', 'write'),
   addressValidation.create,
@@ -219,7 +217,11 @@ addressRoute.post('/addresses',
 );
 
 // GET /addresses/:id - Get address by ID
-addressRoute.get('/addresses/:id',
+addressRoute.get('/user',
+  authMiddleware,
+  addressController.getAddressUserId
+);
+addressRoute.get('/:id',
   authMiddleware,
   authorize('addresses', 'read'),
   instanceCheckMiddleware,
@@ -228,7 +230,7 @@ addressRoute.get('/addresses/:id',
 );
 
 // PUT /addresses/:id - Update address (full update)
-addressRoute.put('/addresses/:id',
+addressRoute.put('/:id',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -236,8 +238,11 @@ addressRoute.put('/addresses/:id',
   addressController.updateAddress
 );
 
+// PUT /addresses/:id - Update address (full update)
+
+
 // PATCH /addresses/:id - Partial update address
-addressRoute.patch('/addresses/:id',
+addressRoute.patch('/:id',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -246,7 +251,7 @@ addressRoute.patch('/addresses/:id',
 );
 
 // PATCH /addresses/:id/set-default - Set address as default
-addressRoute.patch('/addresses/:id/set-default',
+addressRoute.patch('/:id/set-default',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -255,7 +260,7 @@ addressRoute.patch('/addresses/:id/set-default',
 );
 
 // DELETE /addresses/:id - Soft delete address
-addressRoute.delete('/addresses/:id',
+addressRoute.delete('/:id',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -264,7 +269,7 @@ addressRoute.delete('/addresses/:id',
 );
 
 // PATCH /addresses/:id/archive - Archive address
-addressRoute.patch('/addresses/:id/archive',
+addressRoute.patch('/:id/archive',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -273,7 +278,7 @@ addressRoute.patch('/addresses/:id/archive',
 );
 
 // PATCH /addresses/:id/restore - Restore address
-addressRoute.patch('/addresses/:id/restore',
+addressRoute.patch('/:id/restore',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -282,7 +287,7 @@ addressRoute.patch('/addresses/:id/restore',
 );
 
 // POST /addresses/:id/clone - Clone address
-addressRoute.post('/addresses/:id/clone',
+addressRoute.post('/:id/clone',
   authMiddleware,
   authorize('addresses', 'write'),
   instanceCheckMiddleware,
@@ -291,7 +296,7 @@ addressRoute.post('/addresses/:id/clone',
 );
 
 // GET /addresses/:addressId1/compare/:addressId2 - Compare two addresses
-addressRoute.get('/addresses/:addressId1/compare/:addressId2',
+addressRoute.get('/:addressId1/compare/:addressId2',
   authMiddleware,
   authorize('addresses', 'view'),
   instanceCheckMiddleware,
@@ -300,21 +305,21 @@ addressRoute.get('/addresses/:addressId1/compare/:addressId2',
 );
 
 // GET /addresses/default - Get default address
-addressRoute.get('/addresses/default',
+addressRoute.get('/default',
   authMiddleware,
   authorize('addresses', 'read'),
   addressController.getDefaultAddress
 );
 
 // GET /addresses - Get all user addresses
-addressRoute.get('/addresses',
+addressRoute.get('/',
   authMiddleware,
   authorize('addresses', 'read'),
   addressController.getUserAddresses
 );
 
 // DELETE /addresses - Remove all user addresses
-addressRoute.delete('/addresses',
+addressRoute.delete('/',
   authMiddleware,
   authorize('addresses', 'update'),
   bulkOperationLimiter,
@@ -322,7 +327,7 @@ addressRoute.delete('/addresses',
 );
 
 // GET /addresses/nearby - Find nearby addresses
-addressRoute.get('/addresses/nearby',
+addressRoute.get('/nearby',
   authMiddleware,
   authorize('addresses', 'read'),
   addressValidation.nearby,
@@ -330,7 +335,7 @@ addressRoute.get('/addresses/nearby',
 );
 
 // PATCH /addresses/:id/status - Update address status
-addressRoute.patch('/addresses/:id/status',
+addressRoute.patch('/:id/status',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -339,7 +344,7 @@ addressRoute.patch('/addresses/:id/status',
 );
 
 // PATCH /addresses/bulk/status - Bulk update address status
-addressRoute.patch('/addresses/bulk/status',
+addressRoute.patch('/bulk/status',
   authMiddleware,
   authorize('addresses', 'update'),
   bulkOperationLimiter,
@@ -348,7 +353,7 @@ addressRoute.patch('/addresses/bulk/status',
 );
 
 // GET /addresses/:id/history - Get address history
-addressRoute.get('/addresses/:id/history',
+addressRoute.get('/:id/history',
   authMiddleware,
   authorize('addresses', 'view'),
   instanceCheckMiddleware,
@@ -357,7 +362,7 @@ addressRoute.get('/addresses/:id/history',
 );
 
 // GET /addresses/search - Search addresses
-addressRoute.get('/addresses/search',
+addressRoute.get('/search',
   authMiddleware,
   authorize('addresses', 'read'),
   addressValidation.search,
@@ -365,7 +370,7 @@ addressRoute.get('/addresses/search',
 );
 
 // POST /addresses/batch - Batch create addresses
-addressRoute.post('/addresses/batch',
+addressRoute.post('/batch',
   authMiddleware,
   authorize('addresses', 'write'),
   bulkOperationLimiter,
@@ -374,21 +379,21 @@ addressRoute.post('/addresses/batch',
 );
 
 // GET /addresses/duplicates - Find duplicate addresses
-addressRoute.get('/addresses/duplicates',
+addressRoute.get('/duplicates',
   authMiddleware,
   authorize('addresses', 'read'),
   addressController.findDuplicateAddresses
 );
 
 // GET /addresses/status/count - Get address count by status
-addressRoute.get('/addresses/status/count',
+addressRoute.get('/status/count',
   authMiddleware,
   authorize('addresses', 'view'),
   addressController.getAddressCountByStatus
 );
 
 // PATCH /addresses/:id/add-tag - Add tag to address
-addressRoute.patch('/addresses/:id/add-tag',
+addressRoute.patch('/:id/add-tag',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -397,7 +402,7 @@ addressRoute.patch('/addresses/:id/add-tag',
 );
 
 // PATCH /addresses/:id/remove-tag - Remove tag from address
-addressRoute.patch('/addresses/:id/remove-tag',
+addressRoute.patch('/:id/remove-tag',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -406,7 +411,7 @@ addressRoute.patch('/addresses/:id/remove-tag',
 );
 
 // PATCH /addresses/bulk/add-tag - Add tag to multiple addresses
-addressRoute.patch('/addresses/bulk/add-tag',
+addressRoute.patch('/bulk/add-tag',
   authMiddleware,
   authorize('addresses', 'update'),
   bulkOperationLimiter,
@@ -415,7 +420,7 @@ addressRoute.patch('/addresses/bulk/add-tag',
 );
 
 // PATCH /addresses/:id/merge - Merge addresses
-addressRoute.patch('/addresses/:id/merge',
+addressRoute.patch('/:id/merge',
   authMiddleware,
   authorize('addresses', 'update'),
   instanceCheckMiddleware,
@@ -424,7 +429,7 @@ addressRoute.patch('/addresses/:id/merge',
 );
 
 // GET /addresses/export - Export user addresses
-addressRoute.get('/addresses/export',
+addressRoute.get('/export',
   authMiddleware,
   authorize('addresses', 'report'),
   bulkOperationLimiter,
@@ -433,7 +438,7 @@ addressRoute.get('/addresses/export',
 );
 
 // GET /addresses/by-tag - Get addresses by tag
-addressRoute.get('/addresses/by-tag',
+addressRoute.get('/by-tag',
   authMiddleware,
   authorize('addresses', 'read'),
   addressValidation.byTag,

@@ -575,11 +575,18 @@ const sendError = (res, statusCode, error) => {
   });
 };
 
+function removeKeysFromObject(obj, keysToRemove) {
+  const newObj = { ...obj }; // clone to avoid mutating original
+  keysToRemove.forEach(key => {
+    delete newObj[key];
+  });
+  return newObj;
+}
 
 module.exports = {
   decodeToken,
   FilterOptions,
-  getLocationInfo,
+  getLocationInfo,removeKeysFromObject,
   removeEmptyKeys,
   FilterOptionsSearch,
   generateRandomString,
