@@ -18,7 +18,7 @@ const {
   JWT_SECRET = 'your-super-secret-jwt-key',
   JWT_ID_SECRET = "dasd98a7sd97as89d7a98sd7",
   JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
-  JWT_EXPIRY = '15m',
+  JWT_EXPIRY = '1h',
   JWT_REFRESH_EXPIRY = '7d',
   JWT_ID_EXPIRY = '30d',
   JWT_ALGORITHM = 'HS256',
@@ -89,16 +89,54 @@ const userSchema = new mongoose.Schema(
     lockoutUntil: { type: Date, default: null },
     lastLoginAttempt: { type: Date, default: null },
     lastLogin: { type: Date, default: null },
-
     loginHistory: [{
-      loginTime: Date,
-      ipAddress: String,
-      userAgent: String,
-      successful: Boolean,
-      failureReason: String,
-      deviceId: String,
+      loginTime: { type: Date, required: true, default: Date.now },
+      ipAddress: { type: String, trim: true },
+      userAgent: { type: String, trim: true },
+      successful: { type: Boolean, required: true },
+      failureReason: { type: String, default: null },
+      deviceId: { type: String, trim: true },
+      location: {
+        country: { type: String, default: null },
+        region: { type: String, default: null }, // Added from deviceInfo
+        city: { type: String, default: null },
+        coordinates: {
+          lat: { type: Number, default: null },
+          lng: { type: Number, default: null }
+        },
+        timezone: { type: String, default: null } // Added from deviceInfo
+      },
+      browser: {
+        name: { type: String, default: null },
+        version: { type: String, default: null },
+        major: { type: String, default: null } // Added from deviceInfo
+      },
+      os: {
+        name: { type: String, default: null },
+        version: { type: String, default: null }
+      },
+      device: {
+        vendor: { type: String, default: null }, // Added from deviceInfo
+        model: { type: String, default: null },  // Added from deviceInfo
+        type: { type: String, default: null }   // Added from deviceInfo
+      },
+      fingerprint: { type: String, default: null }, // Added from deviceInfo
+      security: {
+        suspiciousScore: { type: Number, default: 0 }, // Added from deviceInfo
+        riskLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'low' }, // Added from deviceInfo
+        flags: [{ type: String }], // Added from deviceInfo
+        analysis: {
+          userAgentLength: { type: Number, default: null },
+          hasSecurityHeaders: { type: Boolean, default: false },
+          headerCount: { type: Number, default: null },
+          timestamp: { type: Date, default: null }
+        }
+      },
+      loginMethod: { type: String, enum: ['password', 'social', 'otp', 'sso'], default: 'password' },
+      detectedAt: { type: Date, default: null }, // Added from deviceInfo
       otpUsed: { type: String, enum: ['totp', 'email', 'sms', 'backup', 'none'], default: 'none' }
     }],
+
 
     // Security Events & Audit Log
     securityEvents: [{
@@ -378,6 +416,65 @@ userSchema.method({
  * 
  */
 
+  async addLoginHistory({ successful, failureReason, deviceInfo, loginMethod = 'password' }) {
+    const loginEntry = {
+      loginTime: new Date(),
+      ipAddress: deviceInfo.ipAddress || null,
+      userAgent: deviceInfo.userAgent || null,
+      successful,
+      failureReason: successful ? null : (failureReason || 'unknown'),
+      deviceId: deviceInfo.deviceId || null,
+      location: {
+        country: deviceInfo.location?.country || null,
+        region: deviceInfo.location?.region || null,
+        city: deviceInfo.location?.city || null,
+        coordinates: {
+          lat: deviceInfo.location?.coordinates?.lat || null,
+          lng: deviceInfo.location?.coordinates?.lng || null
+        },
+        timezone: deviceInfo.location?.timezone || null
+      },
+      browser: {
+        name: deviceInfo.browser?.name || null,
+        version: deviceInfo.browser?.version || null,
+        major: deviceInfo.browser?.major || null
+      },
+      os: {
+        name: deviceInfo.os?.name || null,
+        version: deviceInfo.os?.version || null
+      },
+      device: {
+        vendor: deviceInfo.device?.vendor || null,
+        model: deviceInfo.device?.model || null,
+        type: deviceInfo.device?.type || null
+      },
+      fingerprint: deviceInfo.fingerprint || null,
+      security: {
+        suspiciousScore: deviceInfo.security?.suspiciousScore || 0,
+        riskLevel: deviceInfo.security?.riskLevel || 'low',
+        flags: deviceInfo.security?.flags || [],
+        analysis: {
+          userAgentLength: deviceInfo.security?.analysis?.userAgentLength || null,
+          hasSecurityHeaders: deviceInfo.security?.analysis?.hasSecurityHeaders || false,
+          headerCount: deviceInfo.security?.analysis?.headerCount || null,
+          timestamp: deviceInfo.security?.analysis?.timestamp ? new Date(deviceInfo.security.analysis.timestamp) : null
+        }
+      },
+      loginMethod,
+      detectedAt: deviceInfo.detectedAt ? new Date(deviceInfo.detectedAt) : null
+    };
+
+    this.loginHistory.push(loginEntry);
+
+    // Limit login history to last 50 entries
+    if (this.loginHistory.length > 50) {
+      this.loginHistory = this.loginHistory.slice(-50);
+    }
+
+    await this.save();
+    return this.loginHistory[this.loginHistory.length - 1];
+  },
+
 
   // Instance methods to add to userSchema.method():
 
@@ -600,15 +697,14 @@ userSchema.method({
 
 
       const accessToken = await this.generateAccessToken(deviceId)
-      const idToken = await this.generateIdToken(deviceId)
+    
       const refreshToken = await this.generateRefreshToken(deviceId)
 
       // Store tokens
       const now = new Date();
       const accessTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_EXPIRY));
       const refreshTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_REFRESH_EXPIRY));
-      const idTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_ID_EXPIRY));
-
+   
 
       // console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
 
@@ -630,15 +726,6 @@ userSchema.method({
         lastUsed: now
       });
       this.authTokens.push({
-        token: idToken,
-        type: 'id',
-        deviceId,
-        deviceInfo: deviceData,
-        expiresAt: idTokenExpiry,
-        lastUsed: now
-      });
-
-      this.authTokens.push({
         token: refreshToken,
         type: 'refresh',
         deviceId,
@@ -655,8 +742,6 @@ userSchema.method({
       return {
         accessToken,
         refreshToken,
-        idToken,
-        idTokenExpiry,
         accessTokenExpiresAt: accessTokenExpiry,
         refreshTokenExpiresAt: refreshTokenExpiry,
         deviceId
@@ -1598,7 +1683,7 @@ userSchema.method({
 
 
 
-  async handleFailedLogin(ipAddress = null, userAgent = null, deviceInfo = {}, reason = 'invalid_credentials') {
+  async handleFailedLogin(ipAddress = null, userAgent = null, deviceInfo, reason = 'invalid_credentials') {
     this.failedLoginAttempts += 1;
     this.consecutiveFailedAttempts += 1;
     this.lastLoginAttempt = new Date();
@@ -1607,14 +1692,14 @@ userSchema.method({
     this.loginSecurity.lastLoginAttempt = new Date();
 
     // Add to login history
-    this.loginHistory.push({
-      loginTime: new Date(),
-      ipAddress: deviceInfo.ipAddress,
-      userAgent: deviceInfo.userAgent,
+
+    await this.addLoginHistory({
       successful: false,
       failureReason: reason,
-      deviceId: deviceInfo.deviceId
+      deviceInfo,
+      loginMethod: 'password'
     });
+
 
     // Check if account should be locked
     if (this.loginSecurity.consecutiveFailures >= MAX_ATTEMPTS) {
@@ -1662,7 +1747,7 @@ userSchema.method({
     await this.save();
   },
 
-  async handleSuccessfulLogin(ipAddress = null, userAgent = null, deviceInfo = {}) {
+  async handleSuccessfulLogin(deviceInfo ) {
     this.lastLogin = new Date();
     this.failedLoginAttempts = 0;
     this.consecutiveFailedAttempts = 0;
@@ -1673,15 +1758,14 @@ userSchema.method({
     this.loginSecurity.lockedUntil = null;
     this.loginSecurity.lastLoginAttempt = new Date();
 
-    // Add to login history
-    this.loginHistory.push({
-      loginTime: new Date(),
-      ipAddress: deviceInfo.ipAddress,
-      userAgent: deviceInfo.userAgent,
+
+    await this.addLoginHistory({
       successful: true,
-      deviceId: deviceInfo.deviceId,
-      otpUsed: this.currentOTP.type || 'none'
-    });
+      deviceInfo,
+      loginMethod: 'password',
+      otpUsed: this.currentOTP.type
+    });// Add to login history
+
     // Limit login history to last 50 entries
     if (this.loginHistory.length > 50) {
       this.loginHistory = this.loginHistory.slice(-50);
@@ -3089,7 +3173,7 @@ userSchema.statics.getSessionStatistics = async function () {
 userSchema.statics.fetchUserSettings = async function (userId) {
 
   const selectedKeys = [
-    "otpSettings","lastLogin", "currentOTP", "twoFactorAuth", "loginSecurity", "socialMedia", "preferences", "username","interests", "email", "firstName", "lastName", 'dateOfBirth', "gender", "phoneNumber", "profilePicture", "session", "status", "isVerified", "subscriptionStatus", "subscriptionType", "paymentMethods", "updatedAt", "emailVerified", "phoneVerified", "twoFactorEnabled", "loginHistory", "securityEvents", "activeSessions", "knownDevices", "socialAccounts", "lastLoginAttempt", "referralCode", 'role', 'updated_by',"loyaltyPoints"
+    "otpSettings", "lastLogin", "currentOTP", "twoFactorAuth", "loginSecurity", "socialMedia", "preferences", "username", "interests", "email", "firstName", "lastName", 'dateOfBirth', "gender", "phoneNumber", "profilePicture", "session", "status", "isVerified", "subscriptionStatus", "subscriptionType", "paymentMethods", "updatedAt", "emailVerified", "phoneVerified", "twoFactorEnabled", "loginHistory", "securityEvents", "activeSessions", "knownDevices", "socialAccounts", "lastLoginAttempt", "referralCode", 'role', 'updated_by', "loyaltyPoints"
   ];
 
   // Predefine the population fields

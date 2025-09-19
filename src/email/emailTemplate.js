@@ -1,3 +1,4 @@
+const { host, resetPath, confirmPath, loginPath } = require('../config/setting');
 const { appUrl, applicaionName, frontendUrl } = require('./');
 
 /**
@@ -112,7 +113,7 @@ const welcomeEmailTemplate = (data) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const emailVerificationTemplate = ({ id, emailVerificationToken }) => {
+const emailVerificationTemplate = ({ id,username, emailVerificationToken }) => {
   return {
     subject: `Please Verify Your Email`,
     html: `<!DOCTYPE html>
@@ -125,14 +126,14 @@ const emailVerificationTemplate = ({ id, emailVerificationToken }) => {
   <body style="font-family: Arial, sans-serif; background-color:#f6f9fc; padding:20px;">
     <div style="max-width:600px; margin:0 auto; background:#ffffff; padding:30px; border-radius:8px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">
       
-      <h2 style="color:#2c3e50;">Hello ${name || 'User'},</h2>
+      <h2 style="color:#2c3e50;">Hello ${username || 'User'},</h2>
       
       <p style="font-size:16px; color:#555;">
         Thank you for signing up! To complete your registration, please verify your email address by clicking the button below:
       </p>
 
       <div style="margin:30px 0; text-align:center;">
-        <a href="${verificationUrl}" 
+        <a href="${host}/${confirmPath}/${emailVerificationToken}" 
            style="background:#2c3e50; color:#fff; padding:12px 24px; text-decoration:none; border-radius:6px; font-size:16px;">
           Verify Email
         </a>
@@ -141,7 +142,7 @@ const emailVerificationTemplate = ({ id, emailVerificationToken }) => {
       <p style="font-size:14px; color:#777;">
         Or copy and paste this link into your browser:  
         <br/>
-        <a href="${verificationUrl}" style="color:#2c3e50;">${verificationUrl}</a>
+        <a href="${host}/${confirmPath}/${emailVerificationToken}" style="color:#2c3e50;">${host}/${confirmPath}/${emailVerificationToken}</a>
       </p>
 
       <p style="margin-top:30px; font-size:14px; color:#777;">
@@ -164,11 +165,11 @@ const emailVerificationTemplate = ({ id, emailVerificationToken }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const emailVerificationSuccessTemplate = ({ name }) => {
+const emailVerificationSuccessTemplate = ({ username }) => {
   return {
     subject: `Email Successfully Verified`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#2c3e50;">Hi ${name || 'User'},</h2>
+    <h2 style="color:#2c3e50;">Hi ${username || 'User'},</h2>
     <p>Your email has been successfully verified. 🎉</p>
     <p>You can now enjoy full access to your account.</p>
     <p style="color:#777; font-size:12px;">Thank you for joining us!</p>
@@ -182,14 +183,14 @@ const emailVerificationSuccessTemplate = ({ name }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const passwordResetRequestTemplate = ({ name, resetLink }) => {
+const passwordResetRequestTemplate = ({ resetToken, username }) => {
   return {
     subject: `Reset Your Password`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#2c3e50;">Hello ${name || 'User'},</h2>
+    <h2 style="color:#2c3e50;">Hello ${username || 'User'},</h2>
     <p>We received a request to reset your password.</p>
     <p>Click the button below to reset it:</p>
-    <a href="${resetLink}" style="display:inline-block; padding:12px 24px; background:#2c3e50; color:#fff; text-decoration:none; border-radius:6px;">Reset Password</a>
+    <a href="${host}/${resetPath}?resetToken=${resetToken}" style="display:inline-block; padding:12px 24px; background:#2c3e50; color:#fff; text-decoration:none; border-radius:6px;">Reset Password</a>
     <p style="margin-top:20px; font-size:14px; color:#555;">If you didn’t request this, please ignore this email.</p>
   </div>`,
     attachments: [], // Include any attachments if provided
@@ -201,11 +202,11 @@ const passwordResetRequestTemplate = ({ name, resetLink }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const passwordResetSuccessTemplate = ({ name }) => {
+const passwordResetSuccessTemplate = ({ username }) => {
   return {
     subject: `Password Reset Successful`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#2c3e50;">Hi ${name || 'User'},</h2>
+    <h2 style="color:#2c3e50;">Hi ${username || 'User'},</h2>
     <p>Your password has been successfully reset ✅.</p>
     <p>If this wasn’t you, please contact our support team immediately.</p>
   </div>`,
@@ -218,11 +219,11 @@ const passwordResetSuccessTemplate = ({ name }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const passwordChangedSuccessTemplate = ({ name }) => {
+const passwordChangedSuccessTemplate = ({ username }) => {
   return {
     subject: `Password Changed Successfully`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#2c3e50;">Hello ${name || 'User'},</h2>
+    <h2 style="color:#2c3e50;">Hello ${username || 'User'},</h2>
     <p>Your password was changed successfully 🔒.</p>
     <p>If this change wasn’t made by you, <strong>reset your password immediately</strong> and contact support.</p>
   </div>`,
@@ -235,11 +236,11 @@ const passwordChangedSuccessTemplate = ({ name }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const accountLockedTemplate = ({ name, unlockLink }) => {
+const accountLockedTemplate = ({ username, unlockLink }) => {
   return {
     subject: `Account Temporarily Locked`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#e74c3c;">Hi ${name || 'User'},</h2>
+    <h2 style="color:#e74c3c;">Hi ${username || 'User'},</h2>
     <p>Your account has been temporarily locked due to multiple failed login attempts 🔐.</p>
     <p>Click below to unlock your account:</p>
     <a href="${unlockLink}" style="display:inline-block; padding:12px 24px; background:#e74c3c; color:#fff; text-decoration:none; border-radius:6px;">Unlock Account</a>
@@ -254,11 +255,11 @@ const accountLockedTemplate = ({ name, unlockLink }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const suspiciousLoginTemplate = ({ name, location, device, resetLink }) => {
+const suspiciousLoginTemplate = ({ username, location, device, resetLink }) => {
   return {
     subject: `Suspicious Login Detected`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#f39c12;">Hello ${name || 'User'},</h2>
+    <h2 style="color:#f39c12;">Hello ${username || 'User'},</h2>
     <p>We detected a login to your account from a new device/location:</p>
     <ul>
       <li><strong>Location:</strong> ${location || 'Unknown'}</li>
@@ -276,11 +277,11 @@ const suspiciousLoginTemplate = ({ name, location, device, resetLink }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const accountDeletedTemplate = ({ name }) => {
+const accountDeletedTemplate = ({ username }) => {
   return {
     subject: `Account Deleted`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#2c3e50;">Goodbye ${name || 'User'},</h2>
+    <h2 style="color:#2c3e50;">Goodbye ${username || 'User'},</h2>
     <p>Your account has been successfully deleted 🗑️.</p>
     <p>If you didn’t request this, please contact support immediately.</p>
   </div>`,
@@ -293,11 +294,11 @@ const accountDeletedTemplate = ({ name }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const subscriptionUpdatedTemplate = ({ name, plan }) => {
+const subscriptionUpdatedTemplate = ({ username, plan }) => {
   return {
     subject: `Subscription Updated`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2 style="color:#2c3e50;">Hi ${name || 'User'},</h2>
+    <h2 style="color:#2c3e50;">Hi ${username || 'User'},</h2>
     <p>Your subscription has been updated successfully ✅.</p>
     <p><strong>New Plan:</strong> ${plan || 'N/A'}</p>
     <p>Enjoy your updated features!</p>
@@ -317,11 +318,11 @@ const subscriptionUpdatedTemplate = ({ name, plan }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const paymentFailedTemplate = ({ name, amount, retryLink }) => {
+const paymentFailedTemplate = ({ username, amount, retryLink }) => {
   return {
     subject: `Payment Failed`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2>Hi ${name || 'User'},</h2>
+    <h2>Hi ${username || 'User'},</h2>
     <p>We couldn’t process your recent payment of <strong>$${amount}</strong> 💳.</p>
     <p>Please update your payment method and try again:</p>
     <a href="${retryLink}" style="display:inline-block; padding:12px 24px; background:#e74c3c; color:#fff; border-radius:6px; text-decoration:none;">Update Payment</a>
@@ -354,12 +355,12 @@ const paymentSuccessTemplate = ({ name, amount, invoiceLink }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const orderConfirmationTemplate = ({ name, orderId, items, total }) => {
+const orderConfirmationTemplate = ({ username, orderId, items, total }) => {
   return {
     subject: `Order Confirmation`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
     <h2>Order Confirmed 🛒</h2>
-    <p>Hi ${name || 'User'}, your order <strong>#${orderId}</strong> has been placed successfully.</p>
+    <p>Hi ${username || 'User'}, your order <strong>#${orderId}</strong> has been placed successfully.</p>
     <ul>${itemsList}</ul>
     <p><strong>Total:</strong> $${total}</p>
     <p>We’ll notify you once it ships 🚚.</p>
@@ -373,12 +374,12 @@ const orderConfirmationTemplate = ({ name, orderId, items, total }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const orderShippedTemplate = ({ name, orderId, trackingLink }) => {
+const orderShippedTemplate = ({ username, orderId, trackingLink }) => {
   return {
     subject: `Your Order Has Shipped`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
     <h2>Your Order is on the way 🚚</h2>
-    <p>Hi ${name || 'User'}, your order <strong>#${orderId}</strong> has been shipped.</p>
+    <p>Hi ${username || 'User'}, your order <strong>#${orderId}</strong> has been shipped.</p>
     <p>You can track it here:</p>
     <a href="${trackingLink}" style="display:inline-block; padding:12px 24px; background:#2c3e50; color:#fff; border-radius:6px; text-decoration:none;">Track Shipment</a>
   </div>`,
@@ -871,11 +872,11 @@ const newDeviceApprovalTemplate = ({ name, device, approveLink, denyLink }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const emailChangedTemplate = ({ name, oldEmail, newEmail }) => {
+const emailChangedTemplate = ({ username, oldEmail, newEmail }) => {
   return {
     subject: `Email Address Changed`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2>Hi ${name || 'User'},</h2>
+    <h2>Hi ${username || 'User'},</h2>
     <p>Your account email has been changed.</p>
     <p><strong>Old Email:</strong> ${oldEmail}<br/>
        <strong>New Email:</strong> ${newEmail}</p>
@@ -890,11 +891,11 @@ const emailChangedTemplate = ({ name, oldEmail, newEmail }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const loginAlertTemplate = ({ name, device, location, time }) => {
+const loginAlertTemplate = ({ username, device, location, time }) => {
   return {
     subject: `Login Alert`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2>Hello ${name || 'User'},</h2>
+    <h2>Hello ${username || 'User'},</h2>
     <p>Your account was just logged into:</p>
     <ul>
       <li><strong>Device:</strong> ${device || 'Unknown'}</li>
@@ -912,14 +913,14 @@ const loginAlertTemplate = ({ name, device, location, time }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const sessionExpiredTemplate = ({ name, reLoginLink }) => {
+const sessionExpiredTemplate = ({ username }) => {
   return {
     subject: `Session Expired`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2>Hello ${name || 'User'},</h2>
+    <h2>Hello ${username || 'User'},</h2>
     <p>Your session has expired due to inactivity or security reasons.</p>
     <p>Please log in again to continue:</p>
-    <a href="${reLoginLink}" style="padding:12px 24px; background:#2c3e50; color:#fff; border-radius:6px; text-decoration:none;">Login Again</a>
+    <a href="${host}/${loginPath}" style="padding:12px 24px; background:#2c3e50; color:#fff; border-radius:6px; text-decoration:none;">Login Again</a>
   </div>`,
     attachments: [], // Include any attachments if provided
   };
@@ -1038,11 +1039,11 @@ const failedLoginAttemptsTemplate = ({ name, attempts, lockLink }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const accountVerifiedTemplate = ({ name }) => {
+const accountVerifiedTemplate = ({ username }) => {
   return {
     subject: `Account Verified`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-    <h2>Congratulations ${name || 'User'} 🎉</h2>
+    <h2>Congratulations ${username || 'User'} 🎉</h2>
     <p>Your email has been successfully verified and your account is now fully active.</p>
     <p>You can log in anytime to start using all features.</p>
   </div>`,

@@ -934,6 +934,7 @@ class authController {
    * RESET PASSWORD WITH TOKEN
    */
   static async resetPassword(req, res) {
+  
     try {
       const { email, otpCode, newPassword, confirmPassword } = req.body;
       const { token } = req.params
