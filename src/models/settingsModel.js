@@ -4,18 +4,16 @@ const deepMerge = require('lodash.merge');
 const settingSchema = new mongoose.Schema(
   {
     // Basic Settings
-    basic: {
-      siteName: { type: String, required: true, trim: true },
-      siteKey: { type: String, required: true, unique: true, trim: true },
-      isDeleted: { type: Boolean, default: false },
-      name: { type: String, trim: true },
-      isLive: { type: Boolean, default: true },
-      maintenanceMode: { type: Boolean, default: false },
-      siteTimezone: { type: String, default: 'UTC', trim: true },
-      siteLocale: { type: String, default: 'en-US', trim: true },
-      defaultPageSize: { type: Number, default: 20 },
-      maxUploadSizeMB: { type: Number, default: 10 },
-    },
+    siteName: { type: String, required: true, trim: true },
+    siteKey: { type: String, required: true, unique: true, trim: true },
+    isDeleted: { type: Boolean, default: false },
+    name: { type: String, trim: true },
+    isLive: { type: Boolean, default: true },
+    maintenanceMode: { type: Boolean, default: false },
+    siteTimezone: { type: String, default: 'UTC', trim: true },
+    siteLocale: { type: String, default: 'en-US', trim: true },
+    defaultPageSize: { type: Number, default: 20 },
+    maxUploadSizeMB: { type: Number, default: 10 },
 
     // Contact Information
     contactInfo: {
@@ -175,14 +173,6 @@ const settingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Virtuals
-settingSchema.virtual('isMaintenanceMode').get(function () {
-  return this.basic ? this.basic.maintenanceMode : false;
-});
-
-settingSchema.virtual('isLive').get(function () {
-  return this.basic ? this.basic.isLive : false;
-});
 
 settingSchema.virtual('fullContactInfo').get(function () {
   if (!this.contactInfo) return '';
@@ -201,11 +191,11 @@ settingSchema.virtual('fullContactInfo').get(function () {
 // Pre-save hook for normalization and validations
 settingSchema.pre('save', async function (next) {
   // Ensure siteKey is lowercase (example normalization)
-  if (this.basic && this.basic.siteKey) {
-    this.basic.siteKey = this.basic.siteKey.toLowerCase();
+  if (this.siteKey) {
+    this.siteKey = this.siteKey.toLowerCase();
   }
   // Example validation: maxUploadSizeMB should be positive
-  if (this.basic?.maxUploadSizeMB && this.basic.maxUploadSizeMB < 0) {
+  if (this.maxUploadSizeMB < 0) {
     return next(new Error('maxUploadSizeMB must be non-negative'));
   }
   next();
@@ -218,12 +208,13 @@ settingSchema.methods.mergeAndSave = async function (partialData) {
 };
 
 settingSchema.methods.isInMaintenance = function () {
-  return this.basic ? this.basic.maintenanceMode : false;
+  return this.basic?.maintenanceMode || false;
 };
 
 settingSchema.methods.isStoreLive = function () {
-  return this.basic ? this.basic.isLive : false;
+  return this.basic?.isLive || false;
 };
+
 
 settingSchema.methods.toJSONSafe = function () {
   const obj = this.toObject();
@@ -238,7 +229,7 @@ settingSchema.methods.toJSONSafe = function () {
 
 // Additional Instance Methods
 settingSchema.methods.toggleMaintenance = async function () {
-  this.basic.maintenanceMode = !this.basic.maintenanceMode;
+  this.maintenanceMode = !this.maintenanceMode;
   return this.save();
 };
 
