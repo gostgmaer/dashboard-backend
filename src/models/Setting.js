@@ -5,7 +5,7 @@ const settingSchema = new mongoose.Schema(
   {
     siteName: { type: String, required: true, trim: true },
     siteKey: { type: String, required: true, unique: true, trim: true },
- isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     name: { type: String, trim: true },
 
     contactInfo: {
@@ -48,7 +48,7 @@ const settingSchema = new mongoose.Schema(
 
     logo: { type: String, trim: true },
     favicon: { type: String, trim: true },
-      enabledMFA: { type: Boolean, default: false },
+    enabledMFA: { type: Boolean, default: false },
     paymentMethods: [{ type: String, trim: true }],
     shippingMethods: [{ type: String, trim: true }],
 

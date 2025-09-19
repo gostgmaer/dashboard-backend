@@ -10,9 +10,7 @@ exports.createAddress = async (req, res) => {
   try {
     const addressData = {
       ...req.body,
-      user: req.user.id,
-      created_by: req.user.id,
-      updated_by: req.user.id,
+      user: req.user.id
     };
     const address = new Address(addressData);
     await address.save();
@@ -32,6 +30,29 @@ exports.getAddressById = async (req, res) => {
     sendResponse(res, 200, true, address);
   } catch (error) {
     sendResponse(res, 500, false, null, error.message);
+  }
+};
+// Get address by USer ID
+exports.getAddressUserId = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const addresses = await Address.find({
+      user: userId,
+      status: { $ne: 'deleted' },
+      isDeleted: false,
+    });
+
+    if (!addresses || addresses.length === 0) {
+      return sendResponse(res, 404, false, null, 'Address not found');
+    }
+
+    // Since _id is unique, there will be only one address
+
+
+    return sendResponse(res, 200, true, addresses);
+  } catch (error) {
+    return sendResponse(res, 500, false, null, error.message);
   }
 };
 

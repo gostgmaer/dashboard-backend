@@ -3,8 +3,6 @@ const mongoose = require('mongoose');
 const logSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
     user_id: { type: mongoose.Schema.Types.ObjectId, default: null, ref: 'User' },
-    user_fullname: { type: String, default: 'Unknown' },
-    user_metadata: { type: Object, default: null },
     action: { type: String, required: true },
     operation: { type: String, enum: ['create', 'update', 'delete', 'read'], required: true },
     method: { type: String, required: true },

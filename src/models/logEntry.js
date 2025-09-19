@@ -6,7 +6,7 @@ const activityLogSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     role: { type: String, enum: ["user", "admin", "customer", "system"], default: "user" },
     sessionId: { type: String },
-
+    operation: { type: String, enum: ['create', 'update', 'delete', 'read','remove'], required: true },
     // Action Info
     action: { type: String, required: true },                        // e.g., LOGIN, ORDER_PLACED
     description: { type: String },                                   // human-readable description
@@ -14,7 +14,7 @@ const activityLogSchema = new mongoose.Schema(
     entityId: { type: mongoose.Schema.Types.ObjectId },              // entity _id
     subEntity: { type: String },                                     // e.g., "CartItem", "PaymentMethod"
     subEntityId: { type: mongoose.Schema.Types.ObjectId },
- isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     // Request Metadata
     ipAddress: { type: String },
     userAgent: { type: String },
@@ -196,6 +196,72 @@ activityLogSchema.statics.bulkDelete = function (ids) {
 // Bulk update status
 activityLogSchema.statics.bulkUpdateStatus = function (ids, status) {
   return this.updateMany({ _id: { $in: ids } }, { $set: { status } });
+
+}
+
+  activityLogSchema.statics.createFromRequest = async function (req, logData = {}) {
+  // Parse user-agent
+  const agent = useragent.parse(req.headers["user-agent"] || "");
+
+  const deviceType =
+    /mobile/i.test(agent.device.toString())
+      ? "mobile"
+      : /tablet/i.test(agent.device.toString())
+      ? "tablet"
+      : /bot/i.test(agent.device.toString())
+      ? "bot"
+      : "desktop";
+
+  const log = new this({
+    // User Info (from req.user if available)
+    userId: req.user?._id,
+    role: req.user?.role || "user",
+    sessionId: req.sessionID,
+
+    // Request Info
+    ipAddress: req.ip,
+    userAgent: req.headers["user-agent"],
+    endpoint: req.originalUrl,
+    httpMethod: req.method,
+
+    // Device Info
+    device: {
+      os: agent.os.toString(),
+      browser: agent.toAgent(),
+      deviceType,
+    },
+
+    // Custom Data
+    operation: logData.operation,
+    action: logData.action,
+    description: logData.description,
+    entity: logData.entity,
+    entityId: logData.entityId,
+    subEntity: logData.subEntity,
+    subEntityId: logData.subEntityId,
+    changes: logData.changes,
+    metadata: logData.metadata,
+    status: "pending",
+  });
+
+  return log.save();
 };
+
+/* ---------------------- METHODS ---------------------- */
+activityLogSchema.methods.markSuccess = async function () {
+  this.status = "success";
+  this.errorCode = null;
+  this.errorMessage = null;
+  return this.save();
+};
+
+activityLogSchema.methods.markFailure = async function (errorCode, errorMessage) {
+  this.status = "failure";
+  this.errorCode = errorCode;
+  this.errorMessage = errorMessage;
+  return this.save();
+};
+
+
 const LogEntry = mongoose.model("ActivityLog", activityLogSchema);
 module.exports = LogEntry;

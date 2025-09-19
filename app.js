@@ -89,7 +89,7 @@ app.use('/api/brands', checkRoute("BrandRoute", BrandRoute));
 app.use('/api/auth', checkRoute("authRoute", authRoute));
 app.use('/api/attributes', checkRoute("attributeRouter", attributeRouter));
 app.use('/api/attachments', checkRoute("attachmentRoutes", attachmentRoutes));
-app.use('/api/address', checkRoute("addressRoute", addressRoute));
+app.use('/api/addresses', checkRoute("addressRoute", addressRoute));
 app.use('/api/logs', checkRoute("logRoute", logRoute));
 app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));

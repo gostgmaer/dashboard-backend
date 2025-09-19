@@ -2079,9 +2079,18 @@ userSchema.statics.findFullyPopulatedById = async function (userId) {
     'favoriteProducts',
     'shoppingCart',
     'wishList',
-    'referredBy',
-    'created_by',
-    'updated_by'
+    {
+      path: 'referredBy',
+      select: 'firstName lastName _id'
+    },
+    {
+      path: 'created_by',
+      select: 'firstName lastName _id'
+    },
+    {
+      path: 'updated_by',
+      select: 'firstName lastName _id'
+    }
   ]);
 };
 
@@ -3076,6 +3085,32 @@ userSchema.statics.getSessionStatistics = async function () {
     avgSessionsPerUser: 0
   };
 };
+
+userSchema.statics.fetchUserSettings = async function (userId) {
+
+  const selectedKeys = [
+    "otpSettings","lastLogin", "currentOTP", "twoFactorAuth", "loginSecurity", "socialMedia", "preferences", "username","interests", "email", "firstName", "lastName", 'dateOfBirth', "gender", "phoneNumber", "profilePicture", "session", "status", "isVerified", "subscriptionStatus", "subscriptionType", "paymentMethods", "updatedAt", "emailVerified", "phoneVerified", "twoFactorEnabled", "loginHistory", "securityEvents", "activeSessions", "knownDevices", "socialAccounts", "lastLoginAttempt", "referralCode", 'role', 'updated_by',"loyaltyPoints"
+  ];
+
+  // Predefine the population fields
+  const populationFields = [{
+    path: 'updated_by',
+    select: 'firstName lastName _id'
+  }, {
+    path: 'role',
+    select: 'name isActive _id'
+  },];
+
+  let query = this.findById(userId).select(selectedKeys.join(" "));
+
+  populationFields.forEach((field) => {
+    query = query.populate(field);
+  });
+
+  const userSettings = await query.exec();
+  return userSettings;
+};
+
 
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);

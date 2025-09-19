@@ -3,34 +3,12 @@ const ISO_COUNTRIES = require('iso-3166-1-alpha-2'); // Assuming an external lib
 
 const addressSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'User is required'],
-      index: true,
-    },
-     isDeleted: { type: Boolean, default: false},
-    label: {
-      type: String,
-      default: 'home',
-      trim: true,
-      enum: ['home', 'work', 'billing', 'shipping', 'other'],
-    },
-    fullName: {
-      type: String,
-      trim: true,
-      required: [true, 'Full name is required'],
-    },
-    phoneNumber: {
-      type: String,
-      trim: true,
-      validate: {
-        validator: function (v) {
-          return /^\+?[1-9]\d{1,14}$/.test(v); // E.164 format
-        },
-        message: 'Invalid phone number format',
-      },
-    },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    isDeleted: { type: Boolean, default: false },
+    label: { type: String, enum: ["home", "work", "other"], default: "home" },
+    fullName: { type: String, required: true },
+    phone: { type: String, required: true },
+    email: { type: String },
     status: {
       type: String,
       default: 'pending',
@@ -38,31 +16,11 @@ const addressSchema = new mongoose.Schema(
       enum: ['pending', 'active', 'deleted', 'archived', 'draft'],
       index: true,
     },
-    addressLine1: {
-      type: String,
-      trim: true,
-      required: [true, 'Address Line 1 is required'],
-    },
-    addressLine2: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    addressLine3: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-    city: {
-      type: String,
-      trim: true,
-      required: [true, 'City is required'],
-    },
-    state: {
-      type: String,
-      trim: true,
-      required: [true, 'State is required'],
-    },
+    addressLine1: { type: String, required: true },
+    addressLine2: { type: String },
+    addressLine3: { type: String },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
     country: {
       type: String,
       trim: true,
@@ -91,15 +49,8 @@ const addressSchema = new mongoose.Schema(
         message: 'Invalid postal code for the specified country',
       },
     },
-    isDefault: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
+    isDefault: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false },
     coordinates: {
       type: { type: String, enum: ['Point'], default: 'Point' },
       coordinates: {
@@ -119,15 +70,8 @@ const addressSchema = new mongoose.Schema(
         },
       },
     },
-    created_by: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'Created by is required'],
-    },
-    updated_by: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-    },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", },
     tags: [
       {
         type: String,
@@ -186,11 +130,9 @@ addressSchema.index({ isVerified: 1 });
 
 // Virtuals
 addressSchema.virtual('formattedAddress').get(function () {
-  return `${this.fullName || ''}, ${this.addressLine1 || ''}, ${
-    this.addressLine2 ? this.addressLine2 + ', ' : ''
-  }${this.addressLine3 ? this.addressLine3 + ', ' : ''}${this.city || ''}, ${this.state || ''}, ${
-    this.country || ''
-  }${this.postalCode ? ' - ' + this.postalCode : ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
+  return `${this.addressLine1 || ''}, ${this.addressLine2 ? this.addressLine2 + ', ' : ''
+    }${this.addressLine3 ? this.addressLine3 + ', ' : ''}${this.city || ''}, ${this.state || ''}, ${this.country || ''
+    }${this.postalCode ? ' - ' + this.postalCode : ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
 });
 
 // Middleware: Ensure one default address
