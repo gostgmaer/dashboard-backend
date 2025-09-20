@@ -34,6 +34,7 @@ const socketService = require('./src/services/socketService');
 const notificationService = require('./src/services/NotificationService');
 const NotificationMiddleware = require('./src/middleware/notificationMiddleware');
 const {notificationRoute} = require('./src/routes/notificationRoutes');
+const { AttachmentUpload } = require('./src/routes/fileUploader');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -104,7 +105,7 @@ app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
-
+app.use('/api/files', checkRoute("Attachment Files", AttachmentUpload));
 
 
 // Mount other feature routes here...
