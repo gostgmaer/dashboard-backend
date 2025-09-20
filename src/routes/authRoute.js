@@ -5,6 +5,7 @@ const AuthMiddleware = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const rateLimit = require('express-rate-limit');
 const authAccess = require('../middleware/access');
+const NotificationMiddleware = require('../middleware/notificationMiddleware');
 
 /**
  * 🚀 AUTHENTICATION ROUTES

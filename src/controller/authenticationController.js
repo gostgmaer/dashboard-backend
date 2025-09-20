@@ -14,8 +14,10 @@ const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
 const DeviceDetector = require('../services/DeviceDetector');
 const otpService = require('../services/otpService');
-const { emailVerificationTemplate, welcomeEmailTemplate,passwordResetRequestTemplate } = require('../email/emailTemplate');
+const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTemplate } = require('../email/emailTemplate');
 const { removeKeysFromObject } = require('../utils/helper');
+const NotificationService = require('../services/NotificationService');
+const NotificationMiddleware = require('../middleware/notificationMiddleware');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -142,7 +144,7 @@ class authController {
 
   //Register User
 
-  static async registerUser(req, res) {
+  static async registerUser(req, res, next) {
     // Validate incoming request data via express-validator middleware
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -196,35 +198,36 @@ class authController {
 
       // Send welcome email
       let emaildata = await sendEmail(welcomeEmailTemplate, user);
+      // await NotificationService.create({
+      //   recipient: user._id,
+      //   type: 'USER_CREATED',
+      //   channels: ['IN_APP', 'EMAIL'] // choose channels
+      //   // other notification data
+      // });
 
+      res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-
-      if (emaildata.success) {
-
-
-        return authController.standardResponse(res, true, {
-          user: {
-            email: user.email,
-            username: user.username,
-            status: user.status
-          },
-          otpEnabled: otpService.isEnabled(),
-          verificationRequired: user.status === 'pending',
-          verificationSent: !!verificationResult
-        }, 'Registration successful', 201);
-      }
-      else {
-        return authController.errorResponse(res,
-          'Registration successful but failed to send welcome email Please Activate Your Account', 500, emaildata.error);
-      }
+      await NotificationMiddleware.onUserCreate(req, res, () => { });
+      return authController.standardResponse(res, true, {
+        user: {
+          email: user.email,
+          username: user.username,
+          status: user.status
+        },
+        otpEnabled: otpService.isEnabled(),
+        verificationRequired: user.status === 'pending',
+        verificationSent: !!verificationResult
+      }, emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account', 201);
 
     }
+    
     catch (err) {
       // Handle errors (e.g., duplicate keys, validation)
       console.error('Registration error:', err);
       return authController.errorResponse(res,
         err.message, 500, err);
     }
+
   }
 
   /**
@@ -911,7 +914,7 @@ class authController {
       const result = await User.initiatePasswordReset(email, req.deviceInfo);
       await sendEmail(passwordResetRequestTemplate, result.user);
       try {
- 
+
         console.log(`Password reset token for ${user.email}: ${result.resetToken}`);
       } catch (error) {
         console.error('Failed to send reset email:', error);
@@ -934,7 +937,7 @@ class authController {
    * RESET PASSWORD WITH TOKEN
    */
   static async resetPassword(req, res) {
-  
+
     try {
       const { email, otpCode, newPassword, confirmPassword } = req.body;
       const { token } = req.params

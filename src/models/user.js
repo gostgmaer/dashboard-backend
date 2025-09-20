@@ -591,27 +591,28 @@ userSchema.method({
     const now = new Date();
     let hasExpiredSessions = false;
 
+    // 1. Mark expired sessions inactive
     this.activeSessions.forEach(session => {
-      if (session.expiresAt < now && session.isActive) {
+      const expiresAt = new Date(session.expiresAt);
+      if (expiresAt < now && session.isActive) {
         session.isActive = false;
         hasExpiredSessions = true;
       }
     });
 
-    // Remove inactive sessions older than 30 days
-    const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+    // 2. Remove all inactive sessions
     const initialLength = this.activeSessions.length;
+    this.activeSessions = this.activeSessions.filter(session => session.isActive);
 
-    this.activeSessions = this.activeSessions.filter(session =>
-      session.isActive || session.createdAt > thirtyDaysAgo
-    );
-
+    // 3. Save only if something changed
     if (hasExpiredSessions || this.activeSessions.length < initialLength) {
       await this.save();
     }
 
-    return this.activeSessions.filter(s => s.isActive);
-  },
+    // 4. Return only active sessions
+    return this.activeSessions;
+  }
+  ,
 
   // Check if session exists and is active
   async isSessionActive(sessionId) {
@@ -697,18 +698,13 @@ userSchema.method({
 
 
       const accessToken = await this.generateAccessToken(deviceId)
-    
       const refreshToken = await this.generateRefreshToken(deviceId)
 
       // Store tokens
       const now = new Date();
       const accessTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_EXPIRY));
       const refreshTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_REFRESH_EXPIRY));
-   
-
       // console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
-
-
       const deviceData = {
         name: deviceInfo.name,
         type: deviceInfo.type,
@@ -736,7 +732,6 @@ userSchema.method({
 
       // Register/update device
       await this.registerDevice(deviceInfo);
-
       await this.save();
 
       return {
@@ -1367,10 +1362,9 @@ userSchema.method({
       userId: this._id,
       username: this.username,
       email: this.email,
-      role: this.role,
+      role: this.role.name,
       type: 'access',
-      deviceId: deviceId,
-      permissions: this.permissions || []
+      deviceId: deviceId
     };
 
     return jwt.sign(payload, JWT_SECRET, {
@@ -1747,7 +1741,7 @@ userSchema.method({
     await this.save();
   },
 
-  async handleSuccessfulLogin(deviceInfo ) {
+  async handleSuccessfulLogin(deviceInfo) {
     this.lastLogin = new Date();
     this.failedLoginAttempts = 0;
     this.consecutiveFailedAttempts = 0;

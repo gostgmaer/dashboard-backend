@@ -1,9 +1,7 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const { Logger } = require('../utils/logger');
-
-const logger = new Logger('PaymentModel');
-
+const { Logger } = require('../config/logger');
+const logger = Logger('PaymentModel');
 const paymentSchema = new mongoose.Schema({
   paymentId: {
     type: String,
@@ -174,14 +172,12 @@ paymentIntentId: {
 
 // Indexes for performance optimization
 paymentSchema.index({ customerId: 1, createdAt: -1 });
-paymentSchema.index({ orderId: 1 });
 paymentSchema.index({ status: 1, createdAt: -1 });
 paymentSchema.index({ paymentProvider: 1, status: 1 });
 paymentSchema.index({ 'paymentDetails.providerPaymentId': 1 });
 paymentSchema.index({ paymentMethod: 1, status: 1 });
 paymentSchema.index({ amount: 1, currency: 1 });
 paymentSchema.index({ 'metadata.riskScore': 1 });
-paymentSchema.index({ expiresAt: 1 });
 
 // Virtual for total refunded amount
 paymentSchema.virtual('totalRefunded').get(function() {
