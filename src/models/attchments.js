@@ -10,9 +10,12 @@ const attachmentSchema = new mongoose.Schema(
     fileSize: { type: Number, required: true },
     fileUrl: { type: String, required: true, trim: true },
     thumbnailUrl: { type: String, trim: true },
- isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     // Metadata
-    storageType: { type: String, enum: ["local", "s3", "cloudinary", "gcs"], default: "local" },
+    storageType: { type: String, enum: ["local", "s3", "cloudinary", "gcs", "firebase", "azure"], default: "local" },
+    bucketName: { type: String, trim: true }, // S3 bucket, Firebase storage bucket, or Azure container
+    storagePath: { type: String, trim: true }, // Full path in cloud storage
+    cloudMetadata: { type: Map, of: String }, // Store cloud-specific metadata (e.g., ETag for S3)
     checksum: { type: String, trim: true },
     encoding: { type: String, trim: true },
     extension: { type: String, trim: true },
@@ -23,7 +26,7 @@ const attachmentSchema = new mongoose.Schema(
     duration: { type: Number }, // seconds
 
     // Security & Access
-    isPublic: { type: Boolean, default: true, index: true },
+    isPublic: { type: Boolean, default: true, immutable: true, index: true },
     permissions: {
       read: [{ type: String, enum: ["user", "admin", "customer", "guest"] }],
       write: [{ type: String, enum: ["user", "admin", "customer"] }],
@@ -34,7 +37,6 @@ const attachmentSchema = new mongoose.Schema(
     category: { type: String, enum: ["image", "video", "document", "audio", "other"], default: "other", index: true },
 
     // Audit Info
-    uploadedAt: { type: Date, default: Date.now },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     sourceIp: { type: String, trim: true },
 
@@ -108,6 +110,7 @@ attachmentSchema.methods.maskForPublic = function () {
     delete obj.thumbnailUrl;
   }
   delete obj.checksum;
+  delete obj.cloudMetadata;
   delete obj.sourceIp;
   return obj;
 };
@@ -116,17 +119,54 @@ attachmentSchema.methods.maskForPublic = function () {
 attachmentSchema.methods.getFileAgeInDays = function () {
   return Math.floor((Date.now() - this.uploadedAt.getTime()) / (1000 * 60 * 60 * 24));
 };
+// Generate signed URL for cloud storage
+attachmentSchema.methods.generateSignedUrl = async function (expirySeconds = 3600) {
+  let signedUrl = this.fileUrl;
+  
+  switch (this.storageType) {
+    case "s3":
+      // Implement AWS S3 signed URL generation
+      // Example: const AWS = require('aws-sdk');
+      // const s3 = new AWS.S3();
+      // signedUrl = await s3.getSignedUrlPromise('getObject', {
+      //   Bucket: this.bucketName,
+      //   Key: this.storagePath,
+      //   Expires: expirySeconds
+      // });
+      break;
+    case "firebase":
+      // Implement Firebase Storage signed URL generation
+      // Example: const { getStorage, getDownloadURL } = require('firebase/storage');
+      // const storage = getStorage();
+      // signedUrl = await getDownloadURL(ref(storage, this.storagePath));
+      break;
+    case "azure":
+      // Implement Azure Blob Storage SAS token generation
+      // Example: const { BlobServiceClient } = require('@azure/storage-blob');
+      // const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+      // const containerClient = blobServiceClient.getContainerClient(this.bucketName);
+      // const blobClient = containerClient.getBlobClient(this.storagePath);
+      // signedUrl = await blobClient.generateSasUrl({ expiresOn: new Date(Date.now() + expirySeconds * 1000) });
+      break;
+    case "gcs":
+      // Implement Google Cloud Storage signed URL generation
+      // Example: const { Storage } = require('@google-cloud/storage');
+      // const storage = new Storage();
+      // signedUrl = await storage.bucket(this.bucketName).file(this.storagePath).getSignedUrl({
+      //   action: 'read',
+      //   expires: Date.now() + expirySeconds * 1000
+      // });
+      break;
+  }
+  
+  return `${signedUrl}?signed=true&expiresIn=${expirySeconds}`;
+};
 
 // Check if file exceeds size limit (MB)
 attachmentSchema.methods.exceedsSizeLimit = function (maxMB) {
   return this.fileSize > maxMB * 1024 * 1024;
 };
 
-// Generate signed URL (for private storage)
-attachmentSchema.methods.generateSignedUrl = function (expirySeconds = 3600) {
-  // Placeholder — integrate with S3, GCS, etc.
-  return `${this.fileUrl}?signed=true&expiresIn=${expirySeconds}`;
-};
 
 // Replace file metadata (e.g., after re-upload)
 attachmentSchema.methods.replaceFile = async function (newFileData, updatedBy) {
@@ -171,6 +211,13 @@ attachmentSchema.methods.updatePermissions = async function (newPermissions) {
   };
   await this.save();
   return this;
+};
+
+// Get file extension from fileName if not explicitly stored
+attachmentSchema.methods.getFileExtension = function () {
+  if (this.extension) return this.extension.toLowerCase();
+  const parts = this.fileName.split(".");
+  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : "";
 };
 
 // Archive file
@@ -345,6 +392,17 @@ attachmentSchema.statics.getTopTags = function (tenantId, limit = 5) {
 attachmentSchema.pre("save", function (next) {
   if (this.fileName) this.fileName = this.fileName.trim();
   if (this.extension) this.extension = this.extension.toLowerCase();
+  
+  // Validate cloud storage configuration
+  if (["s3", "firebase", "azure", "gcs"].includes(this.storageType)) {
+    if (!this.bucketName) {
+      return next(new Error("bucketName is required for cloud storage"));
+    }
+    if (!this.storagePath) {
+      return next(new Error("storagePath is required for cloud storage"));
+    }
+  }
+  
   next();
 });
 
@@ -357,6 +415,7 @@ attachmentSchema.post("save", function (doc) {
    =========================== */
 attachmentSchema.index({ tenant: 1, category: 1 });
 attachmentSchema.index({ fileName: "text", tags: "text" });
+attachmentSchema.index({ storageType: 1, bucketName: 1 });
 
 const Attachment = mongoose.model("Attachment", attachmentSchema);
 module.exports = Attachment;

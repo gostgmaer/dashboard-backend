@@ -25,7 +25,7 @@ exports.createSettings = asyncHandler(async (req, res) => {
 // GET settings for a specific site/app
 exports.getSettingsBySite = asyncHandler(async (req, res) => {
   const { siteKey } = req.params;
-  const settings = await Setting.findOne({ siteKey }).lean();
+  const settings = await Setting.findOne({ siteKey })
   if (!settings) {
     return res.status(404).json({ message: `No settings found for ${siteKey}` });
   }
