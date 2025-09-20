@@ -3,15 +3,16 @@ const http = require('http');
 const app = require('./app');
 const { serverPort } = require('./src/config/setting');
 const connectDB = require('./src/config/dbConnact');
+const socketService = require('./src/services/socketService');
 
 // Connect DB first, then start server
 const startServer = async () => {
   await connectDB();
 
-//   const port = process.env.PORT || 3000;
+  //   const port = process.env.PORT || 3000;
   const server = http.createServer(app);
-
-  server.listen(serverPort||3500, () => {
+  const io = socketService.initialize(server);
+  server.listen(serverPort || 3500, () => {
     console.log(`🚀 Server running on port ${serverPort}`);
   });
 

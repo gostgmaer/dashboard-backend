@@ -26,11 +26,14 @@ const BrandRoute = require('./src/routes/brandRouters');
 const { attributeRouter } = require('./src/routes/attributeRoutes');
 const { attachmentRoutes } = require('./src/routes/attachmentsRoutes');
 const addressRoute = require('./src/routes/address');
-const {logRoutes} = require('./src/routes/logRoutes');
-const {roleRoute} = require('./src/routes/roleRoute');
+const { logRoutes } = require('./src/routes/logRoutes');
+const { roleRoute } = require('./src/routes/roleRoute');
 const { verifyEmailConnection } = require('./src/email');
 const authRoute = require('./src/routes/authRoute');
-
+const socketService = require('./src/services/socketService');
+const notificationService = require('./src/services/NotificationService');
+const NotificationMiddleware = require('./src/middleware/notificationMiddleware');
+const {notificationRoute} = require('./src/routes/notificationRoutes');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -53,7 +56,13 @@ function checkRoute(name, route) {
   }
   return route;
 }
+
+
 verifyEmailConnection().then((result) => console.log(result));
+
+notificationService.socketService = socketService;
+
+
 // // Mount APIs
 // app.use('/api/products', ProductRoute);
 // app.use('/api/users', UserRoute);
@@ -74,7 +83,7 @@ verifyEmailConnection().then((result) => console.log(result));
 // app.use('/api/contacts',contactsRoute );
 // app.use('/api/orders',orderRoutes );
 
-
+app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
 app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
 app.use('/api/users', checkRoute("UserRoute", UserRoute));
 app.use('/api/wishlists', checkRoute("WishlistRoute", WishlistRoute));
@@ -94,7 +103,6 @@ app.use('/api/logs', checkRoute("logRoute", logRoute));
 app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
-
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
 
 

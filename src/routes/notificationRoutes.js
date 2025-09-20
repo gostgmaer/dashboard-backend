@@ -1,50 +1,37 @@
 // routes/notificationRoutes.js
-
 const express = require('express');
 const router = express.Router();
-const notificationController = require('../controllers/notificationController');
+const notificationController = require('../controller/notificationController');
+const { body } = require('express-validator');
+const authMiddleware = require('../middleware/auth');
+const authorize = require('../middleware/authorize');
 
-// Create
-router.post('/notifications', notificationController.create);
-router.post('/notifications/bulk', notificationController.createBulk);
+// Validation middleware
+const createNotificationValidation = [
+  body('recipient').isMongoId().withMessage('Valid recipient ID is required'),
+  body('type').isIn([
+    'USER_CREATED', 'USER_UPDATED', 'USER_DELETED',
+    'ORDER_CREATED', 'ORDER_UPDATED', 'ORDER_SHIPPED', 'ORDER_DELIVERED',
+    'PAYMENT_SUCCESS', 'PAYMENT_FAILED',
+    'PRODUCT_CREATED', 'PRODUCT_UPDATED',
+    'ROLE_ASSIGNED', 'SYSTEM_ALERT', 'CUSTOM'
+  ]).withMessage('Valid notification type is required'),
+  body('title').optional().isLength({ min: 1, max: 200 }).withMessage('Title must be 1-200 characters'),
+  body('message').optional().isLength({ min: 1, max: 1000 }).withMessage('Message must be 1-1000 characters'),
+  body('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).withMessage('Invalid priority level'),
+  body('channels').optional().isArray().withMessage('Channels must be an array')
+];
 
-// Read (list)
-router.get('/notifications', notificationController.getAll);
-router.get('/notifications/search', notificationController.search);
-router.get('/notifications/trending', notificationController.getTrending);
-router.get('/notifications/analytics/summary', notificationController.getAnalyticsSummary);
-router.get('/notifications/daily-count', notificationController.dailyNotificationCount);
+// Routes
+router.get('/', authMiddleware, notificationController.getAll);
+router.get('/unread-count', authMiddleware, notificationController.getUnreadCount);
+router.get('/:id', authMiddleware, notificationController.getSingle);
+router.patch('/:id/read', authMiddleware, notificationController.markAsRead);
+router.patch('/read-all', authMiddleware, notificationController.markAllAsRead);
+router.delete('/:id', authMiddleware, notificationController.remove);
 
-// Read by user
-router.get('/users/:userId/notifications', notificationController.getForUser);
-router.get('/users/:userId/notifications/unread-count', notificationController.getUnreadCount);
-router.post('/users/:userId/notifications/mark-read', notificationController.markAsReadForUser);
-router.get('/users/:userId/notifications/recent-summary', notificationController.getRecentSummaryByUser);
+// // Admin routes
+router.post('/', authMiddleware, authorize('notifications', 'write'), createNotificationValidation, notificationController.create);
+router.post('/bulk', authMiddleware, authorize('notifications', 'write'), notificationController.createBulk);
 
-// Read by entity
-router.get('/notifications/entity/:entityType/:entityId', notificationController.findByEntity);
-
-// Broadcast & system
-router.post('/notifications/broadcast', notificationController.broadcastToRoles);
-router.post('/notifications/system', notificationController.sendSystemNotification);
-
-// Update delivery status
-router.post('/notifications/delivery-status', notificationController.updateDeliveryStatus);
-
-// Retry & cleanup
-router.post('/notifications/retry-failures', notificationController.retryFailedDeliveries);
-router.post('/notifications/cleanup-expired', notificationController.cleanupExpired);
-router.post('/notifications/archive-old', notificationController.archiveOld);
-router.post('/notifications/bulk-archive', notificationController.bulkArchive);
-router.post('/notifications/purge-archived', notificationController.purgeOldArchived);
-
-// Bulk operations
-router.post('/notifications/bulk-update-status', notificationController.bulkUpdateStatus);
-
-// Analytics grouping
-router.get('/notifications/count-by-type-status', notificationController.countGroupedByTypeAndStatus);
-
-// Filters by tags
-router.get('/notifications/by-tags', notificationController.findByTags);
-
-module.exports = router;
+module.exports  = { notificationRoute: router };

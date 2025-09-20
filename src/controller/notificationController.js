@@ -1,275 +1,220 @@
-const Notification = require('../models/notification');
-const mongoose = require('mongoose');
+// controllers/notificationController.js
+const notificationService = require('../services/NotificationService');
+const { validationResult } = require('express-validator');
 
-module.exports = {
-  // Create a single notification
-  create: async (req, res, next) => {
+class NotificationController {
+  // Get all notifications for authenticated user
+  async getAll(req, res) {
     try {
-      const data = req.body;
-      // Optionally set current user for auditing
-      Notification.setCurrentUser(req.user?.id);
-      const notification = new Notification(data);
-      await notification.save();
-      res.status(201).json(notification);
-    } catch (err) {
-      next(err);
-    }
-  },
+      const userId = req.user.id;
+      const options = {
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 20,
+        status: req.query.status,
+        type: req.query.type,
+        priority: req.query.priority,
+        unreadOnly: req.query.unreadOnly === 'true'
+      };
 
-  // Bulk create notifications
-  createBulk: async (req, res, next) => {
-    try {
-      Notification.setCurrentUser(req.user?.id);
-      const notifications = req.body.notifications;
-      const saved = await Notification.createBulk(notifications);
-      res.status(201).json(saved);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Get all notifications with advanced filters
-  getAll: async (req, res, next) => {
-    try {
-      const { filter, pagination, sorting, selectFields, populateFields, excludeReadByUser, useCursor, cursor } = req.query;
-      const result = await Notification.getAll({
-        filter: JSON.parse(filter || '{}'),
-        pagination: JSON.parse(pagination || '{}'),
-        sorting: JSON.parse(sorting || '{}'),
-        selectFields: selectFields ? selectFields.split(',').join(' ') : null,
-        populateFields: populateFields ? JSON.parse(populateFields) : [],
-        excludeReadByUser: excludeReadByUser || null,
-        useCursor: useCursor === 'true',
-        cursor: cursor || null
+      const result = await notificationService.getAll(userId, options);
+      
+      res.status(200).json({
+        success: true,
+        data: result
       });
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Get notifications for one user
-  getForUser: async (req, res, next) => {
-    try {
-      const userId = req.params.userId;
-      const options = req.query;
-      const notifications = await Notification.findForUser(userId, options);
-      res.json(notifications);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Search notifications (simple wrapper)
-  search: async (req, res, next) => {
-    try {
-      const { term, userId, type, priority, limit, skip } = req.query;
-      const results = await Notification.search(term, { userId, type, priority, limit, skip });
-      res.json(results);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Get trending notifications
-  getTrending: async (req, res, next) => {
-    try {
-      const { timeframe, limit } = req.query;
-      const trending = await Notification.getTrending(timeframe, Number(limit) || 10);
-      res.json(trending);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Analytics summary
-  getAnalyticsSummary: async (req, res, next) => {
-    try {
-      const { startDate, endDate } = req.query;
-      const summary = await Notification.getAnalyticsSummary({ startDate, endDate });
-      res.json(summary);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Get unread count for a user
-  getUnreadCount: async (req, res, next) => {
-    try {
-      const userId = req.params.userId;
-      const count = await Notification.getUnreadCount(userId);
-      res.json({ count });
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Mark notifications as read (bulk or all)
-  markAsReadForUser: async (req, res, next) => {
-    try {
-      const userId = req.params.userId;
-      const { notificationIds } = req.body;
-      const result = await Notification.markAsReadForUser(userId, notificationIds);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Retry failed deliveries
-  retryFailedDeliveries: async (req, res, next) => {
-    try {
-      const { maxRetries } = req.query;
-      const results = await Notification.retryFailedDeliveries(Number(maxRetries) || 3);
-      res.json(results);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Cleanup expired & old notifications
-  cleanupExpired: async (req, res, next) => {
-    try {
-      const result = await Notification.cleanupExpired();
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  archiveOld: async (req, res, next) => {
-    try {
-      const { days } = req.query;
-      const result = await Notification.archiveOld(Number(days) || 90);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Find by entity
-  findByEntity: async (req, res, next) => {
-    try {
-      const { entityType, entityId } = req.params;
-      const notifications = await Notification.findByEntity(entityType, mongoose.Types.ObjectId(entityId));
-      res.json(notifications);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Broadcast to roles
-  broadcastToRoles: async (req, res, next) => {
-    try {
-      const { roles, data } = req.body;
-      const notification = await Notification.broadcastToRoles(roles, data);
-      res.status(201).json(notification);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Send system notification
-  sendSystemNotification: async (req, res, next) => {
-    try {
-      const data = req.body;
-      const notification = await Notification.sendSystemNotification(data);
-      res.status(201).json(notification);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Update delivery status atomic
-  updateDeliveryStatus: async (req, res, next) => {
-    try {
-      const { notificationId, channel, status, error, externalId } = req.body;
-      const result = await Notification.updateDeliveryStatus(notificationId, channel, status, { error, externalId });
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  // Bulk archive, purge, tag find, counts
-  bulkArchive: async (req, res, next) => {
-    try {
-      const { ids } = req.body;
-      const result = await Notification.bulkArchive(ids);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  purgeOldArchived: async (req, res, next) => {
-    try {
-      const { days } = req.query;
-      const result = await Notification.purgeOldArchived(Number(days) || 365);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  countGroupedByTypeAndStatus: async (req, res, next) => {
-    try {
-      const { startDate, endDate } = req.query;
-      const result = await Notification.countGroupedByTypeAndStatus({ startDate, endDate });
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  findPendingRetryFailures: async (req, res, next) => {
-    try {
-      const { hours } = req.query;
-      const result = await Notification.findPendingRetryFailures(Number(hours) || 24);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  bulkUpdateStatus: async (req, res, next) => {
-    try {
-      const { ids, status } = req.body;
-      const result = await Notification.bulkUpdateStatus(ids, status);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  getRecentSummaryByUser: async (req, res, next) => {
-    try {
-      const userId = req.params.userId;
-      const { days } = req.query;
-      const result = await Notification.getRecentSummaryByUser(userId, Number(days) || 30);
-      res.json(result);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  findByTags: async (req, res, next) => {
-    try {
-      const { tags, limit, skip } = req.query;
-      const notifications = await Notification.findByTags(tags, { limit: Number(limit), skip: Number(skip) });
-      res.json(notifications);
-    } catch (err) {
-      next(err);
-    }
-  },
-
-  dailyNotificationCount: async (req, res, next) => {
-    try {
-      const { days } = req.query;
-      const report = await Notification.dailyNotificationCount(Number(days) || 30);
-      res.json(report);
-    } catch (err) {
-      next(err);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching notifications',
+        error: error.message
+      });
     }
   }
-};
+
+  // Get single notification
+  async getSingle(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+
+      const notification = await Notification.findOne({
+        _id: id,
+        recipient: userId
+      }).populate('sender', 'username email avatar');
+
+      if (!notification) {
+        return res.status(404).json({
+          success: false,
+          message: 'Notification not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: notification
+      });
+    } catch (error) {
+      console.error('Error fetching notification:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching notification',
+        error: error.message
+      });
+    }
+  }
+
+  // Mark notification as read
+  async markAsRead(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+
+      const notification = await notificationService.markAsRead(id, userId);
+      
+      res.status(200).json({
+        success: true,
+        data: notification,
+        message: 'Notification marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error marking notification as read'
+      });
+    }
+  }
+
+  // Mark all notifications as read
+  async markAllAsRead(req, res) {
+    try {
+      const userId = req.user.id;
+      const result = await notificationService.markAllAsRead(userId);
+      
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: 'All notifications marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error marking all notifications as read',
+        error: error.message
+      });
+    }
+  }
+
+  // Delete notification
+  async remove(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+
+      await notificationService.remove(id, userId);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Notification deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error deleting notification'
+      });
+    }
+  }
+
+  // Get unread count
+  async getUnreadCount(req, res) {
+    try {
+      const userId = req.user.id;
+      const count = await notificationService.getUnreadCount(userId);
+      
+      res.status(200).json({
+        success: true,
+        data: { unreadCount: count }
+      });
+    } catch (error) {
+      console.error('Error getting unread count:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error getting unread count',
+        error: error.message
+      });
+    }
+  }
+
+  // Create notification (admin only)
+  async create(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
+      }
+
+      const notificationData = {
+        ...req.body,
+        sender: req.user.id
+      };
+
+      const notification = await notificationService.create(notificationData);
+      
+      res.status(201).json({
+        success: true,
+        data: notification,
+        message: 'Notification created successfully'
+      });
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error creating notification',
+        error: error.message
+      });
+    }
+  }
+
+  // Bulk create notifications (admin only)
+  async createBulk(req, res) {
+    try {
+      const { notifications } = req.body;
+      
+      if (!Array.isArray(notifications) || notifications.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Notifications array is required'
+        });
+      }
+
+      const notificationsWithSender = notifications.map(notification => ({
+        ...notification,
+        sender: req.user.id
+      }));
+
+      const createdNotifications = await notificationService.createBulk(notificationsWithSender);
+      
+      res.status(201).json({
+        success: true,
+        data: createdNotifications,
+        message: `${createdNotifications.length} notifications created successfully`
+      });
+    } catch (error) {
+      console.error('Error creating bulk notifications:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error creating bulk notifications',
+        error: error.message
+      });
+    }
+  }
+}
+
+module.exports = new NotificationController();
