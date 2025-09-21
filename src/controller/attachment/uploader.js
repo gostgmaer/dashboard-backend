@@ -8,6 +8,7 @@ const {  PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
 const { storageType, localStoragePath, firebasePrivateKey,azureContainer, firebaseAuthDomain, azurestorage_conn_string, firebaseProjectId, firebaseBucket, firebaseMessagingSenderId, firebaseAppId, s3Region, s3AccessKey, s3SecretKey, bucketName } = require('../../config/setting');
 const Attachment = require("../../models/attchments");
 const { BlobServiceClient } = require("@azure/storage-blob");
+const { standardResponse } = require('../../utils/apiUtils');
 // Ensure local upload directory exists
 if (storageType === 'firebase' || storageType === 'local') {
     fs.mkdir(localStoragePath, { recursive: true }).catch(console.error);
@@ -46,7 +47,7 @@ if (storageType === 'firebase' || storageType === 'local') {
         destination: (req, file, cb) => cb(null, localStoragePath),
         filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
     }) : multer.memoryStorage(),
-    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
             "image/jpeg",
@@ -153,7 +154,7 @@ exports.uploadFile = [
                 sourceIp: req.ip,
             });
 
-            res.status(201).json(attachment.maskForPublic());
+            standardResponse(res, true, attachment.maskForPublic(), 'File uploaded successfully', 201);
         } catch (error) {
             next(error);
         }
@@ -188,7 +189,7 @@ exports.updateFile = [
         try {
             const { id } = req.params;
             const { tenantId, _id } = req.user;
-            const attachment = await Attachment.findById(id).active().byTenant(tenantId);
+            const attachment = await Attachment.findById(id).active().byTenant(id);
 
             if (!attachment) {
                 return res.status(404).json({ error: 'File not found or not accessible' });
