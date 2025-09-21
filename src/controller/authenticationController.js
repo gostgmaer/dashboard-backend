@@ -220,7 +220,7 @@ class authController {
       }, emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account', 201);
 
     }
-    
+
     catch (err) {
       // Handle errors (e.g., duplicate keys, validation)
       console.error('Registration error:', err);
@@ -1458,16 +1458,8 @@ class authController {
    */
   static async updateProfile(req, res) {
     try {
-      const { id } = req.params;
-
-      const user = await User.findById(id);
-      if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
-      }
-
-      const updatedUser = await user.updateProfile(req.body);
-
-      return authController.standardResponse(res, true, authController.enrichUser(updatedUser), 'Profile updated successfully');
+      await req.user.updateProfile(req.body);
+      return authController.standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
       return authController.errorResponse(res, 'Failed to update profile', 500, error.message);
@@ -1479,20 +1471,13 @@ class authController {
    */
   static async updateProfilePicture(req, res) {
     try {
-      const { id } = req.params;
       const { url } = req.body;
 
       if (!url) {
         return authController.errorResponse(res, 'Image URL is required', 400);
       }
 
-      const user = await User.findById(id);
-      if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
-      }
-
-      const profilePicture = await user.updateProfilePicture(url);
-
+      const profilePicture = await req.user.updateProfilePicture(url);
       return authController.standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
     } catch (error) {
       console.error('Update profile picture error:', error);
