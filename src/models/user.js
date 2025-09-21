@@ -66,7 +66,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
-    profilePicture: { type: String, default: null },
+    profilePicture: {
+      _id: { type: mongoose.Schema.Types.ObjectId, ref: "Attachment", default: null },
+      fileUrl: { type: String, default: null }
+    },
 
     // ─────────── Verification & Security ───────────
     isVerified: { type: Boolean, default: false },
@@ -1824,8 +1827,7 @@ userSchema.method({
   // Profile
   async updateProfile(updates) {
     Object.assign(this, updates);
-    await this.save();
-    return this.populate(populateFields);
+    return await this.save();
   },
   async updateProfilePicture(url) {
     this.profilePicture = url;

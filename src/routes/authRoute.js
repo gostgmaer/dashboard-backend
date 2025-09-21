@@ -96,12 +96,12 @@ authRoute.put('/otp/settings', AuthMiddleware, authAccess.requireOTP('update_otp
 // ========================================
 // 👤 PROFILE & SOCIAL ACCOUNTS
 // ========================================
-authRoute.put('/profile/:id', AuthMiddleware, authorize('users', 'update'), authController.updateProfile);
-authRoute.put('/profile-picture/:id', AuthMiddleware, authorize('users', 'update'), authController.updateProfilePicture);
-authRoute.put('/email/:id', AuthMiddleware, authorize('users', 'update'), authController.updateEmail);
-authRoute.put('/phone/:id', AuthMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
-authRoute.post('/social/link/:id', AuthMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
-authRoute.post('/social/unlink/:id', AuthMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
+authRoute.patch('/profile', AuthMiddleware, authController.updateProfile);
+authRoute.patch('/profile-picture', AuthMiddleware, authController.updateProfilePicture);
+authRoute.patch('/email', AuthMiddleware, authorize('users', 'update'), authController.updateEmail);
+authRoute.patch('/phone', AuthMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
+authRoute.post('/social/link', AuthMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
+authRoute.post('/social/unlink', AuthMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
 authRoute.delete('/social/clear/:id', AuthMiddleware, authorize('users', 'update'), authController.clearAllSocialLinks);
 
 // ========================================
