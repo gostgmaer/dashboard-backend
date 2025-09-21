@@ -96,7 +96,7 @@ const roleValidation = {
 // POST /api/role - Create a new role
 router.post('/', 
   authMiddleware,
-  // authorize('roles', 'write'),
+  authorize('roles', 'write'),
   roleValidation.create,
   roleController.create
 );
@@ -104,14 +104,14 @@ router.post('/',
 // GET /api/role - Get all roles (with optional activeOnly or search query)
 router.get('/', 
   authMiddleware,
-  // authorize('roles', 'read'),
+  authorize('roles', 'read'),
   // roleValidation.query,
   roleController.getAll
 );
 
 router.get('/statistics', 
   authMiddleware,
-  // authorize('roles', 'read'),
+  authorize('roles', 'read'),
   // roleValidation.query,
   roleController.getRoleStatistics
 );
@@ -119,7 +119,7 @@ router.get('/statistics',
 // GET /api/role/:id - Get a single role by ID
 router.get('/:id', 
   authMiddleware,
-  // authorize('roles', 'read'),
+  authorize('roles', 'read'),
   param('id').isMongoId().withMessage('Invalid role ID'),
   roleController.getSingle
 );

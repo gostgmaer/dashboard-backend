@@ -262,6 +262,158 @@ activityLogSchema.methods.markFailure = async function (errorCode, errorMessage)
   return this.save();
 };
 
+activityLogSchema.statics.findByUserId = function (userId, limit = 10) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error('Invalid user_id format');
+  }
+  return this.find({ user_id: userId })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.findByUserFullname = function (fullname, limit = 10) {
+  return this.find({ user_fullname: fullname })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.findByOperation = function (operation, limit = 10) {
+  if (!['create', 'update', 'delete', 'read'].includes(operation)) {
+    throw new Error('Invalid operation');
+  }
+  return this.find({ operation })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.findByDateRange = function (startDate, endDate, limit = 10) {
+  return this.find({
+    timestamp: { $gte: new Date(startDate), $lte: new Date(endDate) }
+  })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.getOperationStats = function () {
+  return this.aggregate([
+    { $group: { _id: '$operation', count: { $sum: 1 } } },
+    { $sort: { _id: 1 } }
+  ]);
+};
+
+activityLogSchema.statics.getUserActivityStats = function () {
+  return this.aggregate([
+    { $group: { _id: { user_id: '$user_id', user_fullname: '$user_fullname' }, count: { $sum: 1 } } },
+    { $sort: { count: -1 } }
+  ]);
+};
+
+// tableEndpointMap should be defined somewhere globally or imported
+activityLogSchema.statics.findByTable = function (table, limit = 10) {
+  const endpoints = tableEndpointMap[table] || [];
+  if (endpoints.length === 0) {
+    throw new Error(`Invalid table: ${table}`);
+  }
+  return this.find({ endpoint: { $regex: `^(${endpoints.join('|')})` } })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.findByUserAndTable = function (userId, table, limit = 10) {
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error('Invalid user_id format');
+  }
+  const endpoints = tableEndpointMap[table] || [];
+  if (endpoints.length === 0) {
+    throw new Error(`Invalid table: ${table}`);
+  }
+  return this.find({
+    user_id: userId,
+    endpoint: { $regex: `^(${endpoints.join('|')})` }
+  })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.findFailedRequests = function (limit = 10) {
+  return this.find({ response_status: { $gte: 400 } })
+    .select('timestamp user_id user_fullname user_metadata action operation endpoint method response_status')
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .lean();
+};
+
+activityLogSchema.statics.getDailyActivity = function (days = 7) {
+  const endDate = new Date();
+  const startDate = new Date(endDate.getTime() - (days * 24 * 60 * 60 * 1000));
+  return this.aggregate([
+    { $match: { timestamp: { $gte: startDate, $lte: endDate } } },
+    {
+      $group: {
+        _id: {
+          day: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+          operation: '$operation'
+        },
+        count: { $sum: 1 },
+        users: { $addToSet: '$user_fullname' }
+      }
+    },
+    { $sort: { '_id.day': -1 } }
+  ]);
+};
+
+activityLogSchema.statics.getTopEndpoints = function (limit = 10) {
+  return this.aggregate([
+    { $group: { _id: '$endpoint', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: limit }
+  ]);
+};
+
+activityLogSchema.statics.getTableStats = function () {
+  return this.aggregate([
+    {
+      $addFields: {
+        table: {
+          $let: {
+            vars: {
+              path: {
+                $regexFind: {
+                  input: '$endpoint',
+                  regex: '^/([a-zA-Z]+)'
+                }
+              }
+            },
+            in: { $ifNull: ['$$path.captures.0', 'unknown'] }
+          }
+        }
+      }
+    },
+    { $group: { _id: '$table', count: { $sum: 1 } } },
+    { $sort: { count: -1 } }
+  ]);
+};
+
+// Example cleanup method
+activityLogSchema.statics.deleteOlderThan = function (days) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return this.deleteMany({ createdAt: { $lt: cutoff } });
+};
+
+
 
 const LogEntry = mongoose.model("ActivityLog", activityLogSchema);
 module.exports = LogEntry;

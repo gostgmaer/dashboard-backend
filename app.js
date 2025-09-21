@@ -2,7 +2,7 @@
  * Express app setup
  * Initializes middleware, routes, error handling, etc.
  */
-
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -62,27 +62,8 @@ function checkRoute(name, route) {
 verifyEmailConnection().then((result) => console.log(result));
 
 notificationService.socketService = socketService;
-
-
-// // Mount APIs
-// app.use('/api/products', ProductRoute);
-// app.use('/api/users', UserRoute);
-// app.use('/api/wishlists', WishlistRoute);
-// app.use('/api/categories',categoryRoute );
-// app.use('/api/settings', settingRoute);
-// app.use('/api/reviews',reviewRoute );
-// app.use('/api/permissins',permissionRoute );
-// app.use('/api/carts',cartRoutes );
-// app.use('/api/brands',BrandRoute );
-// app.use('/api/user',authRoute );
-// app.use('/api/attributes',attributeRouter );
-// app.use('/api/attachments',attachmentsRoutes );
-// app.use('/api/address',addressRoute );
-// app.use('/api/logs',logRoute );
-// app.use('/api/discounts',discountRoute );
-// app.use('/api/coupons',couponRouter );
-// app.use('/api/contacts',contactsRoute );
-// app.use('/api/orders',orderRoutes );
+// Assuming your uploads folder is ./uploads relative to your project root
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
 app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
