@@ -218,8 +218,8 @@ router.get('/:id',
 // GET /api/orders - Get all orders with filtering
 router.get('/', 
   authMiddleware,
-  authorize('orders', 'read'),
-  orderValidation.query,
+  // authorize('orders', 'read'),
+  // orderValidation.query,
   orderController.getOrders
 );
 

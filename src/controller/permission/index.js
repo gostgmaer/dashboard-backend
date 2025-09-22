@@ -1,5 +1,6 @@
 const { FilterOptions } = require('../../utils/helper');
 const Permission = require('../../models/permission');
+const { standardResponse } = require('../../utils/apiUtils');
 
 // ===== CREATE =====
 const createPermission = async (req, res) => {
@@ -62,15 +63,18 @@ const getAllPermissions = async (req, res) => {
       filter = {},
       page = 1,
       limit = 50,
-      sortBy ,
-      sortDesc ,
+      sort = "createdAt",
+      order = "desc",
       isDeleted = false,
-      sort = 'createdAt:desc',
+      // sort = 'createdAt:desc',
       selectFields = null,
       search = null,
     } = req.method === 'GET' ? req.query : req.body;
 
-    const sortkey = (sortBy && sortDesc) ? `${sortBy}:${sortDesc=='false'?'asc':'desc'}`:'createdAt:desc'
+    // const sortkey = (sort && order) ? `${sort}:${sortDesc == 'false' ? 'asc' : 'desc'}` : 'createdAt:desc'
+    const sortkey = {};
+    sortkey[sort] = order === 'desc' ? -1 : 1;
+    // const sortkey   = order === 'desc' ? -1 : 1;
     // Parse JSON fields if they come as strings in query params
     const parsedFilter = typeof filter === 'string' ? JSON.parse(filter) : filter;
     const parsedSelectFields = typeof selectFields === 'string'
@@ -82,7 +86,7 @@ const getAllPermissions = async (req, res) => {
       filter: parsedFilter,
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
-      sort:sortkey,
+      sort: sortkey,
       isDeleted,
       selectFields: parsedSelectFields,
       search,
@@ -97,6 +101,8 @@ const getAllPermissions = async (req, res) => {
 
 
 const getGroupedPermissions = async (req, res) => {
+  console.log(req);
+
   try {
     const data = await Permission.getPermissionsGroupedByCategoryAndAction();
     res.status(200).json({ data, success: true });
@@ -348,14 +354,20 @@ const createIfNotExists = async (req, res) => {
 const getPermissionsGrouped = async (req, res) => {
   try {
     const grouped = await Permission.getGroupedByCategory();
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: grouped,
-      message: 'Permissions grouped by category retrieved successfully',
-    });
+    standardResponse(
+      res,
+      true,
+      grouped,
+      'Permissions grouped by category retrieved successfully',
+      200
+    );
+
   } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+    errorResponse(
+      res,
+      error.message || 'Failed to retrieve grouped permissions',
+      500
+    );
   }
 };
 

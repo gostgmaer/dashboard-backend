@@ -87,7 +87,7 @@ class NotificationMiddleware {
     
     static async onUserUpdate(req, res, next) {
         try {
-            const user = res.locals.updatedUser;
+            const user = res.locals.user;
             const changes = res.locals.changes || [];
             
             await notificationService.create({

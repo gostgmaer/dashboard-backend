@@ -1,25 +1,18 @@
 const { StatusCodes, ReasonPhrases } = require('http-status-codes');
 const Role = require('../../models/role');
 const User = require('../../models/user');
+const { standardResponse, errorResponse } = require('../../utils/apiUtils');
 /**
  * Create a new role
  */
 const create = async (req, res) => {
   try {
     const role = await Role.create(req.body);
-    res.status(StatusCodes.CREATED).json({
-      statusCode: StatusCodes.CREATED,
-      status: ReasonPhrases.CREATED,
-      results: { id: role._id },
-      message: 'Role created successfully',
-    });
+
+  await standardResponse(res, true, role, "Role created successfully");
+
   } catch (error) {
-    res.status(StatusCodes.BAD_REQUEST).json({
-      statusCode: StatusCodes.BAD_REQUEST,
-      status: ReasonPhrases.BAD_REQUEST,
-      results: null,
-      message: error.message,
-    });
+    await errorResponse(res, error.message, StatusCodes.BAD_REQUEST, error.message);
   }
 };
 
@@ -50,32 +43,26 @@ const getAll = async (req, res) => {
         };
       })
     );
-
-    res.status(StatusCodes.OK).json({
-      statusCode: StatusCodes.OK,
-      status: ReasonPhrases.OK,
-      results: rolesWithCounts,
-      total: rolesWithCounts.length,
-      message: 'Roles retrieved successfully',
-    });
+    await standardResponse(res, true, rolesWithCounts, "Roles retrieved successfully");
   } catch (error) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
-      status: ReasonPhrases.INTERNAL_SERVER_ERROR,
-      results: null,
-      message: error.message,
-    });
+    await errorResponse(res, error.message, 500, null, error.message);
   }
 };
 
 
+
+
+
 const getRoleStatistics = async (req, res) => {
+
+  console.log("Fetching role statistics..." ,req.query);
+  
   try {
     const options = {
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 10,
-      sortBy: req.query.sortBy || "name",
-      sortOrder: req.query.sortOrder || "asc",
+      sortBy: req.query.sort || "name",
+      sortOrder: req.query.order || "asc",
       search: req.query.search || "",
       isActive: req.query.isActive !== undefined ? req.query.isActive === "true" : null,
       includePermissionDetails: req.query.includePermissionDetails !== "false",
@@ -324,7 +311,7 @@ const toggleActive = async (req, res) => {
 const getActiveRole = async (req, res) => {
 
   console.log(req);
-  
+
   try {
     const roles = await Role.getActiveRoles();
     res.status(StatusCodes.OK).json({

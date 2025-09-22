@@ -9,7 +9,7 @@ const ACTIONS = {
 
 
 const allowedFilterFields = ['name', 'action', 'category', 'isActive']; // whitelist filterable fields
-const allowedSortFields = ['name', 'category', 'createdAt', 'updatedAt','action'];
+const allowedSortFields = ['name', 'category', 'createdAt', 'updatedAt', 'action'];
 const defaultExcludeFields = ['__v', 'createdBy', 'updatedBy', 'isDeleted']; // fields to exclude by default
 
 const permissionSchema = new mongoose.Schema(
@@ -19,7 +19,7 @@ const permissionSchema = new mongoose.Schema(
     category: { type: String, trim: true },
     isDefault: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
-    isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     action: {
       type: String,
       enum: Object.values(ACTIONS),
@@ -113,7 +113,7 @@ permissionSchema.statics.getAll = async function (options = {}) {
     filter = {},
     page = 1,
     limit = 50,
-    isDeleted=false,
+    isDeleted = false,
     sort = { createdAt: -1 },
     selectFields = null, // comma separated string of fields or array of fields
     search = null, // string keyword for text search on allowed fields
@@ -254,14 +254,26 @@ permissionSchema.statics.createIfNotExists = async function (name, description =
 
 // Get all permissions grouped by category
 permissionSchema.statics.getGroupedByCategory = async function () {
-  const permissions = await this.find().sort({ category: 1, name: 1 }).lean();
-  return permissions.reduce((acc, perm) => {
-    if (!acc[perm.category || "Uncategorized"]) {
-      acc[perm.category || "Uncategorized"] = [];
+  return await this.aggregate([
+    { $match: { isActive: true } },
+    { $sort: { category: 1, name: 1 } },
+    {
+      $group: {
+        _id: { $ifNull: ["$category", "Uncategorized"] },
+        action: { $push: { id: "$_id", action: "$action", name: "$name" } }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        category: "$_id",
+        action: 1
+      }
+    },
+    {
+      $sort: { category: 1 }
     }
-    acc[perm.category || "Uncategorized"].push(perm);
-    return acc;
-  }, {});
+  ]);
 };
 
 
