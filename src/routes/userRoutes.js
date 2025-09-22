@@ -95,14 +95,7 @@ const userValidation = {
     validate
   ],
 
-  query: [
-    query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer').toInt(),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
-    query('sort').optional().isIn(['createdAt', 'updatedAt', 'lastLogin', 'loyaltyPoints', 'ordersCount']).withMessage('Invalid sort field'),
-    query('order').optional().isIn(['asc', 'desc']).withMessage('Order must be asc or desc'),
-    query('status').optional().isIn(['active', 'inactive', 'suspended', 'pending']).withMessage('Invalid status filter'),
-    validate
-  ],
+
 
   auth: [
     body('email').isEmail().withMessage('Valid email is required').trim().normalizeEmail(),
@@ -218,8 +211,8 @@ router.patch(
 // GET /api/users - Get all users with advanced filtering
 router.get('/',
   authMiddleware,
-  // authorize('users', 'read'),
-  userValidation.query,
+  authorize('users', 'read'),
+  // userValidation.query,
   UserController.getUsers
 );
 

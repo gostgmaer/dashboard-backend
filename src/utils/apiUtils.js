@@ -38,7 +38,7 @@ function errorResponse(res, message, statusCode = 500, error = null) {
   });
 }
 
-module.exports = { standardResponse, errorResponse };
+
 
 
 module.exports = {

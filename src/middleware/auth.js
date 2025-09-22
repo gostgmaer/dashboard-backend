@@ -15,6 +15,7 @@ const authMiddleware = async (req, res, next) => {
         req.user = user;
         req.body.created_by = user.id
         req.body.updated_by = user.id
+        res.locals.user = user;
         next();
     } catch (error) {
         return res.status(401).json({ success: false, message: 'Invalid token.' });

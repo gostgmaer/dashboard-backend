@@ -8,7 +8,7 @@ const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
-const { APIError, formatResponse } = require('../utils/apiUtils');
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 // const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
@@ -52,24 +52,7 @@ class authController {
     return Math.round(percentage);
   }
 
-  static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
-    return res.status(statusCode).json({
-      success,
-      statusCode,
-      data,
-      message,
-      ...meta,
-    });
-  }
 
-  static errorResponse(res, message, statusCode = 500, error = null) {
-    return res.status(statusCode).json({
-      success: false,
-      statusCode,
-      message,
-      error: process.env.NODE_ENV === 'development' ? error : undefined,
-    });
-  }
   // ========================================
   // 🔧 UTILITY METHODS
   // ========================================
@@ -157,12 +140,12 @@ class authController {
 
       // Validation
       if (!email || !username || !password) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Email, username, and password are required', 400);
       }
 
       if (password !== confirmPassword) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Passwords do not match', 400);
       }
 
@@ -208,7 +191,7 @@ class authController {
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
       await NotificationMiddleware.onUserCreate(req, res, () => { });
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         user: {
           email: user.email,
           username: user.username,
@@ -224,7 +207,7 @@ class authController {
     catch (err) {
       // Handle errors (e.g., duplicate keys, validation)
       console.error('Registration error:', err);
-      return authController.errorResponse(res,
+      errorResponse(res,
         err.message, 500, err);
     }
 
@@ -233,22 +216,22 @@ class authController {
   /**
    * LOGIN USER
    */
-  static async login(req, res) {
+  static async login(req, res, next) {
     try {
       const { identifier, password, deviceTrust = false } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!identifier || !password) {
-        return authController.errorResponse(res, 'Email/username and password are required', 400);
+        errorResponse(res, 'Email/username and password are required', 400);
       }
       // Authenticate user
       const authResult = await User.authenticateUser(identifier, password, deviceInfo);
       let user = authResult.user;
 
-
+      res.locals.user = user;
       // const user = await User.findByEmail(email);
       if (!user) {
-        return authController.errorResponse(res, 'Invalid Email/username or password', 401);
+        errorResponse(res, 'Invalid Email/username or password', 401);
       }
 
 
@@ -269,7 +252,7 @@ class authController {
           await user.handleSuccessfulLogin(deviceInfo);
           const tokens = await user.generateTokens(deviceInfo);
 
-          return authController.standardResponse(res, true, {
+          standardResponse(res, true, {
             user: {
               id: user._id,
               email: user.email,
@@ -303,7 +286,7 @@ class authController {
           console.error('OTP generation failed:', error);
         }
 
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           requiresMFA: true,
           availableMethods: authResult.availableMethods,
           tempToken,
@@ -323,7 +306,7 @@ class authController {
         await user.trustDevice(deviceInfo.deviceId);
       }
 
-      return authController.standardResponse(
+      standardResponse(
         res,
         true,
         {
@@ -342,10 +325,13 @@ class authController {
         },
         'Login successful'
       );
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
     } catch (error) {
       console.error('Login error:', error);
-      return authController.errorResponse(res, error.message, 500, error.message);
+      errorResponse(res, error.message, 500, error.message);
+      NotificationMiddleware.onLoginFailed(req, res, () => { });
     }
+
   }
   static async socialLogin(req, res) {
     try {
@@ -356,13 +342,13 @@ class authController {
       // Authenticate user
       const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
       let user = authResult.user;
-
+      res.locals.user = user;
       const tokens = await user.generateTokens(deviceInfo);
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
 
-      return authController.standardResponse(
+      standardResponse(
         res,
         true,
         {
@@ -381,9 +367,10 @@ class authController {
         },
         'Login successful'
       );
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
     } catch (error) {
       console.error('Login error:', error);
-      return authController.errorResponse(res, error.message, 500, error.message);
+      errorResponse(res, error.message, 500, error.message);
     }
   }
   /**
@@ -395,7 +382,7 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!tempToken || !otpCode) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Temporary token and OTP code are required', 400);
       }
 
@@ -407,21 +394,21 @@ class authController {
           throw new Error('Invalid token step');
         }
       } catch (error) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid or expired temporary token', 400);
       }
 
       // Find user
       const user = await User.findById(decoded.userId).populate('role');
       if (!user) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'User not found', 404);
       }
 
       // Verify OTP
       const otpValid = await user.verifyOTP(otpCode, 'login', deviceInfo);
       if (!otpValid) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid or expired OTP code', 400);
       }
 
@@ -434,7 +421,7 @@ class authController {
         await user.trustDevice(deviceInfo.deviceId);
       }
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         user: {
           id: user._id,
           email: user.email,
@@ -447,10 +434,10 @@ class authController {
         tokens,
         deviceTrusted: deviceTrust
       }, 'Authentication successful');
-
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
     } catch (error) {
       console.error('OTP verification error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'OTP verification failed', 400);
     }
   }
@@ -464,7 +451,7 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!tempToken) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Temporary token is required', 400);
       }
 
@@ -473,20 +460,20 @@ class authController {
       try {
         decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
       } catch (error) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid or expired temporary token', 400);
       }
 
       const user = await User.findById(decoded.userId);
       if (!user) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'User not found', 404);
       }
 
       // Generate new OTP
       const otpResult = await user.generateOTP('login', deviceInfo, method);
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         otpSent: true,
         method: otpResult.type,
         destination: otpResult.destination,
@@ -495,7 +482,7 @@ class authController {
 
     } catch (error) {
       console.error('Resend OTP error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Failed to resend OTP', 500);
     }
   }
@@ -578,11 +565,11 @@ class authController {
 
       await user.logSecurityEvent('logout', 'User logout', 'low', deviceInfo);
 
-      return authController.standardResponse(res, true, null,
+      standardResponse(res, true, null,
         'Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Logout failed', 500, error.message);
 
     }
@@ -601,11 +588,11 @@ class authController {
       await user.logSecurityEvent('logout_all', 'User logout from all devices', 'medium', deviceInfo);
 
 
-      return authController.standardResponse(res, true, null,
+      standardResponse(res, true, null,
         'Logged out from all devices successfully');
     } catch (error) {
       console.error('Logout all error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to logout from all devices', 500, error.message);
 
     }
@@ -620,7 +607,7 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!refreshToken) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Refresh token is required', 400);
       }
 
@@ -629,25 +616,25 @@ class authController {
       try {
         decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
       } catch (error) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid or expired refresh token', 401);
       }
 
 
       const user = await User.findById(decoded.userId);
       if (!user) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'User not found', 404);
       }
       // Generate new tokens
       const tokens = await user.refreshAccessToken(refreshToken);
 
-      return authController.standardResponse(res, true, tokens,
+      standardResponse(res, true, tokens,
         'Token refreshed successfully');
 
     } catch (error) {
       console.error('Token refresh error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Token refresh failed', 401);
     }
   }
@@ -745,12 +732,12 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!currentPassword || !newPassword || !confirmPassword) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'All password fields are required', 400);
       }
 
       if (newPassword !== confirmPassword) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'New passwords do not match', 400);
       }
 
@@ -765,7 +752,7 @@ class authController {
       }
       const isValidPassword = await user.validatePassword(currentPassword);
       if (!isValidPassword) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Current password is incorrect', 400);
       }
 
@@ -773,15 +760,16 @@ class authController {
       await user.logSecurityEvent('password_changed',
         'Password changed successfully', 'medium', deviceInfo);
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         passwordChanged: true,
         tokenRevoked: true,
         message: 'Password changed successfully. Please login again.'
       }, 'Password changed successfully');
+      NotificationMiddleware.onPasswordChange(req, res, () => { });
 
     } catch (error) {
       console.error('Change password error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Failed to change password', 500);
     }
   }
@@ -808,6 +796,7 @@ class authController {
         message: 'MFA setup initiated',
         data: mfaSetup,
       });
+      NotificationMiddleware.onTwoFactorEnabled(req, res, () => { });
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -886,6 +875,8 @@ class authController {
           message: 'MFA disabled successfully',
         });
       }
+
+      NotificationMiddleware.onTwoFactorDisabled(req, res, () => { });
     } catch (error) {
       res.status(400).json({
         success: false,
@@ -903,12 +894,12 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!email) {
-        return authController.errorResponse(res, 'Email is required', 400);
+        errorResponse(res, 'Email is required', 400);
       }
 
       const user = await User.findByEmail(email);
       if (!user) {
-        return authController.errorResponse(res, 'this email is not registered', 404);
+        errorResponse(res, 'this email is not registered', 404);
       }
 
       const result = await User.initiatePasswordReset(email, req.deviceInfo);
@@ -923,12 +914,12 @@ class authController {
       await user.logSecurityEvent('password_reset_requested',
         'Password reset requested', 'medium', deviceInfo);
 
-      return authController.standardResponse(res, true,
+      standardResponse(res, true,
         'If this email is registered, you will receive a password reset link');
 
     } catch (error) {
       console.error('Forgot password error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message, 500, error.message);
     }
   }
@@ -943,17 +934,17 @@ class authController {
       const { token } = req.params
       const deviceInfo = DeviceDetector.detectDevice(req);
       if (!token || !newPassword || !confirmPassword) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Token and password fields are required', 400);
       }
 
       if (newPassword !== confirmPassword) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Passwords do not match', 400);
       }
 
       if (!token || !newPassword) {
-        return authController.errorResponse(res, 'Token and new password are required', 400);
+        errorResponse(res, 'Token and new password are required', 400);
       }
       const passwordStrength = checkPasswordStrength(newPassword);
       if (!passwordStrength.isValid) {
@@ -970,14 +961,14 @@ class authController {
 
       // const user = await User.findOne({ resetToken: token });
       if (!user) {
-        return authController.errorResponse(res, 'Invalid token', 400);
+        errorResponse(res, 'Invalid token', 400);
       }
 
       const isValid = await user.checkResetTokenValidity(token);
       if (!isValid) {
-        return authController.errorResponse(res, 'Invalid or expired reset token', 400);
+        errorResponse(res, 'Invalid or expired reset token', 400);
       }
-
+      res.locals.user = user;
       await user.setPassword(newPassword);
       user.resetToken = null;
       user.resetTokenExpiration = null;
@@ -993,14 +984,14 @@ class authController {
         'Password reset completed', 'high', deviceInfo);
 
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         passwordReset: true,
         message: 'Password reset successfully. Please login with your new password.'
       }, 'Password reset successfully');
-
+      NotificationMiddleware.onPasswordReset(req, res, () => { });
     } catch (error) {
       console.error('Reset password error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Failed to reset password', 500);
     }
   }
@@ -1018,13 +1009,13 @@ class authController {
 
       // 0. Account already verified
       if (user.accountVerified) {
-        return authController.errorResponse(res, 'Account is already verified.', 400);
+        errorResponse(res, 'Account is already verified.', 400);
       }
 
       // 1. Priority: Email
       if (user.email && !user.emailVerified) {
         const result = await user.sendEmailVerification(deviceInfo);
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           verificationType: 'email',
           destination: result.destination,
           expiresAt: result.expiresAt
@@ -1034,7 +1025,7 @@ class authController {
       // 2. Next: OTP
       if (user.otpConfig && user.otpConfig.enableOTP) {
         const result = await user.generateOTP('email_verification', deviceInfo, 'email');
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           verificationType: 'otp',
           destination: result.destination,
           expiresAt: result.expiresAt
@@ -1044,17 +1035,17 @@ class authController {
       // 3. Last: Phone
       if (user.phone && !user.phoneVerified) {
         const result = await user.sendPhoneVerification(deviceInfo);
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           verificationType: 'phone',
           destination: result.destination,
           expiresAt: result.expiresAt
         }, 'Phone verification sent');
       }
 
-      return authController.errorResponse(res, 'No valid verification method available.', 400);
+      errorResponse(res, 'No valid verification method available.', 400);
     } catch (error) {
       console.error('Verify account error:', error);
-      return authController.errorResponse(res, error.message || 'Failed to verify account', 500);
+      errorResponse(res, error.message || 'Failed to verify account', 500);
     }
   }
 
@@ -1065,14 +1056,14 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (user.emailVerified) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Email is already verified', 400);
       }
       if (user.email && !user.emailVerified) {
         await user.sendEmailVerification()
         await sendEmail(emailVerificationTemplate, user);
 
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           verificationSent: true,
         }, 'Email verification sent successfully');
       }
@@ -1080,7 +1071,7 @@ class authController {
 
     } catch (error) {
       console.error('Send email verification error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Failed to send email verification', 500);
     }
   }
@@ -1108,8 +1099,9 @@ class authController {
       if (token) {
         // Find user by token (Assuming confirmToken field stores token for email confirmation)
         user = await User.findOne({ emailVerificationToken: token });
+        res.locals.user = user;
         if (!user) {
-          return authController.errorResponse(res, 'Invalid or expired verification token', 400);
+          errorResponse(res, 'Invalid or expired verification token', 400);
         }
       } else if (code) {
         // When verifying by code, identify user by other means (e.g., email in body or code lookup)
@@ -1123,13 +1115,13 @@ class authController {
         }
         user = await User.findOne({ email });
         if (!user) {
-          return authController.errorResponse(res, 'User not found', 404);
+          errorResponse(res, 'User not found', 404);
         }
       }
 
 
       if (user.emailVerified) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Email is already verified', 400);
       }
 
@@ -1143,12 +1135,12 @@ class authController {
           await user.logSecurityEvent('email_verified',
             'Email address verified', 'low', deviceInfo);
 
-          return authController.standardResponse(res, true, {
+          standardResponse(res, true, {
             emailVerified: true
           }, 'Email verified successfully');
         }
 
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid or expired verification code', 400);
       }
       const result = await User.verifyUserEmail(token);
@@ -1157,14 +1149,15 @@ class authController {
         await user.logSecurityEvent('email_verified',
           'Email address verified', 'low', deviceInfo);
 
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           emailVerified: true
         }, 'Email verified successfully');
       }
+      NotificationMiddleware.onEmailVerified(req, res, () => { });
 
     } catch (error) {
       console.error('Verify email error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Email verification failed', 500);
     }
   }
@@ -1173,20 +1166,20 @@ class authController {
       const { token } = req.body;
 
       if (!token) {
-        return authController.errorResponse(res, 'Token is required', 400);
+        errorResponse(res, 'Token is required', 400);
       }
 
       const user = await User.findOne({ confirmToken: token });
       if (!user) {
-        return authController.errorResponse(res, 'Invalid token', 400);
+        errorResponse(res, 'Invalid token', 400);
       }
 
       await user.confirmEmail(token);
 
-      return authController.standardResponse(res, true, null, 'Email confirmed successfully');
+      standardResponse(res, true, null, 'Email confirmed successfully');
     } catch (error) {
       console.error('Confirm email error:', error);
-      return authController.errorResponse(res, error.message || 'Failed to confirm email', 400);
+      errorResponse(res, error.message || 'Failed to confirm email', 400);
     }
   }
 
@@ -1363,7 +1356,7 @@ class authController {
     try {
       const user = req.user;
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         otpEnabled: otpService.isEnabled(),
         userSettings: user.otpSettings,
         availableMethods: user.availableOTPMethods,
@@ -1378,7 +1371,7 @@ class authController {
 
     } catch (error) {
       console.error('Get OTP settings error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve OTP settings', 500, error.message);
     }
   }
@@ -1394,7 +1387,7 @@ class authController {
 
       const validMethods = ['totp', 'email', 'sms'];
       if (preferredMethod && !validMethods.includes(preferredMethod)) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid preferred method', 400);
       }
 
@@ -1416,13 +1409,13 @@ class authController {
       await user.logSecurityEvent('otp_settings_updated',
         'OTP settings updated', 'low', deviceInfo);
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         otpSettings: user.otpSettings
       }, 'OTP settings updated successfully');
 
     } catch (error) {
       console.error('Update OTP settings error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to update OTP settings', 500, error.message);
     }
   }
@@ -1437,15 +1430,15 @@ class authController {
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       const verified = await user.verifyUser();
 
-      return authController.standardResponse(res, true, { verified }, 'User verified successfully');
+      standardResponse(res, true, { verified }, 'User verified successfully');
     } catch (error) {
       console.error('Verify user error:', error);
-      return authController.errorResponse(res, 'Failed to verify user', 500, error.message);
+      errorResponse(res, 'Failed to verify user', 500, error.message);
     }
   }
 
@@ -1459,10 +1452,12 @@ class authController {
   static async updateProfile(req, res) {
     try {
       await req.user.updateProfile(req.body);
-      return authController.standardResponse(res, true, {}, 'Profile updated successfully');
+      standardResponse(res, true, {}, 'Profile updated successfully');
+      res.locals.changes = req.body
+      NotificationMiddleware.onUserUpdate(req, res, () => { });
     } catch (error) {
       console.error('Update profile error:', error);
-      return authController.errorResponse(res, 'Failed to update profile', 500, error.message);
+      errorResponse(res, 'Failed to update profile', 500, error.message);
     }
   }
 
@@ -1474,14 +1469,16 @@ class authController {
       const { url } = req.body;
 
       if (!url) {
-        return authController.errorResponse(res, 'Image URL is required', 400);
+        errorResponse(res, 'Image URL is required', 400);
       }
 
       const profilePicture = await req.user.updateProfilePicture(url);
-      return authController.standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
+      standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
+      NotificationMiddleware.onUserUpdate(req, res, () => { });
+
     } catch (error) {
       console.error('Update profile picture error:', error);
-      return authController.errorResponse(res, 'Failed to update profile picture', 500, error.message);
+      errorResponse(res, 'Failed to update profile picture', 500, error.message);
     }
   }
 
@@ -1494,20 +1491,20 @@ class authController {
       const { newEmail } = req.body;
 
       if (!newEmail) {
-        return authController.errorResponse(res, 'New email is required', 400);
+        errorResponse(res, 'New email is required', 400);
       }
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       const result = await user.updateEmail(newEmail);
 
-      return authController.standardResponse(res, true, result, 'Email updated successfully');
+      standardResponse(res, true, result, 'Email updated successfully');
     } catch (error) {
       console.error('Update email error:', error);
-      return authController.errorResponse(res, error.message || 'Failed to update email', 500);
+      errorResponse(res, error.message || 'Failed to update email', 500);
     }
   }
 
@@ -1520,20 +1517,20 @@ class authController {
       const { newPhone } = req.body;
 
       if (!newPhone) {
-        return authController.errorResponse(res, 'Phone number is required', 400);
+        errorResponse(res, 'Phone number is required', 400);
       }
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       const phoneNumber = await user.updatePhoneNumber(newPhone);
 
-      return authController.standardResponse(res, true, { phoneNumber }, 'Phone number updated successfully');
+      standardResponse(res, true, { phoneNumber }, 'Phone number updated successfully');
     } catch (error) {
       console.error('Update phone number error:', error);
-      return authController.errorResponse(res, error.message || 'Failed to update phone number', 500);
+      errorResponse(res, error.message || 'Failed to update phone number', 500);
     }
   }
 
@@ -1546,20 +1543,20 @@ class authController {
       const { platform, socialId } = req.body;
 
       if (!platform || !socialId) {
-        return authController.errorResponse(res, 'Platform and social ID are required', 400);
+        errorResponse(res, 'Platform and social ID are required', 400);
       }
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       await user.linkSocialAccount(platform, socialId);
 
-      return authController.standardResponse(res, true, null, 'Social account linked');
+      standardResponse(res, true, null, 'Social account linked');
     } catch (error) {
       console.error('Link social account error:', error);
-      return authController.errorResponse(res, 'Failed to link social account', 500, error.message);
+      errorResponse(res, 'Failed to link social account', 500, error.message);
     }
   }
 
@@ -1572,20 +1569,20 @@ class authController {
       const { platform } = req.body;
 
       if (!platform) {
-        return authController.errorResponse(res, 'Platform is required', 400);
+        errorResponse(res, 'Platform is required', 400);
       }
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       await user.unlinkSocialAccount(platform);
 
-      return authController.standardResponse(res, true, null, 'Social account unlinked');
+      standardResponse(res, true, null, 'Social account unlinked');
     } catch (error) {
       console.error('Unlink social account error:', error);
-      return authController.errorResponse(res, 'Failed to unlink social account', 500, error.message);
+      errorResponse(res, 'Failed to unlink social account', 500, error.message);
     }
   }
 
@@ -1598,15 +1595,15 @@ class authController {
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       const socialMedia = await user.clearAllSocialLinks();
 
-      return authController.standardResponse(res, true, socialMedia, 'All social links cleared');
+      standardResponse(res, true, socialMedia, 'All social links cleared');
     } catch (error) {
       console.error('Clear all social links error:', error);
-      return authController.errorResponse(res, 'Failed to clear social links', 500, error.message);
+      errorResponse(res, 'Failed to clear social links', 500, error.message);
     }
   }
 
@@ -1623,15 +1620,15 @@ class authController {
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       await user.invalidateAllSessions();
 
-      return authController.standardResponse(res, true, null, 'All sessions invalidated');
+      standardResponse(res, true, null, 'All sessions invalidated');
     } catch (error) {
       console.error('Invalidate all sessions error:', error);
-      return authController.errorResponse(res, 'Failed to invalidate sessions', 500, error.message);
+      errorResponse(res, 'Failed to invalidate sessions', 500, error.message);
     }
   }
 
@@ -1644,20 +1641,20 @@ class authController {
       const { token } = req.body;
 
       if (!token) {
-        return authController.errorResponse(res, 'Token is required', 400);
+        errorResponse(res, 'Token is required', 400);
       }
 
       const user = await User.findById(id);
       if (!user) {
-        return authController.errorResponse(res, 'User not found', 404);
+        errorResponse(res, 'User not found', 404);
       }
 
       await user.revokeToken(token);
 
-      return authController.standardResponse(res, true, null, 'Token revoked');
+      standardResponse(res, true, null, 'Token revoked');
     } catch (error) {
       console.error('Revoke token error:', error);
-      return authController.errorResponse(res, 'Failed to revoke token', 500, error.message);
+      errorResponse(res, 'Failed to revoke token', 500, error.message);
     }
   }
 
@@ -1673,13 +1670,13 @@ class authController {
       const user = req.user;
 
       if (user.hasActiveTOTP) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'TOTP is already enabled for this user', 400);
       }
 
       const setupData = await user.setupTOTP();
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         qrCode: setupData.qrCode,
         manualEntryKey: setupData.manualEntryKey,
         instructions: {
@@ -1691,7 +1688,7 @@ class authController {
 
     } catch (error) {
       console.error('TOTP setup error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'TOTP setup failed', 500);
     }
   }
@@ -1706,7 +1703,7 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!code) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'TOTP code is required', 400);
       }
 
@@ -1716,19 +1713,19 @@ class authController {
         await user.logSecurityEvent('totp_setup_completed',
           'TOTP authentication enabled', 'medium', deviceInfo);
 
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           totpEnabled: true,
           backupCodes: result.backupCodes,
           message: 'TOTP enabled successfully. Save these backup codes in a safe place.'
         }, 'TOTP authentication enabled successfully');
       }
 
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Invalid TOTP code', 400);
 
     } catch (error) {
       console.error('TOTP verification error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'TOTP verification failed', 500);
     }
   }
@@ -1743,17 +1740,17 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!user.hasActiveTOTP) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'TOTP is not enabled for this user', 400);
       }
 
       if (!code) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'TOTP code is required to disable 2FA', 400);
       }
 
       if (!confirmDisable) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Please confirm that you want to disable 2FA', 400);
       }
 
@@ -1763,17 +1760,17 @@ class authController {
         await user.logSecurityEvent('totp_disabled',
           'TOTP authentication disabled', 'high', deviceInfo);
 
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           totpEnabled: false
         }, 'TOTP authentication disabled successfully');
       }
 
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Invalid TOTP code', 400);
 
     } catch (error) {
       console.error('TOTP disable error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'TOTP disable failed', 500);
     }
   }
@@ -1788,19 +1785,19 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!user.hasActiveTOTP) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'TOTP is not enabled for this user', 400);
       }
 
       if (!code) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'TOTP code is required to generate new backup codes', 400);
       }
 
       // Verify TOTP code
       const isValid = await otpService.verifyTOTP(user, code);
       if (!isValid) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Invalid TOTP code', 400);
       }
 
@@ -1816,14 +1813,14 @@ class authController {
       await user.logSecurityEvent('backup_codes_regenerated',
         'New backup codes generated', 'medium', deviceInfo);
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         backupCodes: newBackupCodes,
         message: 'New backup codes generated. Save them in a safe place.'
       }, 'Backup codes regenerated successfully');
 
     } catch (error) {
       console.error('Backup codes generation error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         error.message || 'Failed to generate backup codes', 500);
     }
   }
@@ -1848,7 +1845,7 @@ class authController {
         ).length
       }));
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         devices,
         totalDevices: devices.length,
         trustedDevices: devices.filter(d => d.isTrusted).length
@@ -1856,7 +1853,7 @@ class authController {
 
     } catch (error) {
       console.error('Get devices error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve devices', 500, error.message);
     }
   }
@@ -1871,25 +1868,25 @@ class authController {
       const currentDeviceInfo = DeviceDetector.detectDevice(req);
 
       if (!deviceId) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Device ID is required', 400);
       }
 
       const success = await user.trustDevice(deviceId);
 
       if (success) {
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           deviceTrusted: true,
           deviceId
         }, 'Device trusted successfully');
       }
 
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Device not found', 404);
 
     } catch (error) {
       console.error('Trust device error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to trust device', 500, error.message);
     }
   }
@@ -1904,30 +1901,30 @@ class authController {
       const currentDeviceInfo = DeviceDetector.detectDevice(req);
 
       if (!deviceId) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Device ID is required', 400);
       }
 
       if (deviceId === currentDeviceInfo.deviceId && !confirmRemove) {
-        return authController.errorResponse(res,
+        errorResponse(res,
           'Cannot remove current device without confirmation', 400);
       }
 
       const success = await user.removeDevice(deviceId);
 
       if (success) {
-        return authController.standardResponse(res, true, {
+        standardResponse(res, true, {
           deviceRemoved: true,
           deviceId
         }, 'Device removed successfully');
       }
 
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Device not found', 404);
 
     } catch (error) {
       console.error('Remove device error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to remove device', 500, error.message);
     }
   }
@@ -1980,7 +1977,7 @@ class authController {
       const start = (page - 1) * limit;
       const paginatedEvents = events.slice(start, start + parseInt(limit));
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         events: paginatedEvents,
         pagination: {
           currentPage: parseInt(page),
@@ -1993,7 +1990,7 @@ class authController {
 
     } catch (error) {
       console.error('Get security events error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve security events', 500, error.message);
     }
   }
@@ -2020,7 +2017,7 @@ class authController {
       const start = (page - 1) * limit;
       const paginatedHistory = loginHistory.slice(start, start + parseInt(limit));
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         loginHistory: paginatedHistory,
         pagination: {
           currentPage: parseInt(page),
@@ -2038,7 +2035,7 @@ class authController {
 
     } catch (error) {
       console.error('Get login history error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve login history', 500, error.message);
     }
   }
@@ -2061,7 +2058,7 @@ class authController {
 
       const trustedDevices = user.knownDevices?.filter(d => d.isTrusted).length || 0;
 
-      return authController.standardResponse(res, true, {
+      standardResponse(res, true, {
         securityScore,
         twoFactorEnabled: user.hasActiveTOTP,
         emailVerified: user.emailVerified,
@@ -2078,7 +2075,7 @@ class authController {
 
     } catch (error) {
       console.error('Get security summary error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve security summary', 500, error.message);
     }
   }
@@ -2153,12 +2150,12 @@ class authController {
       // This would typically query your metrics/logging service
       const analytics = await otpService.getOTPStatistics(timeframe);
 
-      return authController.standardResponse(res, true, analytics,
+      standardResponse(res, true, analytics,
         'OTP analytics retrieved successfully');
 
     } catch (error) {
       console.error('Get OTP analytics error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve OTP analytics', 500, error.message);
     }
   }
@@ -2172,12 +2169,12 @@ class authController {
 
       const report = await User.getSecurityReport(timeframe);
 
-      return authController.standardResponse(res, true, report,
+      standardResponse(res, true, report,
         'Security report retrieved successfully');
 
     } catch (error) {
       console.error('Get security report error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve security report', 500, error.message);
     }
   }
@@ -2186,11 +2183,11 @@ class authController {
       const user = await User.findFullyPopulatedById(req.user.id);
 
 
-      return authController.standardResponse(res, true, user, 'Devices retrieved successfully');
+      standardResponse(res, true, user, 'Devices retrieved successfully');
 
     } catch (error) {
       console.error('Get devices error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve devices', 500, error.message);
     }
   }
@@ -2199,11 +2196,11 @@ class authController {
     try {
       const user = await User.fetchUserSettings(req.user.id);
 
-      return authController.standardResponse(res, true, authController.enrichUser(user), 'Account Setting Fetch successfully');
+      standardResponse(res, true, authController.enrichUser(user), 'Account Setting Fetch successfully');
 
     } catch (error) {
       console.error('Get devices error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve devices', 500, error.message);
     }
   }
@@ -2211,11 +2208,11 @@ class authController {
   static async getProfile(req, res) {
     try {
       const user = await req.user.getMyProfile();
-      return authController.standardResponse(res, true, user, 'Profile Fetch successfully');
+      standardResponse(res, true, user, 'Profile Fetch successfully');
 
     } catch (error) {
       console.error('Get devices error:', error);
-      return authController.errorResponse(res,
+      errorResponse(res,
         'Failed to retrieve devices', 500, error.message);
     }
   }

@@ -145,11 +145,11 @@ class OrderController {
 
   async getOrders(req, res) {
     try {
-      let { page = 1, limit = 20, sortBy = "createdAt", sortOrder = "desc", ...filters } = req.query;
+      let { page = 1, limit = 20, sort = "createdAt", order = "desc", ...filters } = req.query;
 
       page = parseInt(page);
       limit = parseInt(limit);
-      sortOrder = sortOrder.toLowerCase() === "asc" ? 1 : -1;
+      order = order.toLowerCase() === "asc" ? 1 : -1;
 
       // Fields that support multiple values separated by commas
       const multiValueFields = ["status", "payment_status", "orderSource", "priorityLevel"];
@@ -208,7 +208,7 @@ class OrderController {
       const orders = await Order.find(filter)
         .populate("items.product", "name sku price")
         .populate("user", "firstName lastName email")
-        .sort({ [sortBy]: sortOrder })
+        .sort({ [sort]: order })
         .skip((page - 1) * limit)
         .limit(limit);
 
@@ -221,7 +221,9 @@ class OrderController {
         items: orders,
       });
     } catch (error) {
-      return this.handleError(res, error);
+      return res.json({
+        400: error.message || "An error occurred while fetching orders"
+      });
     }
   }
 

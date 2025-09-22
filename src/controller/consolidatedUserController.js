@@ -92,7 +92,7 @@ class UserController {
     if (includeCalculated) {
       return {
         ...userObj,
-        fullName:user.fullName,
+        fullName: user.fullName,
         userScore: this.calculateUserScore(userObj),
         activityLevel: this.getUserActivityLevel(userObj),
         profileCompleteness: this.calculateProfileCompleteness(userObj),
@@ -101,7 +101,7 @@ class UserController {
       };
     }
 
-    return {...userObj,fullName:user.fullName };
+    return { ...userObj, fullName: user.fullName };
   }
 
   static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
@@ -287,6 +287,7 @@ class UserController {
         ...otherFilters
       } = req.query;
 
+
       // Build query filters
       const filters = { status: { $ne: 'deleted' } };
 
@@ -297,9 +298,23 @@ class UserController {
       if (isVerified !== undefined) filters.isVerified = isVerified === 'true';
 
       // Apply additional filters dynamically
-      Object.keys(otherFilters).forEach(key => {
-        const value = otherFilters[key];
+
+      var normalizedOtherFilters = {};
+      for (var key in otherFilters) {
+        var value = otherFilters[key];
         if (value && value !== '' && value !== 'undefined') {
+          var normalizedKey = key.startsWith('filter_') ? key.replace('filter_', '') : key;
+          normalizedOtherFilters[normalizedKey] = value;
+        }
+      }
+
+      // Replace original otherFilters with normalized version
+      // otherFilters = normalizedOtherFilters;
+
+      Object.keys(normalizedOtherFilters).forEach(key => {
+        const value = normalizedOtherFilters[key];
+        if (value && value !== '' && value !== 'undefined') {
+
           switch (key) {
             case 'interests':
             case 'tags':
@@ -310,14 +325,21 @@ class UserController {
               filters[`preferences.${key}`] = value === 'true';
               break;
             default:
-              if (typeof value === 'string' && value.includes(',')) {
-                filters[key] = { $in: value.split(',') };
+              if (typeof value === 'string') {
+                if (value.includes(',')) {
+                  // Multiple exact matches
+                  filters[key] = { $in: value.split(',') };
+                } else {
+                  // Partial match
+                  filters[key] = { $regex: value, $options: 'i' }; // case-insensitive partial match
+                }
               } else {
                 filters[key] = value;
               }
           }
         }
       });
+
 
       // Add search functionality
       if (search) {
@@ -352,10 +374,10 @@ class UserController {
         UserController.enrichUser(user)
       );
 
-    const  response = {
+      const response = {
         users: data.map(u => {
           return {
-            id:u._id,
+            id: u._id,
             theme: u.preferences?.theme || '',
             language: u.preferences?.language || '',
             currency: u.preferences?.currency || 'USD',
