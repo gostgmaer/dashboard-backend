@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const paymentsController = require('../controller/paymentController'); // Adjust path as needed
 const { body, query, param, validationResult } = require('express-validator');
-const authMiddleware = require('../middleware/auth');
+const {authMiddleware} = require('../middleware/auth');
 const authorize = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting'); // Assuming environment config
@@ -185,6 +185,56 @@ const paymentValidation = {
 // ========================================
 // 💸 USER PAYMENT OPERATIONS
 // ========================================
+
+
+// Payment Management Routes (Authenticated)
+router.post('/initiate', 
+    authenticateToken,
+    paymentRateLimit,
+    validatePaymentRequest,
+    paymentsController.initiatePayment
+);
+
+router.post('/verify',
+    authenticateToken,
+    paymentsController.verifyPayment
+);
+
+router.post('/retry',
+    authenticateToken,
+    paymentRateLimit,
+    paymentsController.retryPayment
+);
+
+router.post('/refund',
+    authenticateToken,
+    authorize('admin', 'manager'),
+    validateRefundRequest,
+    paymentsController.processRefund
+);
+
+// NEW: Get payment details with refunds
+router.get('/:paymentId',
+    authenticateToken,
+    paymentsController.getPaymentDetails
+);
+
+// Webhook Routes (Public - no auth required)
+router.post('/webhook/paypal',
+    webhookRateLimit,
+    WebhookController.handlePaypalWebhook
+);
+
+router.post('/webhook/razorpay',
+    webhookRateLimit,
+    WebhookController.handleRazorpayWebhook
+);
+
+router.post('/webhook/stripe',
+    webhookRateLimit,
+    WebhookController.handleStripeWebhook
+);
+
 
 // POST /api/payments - Create a new payment
 router.post('/',

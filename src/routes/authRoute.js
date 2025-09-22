@@ -1,7 +1,7 @@
 const express = require('express');
 const authRoute = express.Router();
 const authController = require('../controller/authenticationController');
-const AuthMiddleware = require('../middleware/auth');
+const {authMiddleware} = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const rateLimit = require('express-rate-limit');
 const authAccess = require('../middleware/access');
@@ -37,83 +37,83 @@ authRoute.post('/resend-otp', authLimiter, authController.resendOTP);
 authRoute.post('/social-auth', authLimiter, authController.socialLogin);
 authRoute.post('/forgot-password', authLimiter, authController.forgotPassword);
 authRoute.post('/reset-password/:token', authLimiter, authController.resetPassword);
-authRoute.post('/verify-user/:id', AuthMiddleware,authorize('users', 'update'), authController.verifyUser);
+authRoute.post('/verify-user/:id', authMiddleware,authorize('users', 'update'), authController.verifyUser);
 
 // ========================================
 // 🔐 AUTHENTICATED ENDPOINTS
 // ========================================
-authRoute.post('/logout', AuthMiddleware, authController.logout);
-authRoute.get('/permissions', AuthMiddleware, authController.getUserPermissionsController);
-authRoute.post('/logout-all', AuthMiddleware, authAccess.requireOTP('logout_all'), authController.logoutAll);
+authRoute.post('/logout', authMiddleware, authController.logout);
+authRoute.get('/permissions', authMiddleware, authController.getUserPermissionsController);
+authRoute.post('/logout-all', authMiddleware, authAccess.requireOTP('logout_all'), authController.logoutAll);
 authRoute.post('/refresh-token', authController.refreshToken);
-authRoute.post('/change-password', AuthMiddleware, authAccess.requireOTP('change_password'), authController.changePassword);
+authRoute.post('/change-password', authMiddleware, authAccess.requireOTP('change_password'), authController.changePassword);
 
 // ========================================
 // 📧 EMAIL VERIFICATION
 // ========================================
-authRoute.post('/send-email-verification', AuthMiddleware, authController.sendEmailVerification);
+authRoute.post('/send-email-verification', authMiddleware, authController.sendEmailVerification);
 authRoute.post('/verify-email/:token',authLimiter,  authController.verifyEmail);
 authRoute.post('/confirm-email', authLimiter, authController.confirmEmail);
 
 // ========================================
 // 🔐 MFA / TOTP
 // ========================================
-authRoute.post('/totp/setup', AuthMiddleware, authAccess.requireEmailVerification(), authController.setupTOTP);
-authRoute.post('/totp/verify-setup', AuthMiddleware, authController.verifyTOTPSetup);
-authRoute.post('/totp/disable', AuthMiddleware, authAccess.requireOTP('disable_2fa'), authController.disableTOTP);
-authRoute.post('/totp/backup-codes', AuthMiddleware, authAccess.requireOTP('generate_backup_codes'), authController.generateBackupCodes);
-authRoute.post('/mfa/enable', AuthMiddleware, authController.enableMFA);
-authRoute.post('/mfa/confirm', AuthMiddleware, authController.confirmMFA);
-authRoute.post('/mfa/verify', AuthMiddleware, authController.verifyMFA);
+authRoute.post('/totp/setup', authMiddleware, authAccess.requireEmailVerification(), authController.setupTOTP);
+authRoute.post('/totp/verify-setup', authMiddleware, authController.verifyTOTPSetup);
+authRoute.post('/totp/disable', authMiddleware, authAccess.requireOTP('disable_2fa'), authController.disableTOTP);
+authRoute.post('/totp/backup-codes', authMiddleware, authAccess.requireOTP('generate_backup_codes'), authController.generateBackupCodes);
+authRoute.post('/mfa/enable', authMiddleware, authController.enableMFA);
+authRoute.post('/mfa/confirm', authMiddleware, authController.confirmMFA);
+authRoute.post('/mfa/verify', authMiddleware, authController.verifyMFA);
 
 // ========================================
 // 📱 DEVICE & SESSION MANAGEMENT
 // ========================================
-authRoute.get(' ', AuthMiddleware, authController.findFullyPopulatedById);
-authRoute.get('/account-settng', AuthMiddleware, authController.getUserSetting);
-authRoute.get('/profile', AuthMiddleware, authController.getProfile);
-authRoute.get('/devices', AuthMiddleware, authController.getDevices);
-authRoute.post('/devices/trust', AuthMiddleware, authAccess.requireOTP('trust_device'), authController.trustDevice);
-authRoute.delete('/devices/remove', AuthMiddleware, authAccess.requireOTP('remove_device'), authController.removeDevice);
-authRoute.get('/sessions', AuthMiddleware, authController.getActiveSessions);
-authRoute.post('/sessions/revoke', AuthMiddleware, authController.revokeSession);
-authRoute.post('/sessions/invalidate-all', AuthMiddleware, authorize('sessions', 'delete'), authController.invalidateAllSessions);
-authRoute.post('/sessions/revoke-token', AuthMiddleware, authController.revokeToken);
+authRoute.get(' ', authMiddleware, authController.findFullyPopulatedById);
+authRoute.get('/account-settng', authMiddleware, authController.getUserSetting);
+authRoute.get('/profile', authMiddleware, authController.getProfile);
+authRoute.get('/devices', authMiddleware, authController.getDevices);
+authRoute.post('/devices/trust', authMiddleware, authAccess.requireOTP('trust_device'), authController.trustDevice);
+authRoute.delete('/devices/remove', authMiddleware, authAccess.requireOTP('remove_device'), authController.removeDevice);
+authRoute.get('/sessions', authMiddleware, authController.getActiveSessions);
+authRoute.post('/sessions/revoke', authMiddleware, authController.revokeSession);
+authRoute.post('/sessions/invalidate-all', authMiddleware, authorize('sessions', 'delete'), authController.invalidateAllSessions);
+authRoute.post('/sessions/revoke-token', authMiddleware, authController.revokeToken);
 
 // ========================================
 // 🔍 SECURITY & MONITORING
 // ========================================
-authRoute.get('/security/events', AuthMiddleware, authController.getSecurityEvents);
-authRoute.get('/security/login-history', AuthMiddleware, authController.getLoginHistory);
-authRoute.get('/security/summary', AuthMiddleware, authController.getSecuritySummary);
+authRoute.get('/security/events', authMiddleware, authController.getSecurityEvents);
+authRoute.get('/security/login-history', authMiddleware, authController.getLoginHistory);
+authRoute.get('/security/summary', authMiddleware, authController.getSecuritySummary);
 
 // ========================================
 // ⚙️ OTP SETTINGS
 // ========================================
-authRoute.get('/otp/settings', AuthMiddleware, authController.getOTPSettings);
-authRoute.put('/otp/settings', AuthMiddleware, authAccess.requireOTP('update_otp_settings'), authController.updateOTPSettings);
+authRoute.get('/otp/settings', authMiddleware, authController.getOTPSettings);
+authRoute.put('/otp/settings', authMiddleware, authAccess.requireOTP('update_otp_settings'), authController.updateOTPSettings);
 
 // ========================================
 // 👤 PROFILE & SOCIAL ACCOUNTS
 // ========================================
-authRoute.patch('/profile', AuthMiddleware, authController.updateProfile);
-authRoute.patch('/profile-picture', AuthMiddleware, authController.updateProfilePicture);
-authRoute.patch('/email', AuthMiddleware, authorize('users', 'update'), authController.updateEmail);
-authRoute.patch('/phone', AuthMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
-authRoute.post('/social/link', AuthMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
-authRoute.post('/social/unlink', AuthMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
-authRoute.delete('/social/clear/:id', AuthMiddleware, authorize('users', 'update'), authController.clearAllSocialLinks);
+authRoute.patch('/profile', authMiddleware, authController.updateProfile);
+authRoute.patch('/profile-picture', authMiddleware, authController.updateProfilePicture);
+authRoute.patch('/email', authMiddleware, authorize('users', 'update'), authController.updateEmail);
+authRoute.patch('/phone', authMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
+authRoute.post('/social/link', authMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
+authRoute.post('/social/unlink', authMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
+authRoute.delete('/social/clear/:id', authMiddleware, authorize('users', 'update'), authController.clearAllSocialLinks);
 
 // ========================================
 // 📊 ADMIN ANALYTICS & REPORTS
 // ========================================
-authRoute.get('/admin/otp/analytics', AuthMiddleware, authorize('users', 'manage'), authController.getOTPAnalytics);
-authRoute.get('/admin/security/report', AuthMiddleware, authorize('users', 'manage'), authController.getSecurityReport);
+authRoute.get('/admin/otp/analytics', authMiddleware, authorize('users', 'manage'), authController.getOTPAnalytics);
+authRoute.get('/admin/security/report', authMiddleware, authorize('users', 'manage'), authController.getSecurityReport);
 
 // ========================================
 // 📝 ROUTE DOCUMENTATION ENDPOINT
 // ========================================
-authRoute.get('/docs/routes', AuthMiddleware, authorize('auth', 'view'), (req, res) => {
+authRoute.get('/docs/routes', authMiddleware, authorize('auth', 'view'), (req, res) => {
   const routes = {
     public: [
       'POST   /auth/register',

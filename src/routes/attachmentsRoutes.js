@@ -28,7 +28,7 @@ const {
   checkAccess,
 } = require('../controller/attachment');
 const { body, query, param, validationResult } = require('express-validator');
-const authMiddleware = require('../middleware/auth');
+const {authMiddleware} = require('../middleware/auth');
 const  authorize  = require('../middleware/authorize');// Assumed exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');

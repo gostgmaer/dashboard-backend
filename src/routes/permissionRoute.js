@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const permissionController = require('../controller/permission');
 const { body, query, param } = require('express-validator');
-const authMiddleware = require('../middleware/auth');
+const {authMiddleware} = require('../middleware/auth');
 const { enviroment } = require('../config/setting');
 const authorize = require('../middleware/authorize');
 

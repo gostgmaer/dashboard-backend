@@ -2,7 +2,7 @@
   const discountRoute = express.Router();
   const ctrl = require('../controller/discount');
   const { body, param, query, validationResult } = require('express-validator');
-  const authMiddleware = require('../middleware/auth');
+  const {authMiddleware} = require('../middleware/auth');
   const  authorize  = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
   const rateLimit = require('express-rate-limit');
   const { enviroment } = require('../config/setting');

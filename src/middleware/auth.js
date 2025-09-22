@@ -21,4 +21,26 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-module.exports = authMiddleware;
+const optionalAuth = async (req, res, next) => {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (token) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const user = await User.findById(decoded.userId).select('-password');
+            if (user) {
+                req.user = user;
+            }
+        }
+        next();
+    } catch (error) {
+        // Continue without user if token is invalid
+        next();
+    }
+};
+
+module.exports = {
+    authMiddleware,
+    optionalAuth
+}   ;

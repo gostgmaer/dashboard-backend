@@ -1680,7 +1680,7 @@ userSchema.method({
 
 
 
-  async handleFailedLogin(ipAddress = null, userAgent = null, deviceInfo, reason = 'invalid_credentials') {
+  async handleFailedLogin(deviceInfo, reason = 'invalid_credentials') {
     this.failedLoginAttempts += 1;
     this.consecutiveFailedAttempts += 1;
     this.lastLoginAttempt = new Date();
@@ -1757,7 +1757,7 @@ userSchema.method({
 
 
     await this.addLoginHistory({
-      successful: true,
+      successful: true, undefined,
       deviceInfo,
       loginMethod: 'password',
       otpUsed: this.currentOTP.type
@@ -2843,7 +2843,7 @@ userSchema.statics.findLockedAccounts = async function () {
     };
   };
 
-userSchema.statics.authenticateSocial = async function (profileData, identifier, deviceInfo = {}) {
+userSchema.statics.authenticateSocial = async function (profileData, identifier, deviceInfo) {
   const user = await this.findOne({
     $or: [
       { email: identifier.toLowerCase() },

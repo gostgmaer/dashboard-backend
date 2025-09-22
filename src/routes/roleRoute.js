@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const roleController = require('../controller/roles');
 const { body, query, param } = require('express-validator');
-const authMiddleware = require('../middleware/auth');
+const {authMiddleware} = require('../middleware/auth');
 // Assuming authorize is exported from auth middleware
 const { enviroment } = require('../config/setting');
 const authorize = require('../middleware/authorize');
