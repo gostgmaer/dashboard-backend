@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const attachmentController = require("../controller/attachment/uploader");
-const authMiddleware = require("../middleware/auth");
+const {authMiddleware} = require("../middleware/auth");
 // Core File Operations
 router.post("/", authMiddleware, attachmentController.uploadFile);
 router.get("/:id", authMiddleware, attachmentController.viewFile);

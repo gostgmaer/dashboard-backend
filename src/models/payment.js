@@ -2,6 +2,31 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { Logger } = require('../config/logger');
 const logger = Logger('PaymentModel');
+
+const RefundItemSchema = new mongoose.Schema({
+  refundId: { type: String, required: true, index: true }, // unique if top-level
+  gatewayRefundId: String,
+  amount: { type: Number, required: true, min: 0 },
+  reason: {
+    type: String,
+    enum: ['CUSTOMER_REQUEST', 'ORDER_CANCELLED', 'DUPLICATE_PAYMENT', 'FRAUD', 'OTHER'],
+    required: true
+  },
+  description: String,
+  status: {
+    type: String,
+    enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'],
+    default: 'PENDING'
+  },
+  failureReason: String,
+  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+  initiatedAt: { type: Date, default: Date.now },
+  processedAt: Date
+}, {
+  _id: false, // ✅ set true if standalone
+  timestamps: true
+});
+
 const paymentSchema = new mongoose.Schema({
   paymentId: { type: String, required: true, unique: true, index: true },
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true, index: true },
@@ -12,7 +37,6 @@ const paymentSchema = new mongoose.Schema({
     default: "USD",
     enum: ["USD", "EUR", "GBP", "INR", "JPY", "CAD", "AUD"]
   },
-
   method: {
     type: String,
     enum: ["CREDIT_CARD", "DEBIT_CARD", "UPI", "BANK_TRANSFER", "COD", "DIGITAL_WALLET", "CRYPTO", "NET_BANKING"]
@@ -29,8 +53,15 @@ const paymentSchema = new mongoose.Schema({
     default: "PENDING",
     enum: ["PENDING", "PROCESSING", "AUTHORIZED", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "EXPIRED"]
   },
-  disputes: [disputeSchema],
-  refunds: [refundSchema],
+  // Refund Information
+  refunds: [RefundItemSchema],
+  totalRefunded: { type: Number, default: 0, min: 0 },
+  refundableAmount: {
+    type: Number,
+    default: function () {
+      return this.amount - this.totalRefunded;
+    }
+  },
   isRecurring: { type: Boolean, default: false },
   subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: "Subscription", index: true },
   sourceId: { type: String, index: true },
@@ -88,18 +119,31 @@ paymentSchema.index({ status: 1, createdAt: -1 });
 paymentSchema.index({ gateway: 1, status: 1 });
 paymentSchema.index({ method: 1, status: 1 });
 paymentSchema.index({ amount: 1, currency: 1 });
+// Indexes for better query performance
+paymentSchema.index({ orderId: 1, status: 1 });
+paymentSchema.index({ createdAt: -1 });
+paymentSchema.index({ 'refunds.refundId': 1 });
+paymentSchema.index({ 'refunds.status': 1 });
 
-// Virtual for total refunded amount
-paymentSchema.virtual('totalRefunded').get(function () {
-  return this.refunds
-    .filter(refund => refund.status === 'COMPLETED')
-    .reduce((total, refund) => total + refund.amount, 0);
+
+// Virtual for refund status
+paymentSchema.virtual('refundStatus').get(function () {
+  if (this.refunds.length === 0) return 'none';
+  if (this.totalRefunded === 0) return 'none';
+  if (this.totalRefunded >= this.amount) return 'fully_refunded';
+  return 'partially_refunded';
 });
 
-// Virtual for remaining refundable amount
-paymentSchema.virtual('refundableAmount').get(function () {
-  if (this.status !== 'COMPLETED') return 0;
-  return this.amount - this.totalRefunded;
+// Virtual for active refunds
+paymentSchema.virtual('activeRefunds').get(function () {
+  return this.refunds.filter(refund =>
+    ['pending', 'processing'].includes(refund.status)
+  );
+});
+
+// Virtual for completed refunds
+paymentSchema.virtual('completedRefunds').get(function () {
+  return this.refunds.filter(refund => refund.status === 'completed');
 });
 
 // Virtual for payment age in hours
@@ -112,24 +156,24 @@ paymentSchema.virtual('totalAmountWithFees').get(function () {
   return this.amount + this.fees.totalFees;
 });
 // Virtual for payment age
-paymentSchema.virtual('paymentAge').get(function() {
-    return Date.now() - this.createdAt;
+paymentSchema.virtual('paymentAge').get(function () {
+  return Date.now() - this.createdAt;
 });
 
 // Virtual for retry eligibility
-paymentSchema.virtual('canRetry').get(function() {
-    return this.status === 'failed' && 
-           this.retryCount < this.maxRetries && 
-           (!this.lastRetryAt || (Date.now() - this.lastRetryAt) > 60000); // 1 minute cooldown
+paymentSchema.virtual('canRetry').get(function () {
+  return this.status === 'failed' &&
+    this.retryCount < this.maxRetries &&
+    (!this.lastRetryAt || (Date.now() - this.lastRetryAt) > 60000); // 1 minute cooldown
 });
 
 // Pre-save middleware to set expiration for pending payments
-paymentSchema.pre('save', function(next) {
-    if (this.isNew && this.status === 'pending' && !this.expiresAt) {
-        // Set expiration to 30 minutes for pending payments
-        this.expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    }
-    next();
+paymentSchema.pre('save', function (next) {
+  if (this.isNew && this.status === 'pending' && !this.expiresAt) {
+    // Set expiration to 30 minutes for pending payments
+    this.expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  }
+  next();
 });
 
 // STATIC METHODS
@@ -661,7 +705,31 @@ paymentSchema.methods.calculateRiskScore = function () {
 
   return this.metadata.riskScore;
 };
+// Pre-save middleware to set expiration for pending payments
+paymentSchema.pre('save', function (next) {
+  // Set expiration for new pending payments
+  if (this.isNew && this.status === 'pending' && !this.expiresAt) {
+    this.expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+  }
 
+  // Calculate total refunded amount
+  if (this.isModified('refunds')) {
+    this.totalRefunded = this.refunds
+      .filter(refund => refund.status === 'completed')
+      .reduce((total, refund) => total + refund.amount, 0);
+
+    // Update payment status based on refund amount
+    if (this.totalRefunded > 0 && this.status === 'completed') {
+      if (this.totalRefunded >= this.amount) {
+        this.status = 'fully_refunded';
+      } else {
+        this.status = 'partially_refunded';
+      }
+    }
+  }
+
+  next();
+});
 paymentSchema.methods.updateMetadata = function (metadataUpdate, note = 'Metadata updated', updatedBy = 'system') {
   this.metadata = { ...this.metadata, ...metadataUpdate };
   return this.addTimelineEntry(this.status, note, updatedBy);
@@ -688,7 +756,96 @@ paymentSchema.methods.toAPIResponse = function () {
 
   return payment;
 };
+// Instance method to add refund
+PaymentSchema.methods.addRefund = function (refundData) {
+  const refundId = `REF_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  const refund = {
+    refundId,
+    amount: refundData.amount,
+    reason: refundData.reason,
+    description: refundData.description,
+    status: 'pending'
+  };
+
+  this.refunds.push(refund);
+  return refund;
+};
+
+// Instance method to update refund status
+PaymentSchema.methods.updateRefundStatus = function (refundId, status, gatewayRefundId = null, metadata = {}) {
+  const refund = this.refunds.id(refundId) || this.refunds.find(r => r.refundId === refundId);
+
+  if (!refund) {
+    throw new Error('Refund not found');
+  }
+
+  refund.status = status;
+  if (gatewayRefundId) refund.gatewayRefundId = gatewayRefundId;
+  refund.metadata = { ...refund.metadata, ...metadata };
+
+  if (status === 'completed') {
+    refund.processedAt = new Date();
+  }
+
+  return refund;
+};
+
+// Instance method to get refund by ID
+PaymentSchema.methods.getRefund = function (refundId) {
+  return this.refunds.id(refundId) || this.refunds.find(r => r.refundId === refundId);
+};
+
+// Instance method to check if refund is possible
+PaymentSchema.methods.canRefund = function (amount = null) {
+  if (this.status !== 'completed' && this.status !== 'partially_refunded') {
+    return { canRefund: false, reason: 'Payment not completed' };
+  }
+
+  if (this.gateway === 'cod') {
+    return { canRefund: false, reason: 'COD payments cannot be refunded through gateway' };
+  }
+
+  const availableAmount = this.amount - this.totalRefunded;
+
+  if (amount && amount > availableAmount) {
+    return {
+      canRefund: false,
+      reason: `Refund amount exceeds available balance. Available: ${availableAmount}`
+    };
+  }
+
+  return { canRefund: true, availableAmount };
+};
+
+// Static method to find payments with pending refunds
+PaymentSchema.statics.findWithPendingRefunds = function () {
+  return this.find({
+    'refunds.status': { $in: ['pending', 'processing'] }
+  });
+};
+
+// Static method to get refund statistics
+PaymentSchema.statics.getRefundStats = function (dateRange = {}) {
+  const match = {};
+  if (dateRange.start || dateRange.end) {
+    match.createdAt = {};
+    if (dateRange.start) match.createdAt.$gte = dateRange.start;
+    if (dateRange.end) match.createdAt.$lte = dateRange.end;
+  }
+
+  return this.aggregate([
+    { $match: match },
+    { $unwind: '$refunds' },
+    {
+      $group: {
+        _id: '$refunds.status',
+        count: { $sum: 1 },
+        totalAmount: { $sum: '$refunds.amount' }
+      }
+    }
+  ]);
+};
 // Mark payment as paid
 paymentSchema.methods.markAsPaid = function (note = 'Payment marked as paid', updatedBy = 'system') {
   if (this.status !== 'COMPLETED') {

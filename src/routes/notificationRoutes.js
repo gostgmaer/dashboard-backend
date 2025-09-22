@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const notificationController = require('../controller/notificationController');
 const { body } = require('express-validator');
-const authMiddleware = require('../middleware/auth');
+const {authMiddleware} = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 
 // Validation middleware

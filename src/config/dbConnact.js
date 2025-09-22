@@ -60,7 +60,7 @@ const connectDB = async () => {
   try {
     // Enable mongoose debug mode for detailed query logs (optional)
     if (enviroment === 'development') {
-      mongoose.set('debug', true);
+      mongoose.set('debug', false);
     }
 
     mongoose.connection.on('connected', () => {
