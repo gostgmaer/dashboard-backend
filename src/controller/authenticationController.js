@@ -317,8 +317,6 @@ class authController {
             username: user.username,
             fullName: user.fullName,
             role: user.role?.name,
-            isVerified: user.isVerified,
-            hasActiveTOTP: user.hasActiveTOTP
           },
           tokens,
           requiresMFA: false,
@@ -782,7 +780,11 @@ class authController {
       const { method = 'totp' } = req.body;
       const user = req.user;
 
-   
+      if (!user.otpSettings || !user.otpSettings.enabled) {
+        user.otpSettings = user.otpSettings || {};
+        user.otpSettings.enabled = true;
+        await user.save();
+      }
 
       if (user.otpSettings.enabled) {
         return res.status(400).json({
