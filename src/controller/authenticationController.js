@@ -235,10 +235,10 @@ class authController {
       }
 
 
-      if (!user.emailVerified) {
-        await user.generateEmailVerificationToken()
-        await sendEmail(emailVerificationTemplate, user);
-      }
+      // if (!user.emailVerified) {
+      //   await user.generateEmailVerificationToken()
+      //   await sendEmail(emailVerificationTemplate, user);
+      // }
 
       // Check if MFA/OTP is required
       if (authResult.requiresMFA) {
@@ -1938,15 +1938,10 @@ class authController {
   static async getUserPermissionsController(req, res) {
     try {
       const permissions = await req.user.getPermissions();
-      return res.status(200).json({
-        success: true,
-        permissions
-      });
+      standardResponse(res, true, permissions, 'Permissions retrieved successfully')
     } catch (error) {
-      return res.status(404).json({
-        success: false,
-        message: error.message || 'Failed to fetch permissions'
-      });
+      errorResponse(res,
+        'Failed to retrieve permissions', 500, error.message)
     }
   }
 

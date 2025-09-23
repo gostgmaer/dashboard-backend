@@ -716,7 +716,7 @@ userSchema.method({
         ipAddress: deviceInfo.ipAddress
       }
 
-      this.authTokens.push({
+      await this.authTokens.push({
         token: accessToken,
         type: 'access',
         deviceId,
@@ -724,7 +724,7 @@ userSchema.method({
         expiresAt: accessTokenExpiry,
         lastUsed: now
       });
-      this.authTokens.push({
+      await this.authTokens.push({
         token: refreshToken,
         type: 'refresh',
         deviceId,
@@ -1149,16 +1149,63 @@ userSchema.method({
     return (await this.populate(populateFields)).isVerified;
   },
   async getPermissions() {
-    await this.populate({
-      path: 'role',
-      populate: ['permissions', "name", "isActive"]
-    })
+    // await this.populate({
+    //   path: 'role',
+    //   populate: ['permissions', "name", "isActive"]
+    // })
 
-    const rolePermissions = (this.role?.permissions || []).map(p => p.name);
-    // Return unique permissions as an array
-    const uniquePermissions = Array.from(new Set(rolePermissions));
-    return uniquePermissions;
+    // const rolePermissions = (this.role?.permissions || []).map(p => p.name);
+    // // Return unique permissions as an array
+    // const uniquePermissions = Array.from(new Set(rolePermissions));
+    // return uniquePermissions;
+
+
+    // const Role = this.model("Role"); // Get Role model dynamically from mongoose
+
+    // Ensure role exists
+    // if (!this.role) return [];
+
+    // const roleId = typeof this.role === "string" ? new mongoose.Types.ObjectId(this.role) : this.role;
+    const roleId = this.role._id
+    const result = await Role.aggregate([
+      { $match: { _id: roleId } },
+
+      {
+        $lookup: {
+          from: "permissions",   // name of permissions collection
+          localField: "permissions",
+          foreignField: "_id",
+          as: "permissions",
+        },
+      },
+
+      { $unwind: "$permissions" },
+
+      { $match: { "permissions.isActive": true } },
+
+      {
+        $group: {
+          _id: "$permissions.category",
+          actions: { $addToSet: "$permissions.action" },
+        },
+      },
+
+      {
+        $project: {
+          _id: 0,
+          category: "$_id",
+          actions: 1,
+        },
+      },
+    ]);
+
+    return result; // returns [{ category, actions: [] }, ...]
+
+
   },
+
+
+
   // Update last login timestamp
   async updateLastLogin() {
     this.lastLogin = new Date();
@@ -1712,8 +1759,8 @@ userSchema.method({
       // Add security event
       this.securityEvents.push({
         event: 'account_locked',
-        ipAddress,
-        userAgent,
+        ipAddress: deviceInfo.ipAddress,
+        userAgent: deviceInfo.userAgent,
         details: { reason: 'Too many failed login attempts', attempts: this.consecutiveFailedAttempts }
       });
     }
