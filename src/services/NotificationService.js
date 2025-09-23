@@ -110,9 +110,9 @@ class NotificationService {
       }
 
       // Email notification
-      // if (channels.includes('EMAIL')) {
-      //   await emailService.sendNotification(notification);
-      // }
+      if (channels.includes('EMAIL')) {
+        await emailService.sendNotification(notification);
+      }
 
       // Mark as delivered
       notification.deliveredAt = new Date();
