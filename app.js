@@ -33,8 +33,9 @@ const authRoute = require('./src/routes/authRoute');
 const socketService = require('./src/services/socketService');
 const notificationService = require('./src/services/NotificationService');
 const NotificationMiddleware = require('./src/middleware/notificationMiddleware');
-const {notificationRoute} = require('./src/routes/notificationRoutes');
+const { notificationRoute } = require('./src/routes/notificationRoutes');
 const { AttachmentUpload } = require('./src/routes/fileUploader');
+const LoggerService = require("./src/services/logger");
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -53,7 +54,7 @@ function checkRoute(name, route) {
   if (!route || typeof route !== "function") {
     console.error(`❌ Route "${name}" is NOT a valid router. Got:`, route);
   } else {
-    console.log(`✅ Route "${name}" loaded successfully.`);
+    // console.log(`✅ Route "${name}" loaded successfully.`);
   }
   return route;
 }
@@ -62,9 +63,11 @@ function checkRoute(name, route) {
 verifyEmailConnection().then((result) => console.log(result));
 
 notificationService.socketService = socketService;
+
+app.use(LoggerService.expressRequestLogger());
+
 // Assuming your uploads folder is ./uploads relative to your project root
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
 app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
 app.use('/api/users', checkRoute("UserRoute", UserRoute));
