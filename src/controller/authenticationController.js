@@ -782,7 +782,9 @@ class authController {
       const { method = 'totp' } = req.body;
       const user = req.user;
 
-      if (user.mfaEnabled) {
+   
+
+      if (user.otpSettings.enabled) {
         return res.status(400).json({
           success: false,
           message: 'MFA is already enabled',

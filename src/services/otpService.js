@@ -7,7 +7,7 @@ const { otpEmailTemplate } = require('../email/emailTemplate');
 const User = require('../models/user');
 /**
  * 🔐 ENTERPRISE OTP SERVICE
- * 
+ *
  * Features:
  * ✅ Configurable OTP methods (TOTP, Email, SMS)
  * ✅ Priority-based method selection
@@ -19,44 +19,36 @@ const User = require('../models/user');
 
 class OTPService {
   constructor() {
-    // Load configuration from environment
     this.config = {
       enabled: process.env.ENABLE_OTP_VERIFICATION === 'true',
-      priorityOrder: (process.env.OTP_PRIORITY_ORDER || 'totp,email,sms').split(','),
       defaultMethod: process.env.DEFAULT_OTP_METHOD || 'totp',
+      allowFallback: false, // enforce single method only
       expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '5'),
       maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || '3'),
-      rateLimit: {
-        window: parseInt(process.env.OTP_RATE_LIMIT_WINDOW || '60000'),
-        maxRequests: parseInt(process.env.OTP_MAX_REQUESTS_PER_WINDOW || '5')
-      },
       totp: {
         secretLength: parseInt(process.env.TOTP_SECRET_LENGTH || '32'),
         window: parseInt(process.env.TOTP_WINDOW || '1'),
         step: parseInt(process.env.TOTP_STEP || '30'),
         appName: process.env.TOTP_APP_NAME || 'YourApp',
-        issuer: process.env.TOTP_ISSUER || 'YourCompany'
+        issuer: process.env.TOTP_ISSUER || 'YourCompany',
       },
       email: {
         length: parseInt(process.env.EMAIL_OTP_LENGTH || '6'),
         template: process.env.EMAIL_OTP_TEMPLATE || 'otp_verification',
-        sender: process.env.EMAIL_SENDER || 'noreply@yourapp.com'
+        sender: process.env.EMAIL_SENDER || 'noreply@yourapp.com',
       },
       sms: {
         length: parseInt(process.env.SMS_OTP_LENGTH || '6'),
-        provider: process.env.SMS_PROVIDER || 'twilio'
-      }
+        provider: process.env.SMS_PROVIDER || 'twilio',
+      },
     };
 
-    // Initialize SMS client
+    this.preferredMethod = this.config.defaultMethod;
+
     if (this.config.sms.provider === 'twilio' && process.env.TWILIO_ACCOUNT_SID) {
-      this.twilioClient = twilio(
-        process.env.TWILIO_ACCOUNT_SID,
-        process.env.TWILIO_AUTH_TOKEN
-      );
+      this.twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     }
 
-    // Rate limiting storage (in production, use Redis)
     this.rateLimitStore = new Map();
   }
 
@@ -70,43 +62,37 @@ class OTPService {
   /**
    * Get available OTP methods for a user
    */
-  getAvailableMethods(user, deviceInfo = {}) {
+  getAvailableMethods(user) {
     const methods = [];
 
-    // Check TOTP availability
-    if (user.twoFactorEnabled && user.twoFactorSecret) {
-      methods.push({
-        type: 'totp',
-        name: 'Authentication App',
-        priority: this.config.priorityOrder.indexOf('totp'),
-        available: true
-      });
+    if (!this.config.allowFallback) {
+      // Only preferred method allowed
+      if (this.preferredMethod === 'totp' && user.twoFactorAuth?.enabled && user.twoFactorAuth?.secret) {
+        methods.push({
+          type: 'totp',
+          name: 'Authentication App',
+          available: true,
+        });
+      } else if (this.preferredMethod === 'email' && user.email && user.emailVerified) {
+        methods.push({
+          type: 'email',
+          name: 'Email',
+          available: true,
+          destination: this.maskEmail(user.email),
+        });
+      } else if (this.preferredMethod === 'sms' && user.phoneNumber && user.phoneVerified) {
+        methods.push({
+          type: 'sms',
+          name: 'SMS',
+          available: true,
+          destination: this.maskPhone(user.phoneNumber),
+        });
+      }
+    } else {
+      // Fallback logic if enabled (optional)
     }
 
-    // Check Email availability
-    if (user.email && user.emailVerified) {
-      methods.push({
-        type: 'email',
-        name: 'Email',
-        priority: this.config.priorityOrder.indexOf('email'),
-        available: true,
-        destination: this.maskEmail(user.email)
-      });
-    }
-
-    // Check SMS availability
-    if (user.phoneNumber && user.phoneVerified) {
-      methods.push({
-        type: 'sms',
-        name: 'SMS',
-        priority: this.config.priorityOrder.indexOf('sms'),
-        available: true,
-        destination: this.maskPhone(user.phoneNumber)
-      });
-    }
-
-    // Sort by priority
-    return methods.sort((a, b) => a.priority - b.priority);
+    return methods;
   }
 
   /**
@@ -130,21 +116,21 @@ class OTPService {
       const secret = speakeasy.generateSecret({
         length: this.config.totp.secretLength,
         name: `${this.config.totp.appName}:${user.email}`,
-        issuer: this.config.totp.issuer
+        issuer: this.config.totp.issuer,
       });
 
       // Generate QR code
       const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
 
       // Store secret temporarily (will be confirmed later)
-      user.twoFactorSecret = secret.base32;
-      user.twoFactorEnabled = false; // Will be enabled after verification
+      user.twoFactorAuth.secret = secret.base32;
+      user.twoFactorAuth.enabled = false; // Will be enabled after verification
 
       return {
         secret: secret.base32,
         qrCode: qrCodeUrl,
         manualEntryKey: secret.base32,
-        setupUri: secret.otpauth_url
+        setupUri: secret.otpauth_url,
       };
     } catch (error) {
       throw new Error(`TOTP setup failed: ${error.message}`);
@@ -161,29 +147,30 @@ class OTPService {
       }
 
       const verified = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
+        secret: user.twoFactorAuth.secret,
         encoding: 'base32',
         token,
         window: this.config.totp.window,
-        step: this.config.totp.step
+        step: this.config.totp.step,
       });
 
       if (verified) {
-        user.twoFactorEnabled = true;
+        user.twoFactorAuth.enabled = true;
+        user.twoFactorAuth.setupCompleted = true;
         await user.save();
 
         // Generate backup codes
         const backupCodes = this.generateBackupCodes();
-        user.backupCodes = backupCodes.map(code => ({
+        user.twoFactorAuth.backupCodes = backupCodes.map((code) => ({
           code: this.hashBackupCode(code),
           used: false,
-          createdAt: new Date()
+          createdAt: new Date(),
         }));
         await user.save();
 
         return {
           success: true,
-          backupCodes: backupCodes
+          backupCodes: backupCodes,
         };
       }
 
@@ -200,7 +187,7 @@ class OTPService {
     return speakeasy.totp({
       secret,
       encoding: 'base32',
-      step: this.config.totp.step
+      step: this.config.totp.step,
     });
   }
 
@@ -209,7 +196,7 @@ class OTPService {
    */
   verifyTOTP(user, token) {
     try {
-      if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      if (!user.twoFactorAuth.enabled || !user.twoFactorAuth.secret) {
         throw new Error('TOTP not enabled for this user');
       }
 
@@ -223,7 +210,7 @@ class OTPService {
         encoding: 'base32',
         token,
         window: this.config.totp.window,
-        step: this.config.totp.step
+        step: this.config.totp.step,
       });
 
       return verified;
@@ -241,9 +228,9 @@ class OTPService {
         throw new Error('Invalid TOTP token');
       }
 
-      user.twoFactorEnabled = false;
-      user.twoFactorSecret = null;
-      user.backupCodes = [];
+      user.twoFactorAuth.enabled = false;
+      user.twoFactorAuth.secret = null;
+      user.twoFactorAuth.backupCodes = [];
       await user.save();
 
       return { success: true };
@@ -268,22 +255,27 @@ class OTPService {
       const expiresAt = new Date(Date.now() + this.config.expiryMinutes * 60000);
 
       // Store OTP details in user
-      user.otpCode = this.hashOTP(code);
-      user.otpExpiry = expiresAt;
-      user.otpType = 'email';
-      user.otpPurpose = purpose;
-      user.otpAttempts = 0;
-      user.otpLastSent = new Date();
-      await user.save();
 
-      // Send email
+      user.currentOTP = {
+        code,
+        hashedCode: this.hashOTP(code),
+        type: 'email',
+        purpose,
+        expiresAt,
+        attempts: 0,
+        maxAttempts: this.config.maxAttempts,
+        lastSent: new Date(),
+        verified: false
+      };
+
+      await user.save();
       const emailResult = await sendEmail(otpEmailTemplate, {
         to: user.email,
-        name: user.firstName || user.username,
+        username: user.firstName || user.username,
         code,
         purpose,
         expiresAt,
-        deviceInfo
+        deviceInfo,
       });
 
       if (!emailResult.success) {
@@ -295,7 +287,7 @@ class OTPService {
         type: 'email',
         destination: this.maskEmail(user.email),
         expiresAt,
-        messageId: emailResult.messageId
+        messageId: emailResult.messageId,
       };
     } catch (error) {
       throw new Error(`Email OTP generation failed: ${error.message}`);
@@ -322,12 +314,20 @@ class OTPService {
       const expiresAt = new Date(Date.now() + this.config.expiryMinutes * 60000);
 
       // Store OTP details in user
-      user.otpCode = this.hashOTP(code);
-      user.otpExpiry = expiresAt;
-      user.otpType = 'sms';
-      user.otpPurpose = purpose;
-      user.otpAttempts = 0;
-      user.otpLastSent = new Date();
+
+
+      user.currentOTP = {
+        code,
+        hashedCode: this.hashOTP(code),
+        type: 'sms',
+        purpose,
+        expiresAt,
+        attempts: 0,
+        maxAttempts: this.config.maxAttempts,
+        lastSent: new Date(),
+        verified: false
+      };
+
       await user.save();
 
       // Send SMS
@@ -336,7 +336,7 @@ class OTPService {
       const smsResult = await this.twilioClient.messages.create({
         body: message,
         from: process.env.TWILIO_PHONE_NUMBER,
-        to: user.phoneNumber
+        to: user.phoneNumber,
       });
 
       return {
@@ -344,7 +344,7 @@ class OTPService {
         type: 'sms',
         destination: this.maskPhone(user.phoneNumber),
         expiresAt,
-        messageId: smsResult.sid
+        messageId: smsResult.sid,
       };
     } catch (error) {
       throw new Error(`SMS OTP generation failed: ${error.message}`);
@@ -373,7 +373,7 @@ class OTPService {
 
       // Validate method availability
       const availableMethods = this.getAvailableMethods(user, deviceInfo);
-      const selectedMethod = availableMethods.find(m => m.type === method);
+      const selectedMethod = availableMethods.find((m) => m.type === method);
 
       if (!selectedMethod || !selectedMethod.available) {
         throw new Error(`OTP method '${method}' is not available for this user`);
@@ -387,7 +387,7 @@ class OTPService {
             success: true,
             type: 'totp',
             message: 'Use your authentication app to get the code',
-            expiresAt: new Date(Date.now() + this.config.totp.step * 1000)
+            expiresAt: new Date(Date.now() + this.config.totp.step * 1000),
           };
           break;
 
@@ -427,7 +427,7 @@ class OTPService {
       }
 
       // Check if it's a TOTP code
-      if (user.twoFactorEnabled && (code.length === 6 || code.length > 6)) {
+      if (user.twoFactorAuth.enabled && (code.length === 6 || code.length > 6)) {
         const totpValid = this.verifyTOTP(user, code);
         if (totpValid) {
           await this.logOTPEvent(user, 'verified', 'totp', deviceInfo);
@@ -436,38 +436,38 @@ class OTPService {
       }
 
       // Check email/SMS OTP
-      if (!user.otpCode || !user.otpExpiry) {
+      if (!user.currentOTP.code || !user.currentOTP.expiresAt) {
         throw new Error('No OTP found for verification');
       }
 
-      if (user.otpExpiry < new Date()) {
-        user.otpCode = null;
-        user.otpExpiry = null;
-        user.otpAttempts = 0;
+      if (user.currentOTP.expiresAt < new Date()) {
+        user.currentOTP.code = null;
+        user.currentOTP.expiresAt = null;
+        user.currentOTP.attempts = 0;
         await user.save();
         throw new Error('OTP has expired');
       }
 
-      if (user.otpAttempts >= this.config.maxAttempts) {
-        user.otpCode = null;
-        user.otpExpiry = null;
-        user.otpAttempts = 0;
+      if (user.currentOTP.attempts >= this.config.maxAttempts) {
+        user.currentOTP.code = null;
+        user.currentOTP.expiresAt = null;
+        user.currentOTP.attempts = 0;
         await user.save();
         throw new Error('Maximum OTP attempts exceeded');
       }
 
       const hashedInput = this.hashOTP(code);
-      if (user.otpCode !== hashedInput) {
-        user.otpAttempts += 1;
+      if (user.currentOTP.hashedCode !== hashedInput) {
+        user.currentOTP.attempts += 1;
         await user.save();
         await this.logOTPEvent(user, 'verification_failed', user.otpType, deviceInfo);
         throw new Error('Invalid OTP code');
       }
 
       // OTP is valid - clear it
-      user.otpCode = null;
-      user.otpExpiry = null;
-      user.otpAttempts = 0;
+      user.currentOTP.code = null;
+      user.currentOTP.expiresAt = null;
+      user.currentOTP.attempts = 0;
       await user.save();
 
       await this.logOTPEvent(user, 'verified', user.otpType, deviceInfo);
@@ -492,14 +492,12 @@ class OTPService {
    * Verify backup code
    */
   verifyBackupCode(user, code) {
-    if (!user.backupCodes || user.backupCodes.length === 0) {
+    if (!user.twoFactorAuth.backupCodes || user.twoFactorAuth.backupCodes.length === 0) {
       return false;
     }
 
     const hashedCode = this.hashBackupCode(code);
-    const backupCode = user.backupCodes.find(bc =>
-      bc.code === hashedCode && !bc.used
-    );
+    const backupCode = user.user.twoFactorAuth.backupCodes.find((bc) => bc.code === hashedCode && !bc.used);
 
     if (backupCode) {
       backupCode.used = true;
@@ -541,9 +539,7 @@ class OTPService {
    */
   maskEmail(email) {
     const [username, domain] = email.split('@');
-    const maskedUsername = username.length > 2
-      ? `${username[0]}${'*'.repeat(username.length - 2)}${username[username.length - 1]}`
-      : '*'.repeat(username.length);
+    const maskedUsername = username.length > 2 ? `${username[0]}${'*'.repeat(username.length - 2)}${username[username.length - 1]}` : '*'.repeat(username.length);
     return `${maskedUsername}@${domain}`;
   }
 
@@ -566,7 +562,7 @@ class OTPService {
     let requests = this.rateLimitStore.get(key) || [];
 
     // Remove old requests outside the window
-    requests = requests.filter(timestamp => timestamp > windowStart);
+    requests = requests.filter((timestamp) => timestamp > windowStart);
 
     if (requests.length >= this.config.rateLimit.maxRequests) {
       const resetTime = Math.ceil((requests[0] + this.config.rateLimit.window - now) / 1000);
@@ -592,7 +588,7 @@ class OTPService {
         userAgent: deviceInfo.userAgent,
         deviceId: deviceInfo.deviceId,
         success: !error,
-        error: error || null
+        error: error || null,
       };
 
       // In production, send to logging service or store in database
@@ -605,7 +601,7 @@ class OTPService {
           timestamp: event.timestamp,
           ipAddress: event.ipAddress,
           userAgent: event.userAgent,
-          details: { method, success: event.success, error }
+          details: { method, success: event.success, error },
         });
 
         // Keep only last 50 security events
@@ -625,7 +621,6 @@ class OTPService {
    */
   async cleanupExpiredOTPs() {
     try {
-
       const result = await User.updateMany(
         { otpExpiry: { $lt: new Date() } },
         {
@@ -634,8 +629,8 @@ class OTPService {
             otpExpiry: 1,
             otpType: 1,
             otpPurpose: 1,
-            otpAttempts: 1
-          }
+            otpAttempts: 1,
+          },
         }
       );
 
@@ -659,8 +654,8 @@ class OTPService {
       methodBreakdown: {
         totp: 0,
         email: 0,
-        sms: 0
-      }
+        sms: 0,
+      },
     };
   }
 }

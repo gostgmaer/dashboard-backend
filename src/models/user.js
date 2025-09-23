@@ -16,7 +16,7 @@ const SALT_ROUNDS = 10;
 // Environment variables with enhanced defaults
 const {
   JWT_SECRET = 'your-super-secret-jwt-key',
-  JWT_ID_SECRET = "dasd98a7sd97as89d7a98sd7",
+  JWT_ID_SECRET = 'dasd98a7sd97as89d7a98sd7',
   JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
   JWT_EXPIRY = '1h',
   JWT_REFRESH_EXPIRY = '7d',
@@ -36,9 +36,8 @@ const {
   SESSION_TIMEOUT_MINUTES = '120',
   MAX_CONCURRENT_SESSIONS = '3',
   REQUIRE_DEVICE_VERIFICATION = 'false',
-  ENABLE_SUSPICIOUS_LOGIN_DETECTION = 'true'
+  ENABLE_SUSPICIOUS_LOGIN_DETECTION = 'true',
 } = process.env;
-
 
 const MAX_ATTEMPTS = parseInt(MAX_LOGIN_ATTEMPTS);
 const LOCK_TIME = parseInt(LOCKOUT_TIME_MINUTES) * 60 * 1000;
@@ -53,7 +52,7 @@ const userSchema = new mongoose.Schema(
     socialID: { type: String, default: null },
     email: { type: String, required: true, unique: true, lowercase: true },
     hash_password: { type: String, required: false },
-    role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
+    role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
 
     // ─────────── Personal Information ───────────
     firstName: { type: String, trim: true },
@@ -61,30 +60,29 @@ const userSchema = new mongoose.Schema(
     dateOfBirth: { type: Date, default: null },
     gender: {
       type: String,
-      enum: ["male", "female", "other", "prefer_not_to_say"],
+      enum: ['male', 'female', 'other', 'prefer_not_to_say'],
       default: null,
       trim: true,
     },
     phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
     profilePicture: {
-      _id: { type: mongoose.Schema.Types.ObjectId, ref: "Attachment", default: null },
-      fileUrl: { type: String, default: null }
+      _id: { type: mongoose.Schema.Types.ObjectId, ref: 'Attachment', default: null },
+      fileUrl: { type: String, default: null },
     },
 
     // ─────────── Verification & Security ───────────
     isVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
+    emailVerificationTokens: [
+      {
+        token: { type: String, required: true },
+        purpose: { type: String, enum: ['email_verification', 'email_change'], default: 'email_verification' },
+        expiresAt: { type: Date, required: true },
+        used: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     phoneVerified: { type: Boolean, default: false },
-    emailVerificationToken: { type: String, default: null },
-    emailVerificationExpiry: { type: Date, default: null },
-    confirmToken: { type: String, default: null },
-
-    // OTP Management
-    otpCode: { type: String, default: null },
-    otpExpiry: { type: Date, default: null },
-    otpType: { type: String, enum: ["email", "sms", "login", "reset", "verification"], default: null },
-    otpAttempts: { type: Number, default: 0 },
-    otpLastSent: { type: Date, default: null },
 
     // Login & Security Events
     failedLoginAttempts: { type: Number, default: 0 },
@@ -92,66 +90,69 @@ const userSchema = new mongoose.Schema(
     lockoutUntil: { type: Date, default: null },
     lastLoginAttempt: { type: Date, default: null },
     lastLogin: { type: Date, default: null },
-    loginHistory: [{
-      loginTime: { type: Date, required: true, default: Date.now },
-      ipAddress: { type: String, trim: true },
-      userAgent: { type: String, trim: true },
-      successful: { type: Boolean, required: true },
-      failureReason: { type: String, default: null },
-      deviceId: { type: String, trim: true },
-      location: {
-        country: { type: String, default: null },
-        region: { type: String, default: null }, // Added from deviceInfo
-        city: { type: String, default: null },
-        coordinates: {
-          lat: { type: Number, default: null },
-          lng: { type: Number, default: null }
+    loginHistory: [
+      {
+        loginTime: { type: Date, required: true, default: Date.now },
+        ipAddress: { type: String, trim: true },
+        userAgent: { type: String, trim: true },
+        successful: { type: Boolean, required: true },
+        failureReason: { type: String, default: null },
+        deviceId: { type: String, trim: true },
+        location: {
+          country: { type: String, default: null },
+          region: { type: String, default: null }, // Added from deviceInfo
+          city: { type: String, default: null },
+          coordinates: {
+            lat: { type: Number, default: null },
+            lng: { type: Number, default: null },
+          },
+          timezone: { type: String, default: null }, // Added from deviceInfo
         },
-        timezone: { type: String, default: null } // Added from deviceInfo
+        browser: {
+          name: { type: String, default: null },
+          version: { type: String, default: null },
+          major: { type: String, default: null }, // Added from deviceInfo
+        },
+        os: {
+          name: { type: String, default: null },
+          version: { type: String, default: null },
+        },
+        device: {
+          vendor: { type: String, default: null }, // Added from deviceInfo
+          model: { type: String, default: null }, // Added from deviceInfo
+          type: { type: String, default: null }, // Added from deviceInfo
+        },
+        fingerprint: { type: String, default: null }, // Added from deviceInfo
+        security: {
+          suspiciousScore: { type: Number, default: 0 }, // Added from deviceInfo
+          riskLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'low' }, // Added from deviceInfo
+          flags: [{ type: String }], // Added from deviceInfo
+          analysis: {
+            userAgentLength: { type: Number, default: null },
+            hasSecurityHeaders: { type: Boolean, default: false },
+            headerCount: { type: Number, default: null },
+            timestamp: { type: Date, default: null },
+          },
+        },
+        loginMethod: { type: String, enum: ['password', 'social', 'otp', 'sso'], default: 'password' },
+        detectedAt: { type: Date, default: null }, // Added from deviceInfo
+        otpUsed: { type: String, enum: ['totp', 'email', 'sms', 'backup', 'none'], default: 'none' },
       },
-      browser: {
-        name: { type: String, default: null },
-        version: { type: String, default: null },
-        major: { type: String, default: null } // Added from deviceInfo
-      },
-      os: {
-        name: { type: String, default: null },
-        version: { type: String, default: null }
-      },
-      device: {
-        vendor: { type: String, default: null }, // Added from deviceInfo
-        model: { type: String, default: null },  // Added from deviceInfo
-        type: { type: String, default: null }   // Added from deviceInfo
-      },
-      fingerprint: { type: String, default: null }, // Added from deviceInfo
-      security: {
-        suspiciousScore: { type: Number, default: 0 }, // Added from deviceInfo
-        riskLevel: { type: String, enum: ['low', 'medium', 'high'], default: 'low' }, // Added from deviceInfo
-        flags: [{ type: String }], // Added from deviceInfo
-        analysis: {
-          userAgentLength: { type: Number, default: null },
-          hasSecurityHeaders: { type: Boolean, default: false },
-          headerCount: { type: Number, default: null },
-          timestamp: { type: Date, default: null }
-        }
-      },
-      loginMethod: { type: String, enum: ['password', 'social', 'otp', 'sso'], default: 'password' },
-      detectedAt: { type: Date, default: null }, // Added from deviceInfo
-      otpUsed: { type: String, enum: ['totp', 'email', 'sms', 'backup', 'none'], default: 'none' }
-    }],
-
+    ],
 
     // Security Events & Audit Log
-    securityEvents: [{
-      event: { type: String, required: true },
-      description: { type: String, default: null },
-      severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
-      timestamp: { type: Date, default: Date.now },
-      ipAddress: { type: String, default: null },
-      userAgent: { type: String, default: null },
-      deviceId: { type: String, default: null },
-      metadata: { type: mongoose.Schema.Types.Mixed, default: {} }
-    }],
+    securityEvents: [
+      {
+        event: { type: String, required: true },
+        description: { type: String, default: null },
+        severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
+        timestamp: { type: Date, default: Date.now },
+        ipAddress: { type: String, default: null },
+        userAgent: { type: String, default: null },
+        deviceId: { type: String, default: null },
+        metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+      },
+    ],
 
     // ─────────── Session & Tokens ───────────
     refreshTokens: [
@@ -174,26 +175,18 @@ const userSchema = new mongoose.Schema(
         expiresAt: { type: Date, required: true },
         ipAddress: { type: String, default: null },
         userAgent: { type: String, default: null },
-        isActive: { type: Boolean, default: true }
-      }
+        isActive: { type: Boolean, default: true },
+      },
     ],
-    tokens: [{ token: { type: String } }],
     isDeleted: { type: Boolean, default: false },
-    // Password Reset
     passwordReset: {
       token: { type: String, default: null },
       tokenExpiry: { type: Date, default: null },
       attempts: { type: Number, default: 0 },
-      lastAttempt: { type: Date, default: null }
+      lastAttempt: { type: Date, default: null },
     },
-    resetToken: { type: String, default: null },
-    resetTokenExpiration: { type: Date, default: null },
-
     tempPasswordActive: { type: Boolean, default: false },
 
-    // ─────────── Two-Factor Authentication ───────────
-    twoFactorEnabled: { type: Boolean, default: false },
-    twoFactorSecret: { type: String, default: null },
     backupCodes: [
       {
         code: String,
@@ -201,52 +194,42 @@ const userSchema = new mongoose.Schema(
         createdAt: { type: Date, default: Date.now },
       },
     ],
-
-
-
-    // Email Verification
-    emailVerificationTokens: [{
-      token: { type: String, required: true },
-      purpose: { type: String, enum: ['email_verification', 'email_change'], default: 'email_verification' },
-      expiresAt: { type: Date, required: true },
-      used: { type: Boolean, default: false },
-      createdAt: { type: Date, default: Date.now }
-    }],
-
     // Enhanced OTP System
     otpSettings: {
-      enabled: { type: Boolean, default: () => ENABLE_OTP_VERIFICATION === 'true' },
-      preferredMethod: { type: String, enum: ['totp', 'email', 'sms'], default: DEFAULT_OTP_METHOD },
-      allowFallback: { type: Boolean, default: true },
-      requireForLogin: { type: Boolean, default: true },
-      requireForSensitiveOps: { type: Boolean, default: true }
+      enabled: { type: Boolean, default: false },
+      preferredMethod: { type: String, enum: ['totp', 'email', 'sms'], default: 'totp' },
+      allowFallback: { type: Boolean, default: false },
+      requireForLogin: { type: Boolean, default: false },
+      requireForSensitiveOps: { type: Boolean, default: true },
     },
 
     // Current OTP Session
     currentOTP: {
       code: { type: String, default: null },
       hashedCode: { type: String, default: null },
-      type: { type: String, enum: ['totp', 'email', 'sms', 'backup'], default: null },
+      type: { type: String, enum: ['email', 'sms', 'backup'], default: null },
       purpose: { type: String, enum: ['login', 'reset', 'verification', 'sensitive_op'], default: null },
       expiresAt: { type: Date, default: null },
       attempts: { type: Number, default: 0 },
       maxAttempts: { type: Number, default: 3 },
       lastSent: { type: Date, default: null },
-      verified: { type: Boolean, default: false }
+      verified: { type: Boolean, default: false },
     },
 
     // TOTP/2FA Configuration
     twoFactorAuth: {
       enabled: { type: Boolean, default: false },
       secret: { type: String, default: null },
-      backupCodes: [{
-        code: { type: String, required: true },
-        used: { type: Boolean, default: false },
-        usedAt: { type: Date, default: null },
-        createdAt: { type: Date, default: Date.now }
-      }],
+      backupCodes: [
+        {
+          code: { type: String, required: true },
+          used: { type: Boolean, default: false },
+          usedAt: { type: Date, default: null },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
       setupCompleted: { type: Boolean, default: false },
-      lastUsed: { type: Date, default: null }
+      lastUsed: { type: Date, default: null },
     },
 
     // Login Security
@@ -255,64 +238,68 @@ const userSchema = new mongoose.Schema(
       lockedUntil: { type: Date, default: null },
       lastLoginAttempt: { type: Date, default: null },
       consecutiveFailures: { type: Number, default: 0 },
-      suspiciousActivityDetected: { type: Boolean, default: false }
+      suspiciousActivityDetected: { type: Boolean, default: false },
     },
 
     // Enhanced Token Management
-    authTokens: [{
-      token: { type: String, required: true },
-      type: { type: String, enum: ['access', 'refresh', 'id'], required: true },
-      deviceId: { type: String, required: true },
-      deviceInfo: {
+    authTokens: [
+      {
+        token: { type: String, required: true },
+        type: { type: String, enum: ['access', 'refresh', 'id'], required: true },
+        deviceId: { type: String, required: true },
+        deviceInfo: {
+          name: { type: String, default: null },
+          type: { type: String, default: null },
+          os: { type: String, default: null },
+          browser: { type: String, default: null },
+          ipAddress: { type: String, default: null },
+        },
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true },
+        lastUsed: { type: Date, default: Date.now },
+        isRevoked: { type: Boolean, default: false },
+        revokedAt: { type: Date, default: null },
+        revokedReason: { type: String, default: null },
+      },
+    ],
+
+    // Device Management
+    knownDevices: [
+      {
+        deviceId: { type: String, required: true, unique: true },
         name: { type: String, default: null },
         type: { type: String, default: null },
         os: { type: String, default: null },
         browser: { type: String, default: null },
-        ipAddress: { type: String, default: null }
+        firstSeen: { type: Date, default: Date.now },
+        lastSeen: { type: Date, default: Date.now },
+        isTrusted: { type: Boolean, default: false },
+        isActive: { type: Boolean, default: true },
+        fingerprint: { type: String, default: null },
+        location: {
+          country: { type: String, default: null },
+          region: { type: String, default: null },
+          city: { type: String, default: null },
+          coordinates: {
+            lat: { type: Number, default: null },
+            lng: { type: Number, default: null },
+          },
+        },
       },
-      createdAt: { type: Date, default: Date.now },
-      expiresAt: { type: Date, required: true },
-      lastUsed: { type: Date, default: Date.now },
-      isRevoked: { type: Boolean, default: false },
-      revokedAt: { type: Date, default: null },
-      revokedReason: { type: String, default: null }
-    }],
-
-    // Device Management
-    knownDevices: [{
-      deviceId: { type: String, required: true, unique: true },
-      name: { type: String, default: null },
-      type: { type: String, default: null },
-      os: { type: String, default: null },
-      browser: { type: String, default: null },
-      firstSeen: { type: Date, default: Date.now },
-      lastSeen: { type: Date, default: Date.now },
-      isTrusted: { type: Boolean, default: false },
-      isActive: { type: Boolean, default: true },
-      fingerprint: { type: String, default: null },
-      location: {
-        country: { type: String, default: null },
-        region: { type: String, default: null },
-        city: { type: String, default: null },
-        coordinates: {
-          lat: { type: Number, default: null },
-          lng: { type: Number, default: null }
-        }
-      }
-    }],
+    ],
 
     // ─────────── Relationships ───────────
-    address: [{ type: mongoose.Schema.Types.ObjectId, ref: "Address" }],
-    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: "Order" }],
-    favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
-    shoppingCart: { type: mongoose.Schema.Types.ObjectId, ref: "Cart" },
-    wishList: { type: mongoose.Schema.Types.ObjectId, ref: "Wishlist" },
-    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    address: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
+    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
+    favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+    shoppingCart: { type: mongoose.Schema.Types.ObjectId, ref: 'Cart' },
+    wishList: { type: mongoose.Schema.Types.ObjectId, ref: 'Wishlist' },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     // ─────────── Social Accounts ───────────
     socialAccounts: [
       {
-        provider: { type: String, enum: ["google", "facebook", "twitter", "github"] },
+        provider: { type: String, enum: ['google', 'facebook', 'twitter', 'github'] },
         providerId: String,
         email: String,
         verified: { type: Boolean, default: false },
@@ -333,9 +320,9 @@ const userSchema = new mongoose.Schema(
     preferences: {
       newsletter: { type: Boolean, default: false },
       notifications: { type: Boolean, default: true },
-      language: { type: String, default: "en" },
-      currency: { type: String, default: "USD" },
-      theme: { type: String, enum: ["light", "dark"], default: "light" },
+      language: { type: String, default: 'en' },
+      currency: { type: String, default: 'USD' },
+      theme: { type: String, enum: ['light', 'dark'], default: 'light' },
     },
     interests: { type: [String], default: [] },
 
@@ -344,7 +331,7 @@ const userSchema = new mongoose.Schema(
     referralCode: { type: String },
     paymentMethods: [
       {
-        method: { type: String, enum: ["credit_card", "paypal", "bank_transfer"], required: true },
+        method: { type: String, enum: ['credit_card', 'paypal', 'bank_transfer'], required: true },
         details: {
           cardNumber: { type: String, default: null },
           expiryDate: { type: Date, default: null },
@@ -354,20 +341,20 @@ const userSchema = new mongoose.Schema(
       },
     ],
     shippingPreferences: {
-      deliveryMethod: { type: String, enum: ["standard", "express"], default: "standard" },
+      deliveryMethod: { type: String, enum: ['standard', 'express'], default: 'standard' },
       deliveryInstructions: { type: String, default: null },
       preferredTime: { type: String, default: null },
     },
-    subscriptionStatus: { type: String, enum: ["active", "inactive"], default: "inactive" },
-    subscriptionType: { type: String, enum: ["free", "premium", "enterprise"], default: "free" },
+    subscriptionStatus: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
+    subscriptionType: { type: String, enum: ['free', 'premium', 'enterprise'], default: 'free' },
 
     // ─────────── Audit Fields ───────────
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: {
       type: String,
-      enum: ["active", "inactive", "pending", "banned", "deleted", "archived", "draft"],
-      default: "draft",
+      enum: ['active', 'inactive', 'pending', 'banned', 'deleted', 'archived', 'draft'],
+      default: 'draft',
       trim: true,
     },
 
@@ -376,8 +363,6 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
-
 
 userSchema.virtual('fullName').get(function () {
   if (!this.firstName) return null;
@@ -412,12 +397,11 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
-
   /**
- * Generate JWT tokens
- * 
- * 
- */
+   * Generate JWT tokens
+   *
+   *
+   */
 
   async addLoginHistory({ successful, failureReason, deviceInfo, loginMethod = 'password' }) {
     const loginEntry = {
@@ -425,7 +409,7 @@ userSchema.method({
       ipAddress: deviceInfo.ipAddress || null,
       userAgent: deviceInfo.userAgent || null,
       successful,
-      failureReason: successful ? null : (failureReason || 'unknown'),
+      failureReason: successful ? null : failureReason || 'unknown',
       deviceId: deviceInfo.deviceId || null,
       location: {
         country: deviceInfo.location?.country || null,
@@ -433,23 +417,23 @@ userSchema.method({
         city: deviceInfo.location?.city || null,
         coordinates: {
           lat: deviceInfo.location?.coordinates?.lat || null,
-          lng: deviceInfo.location?.coordinates?.lng || null
+          lng: deviceInfo.location?.coordinates?.lng || null,
         },
-        timezone: deviceInfo.location?.timezone || null
+        timezone: deviceInfo.location?.timezone || null,
       },
       browser: {
         name: deviceInfo.browser?.name || null,
         version: deviceInfo.browser?.version || null,
-        major: deviceInfo.browser?.major || null
+        major: deviceInfo.browser?.major || null,
       },
       os: {
         name: deviceInfo.os?.name || null,
-        version: deviceInfo.os?.version || null
+        version: deviceInfo.os?.version || null,
       },
       device: {
         vendor: deviceInfo.device?.vendor || null,
         model: deviceInfo.device?.model || null,
-        type: deviceInfo.device?.type || null
+        type: deviceInfo.device?.type || null,
       },
       fingerprint: deviceInfo.fingerprint || null,
       security: {
@@ -460,11 +444,11 @@ userSchema.method({
           userAgentLength: deviceInfo.security?.analysis?.userAgentLength || null,
           hasSecurityHeaders: deviceInfo.security?.analysis?.hasSecurityHeaders || false,
           headerCount: deviceInfo.security?.analysis?.headerCount || null,
-          timestamp: deviceInfo.security?.analysis?.timestamp ? new Date(deviceInfo.security.analysis.timestamp) : null
-        }
+          timestamp: deviceInfo.security?.analysis?.timestamp ? new Date(deviceInfo.security.analysis.timestamp) : null,
+        },
       },
       loginMethod,
-      detectedAt: deviceInfo.detectedAt ? new Date(deviceInfo.detectedAt) : null
+      detectedAt: deviceInfo.detectedAt ? new Date(deviceInfo.detectedAt) : null,
     };
 
     this.loginHistory.push(loginEntry);
@@ -478,34 +462,24 @@ userSchema.method({
     return this.loginHistory[this.loginHistory.length - 1];
   },
 
-
   // Instance methods to add to userSchema.method():
 
   // Create session for this user
   async createSession(sessionData) {
-    const {
-      sessionId = crypto.randomUUID(),
-      deviceId,
-      ipAddress,
-      userAgent,
-      expiresAt = new Date(Date.now() + SESSION_TIMEOUT)
-    } = sessionData;
+    const { sessionId = crypto.randomUUID(), deviceId, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
 
     // Clean expired sessions first
     await this.cleanupExpiredSessions();
 
     // Check session limit
-    const activeSessionsCount = this.activeSessions.filter(s => s.isActive).length;
+    const activeSessionsCount = this.activeSessions.filter((s) => s.isActive).length;
     if (activeSessionsCount >= MAX_SESSIONS) {
       // Deactivate oldest active session
-      const oldestSession = this.activeSessions
-        .filter(s => s.isActive)
-        .sort((a, b) => a.createdAt - b.createdAt)[0];
+      const oldestSession = this.activeSessions.filter((s) => s.isActive).sort((a, b) => a.createdAt - b.createdAt)[0];
 
       if (oldestSession) {
         oldestSession.isActive = false;
-        await this.logSecurityEvent('session_expired',
-          'Session deactivated due to limit exceeded', 'medium');
+        await this.logSecurityEvent('session_expired', 'Session deactivated due to limit exceeded', 'medium');
       }
     }
 
@@ -518,23 +492,45 @@ userSchema.method({
       expiresAt,
       ipAddress: ipAddress || null,
       userAgent: userAgent || null,
-      isActive: true
+      isActive: true,
     };
 
     this.activeSessions.push(newSession);
     await this.save();
 
-    await this.logSecurityEvent('session_created',
-      `New session created: ${sessionId}`, 'low', { sessionId, deviceId });
+    await this.logSecurityEvent('session_created', `New session created: ${sessionId}`, 'low', { sessionId, deviceId });
 
     return newSession;
   },
 
+  async enableMFA(method) {
+    const validMethods = ['totp', 'email', 'sms'];
+    if (!validMethods.includes(method)) {
+      throw new Error('Invalid OTP method');
+    }
+
+    this.otpSettings.enabled = true;
+    this.otpSettings.preferredMethod = method;
+    this.otpSettings.allowFallback = false;
+    await this.save();
+
+    if (method === 'totp') {
+
+      this.twoFactorAuth.enabled = true;
+      this.twoFactorAuth.setupCompleted = false;
+
+
+    }
+    return {
+      otpSettingsEnabled: this.otpSettings?.enabled || false,
+      twoFactorAuthEnabled: this.twoFactorAuth?.enabled || false,
+      preferredMethod: method,
+    };
+  },
+
   // Update session activity
   async updateSessionActivity(sessionId) {
-    const session = this.activeSessions.find(s =>
-      s.sessionId === sessionId && s.isActive
-    );
+    const session = this.activeSessions.find((s) => s.sessionId === sessionId && s.isActive);
 
     if (!session) {
       throw new Error('Session not found or inactive');
@@ -554,7 +550,7 @@ userSchema.method({
 
   // Deactivate specific session
   async deactivateSession(sessionId, reason = 'user_logout') {
-    const session = this.activeSessions.find(s => s.sessionId === sessionId);
+    const session = this.activeSessions.find((s) => s.sessionId === sessionId);
 
     if (!session) {
       throw new Error('Session not found');
@@ -563,22 +559,20 @@ userSchema.method({
     session.isActive = false;
     await this.save();
 
-    await this.logSecurityEvent('session_deactivated',
-      `Session deactivated: ${reason}`, 'low', { sessionId, reason });
+    await this.logSecurityEvent('session_deactivated', `Session deactivated: ${reason}`, 'low', { sessionId, reason });
 
     return true;
   },
 
   // Deactivate all sessions
   async deactivateAllSessions(reason = 'user_logout_all') {
-    this.activeSessions.forEach(session => {
+    this.activeSessions.forEach((session) => {
       session.isActive = false;
     });
 
     await this.save();
 
-    await this.logSecurityEvent('all_sessions_deactivated',
-      `All sessions deactivated: ${reason}`, 'medium', { reason });
+    await this.logSecurityEvent('all_sessions_deactivated', `All sessions deactivated: ${reason}`, 'medium', { reason });
 
     return true;
   },
@@ -586,7 +580,7 @@ userSchema.method({
   // Get user's active sessions
   async getActiveSessions() {
     await this.cleanupExpiredSessions();
-    return this.activeSessions.filter(session => session.isActive);
+    return this.activeSessions.filter((session) => session.isActive);
   },
 
   // Clean up expired sessions for this user
@@ -595,7 +589,7 @@ userSchema.method({
     let hasExpiredSessions = false;
 
     // 1. Mark expired sessions inactive
-    this.activeSessions.forEach(session => {
+    this.activeSessions.forEach((session) => {
       const expiresAt = new Date(session.expiresAt);
       if (expiresAt < now && session.isActive) {
         session.isActive = false;
@@ -605,7 +599,7 @@ userSchema.method({
 
     // 2. Remove all inactive sessions
     const initialLength = this.activeSessions.length;
-    this.activeSessions = this.activeSessions.filter(session => session.isActive);
+    this.activeSessions = this.activeSessions.filter((session) => session.isActive);
 
     // 3. Save only if something changed
     if (hasExpiredSessions || this.activeSessions.length < initialLength) {
@@ -614,23 +608,19 @@ userSchema.method({
 
     // 4. Return only active sessions
     return this.activeSessions;
-  }
-  ,
-
+  },
   // Check if session exists and is active
   async isSessionActive(sessionId) {
     await this.cleanupExpiredSessions();
 
-    const session = this.activeSessions.find(s =>
-      s.sessionId === sessionId && s.isActive
-    );
+    const session = this.activeSessions.find((s) => s.sessionId === sessionId && s.isActive);
 
     return !!session;
   },
 
   // Get session info
   async getSessionInfo(sessionId) {
-    const session = this.activeSessions.find(s => s.sessionId === sessionId);
+    const session = this.activeSessions.find((s) => s.sessionId === sessionId);
 
     if (!session) {
       return null;
@@ -645,16 +635,13 @@ userSchema.method({
       ipAddress: session.ipAddress,
       userAgent: session.userAgent,
       isActive: session.isActive,
-      timeRemaining: session.isActive ?
-        Math.max(0, session.expiresAt - new Date()) : 0
+      timeRemaining: session.isActive ? Math.max(0, session.expiresAt - new Date()) : 0,
     };
   },
 
   // Extend session expiry
   async extendSession(sessionId, additionalTime = SESSION_TIMEOUT) {
-    const session = this.activeSessions.find(s =>
-      s.sessionId === sessionId && s.isActive
-    );
+    const session = this.activeSessions.find((s) => s.sessionId === sessionId && s.isActive);
 
     if (!session) {
       throw new Error('Session not found or inactive');
@@ -671,7 +658,7 @@ userSchema.method({
   async removeExpiredAuthTokens() {
     const now = new Date();
     const originalCount = this.authTokens.length;
-    this.authTokens = this.authTokens.filter(token => token.expiresAt > now);
+    this.authTokens = this.authTokens.filter((token) => token.expiresAt > now);
     if (this.authTokens.length !== originalCount) {
       await this.save();
     }
@@ -683,13 +670,11 @@ userSchema.method({
       const deviceId = deviceInfo.deviceId || crypto.randomBytes(16).toString('hex');
 
       // Clean up expired tokens
-      this.removeExpiredAuthTokens()
+      this.removeExpiredAuthTokens();
       await User.cleanupExpiredTokens();
 
       // Check session limit
-      const activeSessions = this.authTokens.filter(t =>
-        !t.isRevoked && t.expiresAt > new Date()
-      );
+      const activeSessions = this.authTokens.filter((t) => !t.isRevoked && t.expiresAt > new Date());
 
       if (activeSessions.length >= MAX_SESSIONS) {
         // Revoke oldest session
@@ -699,22 +684,21 @@ userSchema.method({
         oldestSession.revokedReason = 'session_limit_exceeded';
       }
 
-
-      const accessToken = await this.generateAccessToken(deviceId)
-      const refreshToken = await this.generateRefreshToken(deviceId)
+      const accessToken = await this.generateAccessToken(deviceId);
+      const refreshToken = await this.generateRefreshToken(deviceId);
 
       // Store tokens
       const now = new Date();
-      const accessTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_EXPIRY));
-      const refreshTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_REFRESH_EXPIRY));
+      const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_EXPIRY)));
+      const refreshTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_REFRESH_EXPIRY)));
       // console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
       const deviceData = {
         name: deviceInfo.name,
         type: deviceInfo.type,
         os: deviceInfo.os.name,
         browser: deviceInfo.browser.name,
-        ipAddress: deviceInfo.ipAddress
-      }
+        ipAddress: deviceInfo.ipAddress,
+      };
 
       await this.authTokens.push({
         token: accessToken,
@@ -722,7 +706,7 @@ userSchema.method({
         deviceId,
         deviceInfo: deviceData,
         expiresAt: accessTokenExpiry,
-        lastUsed: now
+        lastUsed: now,
       });
       await this.authTokens.push({
         token: refreshToken,
@@ -730,7 +714,7 @@ userSchema.method({
         deviceId,
         deviceInfo: deviceData,
         expiresAt: refreshTokenExpiry,
-        lastUsed: now
+        lastUsed: now,
       });
 
       // Register/update device
@@ -742,7 +726,7 @@ userSchema.method({
         refreshToken,
         accessTokenExpiresAt: accessTokenExpiry,
         refreshTokenExpiresAt: refreshTokenExpiry,
-        deviceId
+        deviceId,
       };
     } catch (error) {
       throw new Error(`Login failed: ${error.message}`);
@@ -762,13 +746,12 @@ userSchema.method({
       return {
         qrCode: setupData.qrCode,
         manualEntryKey: setupData.manualEntryKey,
-        setupUri: setupData.setupUri
+        setupUri: setupData.setupUri,
       };
     } catch (error) {
       throw new Error(`TOTP setup failed: ${error.message}`);
     }
-  }
-  ,
+  },
   /**
    * Verify TOTP setup and enable it
    */
@@ -779,10 +762,10 @@ userSchema.method({
       if (result.success) {
         this.twoFactorAuth.enabled = true;
         this.twoFactorAuth.setupCompleted = true;
-        this.twoFactorAuth.backupCodes = result.backupCodes.map(code => ({
+        this.twoFactorAuth.backupCodes = result.backupCodes.map((code) => ({
           code: crypto.createHash('sha256').update(code).digest('hex'),
           used: false,
-          createdAt: new Date()
+          createdAt: new Date(),
         }));
 
         await this.save();
@@ -790,7 +773,7 @@ userSchema.method({
 
         return {
           success: true,
-          backupCodes: result.backupCodes
+          backupCodes: result.backupCodes,
         };
       }
 
@@ -844,7 +827,7 @@ userSchema.method({
         attempts: 0,
         maxAttempts: 3,
         lastSent: new Date(),
-        verified: false
+        verified: false,
       };
 
       await this.save();
@@ -903,9 +886,7 @@ userSchema.method({
     }
   },
 
-
   async getMyProfile() {
-
     await this.populate(['role']);
     return {
       id: this._id,
@@ -925,7 +906,6 @@ userSchema.method({
   },
 
   async getMyProfileStatistics() {
-
     await this.populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by']);
 
     // const Wishlist = mongoose.model('Wishlist');
@@ -1124,22 +1104,21 @@ userSchema.method({
     }
     throw new Error('Insufficient loyalty points');
   },
-  // async sendEmailVerification(deviceInfo) {
-  //   const user = this;
-  //   user.generateEmailVerificationToken()
-  //   // Delete old tokens of this type for user
-  //   await this.emailVerificationTokens.deleteMany({ userId: user._id, type: 'email_verification' });
-  //   // Save new token
-  //   await this.emailVerificationTokens.create({
-  //     userId: user._id,
-  //     token: user.emailVerificationToken,
-  //     type: 'email_verification',
-  //     expiresAt: user.emailVerificationExpiry,
-  //     deviceInfo: deviceInfo || null,
-  //   });
-  //   return this.user
-  // },
-
+  async sendEmailVerification(deviceInfo) {
+    const user = this;
+    user.generateEmailVerificationToken();
+    // Delete old tokens of this type for user
+    await this.emailVerificationTokens.deleteMany({ userId: user._id, type: 'email_verification' });
+    // Save new token
+    await this.emailVerificationTokens.create({
+      userId: user._id,
+      token: user.emailVerificationToken,
+      type: 'email_verification',
+      expiresAt: user.emailVerificationExpiry,
+      deviceInfo: deviceInfo || null,
+    });
+    return this.user;
+  },
 
   // Mark user as verified
   async verifyUser() {
@@ -1159,52 +1138,47 @@ userSchema.method({
     // const uniquePermissions = Array.from(new Set(rolePermissions));
     // return uniquePermissions;
 
-
     // const Role = this.model("Role"); // Get Role model dynamically from mongoose
 
     // Ensure role exists
     // if (!this.role) return [];
 
     // const roleId = typeof this.role === "string" ? new mongoose.Types.ObjectId(this.role) : this.role;
-    const roleId = this.role._id
+    const roleId = this.role._id;
     const result = await Role.aggregate([
       { $match: { _id: roleId } },
 
       {
         $lookup: {
-          from: "permissions",   // name of permissions collection
-          localField: "permissions",
-          foreignField: "_id",
-          as: "permissions",
+          from: 'permissions', // name of permissions collection
+          localField: 'permissions',
+          foreignField: '_id',
+          as: 'permissions',
         },
       },
 
-      { $unwind: "$permissions" },
+      { $unwind: '$permissions' },
 
-      { $match: { "permissions.isActive": true } },
+      { $match: { 'permissions.isActive': true } },
 
       {
         $group: {
-          _id: "$permissions.category",
-          actions: { $addToSet: "$permissions.action" },
+          _id: '$permissions.category',
+          actions: { $addToSet: '$permissions.action' },
         },
       },
 
       {
         $project: {
           _id: 0,
-          category: "$_id",
+          category: '$_id',
           actions: 1,
         },
       },
     ]);
 
     return result; // returns [{ category, actions: [] }, ...]
-
-
   },
-
-
 
   // Update last login timestamp
   async updateLastLogin() {
@@ -1319,14 +1293,14 @@ userSchema.method({
   },
 
   async changePassword(oldPassword, newPassword) {
-    if (!await this.validatePassword(oldPassword)) {
+    if (!(await this.validatePassword(oldPassword))) {
       throw new Error('Current password is incorrect');
     }
     await this.setPassword(newPassword);
     this.tempPasswordActive = false;
     // Invalidate all refresh tokens and sessions
     await this.invalidateAllSessions();
-    await this.revokeAllTokens('password_change')
+    await this.revokeAllTokens('password_change');
     await this.save();
     return true;
   },
@@ -1359,7 +1333,7 @@ userSchema.method({
       timestamp: new Date(),
       ipAddress,
       userAgent,
-      details
+      details,
     });
 
     // Limit to last 100 security events
@@ -1405,8 +1379,6 @@ userSchema.method({
     });
   },
 
-
-
   async generateAccessToken(deviceId) {
     const payload = {
       userId: this._id,
@@ -1414,14 +1386,14 @@ userSchema.method({
       email: this.email,
       role: this.role.name,
       type: 'access',
-      deviceId: deviceId
+      deviceId: deviceId,
     };
 
     return jwt.sign(payload, JWT_SECRET, {
       expiresIn: JWT_EXPIRY,
       algorithm: JWT_ALGORITHM,
       issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE
+      audience: JWT_AUDIENCE,
     });
   },
 
@@ -1429,31 +1401,29 @@ userSchema.method({
     const payload = {
       userId: this._id,
       tokenType: 'refresh',
-      deviceId
+      deviceId,
     };
 
     return jwt.sign(payload, JWT_REFRESH_SECRET, {
       expiresIn: JWT_REFRESH_EXPIRY,
       issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE
+      audience: JWT_AUDIENCE,
     });
   },
 
   async storeRefreshToken(token, userAgent = null, ipAddress = null) {
-    const expiresAt = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)); // 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     this.refreshTokens.push({
       token,
       expiresAt,
       userAgent,
       ipAddress,
-      isActive: true
+      isActive: true,
     });
 
     // Clean up expired tokens
-    this.refreshTokens = this.refreshTokens.filter(rt =>
-      rt.expiresAt > new Date() && rt.isActive
-    );
+    this.refreshTokens = this.refreshTokens.filter((rt) => rt.expiresAt > new Date() && rt.isActive);
 
     // Limit to 5 active refresh tokens
     if (this.refreshTokens.length > 5) {
@@ -1463,18 +1433,9 @@ userSchema.method({
     await this.save();
   },
 
-
-
   async refreshAccessToken(refreshToken) {
-
-
     try {
-      const tokenData = this.authTokens.find(t =>
-        t.token === refreshToken &&
-        !t.isRevoked &&
-        t.type === 'refresh' &&
-        t.expiresAt > new Date()
-      );
+      const tokenData = this.authTokens.find((t) => t.token === refreshToken && !t.isRevoked && t.type === 'refresh' && t.expiresAt > new Date());
       if (!tokenData) {
         throw new Error('Invalid or expired refresh token');
       }
@@ -1483,11 +1444,11 @@ userSchema.method({
         throw new Error('Token mismatch');
       }
 
-      const token = await this.generateAccessToken(decoded.deviceId)
+      const token = await this.generateAccessToken(decoded.deviceId);
 
       // Add new token
       const now = new Date();
-      const accessTokenExpiry = new Date(now.getTime() + await this.parseTimeToMs(JWT_EXPIRY));
+      const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_EXPIRY)));
 
       this.authTokens.push({
         token: token,
@@ -1495,7 +1456,7 @@ userSchema.method({
         deviceId: decoded.deviceId,
         deviceInfo: tokenData.deviceInfo,
         expiresAt: accessTokenExpiry,
-        lastUsed: now
+        lastUsed: now,
       });
 
       // Update refresh token last used
@@ -1504,26 +1465,21 @@ userSchema.method({
       await this.save();
       return {
         accessToken: token,
-        expiresAt: accessTokenExpiry
+        expiresAt: accessTokenExpiry,
       };
     } catch (error) {
       throw new Error(`Token refresh failed: ${error.message}`);
     }
-
-
-
   },
 
   async revokeRefreshToken(token) {
-    this.refreshTokens = this.refreshTokens.map(rt =>
-      rt.token === token ? { ...rt, isActive: false } : rt
-    );
+    this.refreshTokens = this.refreshTokens.map((rt) => (rt.token === token ? { ...rt, isActive: false } : rt));
     await this.save();
   },
 
   generateEmailVerificationToken() {
     this.emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    this.emailVerificationExpiry = new Date(Date.now() + (24 * 60 * 60 * 1000)); // 24 hours
+    this.emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     return this.emailVerificationToken;
   },
 
@@ -1536,7 +1492,7 @@ userSchema.method({
       token: t,
       tokenExpiry: time, // 1 hour
       attempts: 0,
-      lastAttempt: new Date()
+      lastAttempt: new Date(),
     };
     await this.save();
     return this.resetToken;
@@ -1563,9 +1519,6 @@ userSchema.method({
     await this.save();
     return true;
   },
-
-
-
 
   async confirmEmail(token) {
     if (this.confirmToken !== token) throw new Error('Invalid confirmation token');
@@ -1642,7 +1595,6 @@ userSchema.method({
 
   // Email confirmation & reset
 
-
   // ========================================
   // 🔐 SECURITY & DEVICE MANAGEMENT
   // ========================================
@@ -1655,7 +1607,7 @@ userSchema.method({
       return;
     }
 
-    let device = this.knownDevices.find(d => d.deviceId === deviceInfo.deviceId);
+    let device = this.knownDevices.find((d) => d.deviceId === deviceInfo.deviceId);
 
     if (device) {
       // Update existing device
@@ -1676,16 +1628,14 @@ userSchema.method({
         lastSeen: new Date(),
         isTrusted: false,
         isActive: true,
-        fingerprint: deviceInfo.fingerprint || null
+        fingerprint: deviceInfo.fingerprint || null,
       };
       console.log(device);
-
 
       this.knownDevices.push(device);
 
       // Log new device
-      await this.logSecurityEvent('new_device_registered',
-        `New device registered: ${device.name}`, 'medium', deviceInfo);
+      await this.logSecurityEvent('new_device_registered', `New device registered: ${device.name}`, 'medium', deviceInfo);
     }
   },
 
@@ -1693,7 +1643,7 @@ userSchema.method({
    * Trust a device
    */
   async trustDevice(deviceId) {
-    const device = this.knownDevices.find(d => d.deviceId === deviceId);
+    const device = this.knownDevices.find((d) => d.deviceId === deviceId);
     if (device) {
       device.isTrusted = true;
       await this.save();
@@ -1708,7 +1658,7 @@ userSchema.method({
    */
   async removeDevice(deviceId) {
     // Revoke all tokens for this device
-    this.authTokens.forEach(token => {
+    this.authTokens.forEach((token) => {
       if (token.deviceId === deviceId && !token.isRevoked) {
         token.isRevoked = true;
         token.revokedAt = new Date();
@@ -1717,15 +1667,12 @@ userSchema.method({
     });
 
     // Remove device
-    this.knownDevices = this.knownDevices.filter(d => d.deviceId !== deviceId);
+    this.knownDevices = this.knownDevices.filter((d) => d.deviceId !== deviceId);
 
     await this.save();
     await this.logSecurityEvent('device_removed', `Device removed: ${deviceId}`, 'medium');
     return true;
   },
-
-
-
 
   async handleFailedLogin(deviceInfo, reason = 'invalid_credentials') {
     this.failedLoginAttempts += 1;
@@ -1741,15 +1688,13 @@ userSchema.method({
       successful: false,
       failureReason: reason,
       deviceInfo,
-      loginMethod: 'password'
+      loginMethod: 'password',
     });
-
 
     // Check if account should be locked
     if (this.loginSecurity.consecutiveFailures >= MAX_ATTEMPTS) {
       this.loginSecurity.lockedUntil = new Date(Date.now() + LOCK_TIME);
-      await this.logSecurityEvent('account_locked',
-        `Account locked due to ${MAX_ATTEMPTS} failed login attempts`, 'high', deviceInfo);
+      await this.logSecurityEvent('account_locked', `Account locked due to ${MAX_ATTEMPTS} failed login attempts`, 'high', deviceInfo);
     }
 
     // Lock account after max attempts
@@ -1761,7 +1706,7 @@ userSchema.method({
         event: 'account_locked',
         ipAddress: deviceInfo.ipAddress,
         userAgent: deviceInfo.userAgent,
-        details: { reason: 'Too many failed login attempts', attempts: this.consecutiveFailedAttempts }
+        details: { reason: 'Too many failed login attempts', attempts: this.consecutiveFailedAttempts },
       });
     }
     await this.save();
@@ -1769,7 +1714,6 @@ userSchema.method({
 
     return this.isLocked;
   },
-
 
   async logSecurityEvent(event, description = null, severity = 'medium', metadata = {}) {
     this.securityEvents.push({
@@ -1780,7 +1724,7 @@ userSchema.method({
       ipAddress: metadata.ipAddress,
       userAgent: metadata.userAgent,
       deviceId: metadata.deviceId,
-      metadata
+      metadata,
     });
 
     // Keep only last 100 security events
@@ -1802,13 +1746,13 @@ userSchema.method({
     this.loginSecurity.lockedUntil = null;
     this.loginSecurity.lastLoginAttempt = new Date();
 
-
     await this.addLoginHistory({
-      successful: true, undefined,
+      successful: true,
+      undefined,
       deviceInfo,
       loginMethod: 'password',
-      otpUsed: this.currentOTP.type
-    });// Add to login history
+      otpUsed: this.currentOTP.type,
+    }); // Add to login history
 
     // Limit login history to last 50 entries
     if (this.loginHistory.length > 50) {
@@ -1817,7 +1761,6 @@ userSchema.method({
     await this.registerDevice(deviceInfo);
     await this.save();
     await this.logSecurityEvent('login_success', 'Successful login', 'low', deviceInfo);
-
   },
 
   async parseTimeToMs(str) {
@@ -1828,16 +1771,18 @@ userSchema.method({
     if (isNaN(num)) return NaN;
 
     switch (unit) {
-      case 's': return num * 1000;
-      case 'm': return num * 60 * 1000;
-      case 'h': return num * 60 * 60 * 1000;
-      case 'd': return num * 24 * 60 * 60 * 1000;
-      default: return NaN;
+      case 's':
+        return num * 1000;
+      case 'm':
+        return num * 60 * 1000;
+      case 'h':
+        return num * 60 * 60 * 1000;
+      case 'd':
+        return num * 24 * 60 * 60 * 1000;
+      default:
+        return NaN;
     }
   },
-
-
-
 
   async invalidateAllSessions() {
     this.refreshTokens = [];
@@ -2003,11 +1948,7 @@ userSchema.method({
     this.updated_by = adminId;
     await this.revokeAllTokens('admin_deactivation');
     this.deactivationReason = reason || 'No reason provided';
-    await this.logSecurityEvent('account_deactivated',
-      `Account deactivated by admin: ${reason || 'No reason provided'}`,
-      'high',
-      { adminId, reason }
-    );
+    await this.logSecurityEvent('account_deactivated', `Account deactivated by admin: ${reason || 'No reason provided'}`, 'high', { adminId, reason });
     await this.save();
     return this;
   },
@@ -2027,11 +1968,7 @@ userSchema.method({
     this.updated_by = adminId;
 
     // Log security event
-    await this.logSecurityEvent('account_activated',
-      `Account activated by admin: ${reason || 'No reason provided'}`,
-      'medium',
-      { adminId, reason }
-    );
+    await this.logSecurityEvent('account_activated', `Account activated by admin: ${reason || 'No reason provided'}`, 'medium', { adminId, reason });
 
     await this.save();
     return this;
@@ -2065,10 +2002,9 @@ userSchema.method({
     return this.populate('address');
   },
 
-
   async revokeToken(token) {
     this.tokens = this.tokens.filter((t) => t.token !== token);
-    const tokenData = this.authTokens.find(t => t.token === token);
+    const tokenData = this.authTokens.find((t) => t.token === token);
     if (tokenData) {
       tokenData.isRevoked = true;
       tokenData.revokedAt = new Date();
@@ -2076,11 +2012,10 @@ userSchema.method({
       await this.save();
     }
     return true;
-
   },
 
   async revokeAllTokens(reason = 'user_logout_all') {
-    this.authTokens.forEach(token => {
+    this.authTokens.forEach((token) => {
       if (!token.isRevoked) {
         token.isRevoked = true;
         token.revokedAt = new Date();
@@ -2088,7 +2023,7 @@ userSchema.method({
       }
     });
 
-    this.activeSessions.forEach(session => {
+    this.activeSessions.forEach((session) => {
       session.isActive = false;
     });
 
@@ -2208,16 +2143,16 @@ userSchema.statics.findFullyPopulatedById = async function (userId) {
     'wishList',
     {
       path: 'referredBy',
-      select: 'firstName lastName _id'
+      select: 'firstName lastName _id',
     },
     {
       path: 'created_by',
-      select: 'firstName lastName _id'
+      select: 'firstName lastName _id',
     },
     {
       path: 'updated_by',
-      select: 'firstName lastName _id'
-    }
+      select: 'firstName lastName _id',
+    },
   ]);
 };
 
@@ -2483,7 +2418,6 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
     });
     if (exists) throw new Error('Email or username already registered');
 
-
     email = email.trim().toLowerCase();
     username = username.trim();
 
@@ -2496,7 +2430,6 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
       const roleExists = await Role.exists({ _id: roleId, isActive: true });
       if (!roleExists) throw new Error('Assigned role does not exist or not active');
     }
-
 
     const confirmToken = jwt.sign(
       {
@@ -2536,13 +2469,9 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
   }
 };
 
-
-userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login') {
+(userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login') {
   const user = await this.findOne({
-    $or: [
-      { email: identifier.toLowerCase() },
-      { username: identifier }
-    ]
+    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
   });
 
   if (!user) {
@@ -2561,14 +2490,10 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
   await user.save();
 
   return { user, otp };
-},
-
-  userSchema.statics.verifyOTPLogin = async function (identifier, otp, ipAddress = null, userAgent = null) {
+}),
+  (userSchema.statics.verifyOTPLogin = async function (identifier, otp, ipAddress = null, userAgent = null) {
     const user = await this.findOne({
-      $or: [
-        { email: identifier.toLowerCase() },
-        { username: identifier }
-      ]
+      $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
     }).populate('role');
 
     if (!user) {
@@ -2580,10 +2505,9 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
     await user.save();
 
     return user;
-  },
-
+  }),
   // Token Management
-  userSchema.statics.verifyAccessToken = async function (token) {
+  (userSchema.statics.verifyAccessToken = async function (token) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       const user = await this.findById(decoded.userId).populate('role');
@@ -2596,9 +2520,8 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
     } catch (error) {
       throw new Error('Invalid or expired token');
     }
-  },
-
-  userSchema.statics.verifyRefreshToken = async function (refreshToken) {
+  }),
+  (userSchema.statics.verifyRefreshToken = async function (refreshToken) {
     try {
       const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
       const user = await this.findById(decoded.userId);
@@ -2607,9 +2530,7 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
         throw new Error('User not found');
       }
 
-      const tokenData = user.refreshTokens.find(rt =>
-        rt.token === refreshToken && rt.isActive && rt.expiresAt > new Date()
-      );
+      const tokenData = user.refreshTokens.find((rt) => rt.token === refreshToken && rt.isActive && rt.expiresAt > new Date());
 
       if (!tokenData) {
         throw new Error('Invalid refresh token');
@@ -2619,12 +2540,11 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
     } catch (error) {
       throw new Error('Invalid or expired refresh token');
     }
-  },
-
-  userSchema.statics.verifyUserEmail = async function (token) {
+  }),
+  (userSchema.statics.verifyUserEmail = async function (token) {
     const user = await this.findOne({
       emailVerificationToken: token,
-      emailVerificationExpiry: { $gt: new Date() }
+      emailVerificationExpiry: { $gt: new Date() },
     });
 
     if (!user) {
@@ -2633,12 +2553,9 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
 
     await user.verifyEmail(token);
     return user;
-  },
-
-
-
+  }),
   // Get new user registrations count by day over last N days
-  userSchema.statics.getRegistrationsOverTime = async function (days = 30) {
+  (userSchema.statics.getRegistrationsOverTime = async function (days = 30) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     return this.aggregate([
@@ -2668,7 +2585,7 @@ userSchema.statics.initiateOTPLogin = async function (identifier, type = 'login'
       },
       { $sort: { date: 1 } },
     ]);
-  };
+  });
 
 // Get active user login counts by day over last N days
 userSchema.statics.getLoginActivityOverTime = async function (days = 30) {
@@ -2750,16 +2667,11 @@ userSchema.statics.getAverageOrdersPerUser = async function () {
   return result[0]?.avgOrders || 0;
 };
 
-
-
-userSchema.statics.findLockedAccounts = async function () {
+(userSchema.statics.findLockedAccounts = async function () {
   return this.find({ lockoutUntil: { $gt: new Date() } }).populate('role');
-},
-
-  userSchema.statics.cleanupExpiredTokens = async function () {
+}),
+  (userSchema.statics.cleanupExpiredTokens = async function () {
     const now = new Date();
-
-
 
     // Clean up expired refresh tokens
     await this.updateMany(
@@ -2767,12 +2679,9 @@ userSchema.statics.findLockedAccounts = async function () {
       {
         $pull: {
           refreshTokens: {
-            $or: [
-              { expiresAt: { $lt: now } },
-              { isActive: false }
-            ]
-          }
-        }
+            $or: [{ expiresAt: { $lt: now } }, { isActive: false }],
+          },
+        },
       }
     );
 
@@ -2784,8 +2693,8 @@ userSchema.statics.findLockedAccounts = async function () {
           otpCode: 1,
           otpExpiry: 1,
           otpType: 1,
-          otpAttempts: 1
-        }
+          otpAttempts: 1,
+        },
       }
     );
 
@@ -2795,8 +2704,8 @@ userSchema.statics.findLockedAccounts = async function () {
       {
         $unset: {
           emailVerificationToken: 1,
-          emailVerificationExpiry: 1
-        }
+          emailVerificationExpiry: 1,
+        },
       }
     );
 
@@ -2806,14 +2715,13 @@ userSchema.statics.findLockedAccounts = async function () {
       {
         $unset: {
           resetToken: 1,
-          resetTokenExpiration: 1
-        }
+          resetTokenExpiration: 1,
+        },
       }
     );
-  },
-
+  }),
   // Password Reset Flow
-  userSchema.statics.initiatePasswordReset = async function (email) {
+  (userSchema.statics.initiatePasswordReset = async function (email) {
     const user = await this.findOne({ email: email.toLowerCase() });
 
     if (!user) {
@@ -2824,12 +2732,11 @@ userSchema.statics.findLockedAccounts = async function () {
     await user.save();
 
     return { user, resetToken };
-  },
-
-  userSchema.statics.completePasswordReset = async function (token, newPassword) {
+  }),
+  (userSchema.statics.completePasswordReset = async function (token, newPassword) {
     const user = await this.findOne({
       resetToken: token,
-      resetTokenExpiration: { $gt: new Date() }
+      resetTokenExpiration: { $gt: new Date() },
     });
 
     if (!user) {
@@ -2838,15 +2745,10 @@ userSchema.statics.findLockedAccounts = async function () {
 
     await user.resetPassword(token, newPassword);
     return user;
-  },
-
-
-  userSchema.statics.authenticateUser = async function (identifier, password, deviceInfo) {
+  }),
+  (userSchema.statics.authenticateUser = async function (identifier, password, deviceInfo) {
     const user = await this.findOne({
-      $or: [
-        { email: identifier.toLowerCase() },
-        { username: identifier }
-      ]
+      $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
     }).populate('role');
 
     if (!user) {
@@ -2878,7 +2780,7 @@ userSchema.statics.findLockedAccounts = async function () {
       return {
         user,
         requiresMFA: true,
-        availableMethods: user.availableOTPMethods
+        availableMethods: user.availableOTPMethods,
       };
     }
 
@@ -2886,41 +2788,40 @@ userSchema.statics.findLockedAccounts = async function () {
     await user.createSession(deviceInfo);
     return {
       user,
-      requiresMFA: false
+      requiresMFA: false,
     };
-  };
+  });
 
 userSchema.statics.authenticateSocial = async function (profileData, identifier, deviceInfo) {
   const user = await this.findOne({
-    $or: [
-      { email: identifier.toLowerCase() },
-      { username: identifier }
-    ]
+    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
   }).populate('role');
 
   if (!user) {
     user = new User({
       email: email,
       username: profileData.username || email.split('@')[0],
-      isVerified: true,                // Assume verified by social provider
+      isVerified: true, // Assume verified by social provider
       isEmailVerified: true,
       role: 'customer',
       firstName: profileData.firstName || '',
       lastName: profileData.lastName || '',
-      socialLogins: [{
-        provider: profileData.provider,
-        email: identifier,
-        verified: true,
-        providerId: profileData.providerId,
-        connectedAt: new Date()
-      }],
-      activeSessions: []
+      socialLogins: [
+        {
+          provider: profileData.provider,
+          email: identifier,
+          verified: true,
+          providerId: profileData.providerId,
+          connectedAt: new Date(),
+        },
+      ],
+      activeSessions: [],
     });
     await user.save();
     await user.handleSuccessfulLogin(deviceInfo);
     return {
       user,
-      requiresMFA: false
+      requiresMFA: false,
     };
   }
 
@@ -2939,14 +2840,11 @@ userSchema.statics.authenticateSocial = async function (profileData, identifier,
 
   return {
     user,
-    requiresMFA: false
+    requiresMFA: false,
   };
 };
 
-userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) {
-
-
-}
+userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) { };
 
 /**
  * Verify user credentials with OTP
@@ -2975,7 +2873,6 @@ userSchema.statics.authenticateWithOTP = async function (userId, otpCode, device
   }
 };
 
-
 userSchema.statics.adminActivateUser = async function (userId, adminId, reason = null) {
   const user = await this.findById(userId);
   if (!user) {
@@ -2995,34 +2892,34 @@ userSchema.statics.adminDeactivateUser = async function (userId, adminId, reason
 };
 
 userSchema.statics.getSecurityReport = async function (timeframe = 30) {
-  const startDate = new Date(Date.now() - (timeframe * 24 * 60 * 60 * 1000));
+  const startDate = new Date(Date.now() - timeframe * 24 * 60 * 60 * 1000);
 
   const stats = await this.aggregate([
     {
       $match: {
-        'loginHistory.loginTime': { $gte: startDate }
-      }
+        'loginHistory.loginTime': { $gte: startDate },
+      },
     },
     {
-      $unwind: '$loginHistory'
+      $unwind: '$loginHistory',
     },
     {
       $match: {
-        'loginHistory.loginTime': { $gte: startDate }
-      }
+        'loginHistory.loginTime': { $gte: startDate },
+      },
     },
     {
       $group: {
         _id: null,
         totalLogins: { $sum: 1 },
         successfulLogins: {
-          $sum: { $cond: ['$loginHistory.successful', 1, 0] }
+          $sum: { $cond: ['$loginHistory.successful', 1, 0] },
         },
         failedLogins: {
-          $sum: { $cond: ['$loginHistory.successful', 0, 1] }
+          $sum: { $cond: ['$loginHistory.successful', 0, 1] },
         },
-        uniqueUsers: { $addToSet: '$_id' }
-      }
+        uniqueUsers: { $addToSet: '$_id' },
+      },
     },
     {
       $project: {
@@ -3031,22 +2928,19 @@ userSchema.statics.getSecurityReport = async function (timeframe = 30) {
         failedLogins: 1,
         uniqueUsersCount: { $size: '$uniqueUsers' },
         successRate: {
-          $multiply: [
-            { $divide: ['$successfulLogins', '$totalLogins'] },
-            100
-          ]
-        }
-      }
-    }
+          $multiply: [{ $divide: ['$successfulLogins', '$totalLogins'] }, 100],
+        },
+      },
+    },
   ]);
 
   const lockedAccounts = await this.countDocuments({
-    lockoutUntil: { $gt: new Date() }
+    lockoutUntil: { $gt: new Date() },
   });
 
   const unverifiedAccounts = await this.countDocuments({
     emailVerified: false,
-    createdAt: { $lt: new Date(Date.now() - (7 * 24 * 60 * 60 * 1000)) }
+    createdAt: { $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
   });
 
   return {
@@ -3055,22 +2949,21 @@ userSchema.statics.getSecurityReport = async function (timeframe = 30) {
       successfulLogins: 0,
       failedLogins: 0,
       uniqueUsersCount: 0,
-      successRate: 0
+      successRate: 0,
     },
     lockedAccounts,
     unverifiedAccounts,
-    timeframe
+    timeframe,
   };
-}
+};
 userSchema.statics.findUserFullDetails = async function (identifier) {
-
-
   let filter = {};
 
   // Check if identifier is a valid ObjectId
   if (mongoose.Types.ObjectId.isValid(identifier)) {
     filter.id = identifier;
-  } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) { // basic email regex
+  } else if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)) {
+    // basic email regex
     filter.email = identifier.toLowerCase();
   } else {
     filter.username = identifier;
@@ -3078,28 +2971,10 @@ userSchema.statics.findUserFullDetails = async function (identifier) {
   let user = null;
 
   if (filter.id) {
-    user = await this.findById(filter.id).populate([
-      "role",
-      "address",
-      "orders",
-      "favoriteProducts",
-      "shoppingCart",
-      "wishList",
-      "referredBy",
-    ]).lean({ virtual: true });
+    user = await this.findById(filter.id).populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy']).lean({ virtual: true });
     return user;
   }
-  user = await this.findOne(filter)
-    .populate([
-      "role",
-      "address",
-      "orders",
-      "favoriteProducts",
-      "shoppingCart",
-      "wishList",
-      "referredBy",
-    ])
-    .lean({ virtual: true });
+  user = await this.findOne(filter).populate(['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy']).lean({ virtual: true });
 
   if (!user) return null;
 
@@ -3108,13 +2983,7 @@ userSchema.statics.findUserFullDetails = async function (identifier) {
 
 // Create a new active session
 userSchema.statics.createActiveSession = async function (userId, sessionData) {
-  const {
-    sessionId,
-    deviceId,
-    ipAddress,
-    userAgent,
-    expiresAt = new Date(Date.now() + SESSION_TIMEOUT)
-  } = sessionData;
+  const { sessionId, deviceId, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
 
   const user = await this.findById(userId);
   if (!user) {
@@ -3125,12 +2994,10 @@ userSchema.statics.createActiveSession = async function (userId, sessionData) {
   await user.cleanupExpiredSessions();
 
   // Check if session limit reached
-  const activeSessionsCount = user.activeSessions.filter(s => s.isActive).length;
+  const activeSessionsCount = user.activeSessions.filter((s) => s.isActive).length;
   if (activeSessionsCount >= MAX_SESSIONS) {
     // Deactivate oldest session
-    const oldestSession = user.activeSessions
-      .filter(s => s.isActive)
-      .sort((a, b) => a.createdAt - b.createdAt)[0];
+    const oldestSession = user.activeSessions.filter((s) => s.isActive).sort((a, b) => a.createdAt - b.createdAt)[0];
 
     if (oldestSession) {
       oldestSession.isActive = false;
@@ -3146,7 +3013,7 @@ userSchema.statics.createActiveSession = async function (userId, sessionData) {
     expiresAt,
     ipAddress,
     userAgent,
-    isActive: true
+    isActive: true,
   });
 
   await user.save();
@@ -3161,7 +3028,7 @@ userSchema.statics.getActiveSessions = async function (userId) {
   }
 
   await user.cleanupExpiredSessions();
-  return user.activeSessions.filter(session => session.isActive);
+  return user.activeSessions.filter((session) => session.isActive);
 };
 
 // Cleanup expired sessions across all users
@@ -3173,12 +3040,9 @@ userSchema.statics.cleanupAllExpiredSessions = async function () {
     {
       $pull: {
         activeSessions: {
-          $or: [
-            { expiresAt: { $lt: now } },
-            { isActive: false }
-          ]
-        }
-      }
+          $or: [{ expiresAt: { $lt: now } }, { isActive: false }],
+        },
+      },
     }
   );
 };
@@ -3193,42 +3057,44 @@ userSchema.statics.getSessionStatistics = async function () {
         _id: null,
         totalActiveSessions: { $sum: 1 },
         uniqueUsers: { $addToSet: '$_id' },
-        avgSessionsPerUser: { $avg: { $size: '$activeSessions' } }
-      }
+        avgSessionsPerUser: { $avg: { $size: '$activeSessions' } },
+      },
     },
     {
       $project: {
         totalActiveSessions: 1,
         uniqueActiveUsers: { $size: '$uniqueUsers' },
         avgSessionsPerUser: 1,
-        _id: 0
-      }
-    }
+        _id: 0,
+      },
+    },
   ]);
 
-  return stats[0] || {
-    totalActiveSessions: 0,
-    uniqueActiveUsers: 0,
-    avgSessionsPerUser: 0
-  };
+  return (
+    stats[0] || {
+      totalActiveSessions: 0,
+      uniqueActiveUsers: 0,
+      avgSessionsPerUser: 0,
+    }
+  );
 };
 
 userSchema.statics.fetchUserSettings = async function (userId) {
-
-  const selectedKeys = [
-    "otpSettings", "lastLogin", "currentOTP", "twoFactorAuth", "loginSecurity", "socialMedia", "preferences", "username", "interests", "email", "firstName", "lastName", 'dateOfBirth', "gender", "phoneNumber", "profilePicture", "session", "status", "isVerified", "subscriptionStatus", "subscriptionType", "paymentMethods", "updatedAt", "emailVerified", "phoneVerified", "twoFactorEnabled", "loginHistory", "securityEvents", "activeSessions", "knownDevices", "socialAccounts", "lastLoginAttempt", "referralCode", 'role', 'updated_by', "loyaltyPoints"
-  ];
+  const selectedKeys = ['otpSettings', 'lastLogin', 'currentOTP', 'twoFactorAuth', 'loginSecurity', 'socialMedia', 'preferences', 'username', 'interests', 'email', 'firstName', 'lastName', 'dateOfBirth', 'gender', 'phoneNumber', 'profilePicture', 'session', 'status', 'isVerified', 'subscriptionStatus', 'subscriptionType', 'paymentMethods', 'updatedAt', 'emailVerified', 'phoneVerified', 'twoFactorEnabled', 'loginHistory', 'securityEvents', 'activeSessions', 'knownDevices', 'socialAccounts', 'lastLoginAttempt', 'referralCode', 'role', 'updated_by', 'loyaltyPoints'];
 
   // Predefine the population fields
-  const populationFields = [{
-    path: 'updated_by',
-    select: 'firstName lastName _id'
-  }, {
-    path: 'role',
-    select: 'name isActive _id'
-  },];
+  const populationFields = [
+    {
+      path: 'updated_by',
+      select: 'firstName lastName _id',
+    },
+    {
+      path: 'role',
+      select: 'name isActive _id',
+    },
+  ];
 
-  let query = this.findById(userId).select(selectedKeys.join(" "));
+  let query = this.findById(userId).select(selectedKeys.join(' '));
 
   populationFields.forEach((field) => {
     query = query.populate(field);
@@ -3237,8 +3103,6 @@ userSchema.statics.fetchUserSettings = async function (userId) {
   const userSettings = await query.exec();
   return userSettings;
 };
-
-
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
