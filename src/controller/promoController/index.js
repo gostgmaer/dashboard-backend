@@ -1,6 +1,6 @@
 // controllers/promoController.js
 const promoService = require('../services/promoService');
-
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 exports.applyPromoCode = async (req, res) => {
   try {
     const { code, cartItems } = req.body;

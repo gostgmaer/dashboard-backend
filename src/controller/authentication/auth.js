@@ -7,7 +7,7 @@ const sessionStore = require('../../db/sessionConnact');
 const createMailOptions = require('../../email/mailOptions');
 const transporter = require('../../email/mailTransporter');
 const { generateTokens, setCookiesOnHeader } = require('../../lib/service');
-
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 const signUp = async (req, res) => {
   const { firstName, lastName, email, password, username } = req.body;
   if (!firstName || !lastName || !email || !password || !username) {

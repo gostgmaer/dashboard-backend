@@ -2,10 +2,14 @@ const Product = require('../models/products');
 const User = require('../models/user');
 const Order = require('../models/orders');
 const mongoose = require('mongoose');
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 const { validationResult } = require('express-validator');
 const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
+
+
+
 
 /**
  * 🚀 CONSOLIDATED ROBUST PRODUCT CONTROLLER
@@ -92,24 +96,6 @@ class ProductController {
         return productObj;
     }
 
-    static standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
-        return res.status(statusCode).json({
-            success,
-            status: statusCode,
-            data,
-            message,
-            ...meta,
-        });
-    }
-
-    static errorResponse(res, message, statusCode = 500, error = null) {
-        return res.status(statusCode).json({
-            success: false,
-            status: statusCode,
-            message,
-            error: process.env.NODE_ENV === 'development' ? error : undefined,
-        });
-    }
 
     // ========================================
     // 📋 CRUD OPERATIONS
@@ -122,7 +108,7 @@ class ProductController {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return ProductController.errorResponse(res, 'Validation failed', 400, errors.array());
+                return errorResponse(res, 'Validation failed', 400, errors.array());
             }
 
             const productData = req.body;
@@ -161,7 +147,7 @@ class ProductController {
                 { path: 'createdBy', select: 'name email' }
             ]);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(product),
@@ -174,10 +160,10 @@ class ProductController {
 
             if (error.code === 11000) {
                 const field = Object.keys(error.keyPattern)[0];
-                return ProductController.errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
+                return errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
             }
 
-            return ProductController.errorResponse(res, 'Failed to create product', 500, error.message);
+            return errorResponse(res, 'Failed to create product', 500, error.message);
         }
     }
 
@@ -189,7 +175,7 @@ class ProductController {
             // Check if getPaginatedProducts exists
             // if (!Product.getPaginatedProducts) {
             //     console.error('Product.getPaginatedProducts is undefined. Check products.js import and static method definition.');
-            //     return ProductController.errorResponse(res, 'Server configuration error: getPaginatedProducts method not found', 500, {
+            //     return errorResponse(res, 'Server configuration error: getPaginatedProducts method not found', 500, {
             //         availableMethods: Object.keys(Product.schema?.statics || {})
             //     });
             // }
@@ -321,7 +307,7 @@ class ProductController {
             };
 
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 response,
@@ -330,7 +316,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Error in getProducts:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch products', 500, error.message);
         }
     }
 
@@ -385,7 +371,7 @@ class ProductController {
             }).populate(populateOptions);
 
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             // Increment view count
@@ -400,7 +386,7 @@ class ProductController {
                 needsRestock: product.needsRestock()
             };
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProduct,
@@ -409,7 +395,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch product:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch product', 500, error.message);
+            return errorResponse(res, 'Failed to fetch product', 500, error.message);
         }
     }
 
@@ -422,12 +408,12 @@ class ProductController {
             const updateData = req.body;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
-                return ProductController.errorResponse(res, 'Validation failed', 400, errors.array());
+                return errorResponse(res, 'Validation failed', 400, errors.array());
             }
 
             // Remove fields that shouldn't be directly updated
@@ -484,10 +470,10 @@ class ProductController {
             ]);
 
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(product),
@@ -499,10 +485,10 @@ class ProductController {
 
             if (error.code === 11000) {
                 const field = Object.keys(error.keyPattern)[0];
-                return ProductController.errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
+                return errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
             }
 
-            return ProductController.errorResponse(res, 'Failed to update product', 500, error.message);
+            return errorResponse(res, 'Failed to update product', 500, error.message);
         }
     }
 
@@ -515,12 +501,12 @@ class ProductController {
             const { permanent = false } = req.query;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             let result;
@@ -536,7 +522,7 @@ class ProductController {
                 result = { _id: id };
             }
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 { id: result._id },
@@ -545,7 +531,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to delete product:', error);
-            return ProductController.errorResponse(res, 'Failed to delete product', 500, error.message);
+            return errorResponse(res, 'Failed to delete product', 500, error.message);
         }
     }
 
@@ -561,12 +547,12 @@ class ProductController {
             const { ids, permanent = false } = req.body;
 
             if (!Array.isArray(ids) || ids.length === 0) {
-                return ProductController.errorResponse(res, 'Invalid or empty IDs array', 400);
+                return errorResponse(res, 'Invalid or empty IDs array', 400);
             }
 
             const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
             if (validIds.length !== ids.length) {
-                return ProductController.errorResponse(res, 'Some product IDs are invalid', 400);
+                return errorResponse(res, 'Some product IDs are invalid', 400);
             }
 
             let result;
@@ -580,7 +566,7 @@ class ProductController {
                 result = { deletedCount: validIds.length };
             }
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -594,7 +580,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to bulk delete products:', error);
-            return ProductController.errorResponse(res, 'Failed to bulk delete products', 500, error.message);
+            return errorResponse(res, 'Failed to bulk delete products', 500, error.message);
         }
     }
 
@@ -606,21 +592,21 @@ class ProductController {
             const { ids, status } = req.body;
 
             if (!Array.isArray(ids) || !status) {
-                return ProductController.errorResponse(res, 'Invalid input: ids and status required', 400);
+                return errorResponse(res, 'Invalid input: ids and status required', 400);
             }
 
             if (!['active', 'inactive', 'draft', 'pending', 'archived', 'published'].includes(status)) {
-                return ProductController.errorResponse(res, 'Invalid status value', 400);
+                return errorResponse(res, 'Invalid status value', 400);
             }
 
             const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
             if (validIds.length !== ids.length) {
-                return ProductController.errorResponse(res, 'Some product IDs are invalid', 400);
+                return errorResponse(res, 'Some product IDs are invalid', 400);
             }
 
             const result = await Product.bulkUpdateStatus(validIds, status);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -633,7 +619,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to bulk update status:', error);
-            return ProductController.errorResponse(res, 'Failed to update statuses', 500, error.message);
+            return errorResponse(res, 'Failed to update statuses', 500, error.message);
         }
     }
 
@@ -645,16 +631,16 @@ class ProductController {
             const { updates } = req.body;
 
             if (!Array.isArray(updates) || updates.length === 0) {
-                return ProductController.errorResponse(res, 'Invalid or empty updates array', 400);
+                return errorResponse(res, 'Invalid or empty updates array', 400);
             }
 
             if (updates.some(u => !u.id || u.stock < 0)) {
-                return ProductController.errorResponse(res, 'Invalid stock updates', 400);
+                return errorResponse(res, 'Invalid stock updates', 400);
             }
 
             const result = await Product.bulkUpdateStock(updates);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -667,7 +653,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to bulk update stock:', error);
-            return ProductController.errorResponse(res, 'Failed to update stocks', 500, error.message);
+            return errorResponse(res, 'Failed to update stocks', 500, error.message);
         }
     }
 
@@ -684,7 +670,7 @@ class ProductController {
             const { limit = 20, category, priceMin, priceMax, sort = 'relevance' } = req.query;
 
             if (!keyword) {
-                return ProductController.errorResponse(res, 'Search keyword is required', 400);
+                return errorResponse(res, 'Search keyword is required', 400);
             }
 
             let products;
@@ -740,7 +726,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -753,7 +739,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to search products:', error);
-            return ProductController.errorResponse(res, 'Failed to search products', 500, error.message);
+            return errorResponse(res, 'Failed to search products', 500, error.message);
         }
     }
 
@@ -769,7 +755,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -778,7 +764,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch featured products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch featured products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch featured products', 500, error.message);
         }
     }
 
@@ -792,7 +778,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -801,7 +787,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch low stock products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch low stock products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch low stock products', 500, error.message);
         }
     }
 
@@ -815,7 +801,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -824,7 +810,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch out-of-stock products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch out-of-stock products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch out-of-stock products', 500, error.message);
         }
     }
 
@@ -836,7 +822,7 @@ class ProductController {
             const { categoryId } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-                return ProductController.errorResponse(res, 'Invalid category ID format', 400);
+                return errorResponse(res, 'Invalid category ID format', 400);
             }
 
             const products = await Product.getByCategory(categoryId);
@@ -844,7 +830,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -853,7 +839,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch products by category:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch products by category', 500, error.message);
+            return errorResponse(res, 'Failed to fetch products by category', 500, error.message);
         }
     }
 
@@ -871,7 +857,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -880,7 +866,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch products by tags:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch products by tags', 500, error.message);
+            return errorResponse(res, 'Failed to fetch products by tags', 500, error.message);
         }
     }
 
@@ -896,7 +882,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -905,7 +891,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch new arrivals:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch new arrivals', 500, error.message);
+            return errorResponse(res, 'Failed to fetch new arrivals', 500, error.message);
         }
     }
 
@@ -925,7 +911,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -934,7 +920,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch products by price range:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch products by price range', 500, error.message);
+            return errorResponse(res, 'Failed to fetch products by price range', 500, error.message);
         }
     }
 
@@ -950,7 +936,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -959,7 +945,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch top-selling products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch top-selling products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch top-selling products', 500, error.message);
         }
     }
 
@@ -975,7 +961,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -984,7 +970,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch most-viewed products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch most-viewed products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch most-viewed products', 500, error.message);
         }
     }
 
@@ -998,7 +984,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -1007,7 +993,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch discounted products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch discounted products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch discounted products', 500, error.message);
         }
     }
 
@@ -1019,12 +1005,12 @@ class ProductController {
             const { categoryId } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(categoryId)) {
-                return ProductController.errorResponse(res, 'Invalid category ID format', 400);
+                return errorResponse(res, 'Invalid category ID format', 400);
             }
 
             const averageRating = await Product.getAverageRatingByCategory(categoryId);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 { categoryId, averageRating },
@@ -1033,7 +1019,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch average rating:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch average rating', 500, error.message);
+            return errorResponse(res, 'Failed to fetch average rating', 500, error.message);
         }
     }
 
@@ -1045,12 +1031,12 @@ class ProductController {
             const { beforeDate } = req.body;
 
             if (!beforeDate) {
-                return ProductController.errorResponse(res, 'beforeDate is required', 400);
+                return errorResponse(res, 'beforeDate is required', 400);
             }
 
             const result = await Product.archiveOldProducts(new Date(beforeDate));
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1063,7 +1049,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to archive products:', error);
-            return ProductController.errorResponse(res, 'Failed to archive products', 500, error.message);
+            return errorResponse(res, 'Failed to archive products', 500, error.message);
         }
     }
 
@@ -1079,17 +1065,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const images = product.getSimplifiedImages();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 images,
@@ -1098,7 +1084,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch images:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch images', 500, error.message);
+            return errorResponse(res, 'Failed to fetch images', 500, error.message);
         }
     }
 
@@ -1111,17 +1097,17 @@ class ProductController {
             const { quantity = 1 } = req.query;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const finalPrice = product.getFinalPrice(Number(quantity));
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 { finalPrice, quantity: Number(quantity) },
@@ -1130,7 +1116,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch final price:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch final price', 500, error.message);
+            return errorResponse(res, 'Failed to fetch final price', 500, error.message);
         }
     }
 
@@ -1142,17 +1128,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const stockStatus = product.getStockStatus();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 { stockStatus },
@@ -1161,7 +1147,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch stock status:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch stock status', 500, error.message);
+            return errorResponse(res, 'Failed to fetch stock status', 500, error.message);
         }
     }
 
@@ -1173,18 +1159,18 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             product.markAsOutOfStock();
             await product.save();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(product),
@@ -1193,7 +1179,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to mark as out of stock:', error);
-            return ProductController.errorResponse(res, 'Failed to mark as out of stock', 500, error.message);
+            return errorResponse(res, 'Failed to mark as out of stock', 500, error.message);
         }
     }
 
@@ -1205,18 +1191,18 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             product.incrementViews();
             await product.save();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1228,7 +1214,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to increment views:', error);
-            return ProductController.errorResponse(res, 'Failed to increment views', 500, error.message);
+            return errorResponse(res, 'Failed to increment views', 500, error.message);
         }
     }
 
@@ -1244,17 +1230,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const isActive = product.isDiscountActive();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1268,7 +1254,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to check discount status:', error);
-            return ProductController.errorResponse(res, 'Failed to check discount status', 500, error.message);
+            return errorResponse(res, 'Failed to check discount status', 500, error.message);
         }
     }
 
@@ -1280,17 +1266,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const seoData = product.getSEOData();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 seoData,
@@ -1299,7 +1285,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch SEO data:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch SEO data', 500, error.message);
+            return errorResponse(res, 'Failed to fetch SEO data', 500, error.message);
         }
     }
 
@@ -1312,21 +1298,21 @@ class ProductController {
             const { quantity } = req.query;
 
             if (!quantity || Number(quantity) <= 0) {
-                return ProductController.errorResponse(res, 'Positive quantity is required', 400);
+                return errorResponse(res, 'Positive quantity is required', 400);
             }
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const bulkPrice = product.getBulkDiscountPrice(Number(quantity));
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1339,7 +1325,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch bulk discount price:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch bulk discount price', 500, error.message);
+            return errorResponse(res, 'Failed to fetch bulk discount price', 500, error.message);
         }
     }
 
@@ -1351,17 +1337,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const isPurchasable = product.isPurchasable();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1375,7 +1361,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to check purchasable status:', error);
-            return ProductController.errorResponse(res, 'Failed to check purchasable status', 500, error.message);
+            return errorResponse(res, 'Failed to check purchasable status', 500, error.message);
         }
     }
 
@@ -1388,25 +1374,25 @@ class ProductController {
             const { quantity } = req.body;
 
             if (!quantity || quantity <= 0) {
-                return ProductController.errorResponse(res, 'Positive quantity is required', 400);
+                return errorResponse(res, 'Positive quantity is required', 400);
             }
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             if (!product.isPurchasable()) {
-                return ProductController.errorResponse(res, 'Product is not purchasable', 400);
+                return errorResponse(res, 'Product is not purchasable', 400);
             }
 
             await product.reduceStock(quantity);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(product),
@@ -1415,7 +1401,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to reduce stock:', error);
-            return ProductController.errorResponse(res, 'Failed to reduce stock', 500, error.message);
+            return errorResponse(res, 'Failed to reduce stock', 500, error.message);
         }
     }
 
@@ -1428,21 +1414,21 @@ class ProductController {
             const { quantity } = req.body;
 
             if (!quantity || quantity <= 0) {
-                return ProductController.errorResponse(res, 'Positive quantity is required', 400);
+                return errorResponse(res, 'Positive quantity is required', 400);
             }
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             await product.restock(quantity);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(product),
@@ -1451,7 +1437,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to restock product:', error);
-            return ProductController.errorResponse(res, 'Failed to restock product', 500, error.message);
+            return errorResponse(res, 'Failed to restock product', 500, error.message);
         }
     }
 
@@ -1463,17 +1449,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const isFeatured = await product.toggleFeatured();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1485,7 +1471,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to toggle featured status:', error);
-            return ProductController.errorResponse(res, 'Failed to toggle featured status', 500, error.message);
+            return errorResponse(res, 'Failed to toggle featured status', 500, error.message);
         }
     }
 
@@ -1498,12 +1484,12 @@ class ProductController {
             const { limit = 5 } = req.query;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const relatedProducts = await product.getRelatedProducts().limit(parseInt(limit));
@@ -1511,7 +1497,7 @@ class ProductController {
                 ProductController.enrichProduct(product)
             );
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -1520,7 +1506,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch related products:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch related products', 500, error.message);
+            return errorResponse(res, 'Failed to fetch related products', 500, error.message);
         }
     }
 
@@ -1532,17 +1518,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const isBundle = product.isPartOfBundle();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1554,7 +1540,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to check bundle status:', error);
-            return ProductController.errorResponse(res, 'Failed to check bundle status', 500, error.message);
+            return errorResponse(res, 'Failed to check bundle status', 500, error.message);
         }
     }
 
@@ -1566,17 +1552,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const discountPercent = product.getActiveDiscountPercent();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1588,7 +1574,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch discount percentage:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch discount percentage', 500, error.message);
+            return errorResponse(res, 'Failed to fetch discount percentage', 500, error.message);
         }
     }
 
@@ -1601,21 +1587,21 @@ class ProductController {
             const { reviewId } = req.body;
 
             if (!reviewId) {
-                return ProductController.errorResponse(res, 'reviewId is required', 400);
+                return errorResponse(res, 'reviewId is required', 400);
             }
 
             if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(reviewId)) {
-                return ProductController.errorResponse(res, 'Invalid ID format', 400);
+                return errorResponse(res, 'Invalid ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             await product.addReview(reviewId);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1627,7 +1613,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to add review:', error);
-            return ProductController.errorResponse(res, 'Failed to add review', 500, error.message);
+            return errorResponse(res, 'Failed to add review', 500, error.message);
         }
     }
 
@@ -1640,12 +1626,12 @@ class ProductController {
             const { discount, salePrice, startDate, endDate } = req.body;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             await product.applyPromotion({
@@ -1655,7 +1641,7 @@ class ProductController {
                 endDate: endDate ? new Date(endDate) : undefined
             });
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(product),
@@ -1664,7 +1650,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to apply promotion:', error);
-            return ProductController.errorResponse(res, 'Failed to apply promotion', 500, error.message);
+            return errorResponse(res, 'Failed to apply promotion', 500, error.message);
         }
     }
 
@@ -1676,17 +1662,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const isPreOrder = product.isPreOrderAvailable();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1699,7 +1685,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to check pre-order status:', error);
-            return ProductController.errorResponse(res, 'Failed to check pre-order status', 500, error.message);
+            return errorResponse(res, 'Failed to check pre-order status', 500, error.message);
         }
     }
 
@@ -1711,17 +1697,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const totalPrice = await product.getBundleTotalPrice();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 {
@@ -1734,7 +1720,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch bundle price:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch bundle price', 500, error.message);
+            return errorResponse(res, 'Failed to fetch bundle price', 500, error.message);
         }
     }
 
@@ -1750,17 +1736,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id).populate('reviews');
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const ratingStatistics = product.ratingStatistics;
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ratingStatistics,
@@ -1769,7 +1755,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch rating statistics:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch rating statistics', 500, error.message);
+            return errorResponse(res, 'Failed to fetch rating statistics', 500, error.message);
         }
     }
 
@@ -1781,17 +1767,17 @@ class ProductController {
             const { id } = req.params;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             const product = await Product.findById(id);
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             const stockStatus = product.stockStatus;
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 { stockStatus },
@@ -1800,7 +1786,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch virtual stock status:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch virtual stock status', 500, error.message);
+            return errorResponse(res, 'Failed to fetch virtual stock status', 500, error.message);
         }
     }
 
@@ -1815,7 +1801,7 @@ class ProductController {
         try {
             const report = Product.generateSchemaReport();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 report,
@@ -1824,7 +1810,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to generate schema report:', error);
-            return ProductController.errorResponse(res, 'Failed to generate schema report', 500, error.message);
+            return errorResponse(res, 'Failed to generate schema report', 500, error.message);
         }
     }
 
@@ -1835,7 +1821,7 @@ class ProductController {
         try {
             const statistics = await Product.generateDatabaseStatistics();
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 statistics,
@@ -1844,7 +1830,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to generate database statistics:', error);
-            return ProductController.errorResponse(res, 'Failed to generate database statistics', 500, error.message);
+            return errorResponse(res, 'Failed to generate database statistics', 500, error.message);
         }
     }
 
@@ -1861,11 +1847,11 @@ class ProductController {
             const { quantity, operation = 'set' } = req.body; // set, add, subtract
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
-                return ProductController.errorResponse(res, 'Invalid product ID format', 400);
+                return errorResponse(res, 'Invalid product ID format', 400);
             }
 
             if (typeof quantity !== 'number' || quantity < 0) {
-                return ProductController.errorResponse(res, 'Valid quantity is required', 400);
+                return errorResponse(res, 'Valid quantity is required', 400);
             }
 
             const product = await Product.findOne({
@@ -1874,7 +1860,7 @@ class ProductController {
             });
 
             if (!product) {
-                return ProductController.errorResponse(res, 'Product not found', 404);
+                return errorResponse(res, 'Product not found', 404);
             }
 
             let newStock;
@@ -1915,7 +1901,7 @@ class ProductController {
                 { path: 'brand', select: 'name logo' }
             ]);
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 ProductController.enrichProduct(updatedProduct),
@@ -1924,7 +1910,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Update stock error:', error);
-            return ProductController.errorResponse(res, 'Failed to update stock', 500, error.message);
+            return errorResponse(res, 'Failed to update stock', 500, error.message);
         }
     }
 
@@ -1966,7 +1952,7 @@ class ProductController {
                 }
             }));
 
-            return ProductController.standardResponse(
+            return standardResponse(
                 res,
                 true,
                 enrichedProducts,
@@ -1975,7 +1961,7 @@ class ProductController {
 
         } catch (error) {
             console.error('Failed to fetch products with analytics:', error);
-            return ProductController.errorResponse(res, 'Failed to fetch products with analytics', 500, error.message);
+            return errorResponse(res, 'Failed to fetch products with analytics', 500, error.message);
         }
     }
 

@@ -1,6 +1,6 @@
 const Setting = require('../../models/Setting');
-const { standardResponse } = require('../../utils/apiUtils');
-
+// const { standardResponse } = require('../../utils/apiUtils');
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // ================== GETTERS ==================
 
 exports.createSettings = async (req, res) => {

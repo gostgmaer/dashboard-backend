@@ -55,8 +55,9 @@ class OTPService {
   /**
    * Check if OTP verification is enabled
    */
-  isEnabled() {
-    return this.config.enabled;
+  isEnabled(setting) {
+
+    return setting.enabled || this.config.enabled;
   }
 
   /**
@@ -142,9 +143,9 @@ class OTPService {
    */
   async verifyTOTPSetup(user, token) {
     try {
-      if (!user.twoFactorSecret) {
-        throw new Error('TOTP not set up for this user');
-      }
+     if (!user.twoFactorAuth || !user.twoFactorAuth.secret) {
+      throw new Error('TOTP not set up for this user');
+    }
 
       const verified = speakeasy.totp.verify({
         secret: user.twoFactorAuth.secret,

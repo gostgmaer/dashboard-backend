@@ -8,7 +8,8 @@ const {  PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
 const { storageType, localStoragePath, firebasePrivateKey,azureContainer, firebaseAuthDomain, azurestorage_conn_string, firebaseProjectId, firebaseBucket, firebaseMessagingSenderId, firebaseAppId, s3Region, s3AccessKey, s3SecretKey, bucketName } = require('../../config/setting');
 const Attachment = require("../../models/attchments");
 const { BlobServiceClient } = require("@azure/storage-blob");
-const { standardResponse } = require('../../utils/apiUtils');
+// const { standardResponse } = require('../../utils/apiUtils');
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // Ensure local upload directory exists
 if (storageType === 'firebase' || storageType === 'local') {
     fs.mkdir(localStoragePath, { recursive: true }).catch(console.error);
