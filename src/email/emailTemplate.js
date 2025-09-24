@@ -113,7 +113,7 @@ const welcomeEmailTemplate = (data) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const emailVerificationTemplate = ({ id, username, emailVerificationToken }) => {
+const emailVerificationTemplate = ({ id, username, emailVerificationTokens }) => {
   return {
     subject: `Please Verify Your Email`,
     html: `<!DOCTYPE html>
