@@ -1,9 +1,9 @@
 const Wishlist = require('../models/wishlist');
 const { validationResult } = require('express-validator');
 const logger = require('../config/logger');
-const { APIError, formatResponse } = require('../utils/apiUtils');
+// const { APIError, formatResponse } = require('../utils/apiUtils');
 // const { validateWishlistInput, validateBulkWishlistInput } = require('../middleware/validators');
-
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 // Helper function to check authorization
 const checkAuthorization = (req, userId) => {
   if (!req.user || req.user._id.toString() !== userId.toString()) {

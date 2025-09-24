@@ -22,7 +22,6 @@ const contactsRoute = require('./src/routes/contact');
 const { categoryRoute } = require('./src/routes/categoriesRoute');
 const { cartRoutes } = require('./src/routes/cartRoutes');
 const BrandRoute = require('./src/routes/brandRouters');
-// const authRoute = require('./src/routes/auth');
 const { attributeRouter } = require('./src/routes/attributeRoutes');
 const { attachmentRoutes } = require('./src/routes/attachmentsRoutes');
 const addressRoute = require('./src/routes/address');

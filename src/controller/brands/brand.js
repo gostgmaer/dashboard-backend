@@ -2,7 +2,7 @@ const Brand = require("../../models/brands");
 const createError = require("http-errors");
 const logger = require("winston"); // Assuming a logging library is configured
 const { cacheClient } = require("../../config/cache"); // Assuming Redis client configuration
-
+const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // Helper function to handle async errors
 const asyncHandler = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);

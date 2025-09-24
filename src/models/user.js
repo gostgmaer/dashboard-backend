@@ -186,14 +186,6 @@ const userSchema = new mongoose.Schema(
       lastAttempt: { type: Date, default: null },
     },
     tempPasswordActive: { type: Boolean, default: false },
-
-    backupCodes: [
-      {
-        code: String,
-        used: { type: Boolean, default: false },
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
     // Enhanced OTP System
     otpSettings: {
       enabled: { type: Boolean, default: false },
@@ -503,6 +495,89 @@ userSchema.method({
     return newSession;
   },
 
+
+  async enableOTPSetting(method) {
+    // Initialize otpSettings if not present
+    if (!this.otpSettings) {
+      this.otpSettings = {};
+    }
+
+    if (method === 'totp') {
+      // For TOTP (authentication app), enable both otpSettings and setup TOTP
+      this.otpSettings.enabled = true;
+      this.otpSettings.preferredMethod = 'totp';
+      this.otpSettings.allowFallback = false;
+
+      // Initialize twoFactorAuth for TOTP setup
+      if (!this.twoFactorAuth) {
+        this.twoFactorAuth = {};
+      }
+
+      // Use otpService to setup TOTP
+      const totpSetup = await otpService.setupTOTP(this);
+
+      // Update twoFactorAuth with setup data
+      this.twoFactorAuth.enabled = false; // Will be enabled after verification
+      this.twoFactorAuth.setupCompleted = false;
+      this.twoFactorAuth.secret = totpSetup.secret;
+      this.twoFactorAuth.backupCodes = [];
+
+      await this.save();
+
+      return {
+        success: true,
+        otpEnabled: this.otpSettings.enabled,
+        preferredMethod: this.otpSettings.preferredMethod,
+        twoFactorAuthInitialized: true,
+        totpSetup: {
+          qrCode: totpSetup.qrCode,
+          manualEntryKey: totpSetup.manualEntryKey,
+          setupUri: totpSetup.setupUri
+        },
+        message: 'OTP enabled with authentication app. Scan QR code to complete setup.'
+      };
+
+    } else if (method === 'email' || method === 'sms') {
+      // For email/SMS OTP, enable otpSettings and validate prerequisites
+
+      // Check prerequisites for the chosen method
+      if (method === 'email' && (!this.email || !this.emailVerified)) {
+        throw new Error('Email must be verified before enabling email OTP');
+      }
+
+      if (method === 'sms' && (!this.phoneNumber || !this.phoneVerified)) {
+        throw new Error('Phone number must be verified before enabling SMS OTP');
+      }
+
+      this.otpSettings.enabled = true;
+      this.otpSettings.preferredMethod = method;
+      this.otpSettings.allowFallback = false;
+
+      // Clear any existing OTP session
+      this.currentOTP = {
+        code: null,
+        hashedCode: null,
+        type: null,
+        purpose: null,
+        expiresAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        lastSent: null,
+        verified: false
+      };
+
+      await this.save();
+
+      return {
+        success: true,
+        otpEnabled: this.otpSettings.enabled,
+        preferredMethod: this.otpSettings.preferredMethod,
+        twoFactorAuthInitialized: false,
+        message: `OTP enabled with ${method} delivery method. You can now receive OTP codes via ${method}.`
+      };
+    }
+  },
+
   async enableMFA(method) {
     const validMethods = ['totp', 'email', 'sms'];
     if (!validMethods.includes(method)) {
@@ -515,10 +590,8 @@ userSchema.method({
     await this.save();
 
     if (method === 'totp') {
-
       this.twoFactorAuth.enabled = true;
       this.twoFactorAuth.setupCompleted = false;
-
 
     }
     return {
@@ -732,6 +805,36 @@ userSchema.method({
       throw new Error(`Login failed: ${error.message}`);
     }
   },
+  async completeTOTPSetup(token) {
+
+    if (!this.twoFactorAuth?.secret) {
+      throw new Error('TOTP setup not initiated');
+    }
+
+    // Use otpService to verify TOTP setup
+    const verifyResult = await otpService.verifyTOTPSetup(this, token);
+
+    if (verifyResult.success) {
+      this.twoFactorAuth.enabled = true;
+      this.twoFactorAuth.setupCompleted = true;
+      this.twoFactorAuth.backupCodes = verifyResult.backupCodes.map(code => ({
+        code: otpService.hashBackupCode(code),
+        used: false,
+        usedAt: null,
+        createdAt: new Date()
+      }));
+
+      await this.save();
+
+      return {
+        success: true,
+        message: 'TOTP setup completed successfully',
+        backupCodes: verifyResult.backupCodes // Return unhashed backup codes to user
+      };
+    }
+
+    throw new Error('Invalid TOTP token');
+  },
 
   async setupTOTP() {
     try {
@@ -813,7 +916,7 @@ userSchema.method({
    */
   async generateOTP(purpose = 'login', deviceInfo = {}, preferredMethod = null) {
     try {
-      if (!otpService.isEnabled()) {
+      if (!otpService.isEnabled(this.otpSettings)) {
         throw new Error('OTP verification is disabled');
       }
 
@@ -872,10 +975,9 @@ userSchema.method({
    * Check if user needs OTP for operation
    */
   async requiresOTP(operation = 'login') {
-    if (!otpService.isEnabled()) {
+    if (!otpService.isEnabled(this.otpSettings)) {
       return false;
     }
-
     switch (operation) {
       case 'login':
         return this.otpSettings.requireForLogin;
@@ -2773,7 +2875,7 @@ userSchema.statics.getAverageOrdersPerUser = async function () {
       throw new Error('Invalid credentials');
     }
     // Check if OTP is required
-    const requiresOTP = user.requiresOTP('login') && otpService.isEnabled();
+    const requiresOTP = user.requiresOTP('login') && otpService.isEnabled(user.otpSettings);
 
     if (requiresOTP) {
       // Return user with OTP requirement flag
