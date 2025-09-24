@@ -175,7 +175,7 @@ class authController {
 
       // Send email verification if OTP is enabled
       let verificationResult = null;
-      if (otpService.isEnabled()) {
+      if (otpService.isEnabled(user.otpSettings)) {
         verificationResult = await user.generateOTP('email_verification', deviceInfo, 'email');
       }
 
@@ -197,7 +197,7 @@ class authController {
           username: user.username,
           status: user.status
         },
-        otpEnabled: otpService.isEnabled(),
+        otpEnabled: otpService.isEnabled(user.otpSettings),
         verificationRequired: user.status === 'pending',
         verificationSent: !!verificationResult
       }, emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account', 201);
@@ -286,7 +286,7 @@ class authController {
           console.error('OTP generation failed:', error);
         }
 
-        return  standardResponse(res, true, {
+        return standardResponse(res, true, {
           requiresMFA: true,
           availableMethods: authResult.availableMethods,
           tempToken,
@@ -306,7 +306,7 @@ class authController {
         await user.trustDevice(deviceInfo.deviceId);
       }
 
-      return  standardResponse(
+      return standardResponse(
         res,
         true,
         {
@@ -326,9 +326,9 @@ class authController {
       NotificationMiddleware.onLoginSuccess(req, res, () => { });
     } catch (error) {
       console.error('Login error:', error);
-        NotificationMiddleware.onLoginFailed(req, res, () => { });
-     return  errorResponse(res, error.message, 500, error.message);
-    
+      NotificationMiddleware.onLoginFailed(req, res, () => { });
+      return errorResponse(res, error.message, 500, error.message);
+
     }
 
   }
@@ -1077,18 +1077,16 @@ class authController {
       const user = req.user;
       const deviceInfo = DeviceDetector.detectDevice(req);
 
-      if (user.emailVerified) {
-        return errorResponse(res,
-          'Email is already verified', 400);
-      }
-      if (user.email && !user.emailVerified) {
-        await user.sendEmailVerification()
-        await sendEmail(emailVerificationTemplate, user);
+      // if (user.emailVerified) {
+      //   return errorResponse(res,
+      //     'Email is already verified', 400);
+      // }
+      await user.sendEmailVerification(deviceInfo)
+      await sendEmail(emailVerificationTemplate, user);
 
-        return standardResponse(res, true, {
-          verificationSent: true,
-        }, 'Email verification sent successfully');
-      }
+      return standardResponse(res, true, {
+        verificationSent: true,
+      }, 'Email verification sent successfully');
 
 
     } catch (error) {
@@ -1120,7 +1118,16 @@ class authController {
 
       if (token) {
         // Find user by token (Assuming confirmToken field stores token for email confirmation)
-        user = await User.findOne({ emailVerificationToken: token });
+        const now = new Date();
+        user = await User.findOne({
+          emailVerificationTokens: {
+            $elemMatch: {
+              token: token,
+              purpose: 'email_verification',
+              expiresAt: { $gt: now }
+            }
+          }
+        });
         res.locals.user = user;
         if (!user) {
           return errorResponse(res, 'Invalid or expired verification token', 400);
@@ -1142,11 +1149,6 @@ class authController {
       }
 
 
-      if (user.emailVerified) {
-        return errorResponse(res,
-          'Email is already verified', 400);
-      }
-
 
       if (code) {
         const isValid = await user.verifyOTP(code, 'email_verification', deviceInfo);
@@ -1165,7 +1167,7 @@ class authController {
         return errorResponse(res,
           'Invalid or expired verification code', 400);
       }
-      const result = await User.verifyUserEmail(token);
+      const result = await User.verifyUserEmail(user, token);
 
       if (result) {
         await user.logSecurityEvent('email_verified',

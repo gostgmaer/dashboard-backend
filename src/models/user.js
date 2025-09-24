@@ -1208,17 +1208,12 @@ userSchema.method({
   },
   async sendEmailVerification(deviceInfo) {
     const user = this;
-    user.generateEmailVerificationToken();
+    await user.generateEmailVerificationToken(deviceInfo);
     // Delete old tokens of this type for user
-    await this.emailVerificationTokens.deleteMany({ userId: user._id, type: 'email_verification' });
-    // Save new token
-    await this.emailVerificationTokens.create({
-      userId: user._id,
-      token: user.emailVerificationToken,
-      type: 'email_verification',
-      expiresAt: user.emailVerificationExpiry,
-      deviceInfo: deviceInfo || null,
-    });
+    await user.emailVerificationTokens.filter(
+      token => token.type !== 'email_verification'
+    );
+
     return this.user;
   },
 
@@ -1579,10 +1574,17 @@ userSchema.method({
     await this.save();
   },
 
-  generateEmailVerificationToken() {
-    this.emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    this.emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    return this.emailVerificationToken;
+  async generateEmailVerificationToken(deviceInfo) {
+    await this.emailVerificationTokens.push({
+      userId: this._id,
+      token: crypto.randomBytes(32).toString('hex'),
+      type: 'email_verification',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      deviceInfo: deviceInfo || null,
+    });
+    await this.save();
+
+
   },
 
   async generateResetPasswordToken() {
@@ -1603,21 +1605,13 @@ userSchema.method({
     return this.passwordReset.token === token && this.passwordReset.tokenExpiry > Date.now();
   },
 
-  async verifyEmail(token) {
-    if (!this.emailVerificationToken || this.emailVerificationToken !== token) {
-      throw new Error('Invalid verification token');
-    }
-
-    if (this.emailVerificationExpiry < new Date()) {
-      throw new Error('Verification token has expired');
-    }
+  async verifyEmail() {
 
     this.emailVerified = true;
-    this.isVerified = this.emailVerified && (this.phoneVerified || !this.phoneNumber);
-    this.emailVerificationToken = null;
-    this.emailVerificationExpiry = null;
+    this.isVerified = true
+    this.emailVerificationTokens = [];
     this.status = this.isVerified ? 'active' : 'pending';
-    this.confirmToken = null;
+
     await this.save();
     return true;
   },
@@ -2643,16 +2637,7 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
       throw new Error('Invalid or expired refresh token');
     }
   }),
-  (userSchema.statics.verifyUserEmail = async function (token) {
-    const user = await this.findOne({
-      emailVerificationToken: token,
-      emailVerificationExpiry: { $gt: new Date() },
-    });
-
-    if (!user) {
-      throw new Error('Invalid or expired verification token');
-    }
-
+  (userSchema.statics.verifyUserEmail = async function (user, token) {
     await user.verifyEmail(token);
     return user;
   }),

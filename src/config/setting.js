@@ -32,11 +32,11 @@ const applicaionName = process.env.APPLICATION_NAME;
 
 // #client urls
 
-const host = process.env.LOGINHOST;
-const loginPath = process.env.CLIENTLOGINPAGE;
+const host = process.env.FRONTEND_URL;
+const loginPath = process.env.CLIENT_LOGIN_PAGE;
 const frontendUrl = process.env.FRONTEND_URL;
-const resetPath = process.env.CLIENTRESETPASSURL;
-const confirmPath = process.env.CLIENTCONFIRMURL;
+const resetPath = process.env.CLIENT_RESET_PASSWORD_URL;
+const confirmPath = process.env.CLIENT_EMAIL_VERIFY_URL;
 
 //Payment config
 
@@ -49,6 +49,7 @@ const razorPayPublic = process.env.ROZORPAY_PUBLIC_KEY;
 const razorPaySecret = process.env.ROZORPAY_SECRET_KEY;
 
 // Email configuration (optimized for Brevo SMTP)
+const mailSender = process.env.FROM_EMAIL; // Empty for Brevo
 const mailService = process.env.EMAIL_SERVICE; // Empty for Brevo
 const mailUserName = process.env.EMAIL_USER; // Brevo account email
 const mailPassword = process.env.EMAIL_PASS; // Brevo SMTP key
@@ -163,7 +164,7 @@ module.exports = {
   mailchimpList,
   applicaionName,
   paypalMode,
-  host,
+  host,mailSender,
   loginPath,
   frontendUrl,
   resetPath,

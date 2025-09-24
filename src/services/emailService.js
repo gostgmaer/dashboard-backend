@@ -7,6 +7,7 @@ const path = require('path');
 const handlebars = require('handlebars');
 const User = require('../models/user');
 const { emailHost, emailPort, emailSecure, mailUserName, mailPassword } = require('../config/setting');
+const { sendEmail } = require('../email/index.js');
 class EmailService {
   constructor() {
     this.transporter = null;
@@ -333,8 +334,8 @@ class EmailService {
       // }
 
       // Get compiled template
-      const template = this.templates.get(templateName) || this.templates.get('notification');
-      const htmlContent = template(templateData);
+      // const template = this.templates.get(templateName) || this.templates.get('notification');
+      // const htmlContent = template(templateData);
 
 
      const m = await sendEmail(t['USER_CREATED'], templateData);
@@ -357,11 +358,11 @@ class EmailService {
 
       // Send email
       // const result = await this.transporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', result.messageId);
+      console.log('Email sent successfully:', m.messageId);
 
       return {
         success: true,
-        messageId: result.messageId,
+        messageId: m.messageId,
         recipient: recipient.email,
       };
     } catch (error) {
