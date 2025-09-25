@@ -395,6 +395,138 @@ userSchema.method({
    *
    */
 
+  async linkSocialAccount(provider, providerId, email, verified = false) {
+    // Validate provider
+    const validProviders = ['google', 'facebook', 'twitter', 'github'];
+    if (!validProviders.includes(provider)) {
+      throw new Error(`Invalid provider. Must be one of: ${validProviders.join(', ')}`);
+    }
+
+    // Check if account is already linked
+    const existingAccount = this.socialAccounts.find((account) => account.provider === provider && account.providerId === providerId);
+
+    if (existingAccount) {
+      throw new Error(`${provider} account is already linked to this user`);
+    }
+
+    // Check if this social account is linked to another user
+    const existingUser = await this.constructor.findOne({
+      'socialAccounts.provider': provider,
+      'socialAccounts.providerId': providerId,
+      _id: { $ne: this._id },
+    });
+
+    if (existingUser) {
+      throw new Error(`This ${provider} account is already linked to another user`);
+    }
+
+    // Add the new social account
+    this.socialAccounts.push({
+      provider,
+      providerId,
+      email: email || this.email,
+      verified,
+      connectedAt: new Date(),
+    });
+
+    await this.save();
+    await this.logSecurityEvent('social_account_linked', `${provider} account linked`, 'medium', { provider, providerId });
+
+    return this.socialAccounts[this.socialAccounts.length - 1];
+  },
+
+  /**
+   * Unlink a social media account
+   */
+  async unlinkSocialAccount(provider, providerId) {
+    const accountIndex = this.socialAccounts.findIndex((account) => account.provider === provider && account.providerId === providerId);
+
+    if (accountIndex === -1) {
+      throw new Error(`${provider} account not found`);
+    }
+
+    // Ensure user has other login methods available
+    const hasPassword = !!this.hash_password;
+    const hasOtherSocialAccounts = this.socialAccounts.length > 1;
+
+    if (!hasPassword && !hasOtherSocialAccounts) {
+      throw new Error('Cannot unlink the last authentication method. Please set a password first.');
+    }
+
+    const removedAccount = this.socialAccounts[accountIndex];
+    this.socialAccounts.splice(accountIndex, 1);
+
+    await this.save();
+    await this.logSecurityEvent('social_account_unlinked', `${provider} account unlinked`, 'medium', { provider, providerId });
+
+    return removedAccount;
+  },
+
+  /**
+   * Get all linked social accounts (safe for client)
+   */
+  getSocialAccounts() {
+    return this.socialAccounts.map((account) => ({
+      provider: account.provider,
+      email: account.email,
+      verified: account.verified,
+      connectedAt: account.connectedAt,
+      // Note: providerId is intentionally excluded for security
+    }));
+  },
+
+  /**
+   * Check if a specific social provider is linked
+   */
+  hasSocialProvider(provider) {
+    return this.socialAccounts.some((account) => account.provider === provider);
+  },
+
+  /**
+   * Get social account by provider
+   */
+  getSocialAccount(provider) {
+    return this.socialAccounts.find((account) => account.provider === provider);
+  },
+
+  /**
+   * Verify a social account
+   */
+  async verifySocialAccount(provider, providerId) {
+    const account = this.socialAccounts.find((acc) => acc.provider === provider && acc.providerId === providerId);
+
+    if (!account) {
+      throw new Error(`${provider} account not found`);
+    }
+
+    account.verified = true;
+    await this.save();
+
+    await this.logSecurityEvent('social_account_verified', `${provider} account verified`, 'low', { provider, providerId });
+
+    return account;
+  },
+
+  /**
+   * Update social account email
+   */
+  async updateSocialAccountEmail(provider, providerId, newEmail) {
+    const account = this.socialAccounts.find((acc) => acc.provider === provider && acc.providerId === providerId);
+
+    if (!account) {
+      throw new Error(`${provider} account not found`);
+    }
+
+    const oldEmail = account.email;
+    account.email = newEmail;
+    account.verified = false; // Re-verification required
+
+    await this.save();
+    await this.logSecurityEvent('social_account_email_updated', `${provider} account email updated`, 'medium', { provider, providerId, oldEmail, newEmail });
+
+    return account;
+  },
+
   async addLoginHistory({ successful, failureReason, deviceInfo, loginMethod = 'password' }) {
     const loginEntry = {
       loginTime: new Date(),
@@ -495,7 +627,6 @@ userSchema.method({
     return newSession;
   },
 
-
   async enableOTPSetting(method) {
     // Initialize otpSettings if not present
     if (!this.otpSettings) {
@@ -532,11 +663,10 @@ userSchema.method({
         totpSetup: {
           qrCode: totpSetup.qrCode,
           manualEntryKey: totpSetup.manualEntryKey,
-          setupUri: totpSetup.setupUri
+          setupUri: totpSetup.setupUri,
         },
-        message: 'OTP enabled with authentication app. Scan QR code to complete setup.'
+        message: 'OTP enabled with authentication app. Scan QR code to complete setup.',
       };
-
     } else if (method === 'email' || method === 'sms') {
       // For email/SMS OTP, enable otpSettings and validate prerequisites
 
@@ -563,7 +693,7 @@ userSchema.method({
         attempts: 0,
         maxAttempts: 3,
         lastSent: null,
-        verified: false
+        verified: false,
       };
 
       await this.save();
@@ -573,7 +703,7 @@ userSchema.method({
         otpEnabled: this.otpSettings.enabled,
         preferredMethod: this.otpSettings.preferredMethod,
         twoFactorAuthInitialized: false,
-        message: `OTP enabled with ${method} delivery method. You can now receive OTP codes via ${method}.`
+        message: `OTP enabled with ${method} delivery method. You can now receive OTP codes via ${method}.`,
       };
     }
   },
@@ -592,7 +722,6 @@ userSchema.method({
     if (method === 'totp') {
       this.twoFactorAuth.enabled = true;
       this.twoFactorAuth.setupCompleted = false;
-
     }
     return {
       otpSettingsEnabled: this.otpSettings?.enabled || false,
@@ -806,7 +935,6 @@ userSchema.method({
     }
   },
   async completeTOTPSetup(token) {
-
     if (!this.twoFactorAuth?.secret) {
       throw new Error('TOTP setup not initiated');
     }
@@ -817,11 +945,11 @@ userSchema.method({
     if (verifyResult.success) {
       this.twoFactorAuth.enabled = true;
       this.twoFactorAuth.setupCompleted = true;
-      this.twoFactorAuth.backupCodes = verifyResult.backupCodes.map(code => ({
+      this.twoFactorAuth.backupCodes = verifyResult.backupCodes.map((code) => ({
         code: otpService.hashBackupCode(code),
         used: false,
         usedAt: null,
-        createdAt: new Date()
+        createdAt: new Date(),
       }));
 
       await this.save();
@@ -829,7 +957,7 @@ userSchema.method({
       return {
         success: true,
         message: 'TOTP setup completed successfully',
-        backupCodes: verifyResult.backupCodes // Return unhashed backup codes to user
+        backupCodes: verifyResult.backupCodes, // Return unhashed backup codes to user
       };
     }
 
@@ -1210,9 +1338,7 @@ userSchema.method({
     const user = this;
     await user.generateEmailVerificationToken(deviceInfo);
     // Delete old tokens of this type for user
-    await user.emailVerificationTokens.filter(
-      token => token.type !== 'email_verification'
-    );
+    await user.emailVerificationTokens.filter((token) => token.type !== 'email_verification');
 
     return this.user;
   },
@@ -1583,8 +1709,6 @@ userSchema.method({
       deviceInfo: deviceInfo || null,
     });
     await this.save();
-
-
   },
 
   async generateResetPasswordToken() {
@@ -1606,9 +1730,8 @@ userSchema.method({
   },
 
   async verifyEmail() {
-
     this.emailVerified = true;
-    this.isVerified = true
+    this.isVerified = true;
     this.emailVerificationTokens = [];
     this.status = this.isVerified ? 'active' : 'pending';
 
@@ -2931,7 +3054,7 @@ userSchema.statics.authenticateSocial = async function (profileData, identifier,
   };
 };
 
-userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) { };
+userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) {};
 
 /**
  * Verify user credentials with OTP
@@ -3189,6 +3312,104 @@ userSchema.statics.fetchUserSettings = async function (userId) {
 
   const userSettings = await query.exec();
   return userSettings;
+};
+
+// Add these to your userSchema.statics:
+
+/**
+ * Find user by social account
+ */
+userSchema.statics.findBySocialAccount = async function (provider, providerId) {
+  return this.findOne({
+    'socialAccounts.provider': provider,
+    'socialAccounts.providerId': providerId,
+  }).populate('role');
+};
+
+/**
+ * Create or update user from social login
+ */
+userSchema.statics.createOrUpdateFromSocial = async function (socialData, deviceInfo = {}) {
+  const { provider, providerId, email, firstName, lastName, profilePicture } = socialData;
+
+  // Try to find existing user by social account
+  let user = await this.findBySocialAccount(provider, providerId);
+
+  if (user) {
+    // Update existing user's last login and social account info
+    const socialAccount = user.getSocialAccount(provider);
+    if (socialAccount && socialAccount.email !== email) {
+      await user.updateSocialAccountEmail(provider, providerId, email);
+    }
+
+    await user.handleSuccessfulLogin(deviceInfo);
+    return { user, isNewUser: false };
+  }
+
+  // Try to find user by email
+  user = await this.findByEmail(email);
+
+  if (user) {
+    // Link social account to existing user
+    await user.linkSocialAccount(provider, providerId, email, true);
+    await user.handleSuccessfulLogin(deviceInfo);
+    return { user, isNewUser: false };
+  }
+
+  // Create new user
+  const defaultRole = await mongoose.model('Role').findOne({ isDefault: true, isActive: true });
+  if (!defaultRole) {
+    throw new Error('Default role not configured');
+  }
+
+  user = new this({
+    email: email.toLowerCase(),
+    username: email.split('@')[0] + '_' + Date.now(), // Ensure unique username
+    firstName: firstName || '',
+    lastName: lastName || '',
+    isVerified: true,
+    emailVerified: true,
+    status: 'active',
+    role: defaultRole._id,
+    profilePicture: profilePicture ? { fileUrl: profilePicture } : undefined,
+    socialAccounts: [
+      {
+        provider,
+        providerId,
+        email,
+        verified: true,
+        connectedAt: new Date(),
+      },
+    ],
+  });
+
+  // Generate referral code
+  user.referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+
+  await user.save();
+  await user.handleSuccessfulLogin(deviceInfo);
+
+  return { user, isNewUser: true };
+};
+
+/**
+ * Authenticate user via social login
+ */
+userSchema.statics.authenticateViaSocial = async function (socialData, deviceInfo = {}) {
+  try {
+    const { user, isNewUser } = await this.createOrUpdateFromSocial(socialData, deviceInfo);
+
+    // Create session
+    await user.createSession(deviceInfo);
+
+    return {
+      user,
+      isNewUser,
+      requiresMFA: false, // Social logins typically bypass MFA
+    };
+  } catch (error) {
+    throw new Error(`Social authentication failed: ${error.message}`);
+  }
 };
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
