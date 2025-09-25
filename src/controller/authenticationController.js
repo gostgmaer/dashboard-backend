@@ -1207,6 +1207,47 @@ class authController {
     }
   }
 
+  static async linkSocialAccount(req, res) {
+    try {
+      const { provider, providerId, email } = req.body;
+      const userId = req.user.id; // from JWT middleware
+
+      const user = await User.findById(userId);
+      const linkedAccount = await user.linkSocialAccount(provider, providerId, email, true);
+
+      res.json({
+        success: true,
+        message: `${provider} account linked successfully`,
+        account: {
+          provider: linkedAccount.provider,
+          email: linkedAccount.email,
+          connectedAt: linkedAccount.connectedAt
+        }
+      });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  };
+
+  static async unlinkSocialAccount(req, res) {
+    try {
+      const { provider, providerId } = req.body;
+      const userId = req.user.id;
+
+      const user = await User.findById(userId);
+      await user.unlinkSocialAccount(provider, providerId);
+
+      res.json({
+        success: true,
+        message: `${provider} account unlinked successfully`,
+        socialAccounts: user.getSocialAccounts()
+      });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+
+
+  }
   /**
    * Get active sessions
    */
