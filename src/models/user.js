@@ -1699,7 +1699,7 @@ userSchema.method({
         throw new Error('OTP verification is disabled');
       }
 
-      const methodToUse =  this.otpSettings?.preferredMethod;
+      const methodToUse = this.otpSettings?.preferredMethod;
       if (!methodToUse) {
         throw new Error('No OTP method specified or configured');
       }
@@ -2012,57 +2012,53 @@ userSchema.method({
     return (await this.populate(populateFields)).isVerified;
   },
   async getPermissions() {
-    // await this.populate({
-    //   path: 'role',
-    //   populate: ['permissions', "name", "isActive"]
-    // })
-
-    // const rolePermissions = (this.role?.permissions || []).map(p => p.name);
-    // // Return unique permissions as an array
-    // const uniquePermissions = Array.from(new Set(rolePermissions));
-    // return uniquePermissions;
-
-    // const Role = this.model("Role"); // Get Role model dynamically from mongoose
-
-    // Ensure role exists
-    // if (!this.role) return [];
-
-    // const roleId = typeof this.role === "string" ? new mongoose.Types.ObjectId(this.role) : this.role;
     const roleId = this.role._id;
     const result = await Role.aggregate([
       { $match: { _id: roleId } },
 
       {
         $lookup: {
-          from: 'permissions', // name of permissions collection
-          localField: 'permissions',
-          foreignField: '_id',
-          as: 'permissions',
+          from: "permissions", // name of permissions collection
+          localField: "permissions",
+          foreignField: "_id",
+          as: "permissions",
         },
       },
 
-      { $unwind: '$permissions' },
+      { $unwind: "$permissions" },
 
-      { $match: { 'permissions.isActive': true } },
+      { $match: { "permissions.isActive": true } },
+
+      // Extract first word from category
+      {
+        $addFields: {
+          resource: {
+            $arrayElemAt: [{ $split: ["$permissions.category", " "] }, 0],
+          },
+        },
+      },
 
       {
         $group: {
-          _id: '$permissions.category',
-          actions: { $addToSet: '$permissions.action' },
+          _id: "$resource", // group by the first word of category
+          actions: { $addToSet: "$permissions.action" },
+          id: { $first: "$permissions._id" },
         },
       },
 
       {
         $project: {
           _id: 0,
-          category: '$_id',
+          id: { $toString: "$id" },
+          resource: "$_id", // use the first word as resource
           actions: 1,
         },
       },
     ]);
 
-    return result; // returns [{ category, actions: [] }, ...]
-  },
+    return result; // [{ id, resource, actions: [] }, ...]
+  }
+  ,
 
   // Update last login timestamp
   async updateLastLogin() {
