@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const { jwtSecret } = require('../config/setting');
 
 const authMiddleware = async (req, res, next) => {
     try {
@@ -7,15 +8,30 @@ const authMiddleware = async (req, res, next) => {
         if (!token) {
             return res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
         }
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, jwtSecret);
         const user = await User.findById(decoded.userId).select('-password').populate('role');
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid token. User not found.' });
         }
+
+        // Check OTP required and validated status
+        // if (user.otpSettings?.enabled && user.otpSettings?.requireForLogin) {
+        //     if (user.currentOTP.verified || !user.twoFactorAuth.enabled||!user.twoFactorAuth.setupCompleted) {
+        //         return res.status(401).json({
+        //             success: false,
+        //             message: 'OTP verification required to access this resource.',
+        //             requiresOTP: true,
+        //             otpMethods: user.availableOTPMethods || [],
+        //         });
+        //     }
+        // }
+
+        // Attach user info to request and locals for further handlers
         req.user = user;
-        req.body.created_by = user.id
-        req.body.updated_by = user.id
+        req.body.created_by = user.id;
+        req.body.updated_by = user.id;
         res.locals.user = user;
+
         next();
     } catch (error) {
         return res.status(401).json({ success: false, message: 'Invalid token.' });
@@ -43,5 +59,5 @@ const optionalAuth = async (req, res, next) => {
 
 module.exports = {
     authMiddleware,
-    optionalAuth
-}   ;
+    optionalAuth,
+};

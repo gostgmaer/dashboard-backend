@@ -25,6 +25,10 @@ class OTPService {
       allowFallback: false, // enforce single method only
       expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '5'),
       maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || '3'),
+      rateLimit: {
+        window: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute in milliseconds
+        maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5'), // Max 5 requests per window
+      },
       totp: {
         secretLength: parseInt(process.env.TOTP_SECRET_LENGTH || '32'),
         window: parseInt(process.env.TOTP_WINDOW || '1'),
@@ -143,9 +147,9 @@ class OTPService {
    */
   async verifyTOTPSetup(user, token) {
     try {
-     if (!user.twoFactorAuth || !user.twoFactorAuth.secret) {
-      throw new Error('TOTP not set up for this user');
-    }
+      if (!user.twoFactorAuth || !user.twoFactorAuth.secret) {
+        throw new Error('TOTP not set up for this user');
+      }
 
       const verified = speakeasy.totp.verify({
         secret: user.twoFactorAuth.secret,
@@ -243,12 +247,8 @@ class OTPService {
   /**
    * Generate email OTP
    */
-  async generateEmailOTP(user, purpose = 'login', deviceInfo = {}) {
+  async generateEmailOTP(user, purpose, deviceInfo) {
     try {
-      if (!user.email) {
-        throw new Error('Email not configured for this user');
-      }
-
       // Check rate limiting
       await this.checkRateLimit(user._id, 'email');
 
@@ -256,6 +256,13 @@ class OTPService {
       const expiresAt = new Date(Date.now() + this.config.expiryMinutes * 60000);
 
       // Store OTP details in user
+
+      // user.otpSettings = {
+      //   preferredMethod: 'email',
+      //   requireForSensitiveOps: true,
+      //   allowFallback: false,
+      //   requireForLogin: true
+      // };
 
       user.currentOTP = {
         code,
@@ -269,20 +276,21 @@ class OTPService {
         verified: false
       };
 
-      await user.save();
+
       const emailResult = await sendEmail(otpEmailTemplate, {
+        email: user.email,
         to: user.email,
         username: user.firstName || user.username,
-        code,
+        otp:code,
         purpose,
-        expiresAt,
+        expiryMinutes:expiresAt,
         deviceInfo,
       });
 
       if (!emailResult.success) {
         throw new Error('Failed to send OTP email');
       }
-
+      await user.save();
       return {
         success: true,
         type: 'email',
@@ -298,7 +306,7 @@ class OTPService {
   /**
    * Generate SMS OTP
    */
-  async generateSMSOTP(user, purpose = 'login', deviceInfo = {}) {
+  async generateSMSOTP(user, purpose = 'login', deviceInfo) {
     try {
       if (!user.phoneNumber) {
         throw new Error('Phone number not configured for this user');
@@ -315,7 +323,13 @@ class OTPService {
       const expiresAt = new Date(Date.now() + this.config.expiryMinutes * 60000);
 
       // Store OTP details in user
-
+      user.otpSettings = {
+   
+        preferredMethod: 'sms',
+        requireForSensitiveOps: true,
+        allowFallback: false,
+        requireForLogin: true
+      };
 
       user.currentOTP = {
         code,
@@ -357,28 +371,29 @@ class OTPService {
    */
   async sendOTP(user, purpose = 'login', deviceInfo = {}, preferredMethod = null) {
     try {
-      if (!this.isEnabled()) {
-        throw new Error('OTP verification is disabled');
-      }
+      
+      // if (!this.isEnabled(user.otpSettings)) {
+      //   throw new Error('OTP verification is disabled');
+      // }
 
       let method = preferredMethod;
 
       // If no preferred method, get the best available method
-      if (!method) {
-        const bestMethod = this.getBestMethod(user, deviceInfo);
-        if (!bestMethod) {
-          throw new Error('No OTP methods available for this user');
-        }
-        method = bestMethod.type;
-      }
+      // if (!method) {
+      //   const bestMethod = this.getBestMethod(user, deviceInfo);
+      //   if (!bestMethod) {
+      //     throw new Error('No OTP methods available for this user');
+      //   }
+      //   method = bestMethod.type;
+      // }
 
-      // Validate method availability
-      const availableMethods = this.getAvailableMethods(user, deviceInfo);
-      const selectedMethod = availableMethods.find((m) => m.type === method);
+      // // Validate method availability
+      // const availableMethods = this.getAvailableMethods(user, deviceInfo);
+      // const selectedMethod = availableMethods.find((m) => m.type === method);
 
-      if (!selectedMethod || !selectedMethod.available) {
-        throw new Error(`OTP method '${method}' is not available for this user`);
-      }
+      // if (!selectedMethod || !selectedMethod.available) {
+      //   throw new Error(`OTP method '${method}' is not available for this user`);
+      // }
 
       let result;
       switch (method) {
@@ -419,7 +434,7 @@ class OTPService {
    */
   async verifyOTP(user, code, purpose = 'login', deviceInfo = {}) {
     try {
-      if (!this.isEnabled()) {
+      if (!this.isEnabled(user.otpSettings)) {
         return true; // If OTP is disabled, always pass verification
       }
 

@@ -1,4 +1,5 @@
 const { host, resetPath, confirmPath, loginPath } = require('../config/setting');
+const { formatRelativeDuration } = require('../utils/helper');
 const { appUrl, applicaionName, frontendUrl } = require('./');
 
 /**
@@ -32,7 +33,7 @@ const otpEmailTemplate = ({ username, otp, expiryMinutes }) => {
       </div>
 
       <p style="font-size:16px; color:#555;">
-        This code will expire in <strong>${expiryMinutes} minutes</strong>.  
+        This code will expire in <strong>${formatRelativeDuration(expiryMinutes)}</strong>.  
         Please do not share this code with anyone.
       </p>
 
@@ -632,9 +633,6 @@ const dataExportRequestTemplate = ({ username, requestDate }) => {
     attachments: [], // Include any attachments if provided
   };
 };
-
-
-
 
 /**
  * Policyupdate email template.
@@ -1332,7 +1330,7 @@ const wishlistReminderTemplate = ({ username, wishlistItems }) => {
       <h2>Hello ${username || 'User'},</h2>
       <p>You have items waiting in your wishlist:</p>
       <ul>
-        ${wishlistItems.map(item => `<li>${item.name} - ${item.price}</li>`).join('')}
+        ${wishlistItems.map((item) => `<li>${item.name} - ${item.price}</li>`).join('')}
       </ul>
       <p>Come back and check them out!</p>
     </div>`,
@@ -1371,7 +1369,7 @@ const savedForLaterReminderTemplate = ({ username, savedItems }) => {
       <h2>Hello ${username || 'User'},</h2>
       <p>You have items saved for later in your account:</p>
       <ul>
-        ${savedItems.map(item => `<li>${item.name} - ${item.price}</li>`).join('')}
+        ${savedItems.map((item) => `<li>${item.name} - ${item.price}</li>`).join('')}
       </ul>
       <p>Visit your account to complete your purchase.</p>
     </div>`,
@@ -1686,8 +1684,6 @@ const paymentSuccessfulTemplate = ({ username, orderId, amount }) => {
   };
 };
 
-
-
 const paymentMethodExpiringSoonTemplate = ({ username, expiryDate }) => {
   return {
     subject: `Payment Method Expiring Soon`,
@@ -1711,8 +1707,6 @@ const subscriptionStartedTemplate = ({ username, subscriptionName, startDate }) 
     attachments: [],
   };
 };
-
-
 
 const subscriptionRenewedSuccessfullyTemplate = ({ username, subscriptionName }) => {
   return {
@@ -1749,8 +1743,6 @@ const subscriptionCanceledTemplate = ({ username, subscriptionName }) => {
     attachments: [],
   };
 };
-
-
 
 const creditNoteIssuedTemplate = ({ username, creditNoteNumber, amount, issueDate }) => {
   return {
@@ -2045,14 +2037,13 @@ const appDownloadInvitationTemplate = ({ username }) => {
   };
 };
 
-
 const abandonedBrowseReminderTemplate = ({ username, items }) => {
   return {
     subject: `Remember These Items?`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
       <h2>Hello ${username || 'User'},</h2>
       <p>You recently viewed some items. Come back to check them out:</p>
-      <ul>${items.map(i => `<li>${i.name}</li>`).join("")}</ul>
+      <ul>${items.map((i) => `<li>${i.name}</li>`).join('')}</ul>
     </div>`,
     attachments: [],
   };
@@ -2132,8 +2123,6 @@ const fraudulentTransactionAlertTemplate = ({ username, transactionId, amount })
   };
 };
 
-
-
 const sessionTimeoutNotificationTemplate = ({ username }) => {
   return {
     subject: `Session Timeout Notification`,
@@ -2173,8 +2162,6 @@ const accountSecurityCheckReminderTemplate = ({ username }) => {
     attachments: [],
   };
 };
-
-
 
 const newOrderPlacedAdminTemplate = ({ adminName, orderId, customerName, total }) => {
   return {
@@ -2357,8 +2344,6 @@ const inventoryRestockNotificationAdminTemplate = ({ adminName, productName, pro
     attachments: [],
   };
 };
-
-
 
 const bulkOrderRequestAdminTemplate = ({ adminName, requestId, requesterName }) => {
   return {
@@ -2586,8 +2571,6 @@ const accountRecoveryRequestReceivedAdminTemplate = ({ adminName, userName, user
 
 // (Due to space, can provide full code for additional categories if needed)
 
-
-
 module.exports = {
   otpEmailTemplate,
   welcomeEmailTemplate,
@@ -2735,7 +2718,8 @@ module.exports = {
   bulkOrderRequestAdminTemplate,
   customerDataDeletionRequestAdminTemplate,
   suspiciousAccountActivityAlertAdminTemplate,
-  multipleFailedLoginAttemptsAdminTemplate,USER_CREATED,
+  multipleFailedLoginAttemptsAdminTemplate,
+  USER_CREATED,
   accountSuspensionReinstatementNotificationAdminTemplate,
   userProfileUpdateAlertAdminTemplate,
   twoFactorStatusChangeAlertAdminTemplate,

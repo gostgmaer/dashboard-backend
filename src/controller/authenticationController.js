@@ -18,6 +18,7 @@ const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTem
 const { removeKeysFromObject } = require('../utils/helper');
 const NotificationService = require('../services/NotificationService');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
+const { jwtSecret } = require('../config/setting');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -51,7 +52,6 @@ class authController {
 
     return Math.round(percentage);
   }
-
 
   // ========================================
   // 🔧 UTILITY METHODS
@@ -140,13 +140,11 @@ class authController {
 
       // Validation
       if (!email || !username || !password) {
-        return errorResponse(res,
-          'Email, username, and password are required', 400);
+        return errorResponse(res, 'Email, username, and password are required', 400);
       }
 
       if (password !== confirmPassword) {
-        return errorResponse(res,
-          'Passwords do not match', 400);
+        return errorResponse(res, 'Passwords do not match', 400);
       }
 
       // Password strength check
@@ -155,7 +153,11 @@ class authController {
         return res.status(400).json({
           success: false,
           message: 'Password does not meet requirements',
-          passwordRequirements: checks, feedback, suggestions, warning, score
+          passwordRequirements: checks,
+          feedback,
+          suggestions,
+          warning,
+          score,
         });
       }
 
@@ -171,7 +173,6 @@ class authController {
         },
         req.deviceInfo
       );
-
 
       // Send email verification if OTP is enabled
       let verificationResult = null;
@@ -191,31 +192,184 @@ class authController {
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
       await NotificationMiddleware.onUserCreate(req, res, () => { });
-      return standardResponse(res, true, {
-        user: {
-          email: user.email,
-          username: user.username,
-          status: user.status
+      return standardResponse(
+        res,
+        true,
+        {
+          user: {
+            email: user.email,
+            username: user.username,
+            status: user.status,
+          },
+          otpEnabled: otpService.isEnabled(user.otpSettings),
+          verificationRequired: user.status === 'pending',
+          verificationSent: !!verificationResult,
         },
-        otpEnabled: otpService.isEnabled(user.otpSettings),
-        verificationRequired: user.status === 'pending',
-        verificationSent: !!verificationResult
-      }, emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account', 201);
-
-    }
-
-    catch (err) {
+        emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account',
+        201
+      );
+    } catch (err) {
       // Handle errors (e.g., duplicate keys, validation)
       console.error('Registration error:', err);
-      return errorResponse(res,
-        err.message, 500, err);
+      return errorResponse(res, err.message, 500, err);
     }
-
   }
 
   /**
    * LOGIN USER
    */
+
+  // static async login(req, res, next) {
+  //   try {
+  //     const { identifier, password, deviceTrust = false, challengeResponse } = req.body;
+  //     const deviceInfo = DeviceDetector.detectDevice(req);
+  //     const now = new Date();
+
+  //     if (!identifier || !password) {
+  //       return errorResponse(res, 'Email/username and password are required', 400);
+  //     }
+
+  //     // Fetch user by identifier (email/username)
+  //     const user = await User.findOne({
+  //       $or: [{ email: identifier.toLowerCase() }, { username: identifier.toLowerCase() }]
+  //     });
+  //     if (!user) {
+  //       // Delay response to prevent user enumeration
+  //       await new Promise(r => setTimeout(r, 1500));
+  //       return errorResponse(res, 'Invalid credentials', 401);
+  //     }
+
+  //     // Check account lock due to prior failed attempts or suspicious activity
+  //     if (user.lockedAt && now - user.lockedAt < 30 * 60 * 1000) { // locked for 30 mins
+  //       return errorResponse(res, 'Account temporarily locked due to multiple failed login attempts', 423);
+  //     } else if (user.lockedAt) {
+  //       // Auto unlock after cooldown
+  //       user.lockedAt = null;
+  //       await user.save();
+  //     }
+
+  //     // Verify password
+  //     const pwdMatch = await user.comparePassword(password);
+  //     if (!pwdMatch) {
+  //       // Record failed login attempt & lock if threshold exceeded
+  //       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+  //       if (user.failedLoginAttempts >= 5) {
+  //         user.lockedAt = new Date();
+  //         await user.save();
+  //         return errorResponse(res, 'Account locked after multiple failed attempts', 423);
+  //       }
+  //       await user.save();
+  //       return errorResponse(res, 'Invalid credentials', 401);
+  //     }
+
+  //     // Reset failed attempts on successful password
+  //     user.failedLoginAttempts = 0;
+  //     await user.save();
+
+  //     // Require email verified before login
+  //     if (!user.emailVerified) {
+  //       await user.generateEmailVerificationToken();
+  //       await sendEmail(emailVerificationTemplate, user);
+  //       return errorResponse(res, 'Email not verified. Verification email sent.', 403);
+  //     }
+
+  //     // Anomaly detection: Notify or trigger MFA for risky logins
+  //     const isNewDevice = !user.knownDevices?.some(d => d.deviceId === deviceInfo.deviceId);
+  //     const isNewIP = deviceInfo.ip && !user.ipAddresses?.includes(deviceInfo.ip);
+
+  //     // Update IP log asynchronously
+  //     if (isNewIP) {
+  //       user.ipAddresses = [...(user.ipAddresses || []), deviceInfo.ip];
+  //       user.lastIPChangeAt = new Date();
+  //       user.markModified('ipAddresses');
+  //       user.save().catch(console.error);
+  //     }
+
+  //     // Determine MFA requirement flexibly
+  //     const requiresMFA =
+  //       user.otpSettings?.enabled &&
+  //       (isNewDevice || isNewIP || authResult?.requiresMFA);
+
+  //     if (requiresMFA && !challengeResponse) {
+  //       // Trust device skip if configured and device is trusted
+  //       const trustedDevice = user.knownDevices?.find(d =>
+  //         d.deviceId === deviceInfo.deviceId && d.isTrusted
+  //       );
+
+  //       if (trustedDevice && user.otpSettings.allowTrustedDeviceSkip) {
+  //         // Skip MFA for trusted device
+  //         await user.handleSuccessfulLogin(deviceInfo);
+  //         const tokens = await user.generateTokens(deviceInfo);
+
+  //         return standardResponse(res, true, {
+  //           user: user.publicProfile(),
+  //           tokens,
+  //           skipMFA: true,
+  //           trustedDevice: true,
+  //           message: 'Login successful - trusted device'
+  //         });
+  //       }
+
+  //       // Generate temporary token for MFA step
+  //       const tempTokenPayload = {
+  //         userId: user._id,
+  //         step: 'mfa_required',
+  //         deviceId: deviceInfo.deviceId,
+  //         exp: Math.floor(Date.now() / 1000) + (10 * 60) // 10 mins
+  //       };
+  //       const tempToken = jwt.sign(tempTokenPayload, process.env.JWT_SECRET);
+
+  //       // Generate OTP for MFA (handle totp/email/sms inside generateOTP)
+  //       let otpResult = null;
+  //       try {
+  //         otpResult = await user.generateOTP('login', deviceInfo);
+  //       } catch (err) {
+  //         console.error('OTP generation error:', err);
+  //       }
+
+  //       return standardResponse(res, true, {
+  //         requiresMFA: true,
+  //         availableMethods: user.otpSettings.methods || ['totp', 'email', 'sms'],
+  //         tempToken,
+  //         otpSent: !!otpResult,
+  //         user: user.publicProfile(),
+  //         message: 'MFA verification required due to new device/IP or account settings.'
+  //       });
+  //     }
+
+  //     // If MFA provided a challengeResponse token/OTP, validate it before issuing tokens
+  //     if (requiresMFA && challengeResponse) {
+  //       // Call your unified OTP verification method here
+  //       const otpVerification = await user.verifyOTPForPurpose(
+  //         challengeResponse.code,
+  //         challengeResponse.method,
+  //         'login',
+  //         deviceInfo
+  //       );
+
+  //       if (!otpVerification.success) {
+  //         return errorResponse(res, otpVerification.error || 'Invalid OTP code', 401);
+  //       }
+  //     }
+
+  //     // Proceed with login
+  //     if (deviceTrust) {
+  //       await user.trustDevice(deviceInfo.deviceId);
+  //     }
+  //     await user.handleSuccessfulLogin(deviceInfo);
+  //     const tokens = await user.generateTokens(deviceInfo);
+
+  //     return standardResponse(res, true, {
+  //       user: user.publicProfile(),
+  //       tokens,
+  //       requiresMFA: false,
+  //       message: 'Login successful'
+  //     });
+  //   } catch (err) {
+  //     console.error('[LOGIN ERROR]', err);
+  //     return errorResponse(res, 'Internal server error', 500);
+  //   }
+  // }
   static async login(req, res, next) {
     try {
       const { identifier, password, deviceTrust = false } = req.body;
@@ -234,39 +388,39 @@ class authController {
         return errorResponse(res, 'Invalid Email/username or password', 401);
       }
 
-
       if (!user.emailVerified) {
-        await user.generateEmailVerificationToken()
+        await user.generateEmailVerificationToken();
         await sendEmail(emailVerificationTemplate, user);
       }
 
       // Check if MFA/OTP is required
       if (authResult.requiresMFA) {
         // Check if device is trusted and user allows skip
-        const trustedDevice = user.knownDevices?.find(d =>
-          d.deviceId === deviceInfo.deviceId && d.isTrusted
-        );
+        const trustedDevice = user.knownDevices?.find((d) => d.deviceId === deviceInfo.deviceId && d.isTrusted);
 
         if (trustedDevice && user.otpSettings.allowTrustedDeviceSkip) {
           // Skip OTP for trusted device
           await user.handleSuccessfulLogin(deviceInfo);
           const tokens = await user.generateTokens(deviceInfo);
 
-          return standardResponse(res, true, {
-            user: {
-              id: user._id,
-              email: user.email,
-              username: user.username,
-              image: user.profilePicture,
-              fullName: user.fullName,
-              role: user.role?.name,
-              isVerified: user.isVerified,
-              hasActiveTOTP: user.hasActiveTOTP
+          return standardResponse(
+            res,
+            true,
+            {
+              user: {
+                id: user._id,
+                email: user.email,
+                image: user.profilePicture,
+                username: user.username,
+                fullName: user.fullName,
+                role: user.role?.name,
+                skipMFA: true,
+                trustedDevice: true,
+              },
+              tokens,
             },
-            tokens,
-            skipMFA: true,
-            trustedDevice: true
-          }, 'Login successful - trusted device');
+            'Login successful - trusted device'
+          );
         }
 
         // Generate temporary token for MFA step
@@ -274,9 +428,9 @@ class authController {
           userId: user._id,
           step: 'mfa_required',
           deviceId: deviceInfo.deviceId,
-          exp: Math.floor(Date.now() / 1000) + (10 * 60) // 10 minutes
+          exp: Math.floor(Date.now() / 1000) + 10 * 60, // 10 minutes
         };
-        const tempToken = jwt.sign(tempTokenPayload, process.env.JWT_SECRET);
+        const tempToken = jwt.sign(tempTokenPayload, jwtSecret);
 
         // Send OTP using best available method
         let otpResult = null;
@@ -285,20 +439,27 @@ class authController {
         } catch (error) {
           console.error('OTP generation failed:', error);
         }
-
-        return standardResponse(res, true, {
-          requiresMFA: true,
-          availableMethods: authResult.availableMethods,
-          tempToken,
-          otpSent: !!otpResult,
-          user: {
-            id: user._id,
-            email: user.email,
-            username: user.username,
-            image: user.profilePicture,
-            hasActiveTOTP: user.hasActiveTOTP
-          }
-        }, 'MFA verification required', 200);
+        const tokens = await user.generateTokens(deviceInfo);
+        return standardResponse(
+          res,
+          true,
+          {
+            tokens,
+            '2fa_required': true,
+            otp_method: otpResult?.type,
+            tempToken,
+            otpSent: otpResult.destination,
+            user: {
+              id: user._id,
+              email: user.email,
+              username: user.username,
+              image: user.profilePicture,
+              fullName: user.fullName,
+            },
+          },
+          'MFA verification required',
+          200
+        );
       }
 
       const tokens = await user.generateTokens(deviceInfo);
@@ -319,24 +480,19 @@ class authController {
             role: user.role?.name,
           },
           tokens,
-          requiresMFA: false,
         },
         'Login successful'
       );
-      NotificationMiddleware.onLoginSuccess(req, res, () => { });
     } catch (error) {
       console.error('Login error:', error);
       NotificationMiddleware.onLoginFailed(req, res, () => { });
       return errorResponse(res, error.message, 500, error.message);
-
     }
-
   }
   static async socialLogin(req, res) {
     try {
       const { identifier, profileData, deviceTrust = false } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-
 
       // Authenticate user
       const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
@@ -359,7 +515,7 @@ class authController {
             fullName: user.fullName,
             role: user.role?.name,
             isVerified: user.isVerified,
-            hasActiveTOTP: user.hasActiveTOTP
+            hasActiveTOTP: user.hasActiveTOTP,
           },
           tokens,
           requiresMFA: false,
@@ -376,9 +532,7 @@ class authController {
    * VERIFY OTP and complete login
    */
 
-
   static async completeTOTPSetup(req, res, next) {
-
     try {
       const { token } = req.body;
       const user = req.user;
@@ -398,42 +552,36 @@ class authController {
     }
   }
 
-
-
   static async verifyOTPAndLogin(req, res) {
     try {
-      const { tempToken, otpCode, deviceTrust = false } = req.body;
+      const { tempToken, otp, deviceTrust = false, contact, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
 
-      if (!tempToken || !otpCode) {
-        return errorResponse(res,
-          'Temporary token and OTP code are required', 400);
+      if (!tempToken || !otp) {
+        return errorResponse(res, 'Temporary token and OTP code are required', 400);
       }
 
       // Verify temporary token
       let decoded;
       try {
-        decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
+        decoded = jwt.verify(tempToken, jwtSecret);
         if (decoded.step !== 'mfa_required') {
           throw new Error('Invalid token step');
         }
       } catch (error) {
-        return errorResponse(res,
-          'Invalid or expired temporary token', 400);
+        return errorResponse(res, 'Invalid or expired temporary token', 400);
       }
 
       // Find user
       const user = await User.findById(decoded.userId).populate('role');
       if (!user) {
-        return errorResponse(res,
-          'User not found', 404);
+        return errorResponse(res, 'User not found', 404);
       }
 
       // Verify OTP
-      const otpValid = await user.verifyOTP(otpCode, 'login', deviceInfo);
+      const otpValid = await user.verifyOTP(otp, 'login', deviceInfo);
       if (!otpValid) {
-        return errorResponse(res,
-          'Invalid or expired OTP code', 400);
+        return errorResponse(res, 'Invalid or expired OTP code', 400);
       }
 
       // Complete authentication
@@ -444,71 +592,41 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-
-      return standardResponse(res, true, {
-        user: {
-          id: user._id,
-          email: user.email,
-          username: user.username,
-          fullName: user.fullName,
-          role: user.role?.name,
-          isVerified: user.isVerified,
-          hasActiveTOTP: user.hasActiveTOTP
-        },
-        tokens,
-        deviceTrusted: deviceTrust
-      }, 'Authentication successful');
       NotificationMiddleware.onLoginSuccess(req, res, () => { });
+      return standardResponse(
+        res,
+        true,
+        {
+          user: {
+            id: user._id,
+            email: user.email,
+            username: user.username,
+            fullName: user.fullName,
+            role: user.role?.name,
+            isVerified: user.isVerified,
+
+          },
+          tokens,
+          '2fa_verified': true,
+          '2fa_required': true,
+          deviceTrusted: deviceTrust,
+        },
+        'Authentication successful'
+      );
     } catch (error) {
       console.error('OTP verification error:', error);
-      return errorResponse(res,
-        error.message || 'OTP verification failed', 400);
+      return errorResponse(res, error.message || 'OTP verification failed', 400);
     }
   }
 
   /**
- * RESEND OTP
- */
+   * RESEND OTP
+   */
   static async resendOTP(req, res) {
     try {
       const { tempToken, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-
-      if (!tempToken) {
-        return errorResponse(res,
-          'Temporary token is required', 400);
-      }
-
-      // Verify temporary token
-      let decoded;
-      try {
-        decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
-      } catch (error) {
-        return errorResponse(res,
-          'Invalid or expired temporary token', 400);
-      }
-
-      const user = await User.findById(decoded.userId);
-      if (!user) {
-        return errorResponse(res,
-          'User not found', 404);
-      }
-
-      // Generate new OTP
-      const otpResult = await user.generateOTP('login', deviceInfo, method);
-
-      return standardResponse(res, true, {
-        otpSent: true,
-        method: otpResult.type,
-        destination: otpResult.destination,
-        expiresAt: otpResult.expiresAt
-      }, 'OTP resent successfully');
-
-    } catch (error) {
-      console.error('Resend OTP error:', error);
-      return errorResponse(res,
-        error.message || 'Failed to resend OTP', 500);
-    }
+    } catch (error) { }
   }
   /**
    * MFA verification - Step 2
@@ -589,13 +707,10 @@ class authController {
 
       await user.logSecurityEvent('logout', 'User logout', 'low', deviceInfo);
 
-      return standardResponse(res, true, null,
-        'Logout successful');
+      return standardResponse(res, true, null, 'Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
-      return errorResponse(res,
-        'Logout failed', 500, error.message);
-
+      return errorResponse(res, 'Logout failed', 500, error.message);
     }
   }
 
@@ -611,14 +726,10 @@ class authController {
       await user.revokeAllTokens('user_logout_all');
       await user.logSecurityEvent('logout_all', 'User logout from all devices', 'medium', deviceInfo);
 
-
-      return standardResponse(res, true, null,
-        'Logged out from all devices successfully');
+      return standardResponse(res, true, null, 'Logged out from all devices successfully');
     } catch (error) {
       console.error('Logout all error:', error);
-      return errorResponse(res,
-        'Failed to logout from all devices', 500, error.message);
-
+      return errorResponse(res, 'Failed to logout from all devices', 500, error.message);
     }
   }
 
@@ -631,8 +742,7 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!refreshToken) {
-        return errorResponse(res,
-          'Refresh token is required', 400);
+        return errorResponse(res, 'Refresh token is required', 400);
       }
 
       // Verify and decode refresh token
@@ -640,26 +750,20 @@ class authController {
       try {
         decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
       } catch (error) {
-        return errorResponse(res,
-          'Invalid or expired refresh token', 401);
+        return errorResponse(res, 'Invalid or expired refresh token', 401);
       }
-
 
       const user = await User.findById(decoded.userId);
       if (!user) {
-        return errorResponse(res,
-          'User not found', 404);
+        return errorResponse(res, 'User not found', 404);
       }
       // Generate new tokens
       const tokens = await user.refreshAccessToken(refreshToken);
 
-      return standardResponse(res, true, tokens,
-        'Token refreshed successfully');
-
+      return standardResponse(res, true, tokens, 'Token refreshed successfully');
     } catch (error) {
       console.error('Token refresh error:', error);
-      return errorResponse(res,
-        error.message || 'Token refresh failed', 401);
+      return errorResponse(res, error.message || 'Token refresh failed', 401);
     }
   }
 
@@ -713,38 +817,45 @@ class authController {
   /**
    * Verify OTP
    */
-  // static async verifyOTP(req, res) {
-  //   try {
-  //     const { code, purpose = 'login' } = req.body;
-  //     const user = req.user;
+  static async verifyOTP(req, res) {
+    try {
+      // Validate input
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
 
-  //     if (!code) {
-  //       return res.status(400).json({
-  //         success: false,
-  //         message: 'OTP code is required',
-  //       });
-  //     }
+      const { method, purpose, code } = req.body;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-  //     const isValid = await user.verifyOTP(code, purpose, req.deviceInfo);
+      // Find user
+      const user = await User.findById(userId);
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-  //     if (isValid) {
-  //       res.status(200).json({
-  //         success: true,
-  //         message: 'OTP verified successfully',
-  //       });
-  //     } else {
-  //       res.status(400).json({
-  //         success: false,
-  //         message: 'Invalid or expired OTP code',
-  //       });
-  //     }
-  //   } catch (error) {
-  //     res.status(400).json({
-  //       success: false,
-  //       message: error.message,
-  //     });
-  //   }
-  // }
+      // Verify OTP
+      const deviceInfo = {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date(),
+        // Optional params can be added here
+      };
+      const result = await user.verifyOTPForPurpose(code, method, purpose, deviceInfo);
+
+      if (!result.success) {
+        return res.status(400).json({ success: false, message: result.error, locked: result.locked || false });
+      }
+
+      res.json({
+        success: true,
+        method: result.method,
+        purpose: result.purpose,
+        usedBackup: result.usedBackup || false,
+        extraData: result.extraData || {},
+      });
+    } catch (err) {
+      console.error('Verify OTP error:', err);
+      res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
 
   /**
    * CHANGE PASSWORD
@@ -756,13 +867,11 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!currentPassword || !newPassword || !confirmPassword) {
-        return errorResponse(res,
-          'All password fields are required', 400);
+        return errorResponse(res, 'All password fields are required', 400);
       }
 
       if (newPassword !== confirmPassword) {
-        return errorResponse(res,
-          'New passwords do not match', 400);
+        return errorResponse(res, 'New passwords do not match', 400);
       }
 
       // Password strength check
@@ -776,25 +885,26 @@ class authController {
       }
       const isValidPassword = await user.validatePassword(currentPassword);
       if (!isValidPassword) {
-        return errorResponse(res,
-          'Current password is incorrect', 400);
+        return errorResponse(res, 'Current password is incorrect', 400);
       }
 
       const result = await user.changePassword(currentPassword, newPassword);
-      await user.logSecurityEvent('password_changed',
-        'Password changed successfully', 'medium', deviceInfo);
-
-      return standardResponse(res, true, {
-        passwordChanged: true,
-        tokenRevoked: true,
-        message: 'Password changed successfully. Please login again.'
-      }, 'Password changed successfully');
+      await user.logSecurityEvent('password_changed', 'Password changed successfully', 'medium', deviceInfo);
       NotificationMiddleware.onPasswordChange(req, res, () => { });
+      return standardResponse(
+        res,
+        true,
+        {
+          passwordChanged: true,
+          tokenRevoked: true,
+          message: 'Password changed successfully. Please login again.',
+        },
+        'Password changed successfully'
+      );
 
     } catch (error) {
       console.error('Change password error:', error);
-      return errorResponse(res,
-        error.message || 'Failed to change password', 500);
+      return errorResponse(res, error.message || 'Failed to change password', 500);
     }
   }
 
@@ -927,22 +1037,17 @@ class authController {
       const result = await User.initiatePasswordReset(email, req.deviceInfo);
       await sendEmail(passwordResetRequestTemplate, result.user);
       try {
-
         console.log(`Password reset token for ${user.email}: ${result.resetToken}`);
       } catch (error) {
         console.error('Failed to send reset email:', error);
       }
 
-      await user.logSecurityEvent('password_reset_requested',
-        'Password reset requested', 'medium', deviceInfo);
+      await user.logSecurityEvent('password_reset_requested', 'Password reset requested', 'medium', deviceInfo);
 
-      return standardResponse(res, true,
-        'If this email is registered, you will receive a password reset link');
-
+      return standardResponse(res, true, 'If this email is registered, you will receive a password reset link');
     } catch (error) {
       console.error('Forgot password error:', error);
-      return errorResponse(res,
-        error.message, 500, error.message);
+      return errorResponse(res, error.message, 500, error.message);
     }
   }
 
@@ -950,19 +1055,16 @@ class authController {
    * RESET PASSWORD WITH TOKEN
    */
   static async resetPassword(req, res) {
-
     try {
       const { email, otpCode, newPassword, confirmPassword } = req.body;
-      const { token } = req.params
+      const { token } = req.params;
       const deviceInfo = DeviceDetector.detectDevice(req);
       if (!token || !newPassword || !confirmPassword) {
-        return errorResponse(res,
-          'Token and password fields are required', 400);
+        return errorResponse(res, 'Token and password fields are required', 400);
       }
 
       if (newPassword !== confirmPassword) {
-        return errorResponse(res,
-          'Passwords do not match', 400);
+        return errorResponse(res, 'Passwords do not match', 400);
       }
 
       if (!token || !newPassword) {
@@ -973,12 +1075,12 @@ class authController {
         return res.status(400).json({
           success: false,
           message: 'Password does not meet requirements',
-          passwordRequirements: passwordStrength.checks
+          passwordRequirements: passwordStrength.checks,
         });
       }
 
       const user = await User.findOne({
-        'passwordReset.token': token
+        'passwordReset.token': token,
       });
 
       // const user = await User.findOne({ resetToken: token });
@@ -998,31 +1100,31 @@ class authController {
         token: null,
         tokenExpiry: null,
         attempts: 0,
-        lastAttempt: null
+        lastAttempt: null,
       };
       await user.revokeAllTokens('password_reset');
       await user.save();
-      await user.logSecurityEvent('password_reset_completed',
-        'Password reset completed', 'high', deviceInfo);
-
-
-      return standardResponse(res, true, {
-        passwordReset: true,
-        message: 'Password reset successfully. Please login with your new password.'
-      }, 'Password reset successfully');
-      NotificationMiddleware.onPasswordReset(req, res, () => { });
+      await user.logSecurityEvent('password_reset_completed', 'Password reset completed', 'high', deviceInfo);
+ NotificationMiddleware.onPasswordReset(req, res, () => { });
+      return standardResponse(
+        res,
+        true,
+        {
+          passwordReset: true,
+          message: 'Password reset successfully. Please login with your new password.',
+        },
+        'Password reset successfully'
+      );
+     
     } catch (error) {
       console.error('Reset password error:', error);
-      return errorResponse(res,
-        error.message || 'Failed to reset password', 500);
+      return errorResponse(res, error.message || 'Failed to reset password', 500);
     }
   }
 
   /**
    * CONFIRM EMAIL
    */
-
-
 
   static async verifyAccount(req, res) {
     try {
@@ -1037,31 +1139,46 @@ class authController {
       // 1. Priority: Email
       if (user.email && !user.emailVerified) {
         const result = await user.sendEmailVerification(deviceInfo);
-        return standardResponse(res, true, {
-          verificationType: 'email',
-          destination: result.destination,
-          expiresAt: result.expiresAt
-        }, 'Email verification sent');
+        return standardResponse(
+          res,
+          true,
+          {
+            verificationType: 'email',
+            destination: result.destination,
+            expiresAt: result.expiresAt,
+          },
+          'Email verification sent'
+        );
       }
 
       // 2. Next: OTP
       if (user.otpConfig && user.otpConfig.enableOTP) {
         const result = await user.generateOTP('email_verification', deviceInfo, 'email');
-        return standardResponse(res, true, {
-          verificationType: 'otp',
-          destination: result.destination,
-          expiresAt: result.expiresAt
-        }, 'OTP verification initiated');
+        return standardResponse(
+          res,
+          true,
+          {
+            verificationType: 'otp',
+            destination: result.destination,
+            expiresAt: result.expiresAt,
+          },
+          'OTP verification initiated'
+        );
       }
 
       // 3. Last: Phone
       if (user.phone && !user.phoneVerified) {
         const result = await user.sendPhoneVerification(deviceInfo);
-        return standardResponse(res, true, {
-          verificationType: 'phone',
-          destination: result.destination,
-          expiresAt: result.expiresAt
-        }, 'Phone verification sent');
+        return standardResponse(
+          res,
+          true,
+          {
+            verificationType: 'phone',
+            destination: result.destination,
+            expiresAt: result.expiresAt,
+          },
+          'Phone verification sent'
+        );
       }
 
       return errorResponse(res, 'No valid verification method available.', 400);
@@ -1070,7 +1187,6 @@ class authController {
       return errorResponse(res, error.message || 'Failed to verify account', 500);
     }
   }
-
 
   static async sendEmailVerification(req, res) {
     try {
@@ -1081,18 +1197,20 @@ class authController {
       //   return errorResponse(res,
       //     'Email is already verified', 400);
       // }
-      await user.sendEmailVerification(deviceInfo)
+      await user.sendEmailVerification(deviceInfo);
       await sendEmail(emailVerificationTemplate, user);
 
-      return standardResponse(res, true, {
-        verificationSent: true,
-      }, 'Email verification sent successfully');
-
-
+      return standardResponse(
+        res,
+        true,
+        {
+          verificationSent: true,
+        },
+        'Email verification sent successfully'
+      );
     } catch (error) {
       console.error('Send email verification error:', error);
-      return errorResponse(res,
-        error.message || 'Failed to send email verification', 500);
+      return errorResponse(res, error.message || 'Failed to send email verification', 500);
     }
   }
 
@@ -1124,9 +1242,9 @@ class authController {
             $elemMatch: {
               token: token,
               purpose: 'email_verification',
-              expiresAt: { $gt: now }
-            }
-          }
+              expiresAt: { $gt: now },
+            },
+          },
         });
         res.locals.user = user;
         if (!user) {
@@ -1148,41 +1266,44 @@ class authController {
         }
       }
 
-
-
       if (code) {
         const isValid = await user.verifyOTP(code, 'email_verification', deviceInfo);
 
         if (isValid) {
           user.emailVerified = true;
           await user.save();
-          await user.logSecurityEvent('email_verified',
-            'Email address verified', 'low', deviceInfo);
+          await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
 
-          return standardResponse(res, true, {
-            emailVerified: true
-          }, 'Email verified successfully');
+          return standardResponse(
+            res,
+            true,
+            {
+              emailVerified: true,
+            },
+            'Email verified successfully'
+          );
         }
 
-        return errorResponse(res,
-          'Invalid or expired verification code', 400);
+        return errorResponse(res, 'Invalid or expired verification code', 400);
       }
       const result = await User.verifyUserEmail(user, token);
 
       if (result) {
-        await user.logSecurityEvent('email_verified',
-          'Email address verified', 'low', deviceInfo);
-
-        return standardResponse(res, true, {
-          emailVerified: true
-        }, 'Email verified successfully');
+        await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
+  NotificationMiddleware.onEmailVerified(req, res, () => { });
+        return standardResponse(
+          res,
+          true,
+          {
+            emailVerified: true,
+          },
+          'Email verified successfully'
+        );
       }
-      NotificationMiddleware.onEmailVerified(req, res, () => { });
-
+    
     } catch (error) {
       console.error('Verify email error:', error);
-      return errorResponse(res,
-        error.message || 'Email verification failed', 500);
+      return errorResponse(res, error.message || 'Email verification failed', 500);
     }
   }
   static async confirmEmail(req, res) {
@@ -1221,13 +1342,13 @@ class authController {
         account: {
           provider: linkedAccount.provider,
           email: linkedAccount.email,
-          connectedAt: linkedAccount.connectedAt
-        }
+          connectedAt: linkedAccount.connectedAt,
+        },
       });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
-  };
+  }
 
   static async unlinkSocialAccount(req, res) {
     try {
@@ -1240,13 +1361,11 @@ class authController {
       res.json({
         success: true,
         message: `${provider} account unlinked successfully`,
-        socialAccounts: user.getSocialAccounts()
+        socialAccounts: user.getSocialAccounts(),
       });
     } catch (error) {
       res.status(400).json({ success: false, message: error.message });
     }
-
-
   }
   /**
    * Get active sessions
@@ -1421,23 +1540,26 @@ class authController {
     try {
       const user = req.user;
 
-      return standardResponse(res, true, {
-        otpEnabled: otpService.isEnabled(),
-        userSettings: user.otpSettings,
-        availableMethods: user.availableOTPMethods,
-        hasActiveTOTP: user.hasActiveTOTP,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified,
-        systemDefaults: {
-          priorityOrder: process.env.OTP_PRIORITY_ORDER.split(','),
-          defaultMethod: process.env.DEFAULT_OTP_METHOD
-        }
-      }, 'OTP settings retrieved successfully');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          otpEnabled: otpService.isEnabled(),
+          userSettings: user.otpSettings,
+          availableMethods: user.availableOTPMethods,
+          hasActiveTOTP: user.hasActiveTOTP,
+          emailVerified: user.emailVerified,
+          phoneVerified: user.phoneVerified,
+          systemDefaults: {
+            priorityOrder: process.env.OTP_PRIORITY_ORDER.split(','),
+            defaultMethod: process.env.DEFAULT_OTP_METHOD,
+          },
+        },
+        'OTP settings retrieved successfully'
+      );
     } catch (error) {
       console.error('Get OTP settings error:', error);
-      return errorResponse(res,
-        'Failed to retrieve OTP settings', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve OTP settings', 500, error.message);
     }
   }
 
@@ -1452,8 +1574,7 @@ class authController {
 
       const validMethods = ['totp', 'email', 'sms'];
       if (preferredMethod && !validMethods.includes(preferredMethod)) {
-        return errorResponse(res,
-          'Invalid preferred method', 400);
+        return errorResponse(res, 'Invalid preferred method', 400);
       }
 
       // Update settings
@@ -1471,20 +1592,21 @@ class authController {
       }
 
       await user.save();
-      await user.logSecurityEvent('otp_settings_updated',
-        'OTP settings updated', 'low', deviceInfo);
+      await user.logSecurityEvent('otp_settings_updated', 'OTP settings updated', 'low', deviceInfo);
 
-      return standardResponse(res, true, {
-        otpSettings: user.otpSettings
-      }, 'OTP settings updated successfully');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          otpSettings: user.otpSettings,
+        },
+        'OTP settings updated successfully'
+      );
     } catch (error) {
       console.error('Update OTP settings error:', error);
-      return errorResponse(res,
-        'Failed to update OTP settings', 500, error.message);
+      return errorResponse(res, 'Failed to update OTP settings', 500, error.message);
     }
   }
-
 
   /**
    * VERIFY USER
@@ -1517,9 +1639,9 @@ class authController {
   static async updateProfile(req, res) {
     try {
       await req.user.updateProfile(req.body);
-      return standardResponse(res, true, {}, 'Profile updated successfully');
-      res.locals.changes = req.body
+      res.locals.changes = req.body;
       NotificationMiddleware.onUserUpdate(req, res, () => { });
+      return standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
       return errorResponse(res, 'Failed to update profile', 500, error.message);
@@ -1540,7 +1662,6 @@ class authController {
       const profilePicture = await req.user.updateProfilePicture(url);
       return standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
       NotificationMiddleware.onUserUpdate(req, res, () => { });
-
     } catch (error) {
       console.error('Update profile picture error:', error);
       return errorResponse(res, 'Failed to update profile picture', 500, error.message);
@@ -1735,26 +1856,28 @@ class authController {
       const user = req.user;
 
       if (user.hasActiveTOTP) {
-        return errorResponse(res,
-          'TOTP is already enabled for this user', 400);
+        return errorResponse(res, 'TOTP is already enabled for this user', 400);
       }
 
       const setupData = await user.setupTOTP();
 
-      return standardResponse(res, true, {
-        qrCode: setupData.qrCode,
-        manualEntryKey: setupData.manualEntryKey,
-        instructions: {
-          step1: 'Scan the QR code with your authenticator app',
-          step2: 'Or manually enter the key in your authenticator app',
-          step3: 'Enter the 6-digit code from your app to complete setup'
-        }
-      }, 'TOTP setup initiated. Scan QR code with your authenticator app.');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          qrCode: setupData.qrCode,
+          manualEntryKey: setupData.manualEntryKey,
+          instructions: {
+            step1: 'Scan the QR code with your authenticator app',
+            step2: 'Or manually enter the key in your authenticator app',
+            step3: 'Enter the 6-digit code from your app to complete setup',
+          },
+        },
+        'TOTP setup initiated. Scan QR code with your authenticator app.'
+      );
     } catch (error) {
       console.error('TOTP setup error:', error);
-      return errorResponse(res,
-        error.message || 'TOTP setup failed', 500);
+      return errorResponse(res, error.message || 'TOTP setup failed', 500);
     }
   }
 
@@ -1768,30 +1891,30 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!code) {
-        return errorResponse(res,
-          'TOTP code is required', 400);
+        return errorResponse(res, 'TOTP code is required', 400);
       }
 
       const result = await user.verifyTOTPSetup(code);
 
       if (result.success) {
-        await user.logSecurityEvent('totp_setup_completed',
-          'TOTP authentication enabled', 'medium', deviceInfo);
+        await user.logSecurityEvent('totp_setup_completed', 'TOTP authentication enabled', 'medium', deviceInfo);
 
-        return standardResponse(res, true, {
-          totpEnabled: true,
-          backupCodes: result.backupCodes,
-          message: 'TOTP enabled successfully. Save these backup codes in a safe place.'
-        }, 'TOTP authentication enabled successfully');
+        return standardResponse(
+          res,
+          true,
+          {
+            totpEnabled: true,
+            backupCodes: result.backupCodes,
+            message: 'TOTP enabled successfully. Save these backup codes in a safe place.',
+          },
+          'TOTP authentication enabled successfully'
+        );
       }
 
-      return errorResponse(res,
-        'Invalid TOTP code', 400);
-
+      return errorResponse(res, 'Invalid TOTP code', 400);
     } catch (error) {
       console.error('TOTP verification error:', error);
-      return errorResponse(res,
-        error.message || 'TOTP verification failed', 500);
+      return errorResponse(res, error.message || 'TOTP verification failed', 500);
     }
   }
 
@@ -1805,38 +1928,36 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!user.hasActiveTOTP) {
-        return errorResponse(res,
-          'TOTP is not enabled for this user', 400);
+        return errorResponse(res, 'TOTP is not enabled for this user', 400);
       }
 
       if (!code) {
-        return errorResponse(res,
-          'TOTP code is required to disable 2FA', 400);
+        return errorResponse(res, 'TOTP code is required to disable 2FA', 400);
       }
 
       if (!confirmDisable) {
-        return errorResponse(res,
-          'Please confirm that you want to disable 2FA', 400);
+        return errorResponse(res, 'Please confirm that you want to disable 2FA', 400);
       }
 
       const result = await user.disableTOTP(code);
 
       if (result.success) {
-        await user.logSecurityEvent('totp_disabled',
-          'TOTP authentication disabled', 'high', deviceInfo);
+        await user.logSecurityEvent('totp_disabled', 'TOTP authentication disabled', 'high', deviceInfo);
 
-        return standardResponse(res, true, {
-          totpEnabled: false
-        }, 'TOTP authentication disabled successfully');
+        return standardResponse(
+          res,
+          true,
+          {
+            totpEnabled: false,
+          },
+          'TOTP authentication disabled successfully'
+        );
       }
 
-      return errorResponse(res,
-        'Invalid TOTP code', 400);
-
+      return errorResponse(res, 'Invalid TOTP code', 400);
     } catch (error) {
       console.error('TOTP disable error:', error);
-      return errorResponse(res,
-        error.message || 'TOTP disable failed', 500);
+      return errorResponse(res, error.message || 'TOTP disable failed', 500);
     }
   }
 
@@ -1850,43 +1971,42 @@ class authController {
       const deviceInfo = DeviceDetector.detectDevice(req);
 
       if (!user.hasActiveTOTP) {
-        return errorResponse(res,
-          'TOTP is not enabled for this user', 400);
+        return errorResponse(res, 'TOTP is not enabled for this user', 400);
       }
 
       if (!code) {
-        return errorResponse(res,
-          'TOTP code is required to generate new backup codes', 400);
+        return errorResponse(res, 'TOTP code is required to generate new backup codes', 400);
       }
 
       // Verify TOTP code
       const isValid = await otpService.verifyTOTP(user, code);
       if (!isValid) {
-        return errorResponse(res,
-          'Invalid TOTP code', 400);
+        return errorResponse(res, 'Invalid TOTP code', 400);
       }
 
       // Generate new backup codes
       const newBackupCodes = otpService.generateBackupCodes();
-      user.twoFactorAuth.backupCodes = newBackupCodes.map(code => ({
+      user.twoFactorAuth.backupCodes = newBackupCodes.map((code) => ({
         code: crypto.createHash('sha256').update(code).digest('hex'),
         used: false,
-        createdAt: new Date()
+        createdAt: new Date(),
       }));
 
       await user.save();
-      await user.logSecurityEvent('backup_codes_regenerated',
-        'New backup codes generated', 'medium', deviceInfo);
+      await user.logSecurityEvent('backup_codes_regenerated', 'New backup codes generated', 'medium', deviceInfo);
 
-      return standardResponse(res, true, {
-        backupCodes: newBackupCodes,
-        message: 'New backup codes generated. Save them in a safe place.'
-      }, 'Backup codes regenerated successfully');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          backupCodes: newBackupCodes,
+          message: 'New backup codes generated. Save them in a safe place.',
+        },
+        'Backup codes regenerated successfully'
+      );
     } catch (error) {
       console.error('Backup codes generation error:', error);
-      return errorResponse(res,
-        error.message || 'Failed to generate backup codes', 500);
+      return errorResponse(res, error.message || 'Failed to generate backup codes', 500);
     }
   }
 
@@ -1902,24 +2022,25 @@ class authController {
       const user = req.user;
       const currentDeviceId = DeviceDetector.detectDevice(req).deviceId;
 
-      const devices = user.knownDevices.map(device => ({
+      const devices = user.knownDevices.map((device) => ({
         ...device.toObject(),
         isCurrent: device.deviceId === currentDeviceId,
-        activeSessions: user.activeSessions.filter(s =>
-          s.deviceId === device.deviceId && s.isActive
-        ).length
+        activeSessions: user.activeSessions.filter((s) => s.deviceId === device.deviceId && s.isActive).length,
       }));
 
-      return standardResponse(res, true, {
-        devices,
-        totalDevices: devices.length,
-        trustedDevices: devices.filter(d => d.isTrusted).length
-      }, 'Devices retrieved successfully');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          devices,
+          totalDevices: devices.length,
+          trustedDevices: devices.filter((d) => d.isTrusted).length,
+        },
+        'Devices retrieved successfully'
+      );
     } catch (error) {
       console.error('Get devices error:', error);
-      return errorResponse(res,
-        'Failed to retrieve devices', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve devices', 500, error.message);
     }
   }
 
@@ -1933,26 +2054,27 @@ class authController {
       const currentDeviceInfo = DeviceDetector.detectDevice(req);
 
       if (!deviceId) {
-        return errorResponse(res,
-          'Device ID is required', 400);
+        return errorResponse(res, 'Device ID is required', 400);
       }
 
       const success = await user.trustDevice(deviceId);
 
       if (success) {
-        return standardResponse(res, true, {
-          deviceTrusted: true,
-          deviceId
-        }, 'Device trusted successfully');
+        return standardResponse(
+          res,
+          true,
+          {
+            deviceTrusted: true,
+            deviceId,
+          },
+          'Device trusted successfully'
+        );
       }
 
-      return errorResponse(res,
-        'Device not found', 404);
-
+      return errorResponse(res, 'Device not found', 404);
     } catch (error) {
       console.error('Trust device error:', error);
-      return errorResponse(res,
-        'Failed to trust device', 500, error.message);
+      return errorResponse(res, 'Failed to trust device', 500, error.message);
     }
   }
 
@@ -1966,31 +2088,31 @@ class authController {
       const currentDeviceInfo = DeviceDetector.detectDevice(req);
 
       if (!deviceId) {
-        return errorResponse(res,
-          'Device ID is required', 400);
+        return errorResponse(res, 'Device ID is required', 400);
       }
 
       if (deviceId === currentDeviceInfo.deviceId && !confirmRemove) {
-        return errorResponse(res,
-          'Cannot remove current device without confirmation', 400);
+        return errorResponse(res, 'Cannot remove current device without confirmation', 400);
       }
 
       const success = await user.removeDevice(deviceId);
 
       if (success) {
-        return standardResponse(res, true, {
-          deviceRemoved: true,
-          deviceId
-        }, 'Device removed successfully');
+        return standardResponse(
+          res,
+          true,
+          {
+            deviceRemoved: true,
+            deviceId,
+          },
+          'Device removed successfully'
+        );
       }
 
-      return errorResponse(res,
-        'Device not found', 404);
-
+      return errorResponse(res, 'Device not found', 404);
     } catch (error) {
       console.error('Remove device error:', error);
-      return errorResponse(res,
-        'Failed to remove device', 500, error.message);
+      return errorResponse(res, 'Failed to remove device', 500, error.message);
     }
   }
 
@@ -2003,10 +2125,9 @@ class authController {
   static async getUserPermissionsController(req, res) {
     try {
       const permissions = await req.user.getPermissions();
-      return standardResponse(res, true, permissions, 'Permissions retrieved successfully')
+      return standardResponse(res, true, permissions, 'Permissions retrieved successfully');
     } catch (error) {
-      return errorResponse(res,
-        'Failed to retrieve permissions', 500, error.message)
+      return errorResponse(res, 'Failed to retrieve permissions', 500, error.message);
     }
   }
 
@@ -2022,12 +2143,12 @@ class authController {
 
       // Filter by severity
       if (severity) {
-        events = events.filter(e => e.severity === severity);
+        events = events.filter((e) => e.severity === severity);
       }
 
       // Filter by event type
       if (event) {
-        events = events.filter(e => e.event.includes(event));
+        events = events.filter((e) => e.event.includes(event));
       }
 
       // Sort by timestamp (newest first)
@@ -2037,21 +2158,24 @@ class authController {
       const start = (page - 1) * limit;
       const paginatedEvents = events.slice(start, start + parseInt(limit));
 
-      return standardResponse(res, true, {
-        events: paginatedEvents,
-        pagination: {
-          currentPage: parseInt(page),
-          totalEvents: events.length,
-          totalPages: Math.ceil(events.length / limit),
-          hasNext: start + parseInt(limit) < events.length,
-          hasPrev: page > 1
-        }
-      }, 'Security events retrieved successfully');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          events: paginatedEvents,
+          pagination: {
+            currentPage: parseInt(page),
+            totalEvents: events.length,
+            totalPages: Math.ceil(events.length / limit),
+            hasNext: start + parseInt(limit) < events.length,
+            hasPrev: page > 1,
+          },
+        },
+        'Security events retrieved successfully'
+      );
     } catch (error) {
       console.error('Get security events error:', error);
-      return errorResponse(res,
-        'Failed to retrieve security events', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve security events', 500, error.message);
     }
   }
 
@@ -2067,7 +2191,7 @@ class authController {
 
       // Filter by success status
       if (successful !== undefined) {
-        loginHistory = loginHistory.filter(h => h.successful === (successful === 'true'));
+        loginHistory = loginHistory.filter((h) => h.successful === (successful === 'true'));
       }
 
       // Sort by login time (newest first)
@@ -2077,26 +2201,29 @@ class authController {
       const start = (page - 1) * limit;
       const paginatedHistory = loginHistory.slice(start, start + parseInt(limit));
 
-      return standardResponse(res, true, {
-        loginHistory: paginatedHistory,
-        pagination: {
-          currentPage: parseInt(page),
-          totalLogins: loginHistory.length,
-          totalPages: Math.ceil(loginHistory.length / limit),
-          hasNext: start + parseInt(limit) < loginHistory.length,
-          hasPrev: page > 1
+      return standardResponse(
+        res,
+        true,
+        {
+          loginHistory: paginatedHistory,
+          pagination: {
+            currentPage: parseInt(page),
+            totalLogins: loginHistory.length,
+            totalPages: Math.ceil(loginHistory.length / limit),
+            hasNext: start + parseInt(limit) < loginHistory.length,
+            hasPrev: page > 1,
+          },
+          stats: {
+            totalLogins: loginHistory.length,
+            successfulLogins: loginHistory.filter((h) => h.successful).length,
+            failedLogins: loginHistory.filter((h) => !h.successful).length,
+          },
         },
-        stats: {
-          totalLogins: loginHistory.length,
-          successfulLogins: loginHistory.filter(h => h.successful).length,
-          failedLogins: loginHistory.filter(h => !h.successful).length
-        }
-      }, 'Login history retrieved successfully');
-
+        'Login history retrieved successfully'
+      );
     } catch (error) {
       console.error('Get login history error:', error);
-      return errorResponse(res,
-        'Failed to retrieve login history', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve login history', 500, error.message);
     }
   }
 
@@ -2108,35 +2235,34 @@ class authController {
       const user = req.user;
 
       const securityScore = authController.calculateSecurityScore(user);
-      const recentEvents = user.securityEvents
-        ?.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-        .slice(0, 5) || [];
+      const recentEvents = user.securityEvents?.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5) || [];
 
-      const activeSessions = user.authTokens?.filter(t =>
-        !t.isRevoked && t.expiresAt > new Date()
-      ).length || 0;
+      const activeSessions = user.authTokens?.filter((t) => !t.isRevoked && t.expiresAt > new Date()).length || 0;
 
-      const trustedDevices = user.knownDevices?.filter(d => d.isTrusted).length || 0;
+      const trustedDevices = user.knownDevices?.filter((d) => d.isTrusted).length || 0;
 
-      return standardResponse(res, true, {
-        securityScore,
-        twoFactorEnabled: user.hasActiveTOTP,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified,
-        activeSessions,
-        trustedDevices,
-        totalDevices: user.knownDevices?.length || 0,
-        recentEvents,
-        accountLocked: user.isLocked,
-        failedLoginAttempts: user.loginSecurity?.failedAttempts || 0,
-        lastLogin: user.lastLogin,
-        recommendations: authController.getSecurityRecommendations(user)
-      }, 'Security summary retrieved successfully');
-
+      return standardResponse(
+        res,
+        true,
+        {
+          securityScore,
+          twoFactorEnabled: user.hasActiveTOTP,
+          emailVerified: user.emailVerified,
+          phoneVerified: user.phoneVerified,
+          activeSessions,
+          trustedDevices,
+          totalDevices: user.knownDevices?.length || 0,
+          recentEvents,
+          accountLocked: user.isLocked,
+          failedLoginAttempts: user.loginSecurity?.failedAttempts || 0,
+          lastLogin: user.lastLogin,
+          recommendations: authController.getSecurityRecommendations(user),
+        },
+        'Security summary retrieved successfully'
+      );
     } catch (error) {
       console.error('Get security summary error:', error);
-      return errorResponse(res,
-        'Failed to retrieve security summary', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve security summary', 500, error.message);
     }
   }
 
@@ -2151,7 +2277,7 @@ class authController {
         type: 'enable_2fa',
         priority: 'high',
         message: 'Enable two-factor authentication for enhanced security',
-        action: 'Setup TOTP'
+        action: 'Setup TOTP',
       });
     }
 
@@ -2160,7 +2286,7 @@ class authController {
         type: 'verify_email',
         priority: 'high',
         message: 'Verify your email address',
-        action: 'Verify Email'
+        action: 'Verify Email',
       });
     }
 
@@ -2169,31 +2295,31 @@ class authController {
         type: 'verify_phone',
         priority: 'medium',
         message: 'Verify your phone number for SMS backup',
-        action: 'Verify Phone'
+        action: 'Verify Phone',
       });
     }
 
-    const untrustedDevices = user.knownDevices?.filter(d => !d.isTrusted).length || 0;
+    const untrustedDevices = user.knownDevices?.filter((d) => !d.isTrusted).length || 0;
     if (untrustedDevices > 0) {
       recommendations.push({
         type: 'trust_devices',
         priority: 'medium',
         message: `You have ${untrustedDevices} untrusted device(s)`,
-        action: 'Manage Devices'
+        action: 'Manage Devices',
       });
     }
 
-    const oldSessions = user.authTokens?.filter(t =>
-      !t.isRevoked &&
-      (Date.now() - new Date(t.lastUsed).getTime()) > (30 * 24 * 60 * 60 * 1000) // 30 days
-    ).length || 0;
+    const oldSessions =
+      user.authTokens?.filter(
+        (t) => !t.isRevoked && Date.now() - new Date(t.lastUsed).getTime() > 30 * 24 * 60 * 60 * 1000 // 30 days
+      ).length || 0;
 
     if (oldSessions > 0) {
       recommendations.push({
         type: 'cleanup_sessions',
         priority: 'low',
         message: `You have ${oldSessions} old active session(s)`,
-        action: 'Cleanup Sessions'
+        action: 'Cleanup Sessions',
       });
     }
 
@@ -2201,8 +2327,8 @@ class authController {
   }
 
   /**
-      * GET OTP ANALYTICS (Admin only)
-      */
+   * GET OTP ANALYTICS (Admin only)
+   */
   static async getOTPAnalytics(req, res) {
     try {
       const { timeframe = '24h' } = req.query;
@@ -2210,13 +2336,10 @@ class authController {
       // This would typically query your metrics/logging service
       const analytics = await otpService.getOTPStatistics(timeframe);
 
-      return standardResponse(res, true, analytics,
-        'OTP analytics retrieved successfully');
-
+      return standardResponse(res, true, analytics, 'OTP analytics retrieved successfully');
     } catch (error) {
       console.error('Get OTP analytics error:', error);
-      return errorResponse(res,
-        'Failed to retrieve OTP analytics', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve OTP analytics', 500, error.message);
     }
   }
 
@@ -2229,26 +2352,20 @@ class authController {
 
       const report = await User.getSecurityReport(timeframe);
 
-      return standardResponse(res, true, report,
-        'Security report retrieved successfully');
-
+      return standardResponse(res, true, report, 'Security report retrieved successfully');
     } catch (error) {
       console.error('Get security report error:', error);
-      return errorResponse(res,
-        'Failed to retrieve security report', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve security report', 500, error.message);
     }
   }
   static async findFullyPopulatedById(req, res) {
     try {
       const user = await User.findFullyPopulatedById(req.user.id);
 
-
       return standardResponse(res, true, user, 'Devices retrieved successfully');
-
     } catch (error) {
       console.error('Get devices error:', error);
-      return errorResponse(res,
-        'Failed to retrieve devices', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve devices', 500, error.message);
     }
   }
 
@@ -2257,11 +2374,9 @@ class authController {
       const user = await User.fetchUserSettings(req.user.id);
 
       return standardResponse(res, true, authController.enrichUser(user), 'Account Setting Fetch successfully');
-
     } catch (error) {
       console.error('Get devices error:', error);
-      return errorResponse(res,
-        'Failed to retrieve devices', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve devices', 500, error.message);
     }
   }
 
@@ -2269,11 +2384,9 @@ class authController {
     try {
       const user = await req.user.getMyProfile();
       return standardResponse(res, true, user, 'Profile Fetch successfully');
-
     } catch (error) {
       console.error('Get devices error:', error);
-      return errorResponse(res,
-        'Failed to retrieve devices', 500, error.message);
+      return errorResponse(res, 'Failed to retrieve devices', 500, error.message);
     }
   }
   /**
@@ -2290,7 +2403,7 @@ class authController {
         return res.status(404).json({
           success: false,
           message: 'User not found',
-          error: 'USER_NOT_FOUND'
+          error: 'USER_NOT_FOUND',
         });
       }
 
@@ -2300,7 +2413,7 @@ class authController {
         return res.status(400).json({
           success: false,
           message: 'Valid preferred method is required when enabling OTP',
-          error: 'INVALID_METHOD'
+          error: 'INVALID_METHOD',
         });
       }
 
@@ -2309,16 +2422,11 @@ class authController {
         const result = await user.enableOTPSetting(preferredMethod);
 
         // Log security event
-        await user.logSecurityEvent(
-          'otp_enabled',
-          `OTP enabled with ${preferredMethod} method`,
-          'medium',
-          {
-            method: preferredMethod,
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          }
-        );
+        await user.logSecurityEvent('otp_enabled', `OTP enabled with ${preferredMethod} method`, 'medium', {
+          method: preferredMethod,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
 
         return res.status(200).json({
           success: true,
@@ -2327,8 +2435,8 @@ class authController {
             otpEnabled: result.otpEnabled,
             preferredMethod: result.preferredMethod,
             twoFactorAuthInitialized: result.twoFactorAuthInitialized,
-            totpSetup: result.totpSetup || null
-          }
+            totpSetup: result.totpSetup || null,
+          },
         });
       } else {
         // Disable OTP
@@ -2344,7 +2452,7 @@ class authController {
           attempts: 0,
           maxAttempts: 3,
           lastSent: null,
-          verified: false
+          verified: false,
         };
 
         // If TOTP was enabled, disable it
@@ -2358,32 +2466,26 @@ class authController {
         await user.save();
 
         // Log security event
-        await user.logSecurityEvent(
-          'otp_disabled',
-          'OTP disabled by user',
-          'high',
-          {
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          }
-        );
+        await user.logSecurityEvent('otp_disabled', 'OTP disabled by user', 'high', {
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
 
         return res.status(200).json({
           success: true,
           message: 'OTP has been disabled for your account',
           data: {
             otpEnabled: false,
-            preferredMethod: null
-          }
+            preferredMethod: null,
+          },
         });
       }
-
     } catch (error) {
       console.error('OTP Toggle Error:', error);
       return res.status(500).json({
         success: false,
         message: error.message || 'Failed to toggle OTP settings',
-        error: 'OTP_TOGGLE_FAILED'
+        error: 'OTP_TOGGLE_FAILED',
       });
     }
   }
@@ -2395,41 +2497,21 @@ class authController {
   static async setupOTP(req, res) {
     try {
       const { method } = req.body;
+      const deviceInfo = DeviceDetector.detectDevice(req);
       const userId = req.user.id;
 
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found',
-          error: 'USER_NOT_FOUND'
-        });
-      }
+      const user = req.user;
 
-      if (!user.otpSettings.enabled) {
-        return res.status(400).json({
-          success: false,
-          message: 'OTP must be enabled first',
-          error: 'OTP_NOT_ENABLED'
-        });
-      }
+      const otpMethod = method;
 
-      // Use user's preferred method if not specified
-      const otpMethod = method || user.otpSettings.preferredMethod;
-
-      if (otpMethod === 'totp') {
+      if (method === 'totp') {
         // Setup TOTP
         const setupResult = await otpService.setupTOTP(user);
 
-        await user.logSecurityEvent(
-          'totp_setup_initiated',
-          'TOTP setup initiated',
-          'medium',
-          {
-            ipAddress: req.ip,
-            userAgent: req.get('User-Agent')
-          }
-        );
+        await user.logSecurityEvent('totp_setup_initiated', 'TOTP setup initiated', 'medium', {
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
 
         return res.status(200).json({
           success: true,
@@ -2438,64 +2520,60 @@ class authController {
             qrCode: setupResult.qrCode,
             manualEntryKey: setupResult.manualEntryKey,
             setupUri: setupResult.setupUri,
-            method
-          }
+            method,
+          },
         });
-
-      } else if (otpMethod === 'email') {
+      } else if (method === 'email') {
         // Verify email prerequisites
         if (!user.email || !user.emailVerified) {
           return res.status(400).json({
             success: false,
             message: 'Email must be verified before setting up email OTP',
-            error: 'EMAIL_NOT_VERIFIED'
+            error: 'EMAIL_NOT_VERIFIED',
           });
         }
-
+        const setupResult = await otpService.generateEmailOTP(user, 'setup_verification', deviceInfo);
         return res.status(200).json({
           success: true,
           message: 'Email OTP is ready to use',
           data: {
             method: 'email',
             destination: otpService.maskEmail(user.email),
-            ready: true
-          }
+            ready: true,
+          },
         });
-
-      } else if (otpMethod === 'sms') {
+      } else if (method === 'sms') {
         // Verify SMS prerequisites
         if (!user.phoneNumber || !user.phoneVerified) {
           return res.status(400).json({
             success: false,
             message: 'Phone number must be verified before setting up SMS OTP',
-            error: 'PHONE_NOT_VERIFIED'
+            error: 'PHONE_NOT_VERIFIED',
           });
         }
-
+        const setupResult = await otpService.generateSMSOTP(user, 'setup_verification', deviceInfo);
         return res.status(200).json({
           success: true,
           message: 'SMS OTP is ready to use',
           data: {
             method: 'sms',
             destination: otpService.maskPhone(user.phoneNumber),
-            ready: true
-          }
+            ready: true,
+          },
         });
-
       } else {
         return res.status(400).json({
           success: false,
           message: 'Invalid OTP method specified',
-          error: 'INVALID_METHOD'
+          error: 'INVALID_METHOD',
         });
       }
-
     } catch (error) {
       console.error('OTP Setup Error:', error);
       return res.status(500).json({
         success: false,
         message: error.message || 'Failed to setup OTP',
-        error: 'OTP_SETUP_FAILED'
+        error: 'OTP_SETUP_FAILED',
       });
     }
   }
@@ -2505,6 +2583,8 @@ class authController {
    * POST /api/otp/setup/verify
    */
   static async verifySetup(req, res) {
+    const deviceInfo = DeviceDetector.detectDevice(req);
+
     try {
       const { token } = req.body;
       const userId = req.user.id;
@@ -2513,54 +2593,33 @@ class authController {
         return res.status(400).json({
           success: false,
           message: 'Valid 6-digit TOTP token is required',
-          error: 'INVALID_TOKEN_FORMAT'
+          error: 'INVALID_TOKEN_FORMAT',
         });
       }
 
       const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found',
-          error: 'USER_NOT_FOUND'
-        });
-      }
 
-      if (user.otpSettings.preferredMethod !== 'totp') {
-        return res.status(400).json({
-          success: false,
-          message: 'TOTP setup verification only applies to authentication app method',
-          error: 'INVALID_METHOD'
-        });
-      }
+      const result = await user.verify2FASetup(token, req.body.method, deviceInfo);
 
-      const result = await user.completeTOTPSetup(token);
-
-      await user.logSecurityEvent(
-        'totp_setup_completed',
-        'TOTP setup completed successfully',
-        'medium',
-        {
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent')
-        }
-      );
+      await user.logSecurityEvent('OTP_setup_completed', 'OTP setup completed successfully', 'medium', {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
 
       return res.status(200).json({
         success: true,
         message: result.message,
         data: {
           backupCodes: result.backupCodes,
-          totpEnabled: true
-        }
+          totpEnabled: true,
+        },
       });
-
     } catch (error) {
-      console.error('TOTP Setup Verification Error:', error);
+      console.error('OTP Setup Verification Error:', error);
       return res.status(400).json({
         success: false,
         message: error.message || 'TOTP setup verification failed',
-        error: 'TOTP_VERIFICATION_FAILED'
+        error: 'TOTP_VERIFICATION_FAILED',
       });
     }
   }
@@ -2575,26 +2634,26 @@ class authController {
       const userId = req.user.id;
 
       const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found',
-          error: 'USER_NOT_FOUND'
-        });
-      }
+      // if (!user) {
+      //   return res.status(404).json({
+      //     success: false,
+      //     message: 'User not found',
+      //     error: 'USER_NOT_FOUND'
+      //   });
+      // }
 
-      if (!user.otpSettings.enabled) {
-        return res.status(400).json({
-          success: false,
-          message: 'OTP is not enabled for this account',
-          error: 'OTP_NOT_ENABLED'
-        });
-      }
+      // if (!user.otpSettings.enabled) {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: 'OTP is not enabled for this account',
+      //     error: 'OTP_NOT_ENABLED'
+      //   });
+      // }
 
       const deviceInfo = {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
-        deviceId: req.headers['x-device-id'] || 'unknown'
+        deviceId: req.headers['x-device-id'] || 'unknown',
       };
 
       // Use specified method or user's preferred method
@@ -2604,23 +2663,20 @@ class authController {
 
       return res.status(200).json({
         success: true,
-        message: result.type === 'totp'
-          ? 'Use your authenticator app to get the verification code'
-          : `OTP sent to ${result.destination}`,
+        message: result.type === 'totp' ? 'Use your authenticator app to get the verification code' : `OTP sent to ${result.destination}`,
         data: {
           type: result.type,
           destination: result.destination,
           expiresAt: result.expiresAt,
-          messageId: result.messageId || null
-        }
+          messageId: result.messageId || null,
+        },
       });
-
     } catch (error) {
       console.error('Send OTP Error:', error);
       return res.status(400).json({
         success: false,
         message: error.message || 'Failed to send OTP',
-        error: 'OTP_SEND_FAILED'
+        error: 'OTP_SEND_FAILED',
       });
     }
   }
@@ -2638,7 +2694,7 @@ class authController {
         return res.status(400).json({
           success: false,
           message: 'OTP code is required',
-          error: 'CODE_REQUIRED'
+          error: 'CODE_REQUIRED',
         });
       }
 
@@ -2647,14 +2703,14 @@ class authController {
         return res.status(404).json({
           success: false,
           message: 'User not found',
-          error: 'USER_NOT_FOUND'
+          error: 'USER_NOT_FOUND',
         });
       }
 
       const deviceInfo = {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
-        deviceId: req.headers['x-device-id'] || 'unknown'
+        deviceId: req.headers['x-device-id'] || 'unknown',
       };
 
       const isValid = await otpService.verifyOTP(user, code, purpose, deviceInfo);
@@ -2671,23 +2727,22 @@ class authController {
           data: {
             verified: true,
             purpose: purpose,
-            verifiedAt: new Date()
-          }
+            verifiedAt: new Date(),
+          },
         });
       } else {
         return res.status(400).json({
           success: false,
           message: 'Invalid OTP code',
-          error: 'INVALID_OTP'
+          error: 'INVALID_OTP',
         });
       }
-
     } catch (error) {
       console.error('Verify OTP Error:', error);
       return res.status(400).json({
         success: false,
         message: error.message || 'OTP verification failed',
-        error: 'OTP_VERIFICATION_FAILED'
+        error: 'OTP_VERIFICATION_FAILED',
       });
     }
   }
@@ -2706,7 +2761,7 @@ class authController {
         return res.status(404).json({
           success: false,
           message: 'User not found',
-          error: 'USER_NOT_FOUND'
+          error: 'USER_NOT_FOUND',
         });
       }
 
@@ -2714,7 +2769,7 @@ class authController {
         return res.status(400).json({
           success: false,
           message: 'OTP is not currently enabled',
-          error: 'OTP_NOT_ENABLED'
+          error: 'OTP_NOT_ENABLED',
         });
       }
 
@@ -2724,7 +2779,7 @@ class authController {
           return res.status(400).json({
             success: false,
             message: 'TOTP token is required to disable authentication app',
-            error: 'TOKEN_REQUIRED'
+            error: 'TOKEN_REQUIRED',
           });
         }
 
@@ -2733,7 +2788,7 @@ class authController {
           return res.status(400).json({
             success: false,
             message: 'Invalid TOTP token',
-            error: 'INVALID_TOKEN'
+            error: 'INVALID_TOKEN',
           });
         }
       }
@@ -2745,7 +2800,7 @@ class authController {
           const deviceInfo = {
             ipAddress: req.ip,
             userAgent: req.get('User-Agent'),
-            deviceId: req.headers['x-device-id'] || 'unknown'
+            deviceId: req.headers['x-device-id'] || 'unknown',
           };
 
           await otpService.sendOTP(user, 'disable_otp', deviceInfo);
@@ -2754,7 +2809,7 @@ class authController {
             success: false,
             message: 'Confirmation code sent. Please provide the code to disable OTP.',
             requiresConfirmation: true,
-            error: 'CONFIRMATION_REQUIRED'
+            error: 'CONFIRMATION_REQUIRED',
           });
         }
 
@@ -2762,7 +2817,7 @@ class authController {
         const deviceInfo = {
           ipAddress: req.ip,
           userAgent: req.get('User-Agent'),
-          deviceId: req.headers['x-device-id'] || 'unknown'
+          deviceId: req.headers['x-device-id'] || 'unknown',
         };
 
         const isValid = await otpService.verifyOTP(user, confirmationCode, 'disable_otp', deviceInfo);
@@ -2770,7 +2825,7 @@ class authController {
           return res.status(400).json({
             success: false,
             message: 'Invalid confirmation code',
-            error: 'INVALID_CONFIRMATION_CODE'
+            error: 'INVALID_CONFIRMATION_CODE',
           });
         }
       }
@@ -2790,7 +2845,7 @@ class authController {
         attempts: 0,
         maxAttempts: 3,
         lastSent: null,
-        verified: false
+        verified: false,
       };
 
       // Clear TOTP if enabled
@@ -2803,30 +2858,24 @@ class authController {
 
       await user.save();
 
-      await user.logSecurityEvent(
-        'otp_disabled',
-        'OTP completely disabled',
-        'high',
-        {
-          ipAddress: req.ip,
-          userAgent: req.get('User-Agent')
-        }
-      );
+      await user.logSecurityEvent('otp_disabled', 'OTP completely disabled', 'high', {
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
 
       return res.status(200).json({
         success: true,
         message: 'OTP has been disabled for your account',
         data: {
-          otpEnabled: false
-        }
+          otpEnabled: false,
+        },
       });
-
     } catch (error) {
       console.error('Disable OTP Error:', error);
       return res.status(500).json({
         success: false,
         message: error.message || 'Failed to disable OTP',
-        error: 'OTP_DISABLE_FAILED'
+        error: 'OTP_DISABLE_FAILED',
       });
     }
   }
@@ -2844,7 +2893,7 @@ class authController {
         return res.status(404).json({
           success: false,
           message: 'User not found',
-          error: 'USER_NOT_FOUND'
+          error: 'USER_NOT_FOUND',
         });
       }
 
@@ -2859,20 +2908,18 @@ class authController {
           requireForSensitiveOps: user.otpSettings.requireForSensitiveOps || true,
           availableMethods: availableMethods,
           totpConfigured: user.twoFactorAuth?.setupCompleted || false,
-          backupCodesRemaining: user.twoFactorAuth?.backupCodes?.filter(bc => !bc.used).length || 0
-        }
+          backupCodesRemaining: user.twoFactorAuth?.backupCodes?.filter((bc) => !bc.used).length || 0,
+        },
       });
-
     } catch (error) {
       console.error('Get OTP Status Error:', error);
       return res.status(500).json({
         success: false,
         message: 'Failed to get OTP status',
-        error: 'OTP_STATUS_FAILED'
+        error: 'OTP_STATUS_FAILED',
       });
     }
   }
-
 }
 
 module.exports = authController;

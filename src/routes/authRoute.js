@@ -86,8 +86,8 @@ authRoute.post('/mfa/setup/verify', authMiddleware, otpRateLimit, authController
 authRoute.post('/mfa/send', authMiddleware, otpRateLimit, authController.sendOTP);
 authRoute.post('/mfa/resend', authMiddleware, authController.sendOTP);
 authRoute.post('/mfa/verify', authMiddleware, authController.verifyOTP);
+authRoute.post('/mfa/verify-login-otp', authMiddleware, authController.verifyOTPAndLogin);
 authRoute.post('/mfa/disable', authMiddleware, requireOTPVerification('sensitive_op'), authController.disableOTP);
-
 
 
 // ========================================

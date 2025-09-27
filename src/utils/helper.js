@@ -1,14 +1,10 @@
-const jwt = require("jsonwebtoken");
-const axios = require("axios"); // You may need to install axios
-const os = require("os");
-const { jwtSecret, charactersString } = require("../config/setting");
-const Category = require("../models/categories");
-const {
-  ReasonPhrases,
-  StatusCodes,
-} = require("http-status-codes");
-
-
+const jwt = require('jsonwebtoken');
+const axios = require('axios'); // You may need to install axios
+const { formatDuration, intervalToDuration } = require('date-fns');
+const os = require('os');
+const { jwtSecret, charactersString } = require('../config/setting');
+const Category = require('../models/categories');
+const { ReasonPhrases, StatusCodes } = require('http-status-codes');
 
 function decodeToken(token) {
   return new Promise((resolve, reject) => {
@@ -28,37 +24,38 @@ function decodeToken(token) {
  * @returns {Object} MongoDB $or query or {}
  */
 function buildSearchQuery(model, searchValue) {
-  if (!searchValue || String(searchValue).trim() === "") {
+  if (!searchValue || String(searchValue).trim() === '') {
     return {}; // no search condition
   }
 
   const schemaPaths = Object.keys(model.schema.paths).filter((key) => {
     const type = model.schema.paths[key].instance;
-    return type === "String" || type === "Number";
+    return type === 'String' || type === 'Number';
   });
 
   const isNumeric = !isNaN(searchValue);
 
-  const orConditions = schemaPaths.map((key) => {
-    const fieldType = model.schema.paths[key].instance;
+  const orConditions = schemaPaths
+    .map((key) => {
+      const fieldType = model.schema.paths[key].instance;
 
-    if (fieldType === "Number" && isNumeric) {
-      return { [key]: Number(searchValue) }; // exact match for numbers
-    }
+      if (fieldType === 'Number' && isNumeric) {
+        return { [key]: Number(searchValue) }; // exact match for numbers
+      }
 
-    if (fieldType === "String") {
-      return { [key]: { $regex: searchValue, $options: "i" } }; // partial match for strings
-    }
+      if (fieldType === 'String') {
+        return { [key]: { $regex: searchValue, $options: 'i' } }; // partial match for strings
+      }
 
-    return null;
-  }).filter(Boolean);
+      return null;
+    })
+    .filter(Boolean);
 
   return orConditions.length ? { $or: orConditions } : {};
 }
 
-const FilterOptions = (params,model) => {
-
-  const {sort = "createdAt:desc", page, limit, filter, type, search, sortBy, sortDesc} = params
+const FilterOptions = (params, model) => {
+  const { sort = 'createdAt:desc', page, limit, filter, type, search, sortBy, sortDesc } = params;
   var query = {};
 
   if (filter) {
@@ -66,35 +63,27 @@ const FilterOptions = (params,model) => {
     // const startwith = generateMatchQuery(filterObj["match"])
 
     // const agGridFilter = filterObj?.["agGrid"] || {};
-    if (type === "ag-grid") {
+    if (type === 'ag-grid') {
       // const agGridFilter = filterObj?.["agGrid"] || {};
       query = agGridFilterToMongoQuery(filterObj);
     } else {
       for (const key in filterObj) {
         query[key] = filterObj[key];
       }
-
     }
 
-
-    delete filterObj?.["match"];
-    delete filterObj?.["startwith"];
-
-
-
+    delete filterObj?.['match'];
+    delete filterObj?.['startwith'];
   }
-  let statusFilter = { status: { $ne: "archived" } };
+  let statusFilter = { status: { $ne: 'archived' } };
 
-  if (query.status != "" && query.status) {
+  if (query.status != '' && query.status) {
     statusFilter = { ...statusFilter, status: query.status };
   }
 
+  const globalSearch = buildSearchQuery(model, search);
 
-
-  const globalSearch = buildSearchQuery(model, search );
-
-
-  query = { ...query, ...statusFilter, };
+  query = { ...query, ...statusFilter };
   // if (searchValue) {
   //  query.$text = { $search: searchValue };
   // }
@@ -102,66 +91,60 @@ const FilterOptions = (params,model) => {
   removeEmptyKeys(query);
   var sortOptions = {};
   if (sortBy) {
-    sortOptions[sortBy] = String(sortDesc).toLowerCase() === "true" ? -1 : 1;;
+    sortOptions[sortBy] = String(sortDesc).toLowerCase() === 'true' ? -1 : 1;
   } else {
-    const [sortBy, sortOrder] = sort.split(":");
-    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+    const [sortBy, sortOrder] = sort.split(':');
+    sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
   }
 
-
-console.log(Number(limit));
-
+  console.log(Number(limit));
 
   const options = {
-    skip: (Number(page||1) - 1) * Number(limit||10),
-    limit: parseInt(limit||10),
+    skip: (Number(page || 1) - 1) * Number(limit || 10),
+    limit: parseInt(limit || 10),
     sort: sortOptions,
   };
   return {
     options: options,
-    query: { ...query, ...globalSearch }
+    query: { ...query, ...globalSearch },
   };
 };
 
-const FilterOptionsSearch = (sort = "updatedAt:desc", page, limit, filter) => {
+const FilterOptionsSearch = (sort = 'updatedAt:desc', page, limit, filter) => {
   var query = {};
 
   if (filter) {
     const filterObj = JSON.parse(filter);
-    const currObj = parseAndExtractValues(filterObj, ["categories", "salePrice", "rating", "brandName", "discount", "isAvailable", "tags"])
-    const advFilter = generateQuery(currObj)
+    const currObj = parseAndExtractValues(filterObj, ['categories', 'salePrice', 'rating', 'brandName', 'discount', 'isAvailable', 'tags']);
+    const advFilter = generateQuery(currObj);
 
     const search = {
-
       // { title: { $regex: regex } }, // Case-insensitive title match
       // { slug: { $regex: regex } }, // Case-insensitive slug match
       // { brandName: { $regex: regex } }, // Case-insensitive brandName match
-
-    }
-    delete filterObj?.["discount"];
-    delete filterObj?.["search"];
+    };
+    delete filterObj?.['discount'];
+    delete filterObj?.['search'];
     for (const key in filterObj) {
       query[key] = filterObj[key];
     }
-    let statusFilter = { status: { $ne: "INACTIVE" } };
+    let statusFilter = { status: { $ne: 'INACTIVE' } };
 
-    if (query.status != "" && query.status) {
+    if (query.status != '' && query.status) {
       statusFilter = { ...statusFilter, status: query.status };
     }
 
     query = { ...query, ...statusFilter, ...advFilter, ...search };
-    delete query?.["rating"];
+    delete query?.['rating'];
     removeEmptyKeys(query);
   }
 
   var sortOptions = {};
 
   if (sort) {
-    const [sortKey, sortOrder] = sort.split(":");
-    sortOptions[sortKey] = sortOrder === "desc" ? -1 : 1;
+    const [sortKey, sortOrder] = sort.split(':');
+    sortOptions[sortKey] = sortOrder === 'desc' ? -1 : 1;
   }
-
-
 
   const options = {
     skip: (page - 1) * limit,
@@ -169,35 +152,22 @@ const FilterOptionsSearch = (sort = "updatedAt:desc", page, limit, filter) => {
     sort: sortOptions,
   };
   const extra = {
-    rating: query.minValue
-  }
+    rating: query.minValue,
+  };
 
-  delete query?.["minValue"];
+  delete query?.['minValue'];
   return {
     options: options,
     query: query,
-    extra: extra
+    extra: extra,
   };
 };
 
-
-
-
-
-
 function getAppIdAndEntity(url) {
-  const [pathPart] = url.split("?");
-  const parts = pathPart.split("/");
-  const tableIndex = parts.indexOf("table");
-  if (
-    tableIndex !== -1 &&
-    tableIndex > 0 &&
-    tableIndex < parts.length - 1 &&
-    parts[tableIndex - 1] &&
-    !parts[tableIndex - 1].includes("/") &&
-    parts[tableIndex + 1] &&
-    !parts[tableIndex + 1].includes("/")
-  ) {
+  const [pathPart] = url.split('?');
+  const parts = pathPart.split('/');
+  const tableIndex = parts.indexOf('table');
+  if (tableIndex !== -1 && tableIndex > 0 && tableIndex < parts.length - 1 && parts[tableIndex - 1] && !parts[tableIndex - 1].includes('/') && parts[tableIndex + 1] && !parts[tableIndex + 1].includes('/')) {
     const appId = parts[tableIndex - 1];
     const entity = parts[tableIndex + 1];
     return {
@@ -210,9 +180,6 @@ function getAppIdAndEntity(url) {
   }
 }
 
-
-
-
 async function getLocationInfo(ip) {
   try {
     const response = await axios.get(`http://ip-api.com/json/${ip}`);
@@ -224,7 +191,7 @@ async function getLocationInfo(ip) {
       zip: response.data.zip,
     };
   } catch (error) {
-    console.error("Error getting location info:", error);
+    console.error('Error getting location info:', error);
     return {
       ip: ip,
     };
@@ -236,7 +203,7 @@ function removeEmptyKeys(obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const value = obj[key];
 
-      if (value === null || value === undefined || value === "") {
+      if (value === null || value === undefined || value === '') {
         delete obj[key];
       }
     }
@@ -255,7 +222,7 @@ function removeEmptyKeys(obj) {
 // };
 
 function generateRandomString(length) {
-  let result = "";
+  let result = '';
 
   for (let i = 0; i < length; i++) {
     const randomIndex = Math.floor(Math.random() * charactersString.length);
@@ -275,12 +242,12 @@ async function getLocalIpAddress() {
 
     // Iterate over addresses for the current interface
     interfaceInfo.forEach((address) => {
-      if (address.family === "IPv4" && !address.internal) {
+      if (address.family === 'IPv4' && !address.internal) {
         // Found a non-internal IPv4 address
-        IPv4 = address.address
+        IPv4 = address.address;
       } else if (address.family === 'IPv6' && !address.internal) {
         // Found a non-internal IPv6 address
-        IPv6 = address.address
+        IPv6 = address.address;
       }
     });
   });
@@ -291,19 +258,19 @@ async function getLocalIpAddress() {
 function getPublicIpAddress() {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: "api64.ipify.org", // You can use other services like 'api.ipify.org' or 'api.ident.me'
-      path: "/?format=json",
-      method: "GET",
+      hostname: 'api64.ipify.org', // You can use other services like 'api.ipify.org' or 'api.ident.me'
+      path: '/?format=json',
+      method: 'GET',
     };
 
     const req = http.request(options, (res) => {
-      let data = "";
+      let data = '';
 
-      res.on("data", (chunk) => {
+      res.on('data', (chunk) => {
         data += chunk;
       });
 
-      res.on("end", () => {
+      res.on('end', () => {
         try {
           const result = JSON.parse(data);
           resolve(result.ip);
@@ -313,7 +280,7 @@ function getPublicIpAddress() {
       });
     });
 
-    req.on("error", (error) => {
+    req.on('error', (error) => {
       reject(error);
     });
 
@@ -323,7 +290,7 @@ function getPublicIpAddress() {
 
 function parseAndExtractValues(filterObj, keys) {
   const filterObjData = {};
-  keys.forEach(key => {
+  keys.forEach((key) => {
     if (filterObj[key]) {
       filterObjData[key] = Object.values(filterObj[key]);
     }
@@ -333,38 +300,39 @@ function parseAndExtractValues(filterObj, keys) {
 }
 
 const generateQuery = (filterkeys) => {
-  var currObj = {}
+  var currObj = {};
   if (filterkeys.salePrice) {
     currObj = {
-      ...currObj, salePrice: {
+      ...currObj,
+      salePrice: {
         $gte: Number(filterkeys.salePrice[0]),
         $lte: Number(filterkeys.salePrice[1]),
-      }
-    }
-
+      },
+    };
   }
   if (filterkeys.categories) {
     currObj = {
-      ...currObj, categories: filterkeys.categories
-    }
-
+      ...currObj,
+      categories: filterkeys.categories,
+    };
   }
   if (filterkeys.brandName) {
     currObj = {
-      ...currObj, brandName: filterkeys.brandName
-    }
-
+      ...currObj,
+      brandName: filterkeys.brandName,
+    };
   }
   if (filterkeys.tags) {
     currObj = {
-      ...currObj, tags: filterkeys.tags
-    }
-
+      ...currObj,
+      tags: filterkeys.tags,
+    };
   }
   if (filterkeys.isAvailable) {
     currObj = {
-      ...currObj, isAvailable: filterkeys.isAvailable
-    }
+      ...currObj,
+      isAvailable: filterkeys.isAvailable,
+    };
   }
   // if (filterkeys.rating) {
   //   const numberArray = filterkeys.rating.map(Number);
@@ -378,53 +346,37 @@ const generateQuery = (filterkeys) => {
   if (filterkeys.discount) {
     const numberArray = filterkeys.discount.map(Number);
     const minValue = Math.min(...numberArray);
-    currObj = {
+    (currObj = {
       ...currObj,
       $expr: {
-        $gte: [
-          { $multiply: [100, { $divide: [{ $subtract: ['$price', '$salePrice'] }, '$price'] }] },
-          minValue
-        ]
-      }
-    },
-    {
-      $expr: {
-        $lte: [
-          { $multiply: [100, { $divide: [{ $subtract: ['$price', '$salePrice'] }, '$price'] }] },
-          100
-        ]
-      }
-
-    }
+        $gte: [{ $multiply: [100, { $divide: [{ $subtract: ['$price', '$salePrice'] }, '$price'] }] }, minValue],
+      },
+    }),
+      {
+        $expr: {
+          $lte: [{ $multiply: [100, { $divide: [{ $subtract: ['$price', '$salePrice'] }, '$price'] }] }, 100],
+        },
+      };
   }
 
+  return currObj;
+};
 
-
-  return currObj
-}
-
-
-const showingProductFilter = async (sort = "updatedAt:desc", page, limit = 24, category, _id, query) => {
+const showingProductFilter = async (sort = 'updatedAt:desc', page, limit = 24, category, _id, query) => {
   var myquery = {};
 
   if (query) {
-    myquery = { title: { $regex: query, $options: 'i' } }
+    myquery = { title: { $regex: query, $options: 'i' } };
   } else if (category && _id) {
-    myquery = { 'category': _id }
-  }
-  else if (category) {
-    const cate = await Category.findOne(
-      { 'slug': category },
-      "slug title"
-    )
-    myquery = { 'category': cate?.id }
-
-
+    myquery = { category: _id };
+  } else if (category) {
+    const cate = await Category.findOne({ slug: category }, 'slug title');
+    myquery = { category: cate?.id };
   }
 
-  let statusFilter = { status: { $ne: "INACTIVE" } };
+  let statusFilter = { status: { $ne: 'INACTIVE' } };
 
-  if (myquery.status != "" && myquery.status) {
+  if (myquery.status != '' && myquery.status) {
     statusFilter = { ...statusFilter, status: myquery.status };
   }
 
@@ -434,8 +386,8 @@ const showingProductFilter = async (sort = "updatedAt:desc", page, limit = 24, c
   var sortOptions = {};
 
   if (sort) {
-    const [sortKey, sortOrder] = sort.split(":");
-    sortOptions[sortKey] = sortOrder === "desc" ? -1 : 1;
+    const [sortKey, sortOrder] = sort.split(':');
+    sortOptions[sortKey] = sortOrder === 'desc' ? -1 : 1;
   }
   const options = {
     skip: (Number(page) - 1) * Number(limit),
@@ -447,7 +399,6 @@ const showingProductFilter = async (sort = "updatedAt:desc", page, limit = 24, c
     query: myquery,
   };
 };
-
 
 function calculateDiscount(price, coupon) {
   let discount;
@@ -475,12 +426,8 @@ function calculateDiscount(price, coupon) {
 
 function fillNullIfEmpty(obj, fields) {
   const filled = {};
-  fields.forEach(field => {
-    if (
-      obj[field] === undefined ||
-      obj[field] === "" ||
-      (Array.isArray(obj[field]) && obj[field].length === 0)
-    ) {
+  fields.forEach((field) => {
+    if (obj[field] === undefined || obj[field] === '' || (Array.isArray(obj[field]) && obj[field].length === 0)) {
       filled[field] = null;
     } else {
       filled[field] = obj[field];
@@ -488,8 +435,6 @@ function fillNullIfEmpty(obj, fields) {
   });
   return filled;
 }
-
-
 
 function agGridFilterToMongoQuery(filterModel) {
   const query = {};
@@ -520,7 +465,7 @@ function agGridFilterToMongoQuery(filterModel) {
         // For number/date range filters
         query[field] = {
           $gte: filter.filter,
-          $lte: filter.filterTo
+          $lte: filter.filterTo,
         };
         break;
       case 'lessThan':
@@ -536,10 +481,10 @@ function agGridFilterToMongoQuery(filterModel) {
         query[field] = { $gte: filter.filter };
         break;
       case 'blank':
-        query[field] = { $in: [null, ""] };
+        query[field] = { $in: [null, ''] };
         break;
       case 'notBlank':
-        query[field] = { $nin: [null, ""] };
+        query[field] = { $nin: [null, ''] };
         break;
       case 'set':
         // AG Grid "set" filter (array of values)
@@ -556,13 +501,12 @@ function agGridFilterToMongoQuery(filterModel) {
   return query;
 }
 
-
 const sendResponse = (res, statusCode, results, message) => {
   res.status(statusCode).json({
     statusCode,
     status: ReasonPhrases[StatusCodes[statusCode]] || ReasonPhrases.OK,
     results,
-    message
+    message,
   });
 };
 
@@ -571,26 +515,59 @@ const sendError = (res, statusCode, error) => {
     statusCode,
     status: ReasonPhrases[statusCode] || ReasonPhrases.INTERNAL_SERVER_ERROR,
     results: null,
-    message: error.message
+    message: error.message,
   });
 };
 
 function removeKeysFromObject(obj, keysToRemove) {
   const newObj = { ...obj }; // clone to avoid mutating original
-  keysToRemove.forEach(key => {
+  keysToRemove.forEach((key) => {
     delete newObj[key];
   });
   return newObj;
 }
 
+function formatRelativeDuration(dateInput) {
+  // Convert input to Date object
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+
+  if (isNaN(date)) {
+    throw new Error('Invalid date input');
+  }
+
+  const now = new Date();
+  const msDiff = Math.abs(date.getTime() - now.getTime());
+
+  // Calculate duration components
+  const duration = intervalToDuration({ start: 0, end: msDiff });
+
+  // Find largest non-zero unit
+  const largestUnit = ['days', 'hours', 'minutes', 'seconds'].find((unit) => duration[unit] > 0);
+
+  if (!largestUnit) {
+    return '0 seconds';
+  }
+
+  const durationForFormat = { [largestUnit]: duration[largestUnit] };
+
+  return formatDuration(durationForFormat, { format: [largestUnit] });
+}
 module.exports = {
   decodeToken,
   FilterOptions,
-  getLocationInfo,removeKeysFromObject,
+  getLocationInfo,
+  removeKeysFromObject,
   removeEmptyKeys,
   FilterOptionsSearch,
   generateRandomString,
   getLocalIpAddress,
-  getPublicIpAddress, getAppIdAndEntity, showingProductFilter, calculateDiscount, fillNullIfEmpty, agGridFilterToMongoQuery,sendResponse,sendError
+  getPublicIpAddress,
+  getAppIdAndEntity,
+  showingProductFilter,
+  calculateDiscount,
+  fillNullIfEmpty,
+  agGridFilterToMongoQuery,
+  sendResponse,
+  sendError,
+  formatRelativeDuration,
 };
-
