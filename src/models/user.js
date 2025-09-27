@@ -200,7 +200,7 @@ const userSchema = new mongoose.Schema(
       code: { type: String, default: null },
       hashedCode: { type: String, default: null },
       type: { type: String, enum: ['email', 'sms', 'backup'], default: null },
-      purpose: { type: String, enum: ['login', 'reset', 'verification', 'sensitive_op'], default: null },
+      purpose: { type: String, enum: ['login', 'reset', 'verification', 'setup_verification', 'sensitive_op'], default: null },
       expiresAt: { type: Date, default: null },
       attempts: { type: Number, default: 0 },
       maxAttempts: { type: Number, default: 3 },
@@ -389,11 +389,662 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
+  async initiatePasswordReset({ method = 'link', originUrl } = {}, deviceInfo = {}) {
+    if (!originUrl) {
+      throw new Error('originUrl is required');
+    }
+
+    // Log reset initiation
+    await this.logSecurityEvent('password_reset_initiated', `Method: ${method}`, 'medium', deviceInfo);
+
+    // 1. Magic link flow (default)
+    if (method === 'link') {
+      const token = jwt.sign({ sub: this._id.toString(), action: 'PASSWORD_RESET' }, JWT_SECRET, { expiresIn: '15m', issuer: JWT_ISSUER });
+
+      this.currentReset = {
+        type: 'link',
+        tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+        expiresAt: Date.now() + 15 * 60 * 1000,
+        attempts: 0,
+        lastSent: new Date(),
+      };
+      await this.save();
+
+      const resetUrl = `${originUrl}/reset-password?token=${encodeURIComponent(token)}`;
+      await sendEmail({
+        to: this.email,
+        subject: 'Reset your password',
+        html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. Expires in 15 minutes.</p>`,
+      });
+
+      return {
+        success: true,
+        method: 'link',
+        resetUrl,
+        expiresAt: this.currentReset.expiresAt,
+      };
+    }
+
+    // 2. Email or SMS OTP flow
+    if (method === 'email-otp' || method === 'sms-otp') {
+      if (method === 'email-otp' && !this.emailVerified) {
+        throw new Error('Email must be verified to reset via OTP');
+      }
+      if (method === 'sms-otp' && !this.phoneVerified) {
+        throw new Error('Phone must be verified to reset via SMS OTP');
+      }
+
+      const expiresAt = Date.now() + 5 * 60 * 1000;
+      this.currentReset = {
+        type: method,
+        purpose: 'password_reset',
+        expiresAt,
+        attempts: 0,
+        lastSent: new Date(),
+      };
+      await this.save();
+
+      const otpResult = method === 'email-otp' ? await otpService.generateEmailOTP(this, 'password_reset', deviceInfo) : await otpService.generateSMSOTP(this, 'password_reset', deviceInfo);
+
+      this.currentOTP = {
+        code: otpResult.code,
+        hashedCode: otpResult.hashedCode,
+        type: method === 'email-otp' ? 'email' : 'sms',
+        purpose: 'password_reset',
+        expiresAt: otpResult.expiresAt,
+        attempts: 0,
+        maxAttempts: otpService.config.maxAttempts,
+        lastSent: new Date(),
+        verified: false,
+      };
+      await this.save();
+
+      return {
+        success: true,
+        method,
+        otpSentTo: otpResult.destination,
+        expiresAt: otpResult.expiresAt,
+      };
+    }
+
+    throw new Error(`Unsupported reset method: ${method}`);
+  },
+
+  async verifyOTPForPurpose({ code, method, purpose, deviceInfo = {} }) {
+    try {
+      if (!code || !method || !purpose) throw new Error('Missing required inputs');
+      const OTP_LIMITS = { maxAttempts: 5, lockDurationMS: 15 * 60 * 1000, backupReuseWindow: 3 * 60 * 1000 };
+      const allowedMethods = ['totp', 'email', 'sms'];
+      const allowedPurposes = ['login', 'reset_password', 'verify_email', 'verify_phone', 'account_unlock', 'account_recovery', 'transaction'];
+      if (!allowedMethods.includes(method)) throw new Error('Unsupported OTP method');
+      if (!allowedPurposes.includes(purpose)) throw new Error('Unsupported OTP purpose');
+      const now = Date.now();
+
+      let success = false,
+        usedBackup = false,
+        locked = false;
+      // TOTP & backup codes
+      if (method === 'totp') {
+        if (!this.twoFactorAuth?.enabled || !this.twoFactorAuth?.secret) throw new Error('TOTP not enabled for this account');
+        success = await otpService.verifyTOTP(this, code, deviceInfo);
+        if (!success && Array.isArray(this.twoFactorAuth.backupCodes)) {
+          const hash = otpService.hashBackupCode(code);
+          const backup = this.twoFactorAuth.backupCodes.find((b) => b.code === hash && !b.used && (!b.usedAt || now - new Date(b.usedAt).getTime() > OTP_LIMITS.backupReuseWindow));
+          if (backup) {
+            backup.used = true;
+            backup.usedAt = new Date();
+            usedBackup = true;
+            success = true;
+          }
+        }
+      }
+      // Email/SMS OTP logic
+      if (method === 'email' || method === 'sms') {
+        const otpObj = this.currentOTP;
+        if (!otpObj || otpObj.type !== method || otpObj.purpose !== purpose) throw new Error('No active OTP session for this method and purpose');
+        if (otpObj.expiresAt < now) throw new Error('OTP expired');
+        otpObj.attempts = otpObj.attempts || 0;
+        otpObj.maxAttempts = otpObj.maxAttempts || OTP_LIMITS.maxAttempts;
+        if (otpObj.attempts >= otpObj.maxAttempts) {
+          locked = true;
+          this.lockedAt = new Date();
+          await this.save();
+          throw new Error('Max OTP attempts exceeded, account locked');
+        }
+        // Device-context security
+        if (otpObj.fingerprint && deviceInfo.fingerprint && otpObj.fingerprint !== deviceInfo.fingerprint) throw new Error('Fingerprint mismatch');
+        if (otpObj.ip && deviceInfo.ip && otpObj.ip !== deviceInfo.ip) throw new Error('IP mismatch');
+        success = await otpService.verifyOTP(this, code, purpose, deviceInfo);
+        otpObj.attempts += 1;
+        if (success) otpObj.verified = true;
+      }
+      // Success flows by purpose
+      let extraData = {};
+      if (success) {
+        switch (purpose) {
+          case 'login':
+            this.lastLoginAt = new Date();
+            break;
+          case 'reset_password':
+            this.currentReset = null;
+            extraData.readyToReset = true;
+            break;
+          case 'verify_email':
+            this.emailVerified = true;
+            this.currentOTP = null;
+            break;
+          case 'verify_phone':
+            this.phoneVerified = true;
+            this.currentOTP = null;
+            break;
+          case 'account_unlock':
+            this.lockedAt = null;
+            this.currentOTP = null;
+            extraData.unlocked = true;
+            break;
+          case 'account_recovery':
+            this.accountRecovered = true;
+            this.currentOTP = null;
+            extraData.recovered = true;
+            break;
+          case 'transaction':
+            this.currentOTP = null;
+            extraData.transactionVerified = true;
+            break;
+        }
+        await this.save();
+        await this.logSecurityEvent(`${method}_${purpose}_otp_success${usedBackup ? '_backup' : ''}`, `${method.toUpperCase()} OTP verified for ${purpose}${usedBackup ? ' (backup code)' : ''}`, 'medium', deviceInfo);
+        return { success: true, method, purpose, usedBackup, extraData };
+      } else {
+        if (locked) {
+          await this.logSecurityEvent(`${method}_${purpose}_otp_lock`, `Account locked after failed attempts for ${purpose}`, 'critical', deviceInfo);
+        } else {
+          await this.logSecurityEvent(`${method}_${purpose}_otp_failed`, `Failed ${method.toUpperCase()} OTP for ${purpose}`, 'high', deviceInfo);
+        }
+        await this.save();
+        return { success: false, method, purpose, locked, error: locked ? 'Account locked' : 'Invalid OTP code' };
+      }
+    } catch (error) {
+      return { success: false, method, purpose, error: error.message };
+    }
+  },
+
+  async resendOTP({ method, deviceInfo }) {
+    const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 min
+    const DAILY_MAX_RESENDS = 5;
+
+    try {
+      if (!['email', 'sms'].includes(method)) {
+        throw new Error('Resend OTP only supports email or sms method');
+      }
+
+      // Validate active OTP session & ownership consistency
+      const otp = this.currentOTP;
+      if (!otp || otp.type !== method) {
+        throw new Error('No active OTP session matching method');
+      }
+
+      // Ensure OTP purpose is defined (for audit and purpose limit)
+      if (!otp.purpose) {
+        throw new Error('OTP purpose not set, unsafe to resend');
+      }
+
+      const now = Date.now();
+
+      // Check expiration
+      if (otp.expiresAt < now) {
+        throw new Error('Current OTP expired, please initiate a new request');
+      }
+
+      // Verify not already verified
+      if (otp.verified) {
+        throw new Error('OTP already verified, no resend needed');
+      }
+
+      // Enforce cooldown window between resends
+      if (otp.lastSent && now - otp.lastSent.getTime() < RATE_LIMIT_WINDOW_MS) {
+        const remaining = RATE_LIMIT_WINDOW_MS - (now - otp.lastSent.getTime());
+        throw new Error(`Please wait ${Math.ceil(remaining / 1000)} seconds before resending OTP`);
+      }
+
+      // Enforce daily max resend count per user/purpose
+      this.otpResendCount = this.otpResendCount || {};
+      const today = new Date().toISOString().slice(0, 10);
+      const key = `${method}_${otp.purpose}_${today}`;
+      this.otpResendCount[key] = this.otpResendCount[key] || 0;
+      if (this.otpResendCount[key] >= DAILY_MAX_RESENDS) {
+        throw new Error('Maximum daily resend attempts reached for this method and purpose');
+      }
+
+      // Verify contact verified status before sending
+      if (method === 'email') {
+        if (!this.emailVerified) throw new Error('Email not verified for OTP resend');
+      } else {
+        if (!this.phoneVerified) throw new Error('Phone not verified for OTP resend');
+      }
+
+      // Generate new OTP with otpService, maintain same purpose and device info
+      let otpResult;
+      if (method === 'email') {
+        otpResult = await otpService.generateEmailOTP(this, otp.purpose, deviceInfo);
+      } else {
+        otpResult = await otpService.generateSMSOTP(this, otp.purpose, deviceInfo);
+      }
+
+      // Update currentOTP with new OTP data and timestamps
+      this.currentOTP.code = otpResult.code;
+      this.currentOTP.hashedCode = otpResult.hashedCode;
+      this.currentOTP.expiresAt = otpResult.expiresAt;
+      this.currentOTP.lastSent = new Date();
+      this.currentOTP.attempts = 0; // reset attempts
+      this.currentOTP.verified = false;
+
+      // Track resend counts
+      this.otpResendCount[key] += 1;
+
+      // Persist changes
+      await this.save();
+
+      // Log event with full context
+      await this.logSecurityEvent(`otp_resend_${method}`, `User requested OTP resend via ${method.toUpperCase()} for purpose ${otp.purpose}`, 'medium', deviceInfo);
+
+      return {
+        success: true,
+        method,
+        otpSentTo: otpResult.destination,
+        expiresAt: otpResult.expiresAt,
+        cooldownRemaining: RATE_LIMIT_WINDOW_MS,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        method,
+        error: error.message,
+      };
+    }
+  },
   /**
-   * Generate JWT tokens
-   *
-   *
+   * Setup 2FA for any method (email, sms, or totp)
+   * @param {string} method - 'totp', 'email', or 'sms'
+   * @param {object} deviceInfo - Device information for logging
+   * @returns {object} Setup result with necessary data
    */
+
+  async setup2FA(method, deviceInfo) {
+    try {
+      // Validate method
+      const validMethods = ['totp', 'email', 'sms'];
+      if (!validMethods.includes(method)) {
+        throw new Error('Invalid 2FA method. Must be one of: totp, email, sms');
+      }
+
+      // Check if 2FA is already enabled
+      if (this.otpSettings?.enabled) {
+        throw new Error('2FA is already enabled. Disable current method first.');
+      }
+
+      // Initialize otpSettings if not present
+      if (!this.otpSettings) {
+        this.otpSettings = {};
+      }
+
+      if (method === 'totp') {
+        // For TOTP (authentication app)
+        // Initialize twoFactorAuth if not present
+        if (!this.twoFactorAuth) {
+          this.twoFactorAuth = {};
+        }
+
+        // Use otpService to setup TOTP
+        const totpSetup = await otpService.setupTOTP(this);
+
+        // Update both otpSettings and twoFactorAuth
+        this.otpSettings.enabled = false; // Will be enabled after verification
+        this.otpSettings.preferredMethod = 'totp';
+        this.otpSettings.allowFallback = false;
+        this.otpSettings.requireForLogin = true;
+        this.otpSettings.requireForSensitiveOps = true;
+
+        this.twoFactorAuth.enabled = false; // Will be enabled after verification
+        this.twoFactorAuth.setupCompleted = false;
+        this.twoFactorAuth.secret = totpSetup.secret;
+        this.twoFactorAuth.backupCodes = [];
+
+        await this.save();
+
+        // Log security event
+        await this.logSecurityEvent('totp_setup_initiated', 'TOTP setup initiated', 'medium', deviceInfo);
+
+        return {
+          success: true,
+          method: 'totp',
+          setupData: {
+            qrCode: totpSetup.qrCode,
+            manualEntryKey: totpSetup.manualEntryKey,
+            setupUri: totpSetup.setupUri,
+          },
+          message: 'TOTP setup initiated. Scan QR code and verify to complete setup.',
+          requiresVerification: true,
+        };
+      } else if (method === 'email') {
+        // For email OTP
+        // Check prerequisites
+        if (!this.email || !this.emailVerified) {
+          throw new Error('Email must be verified before enabling email 2FA');
+        }
+
+        // Setup otpSettings for email
+        this.otpSettings.enabled = false; // Will be enabled after verification
+        this.otpSettings.preferredMethod = 'email';
+        this.otpSettings.allowFallback = false;
+        this.otpSettings.requireForLogin = true;
+        this.otpSettings.requireForSensitiveOps = true;
+
+        // Initialize currentOTP for setup verification
+        this.currentOTP = {
+          code: null,
+          hashedCode: null,
+          type: null,
+          purpose: 'setup_verification',
+          expiresAt: null,
+          attempts: 0,
+          maxAttempts: 3,
+          lastSent: null,
+          verified: false,
+        };
+
+        await this.save();
+
+        // Generate verification OTP
+        const otpResult = await otpService.generateEmailOTP(this, 'setup_verification', deviceInfo);
+
+        // Log security event
+        await this.logSecurityEvent('email_2fa_setup_initiated', 'Email 2FA setup initiated', 'medium', deviceInfo);
+
+        return {
+          success: true,
+          method: 'email',
+          setupData: {
+            destination: otpResult.destination,
+            expiresAt: otpResult.expiresAt,
+          },
+          message: 'Email 2FA setup initiated. Check your email for verification code.',
+          requiresVerification: true,
+        };
+      } else if (method === 'sms') {
+        // For SMS OTP
+        // Check prerequisites
+        if (!this.phoneNumber || !this.phoneVerified) {
+          throw new Error('Phone number must be verified before enabling SMS 2FA');
+        }
+
+        // Setup otpSettings for SMS
+        this.otpSettings.enabled = false; // Will be enabled after verification
+        this.otpSettings.preferredMethod = 'sms';
+        this.otpSettings.allowFallback = false;
+        this.otpSettings.requireForLogin = true;
+        this.otpSettings.requireForSensitiveOps = true;
+
+        // Initialize currentOTP for setup verification
+        this.currentOTP = {
+          code: null,
+          hashedCode: null,
+          type: null,
+          purpose: 'setup_verification',
+          expiresAt: null,
+          attempts: 0,
+          maxAttempts: 3,
+          lastSent: null,
+          verified: false,
+        };
+
+        await this.save();
+
+        // Generate verification OTP
+        const otpResult = await otpService.generateSMSOTP(this, 'setup_verification', deviceInfo);
+
+        // Log security event
+        await this.logSecurityEvent('sms_2fa_setup_initiated', 'SMS 2FA setup initiated', 'medium', deviceInfo);
+
+        return {
+          success: true,
+          method: 'sms',
+          setupData: {
+            destination: otpResult.destination,
+            expiresAt: otpResult.expiresAt,
+          },
+          message: 'SMS 2FA setup initiated. Check your phone for verification code.',
+          requiresVerification: true,
+        };
+      }
+    } catch (error) {
+      // Log failed setup attempt
+      await this.logSecurityEvent('2fa_setup_failed', `2FA setup failed: ${error.message}`, 'high', deviceInfo);
+      throw new Error(`2FA setup failed: ${error.message}`);
+    }
+  },
+  async verify2FASetup(code, method, deviceInfo) {
+    try {
+      // Validate inputs
+      if (!code) {
+        throw new Error('Verification code is required');
+      }
+
+      const validMethods = ['totp', 'email', 'sms'];
+      if (!validMethods.includes(method)) {
+        throw new Error('Invalid 2FA method');
+      }
+
+      // Check if setup was initiated
+      if (method === 'totp') {
+        // Verify TOTP setup
+        if (!this.twoFactorAuth?.secret) {
+          throw new Error('TOTP setup was not initiated');
+        }
+
+        if (this.twoFactorAuth.enabled) {
+          throw new Error('TOTP is already enabled');
+        }
+
+        // Use otpService to verify TOTP setup
+        const verifyResult = await otpService.verifyTOTPSetup(this, code);
+
+        if (verifyResult.success) {
+          // Enable both otpSettings and twoFactorAuth
+          this.otpSettings.enabled = true;
+          this.twoFactorAuth.enabled = true;
+          this.twoFactorAuth.setupCompleted = true;
+          this.twoFactorAuth.lastUsed = new Date();
+
+          // Store hashed backup codes
+          this.twoFactorAuth.backupCodes = verifyResult.backupCodes.map((code) => ({
+            code: otpService.hashBackupCode(code),
+            used: false,
+            usedAt: null,
+            createdAt: new Date(),
+          }));
+
+          await this.save();
+
+          // Log successful setup
+          await this.logSecurityEvent('totp_enabled', 'TOTP 2FA enabled successfully', 'medium', deviceInfo);
+
+          return {
+            success: true,
+            method: 'totp',
+            message: 'TOTP 2FA enabled successfully',
+            backupCodes: verifyResult.backupCodes, // Return unhashed codes to user
+            enabled: true,
+          };
+        } else {
+          throw new Error('Invalid TOTP code');
+        }
+      } else if (method === 'email' || method === 'sms') {
+        // Verify email/SMS OTP
+        if (!this.currentOTP || this.currentOTP.purpose !== 'setup_verification') {
+          throw new Error(`${method.toUpperCase()} 2FA setup was not initiated`);
+        }
+
+        if (this.otpSettings?.enabled) {
+          throw new Error(`${method.toUpperCase()} 2FA is already enabled`);
+        }
+
+        // Use otpService to verify the OTP
+        const isValidOTP = await otpService.verifyOTP(this, code, 'setup_verification', deviceInfo);
+
+        if (isValidOTP) {
+          // Enable 2FA
+          this.otpSettings.enabled = true;
+          this.currentOTP.verified = true;
+
+          // Clear the setup OTP session
+          this.currentOTP = {
+            code: null,
+            hashedCode: null,
+            type: null,
+            purpose: null,
+            expiresAt: null,
+            attempts: 0,
+            maxAttempts: 3,
+            lastSent: null,
+            verified: false,
+          };
+
+          await this.save();
+
+          // Log successful setup
+          await this.logSecurityEvent(`${method}_2fa_enabled`, `${method.toUpperCase()} 2FA enabled successfully`, 'medium', deviceInfo);
+
+          return {
+            success: true,
+            method: method,
+            message: `${method.toUpperCase()} 2FA enabled successfully`,
+            enabled: true,
+          };
+        } else {
+          throw new Error(`Invalid ${method.toUpperCase()} verification code`);
+        }
+      }
+    } catch (error) {
+      // Log failed verification attempt
+      await this.logSecurityEvent('2fa_verification_failed', `2FA verification failed: ${error.message}`, 'high', deviceInfo);
+      throw new Error(`2FA verification failed: ${error.message}`);
+    }
+  },
+
+  async disable2FA(code, deviceInfo) {
+    try {
+      // Check if 2FA is enabled
+      if (!this.otpSettings?.enabled) {
+        throw new Error('2FA is not enabled');
+      }
+
+      if (!code) {
+        throw new Error('Verification code is required to disable 2FA');
+      }
+
+      const method = this.otpSettings.preferredMethod;
+
+      if (method === 'totp') {
+        // Verify current TOTP code before disabling
+        const isValidTOTP = await otpService.verifyTOTP(this, code);
+        if (!isValidTOTP) {
+          throw new Error('Invalid TOTP code');
+        }
+      } else if (method === 'email' || method === 'sms') {
+        // Generate and verify current OTP for email/SMS
+        // First, send OTP for verification
+        await otpService.sendOTP(this, 'sensitive_op', deviceInfo, method);
+
+        // Verify the provided code
+        const isValidOTP = await otpService.verifyOTP(this, code, 'sensitive_op', deviceInfo);
+        if (!isValidOTP) {
+          throw new Error(`Invalid ${method.toUpperCase()} code`);
+        }
+      }
+
+      // COMPLETELY CLEAR ALL 2FA RELATED DATA
+
+      // Clear otpSettings completely
+      this.otpSettings = {
+        enabled: false,
+        preferredMethod: null,
+        allowFallback: false,
+        requireForLogin: false,
+        requireForSensitiveOps: false,
+        lastModified: new Date(),
+      };
+
+      // Clear twoFactorAuth completely
+      this.twoFactorAuth = {
+        enabled: false,
+        secret: null,
+        setupCompleted: false,
+        backupCodes: [],
+        lastUsed: null,
+        createdAt: null,
+        deviceTrusted: false,
+      };
+
+      // Clear currentOTP completely
+      this.currentOTP = {
+        code: null,
+        hashedCode: null,
+        type: null,
+        purpose: null,
+        expiresAt: null,
+        attempts: 0,
+        maxAttempts: 3,
+        lastSent: null,
+        verified: false,
+        deviceInfo: null,
+      };
+
+      // Clear any other 2FA related fields that might exist
+      if (this.recoveryEmail) {
+        // Keep recovery email but mark as not verified for 2FA
+        this.recoveryEmailVerifiedFor2FA = false;
+      }
+
+      if (this.backupPhoneNumber) {
+        // Keep backup phone but mark as not verified for 2FA
+        this.backupPhoneVerifiedFor2FA = false;
+      }
+
+      // Clear any session-based 2FA data
+      this.trustedDevices = [];
+      this.securitySessions = [];
+
+      // Clear any pending 2FA operations
+      this.pending2FAOperations = [];
+
+      // Update security metadata
+      this.securityMetadata = {
+        ...this.securityMetadata,
+        last2FADisabled: new Date(),
+        [`${method}2FADisabled`]: new Date(),
+        securityLevel: 'basic', // Downgrade from enhanced
+      };
+
+      await this.save();
+
+      // Log security event
+      await this.logSecurityEvent('2fa_completely_disabled', `${method.toUpperCase()} 2FA completely disabled - all data cleared`, 'high', deviceInfo);
+
+      return {
+        success: true,
+        method: method,
+        message: `${method.toUpperCase()} 2FA completely disabled and all related data cleared`,
+        enabled: false,
+        dataCleared: true,
+        securityLevel: 'basic',
+      };
+    } catch (error) {
+      // Log failed disable attempt
+      await this.logSecurityEvent('2fa_disable_failed', `2FA disable failed: ${error.message}`, 'high', deviceInfo);
+      throw new Error(`2FA disable failed: ${error.message}`);
+    }
+  },
 
   async linkSocialAccount(provider, providerId, email, verified = false) {
     // Validate provider
@@ -1042,27 +1693,37 @@ userSchema.method({
   /**
    * Generate OTP using configured method
    */
-  async generateOTP(purpose = 'login', deviceInfo = {}, preferredMethod = null) {
+  async generateOTP(purpose = 'login', deviceInfo, preferredMethod = null) {
     try {
       if (!otpService.isEnabled(this.otpSettings)) {
         throw new Error('OTP verification is disabled');
       }
 
-      const result = await otpService.sendOTP(this, purpose, deviceInfo, preferredMethod);
+      const methodToUse =  this.otpSettings?.preferredMethod;
+      if (!methodToUse) {
+        throw new Error('No OTP method specified or configured');
+      }
 
-      // Store OTP session info
-      this.currentOTP = {
-        type: result.type,
-        purpose,
-        expiresAt: result.expiresAt,
-        attempts: 0,
-        maxAttempts: 3,
-        lastSent: new Date(),
-        verified: false,
-      };
+      let result = null;
 
-      await this.save();
-
+      if (methodToUse === 'totp') {
+        // Check if TOTP is properly enabled for this user
+        if (!this.twoFactorAuth?.enabled || !this.twoFactorAuth?.secret) {
+          throw new Error('TOTP not enabled for this user');
+        }
+        // TOTP does not send an OTP, just prepare info for frontend prompt
+        result = {
+          type: 'totp',
+          purpose,
+          expiresAt: null,
+          message: 'TOTP verification required'
+        };
+      } else if (methodToUse === 'email' || methodToUse === 'sms') {
+        // Generate and send OTP via the otpService
+        result = await otpService.sendOTP(this, purpose, deviceInfo, methodToUse);
+      } else {
+        throw new Error(`Unsupported OTP method: ${methodToUse}`);
+      }
       return result;
     } catch (error) {
       throw new Error(`OTP generation failed: ${error.message}`);
@@ -1072,7 +1733,7 @@ userSchema.method({
   /**
    * Verify OTP
    */
-  async verifyOTP(code, purpose = 'login', deviceInfo = {}) {
+  async verifyOTP(code, purpose = 'login', deviceInfo) {
     try {
       const isValid = await otpService.verifyOTP(this, code, purpose, deviceInfo);
 
@@ -1748,24 +2409,24 @@ userSchema.method({
   },
 
   // OTP Management
-  generateOTP(type = 'login') {
-    // Use crypto for secure OTP generation
-    const otp = crypto.randomInt(100000, 1000000).toString();
+  // generateOTP(type = 'login') {
+  //   // Use crypto for secure OTP generation
+  //   const otp = crypto.randomInt(100000, 1000000).toString();
 
-    this.otpCode = crypto
-      .createHmac('sha256', OTP_SECRET)
-      .update(otp + this.email + Date.now())
-      .digest('hex')
-      .substring(0, 6)
-      .toUpperCase();
+  //   this.otpCode = crypto
+  //     .createHmac('sha256', OTP_SECRET)
+  //     .update(otp + this.email + Date.now())
+  //     .digest('hex')
+  //     .substring(0, 6)
+  //     .toUpperCase();
 
-    this.otpExpiry = new Date(Date.now() + OTP_EXPIRY);
-    this.otpType = type;
-    this.otpAttempts = 0;
-    this.otpLastSent = new Date();
+  //   this.otpExpiry = new Date(Date.now() + OTP_EXPIRY);
+  //   this.otpType = type;
+  //   this.otpAttempts = 0;
+  //   this.otpLastSent = new Date();
 
-    return this.otpCode;
-  },
+  //   return this.otpCode;
+  // },
 
   async validateOTP(inputOTP, type = 'login') {
     if (!this.otpCode || !this.otpExpiry) {
@@ -1799,18 +2460,18 @@ userSchema.method({
     return true;
   },
 
-  clearOTP() {
-    this.otpCode = null;
-    this.otpExpiry = null;
-    this.otpType = null;
-    this.otpAttempts = 0;
-  },
+  // clearOTP() {
+  //   this.otpCode = null;
+  //   this.otpExpiry = null;
+  //   this.otpType = null;
+  //   this.otpAttempts = 0;
+  // },
 
-  canSendOTP() {
-    if (!this.otpLastSent) return true;
-    const oneMinuteAgo = new Date(Date.now() - 60000);
-    return this.otpLastSent < oneMinuteAgo;
-  },
+  // canSendOTP() {
+  //   if (!this.otpLastSent) return true;
+  //   const oneMinuteAgo = new Date(Date.now() - 60000);
+  //   return this.otpLastSent < oneMinuteAgo;
+  // },
 
   // Email confirmation & reset
 
@@ -3054,7 +3715,7 @@ userSchema.statics.authenticateSocial = async function (profileData, identifier,
   };
 };
 
-userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) {};
+userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) { };
 
 /**
  * Verify user credentials with OTP
