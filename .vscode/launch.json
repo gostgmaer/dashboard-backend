@@ -16,7 +16,7 @@
       "type": "node",
       "request": "launch",
       "name": "Debug Node.js",
-      "program": "${workspaceFolder}/app.js",
+      "program": "${workspaceFolder}/server.js",
       "skipFiles": [
         "${workspaceFolder}/node_modules/**/*.js",
         "<node_internals>/**/*.js"
@@ -27,7 +27,7 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "name": "nodemon",
-      "program": "${workspaceFolder}/app.js",
+      "program": "${workspaceFolder}/server.js",
       "request": "launch",
       "restart": true,
       "runtimeExecutable": "nodemon",
