@@ -1,13 +1,9 @@
 const mongoose = require('mongoose');
 const { ValidationError } = require('mongoose').Error;
-const logger = require('../config/logger'); // Assuming a logger utility exists
-// const { CACHE_TTL, CACHE_PREFIX } = require('../config/constants'); // Assuming constants config
-// const Redis = require('ioredis'); // For caching
-// const redis = new Redis(); // Assuming Redis client is configured
-// const { exportToCSV, exportToJSON } = require('../utils/exportUtils'); // Assuming export utilities
 
-const Product = require('./products')
-const User = require('./user')
+const Product = require('./products');
+const User = require('./user');
+
 const wishlistSchema = new mongoose.Schema(
   {
     user: {
@@ -29,7 +25,6 @@ const wishlistSchema = new mongoose.Schema(
       index: true,
       validate: {
         validator: async function (productId) {
-    
           return await Product.exists({ _id: productId });
         },
         message: 'Invalid product ID'
@@ -38,19 +33,16 @@ const wishlistSchema = new mongoose.Schema(
     created_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-     
     },
-     isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     updated_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-     
     },
     notes: {
       type: String,
       trim: true,
       maxlength: [500, 'Notes cannot exceed 500 characters'],
-     
     },
     priority: {
       type: String,
@@ -107,7 +99,6 @@ const wishlistSchema = new mongoose.Schema(
 // Compound indexes
 wishlistSchema.index({ user: 1, product: 1 }, { unique: true, partialFilterExpression: { status: { $in: ['ACTIVE', 'PENDING'] } } });
 wishlistSchema.index({ user: 1, status: 1, priority: 1 });
-// wishlistSchema.index({ tags: 1 });
 
 // Virtuals
 wishlistSchema.virtual('productDetails', {
@@ -145,7 +136,6 @@ wishlistSchema.pre('save', async function (next) {
 
     next();
   } catch (error) {
-    logger.error('Wishlist save validation failed:', error);
     next(error);
   }
 });
@@ -175,12 +165,8 @@ wishlistSchema.statics.addToWishlist = async function ({ userId, productId, crea
       { upsert: true, new: true, runValidators: true }
     );
 
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Added product ${productId} to wishlist for user ${userId}`);
-
     return wishlistItem;
   } catch (error) {
-    logger.error('Error adding to wishlist:', error);
     throw error;
   }
 };
@@ -204,12 +190,8 @@ wishlistSchema.statics.approveWishlistItem = async function ({ userId, productId
       { new: true }
     );
 
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Approved wishlist item ${productId} for user ${userId}`);
-
     return wishlistItem;
   } catch (error) {
-    logger.error('Error approving wishlist item:', error);
     throw error;
   }
 };
@@ -232,12 +214,8 @@ wishlistSchema.statics.removeFromWishlist = async function ({ userId, productId,
       { new: true }
     );
 
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Removed product ${productId} from wishlist for user ${userId}`);
-
     return wishlistItem;
   } catch (error) {
-    logger.error('Error removing from wishlist:', error);
     throw error;
   }
 };
@@ -260,12 +238,8 @@ wishlistSchema.statics.restoreWishlistItem = async function ({ userId, productId
       { new: true }
     );
 
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Restored product ${productId} to wishlist for user ${userId}`);
-
     return wishlistItem;
   } catch (error) {
-    logger.error('Error restoring wishlist item:', error);
     throw error;
   }
 };
@@ -283,14 +257,6 @@ wishlistSchema.statics.getUserWishlist = async function ({
   tags
 }) {
   try {
-    // const cacheKey = `${CACHE_PREFIX}:wishlist:${userId}:${page}:${limit}:${sort}:${priority || 'all'}:${status.join(',')}:${tags?.join(',') || 'all'}`;
-    // const cached = await redis.get(cacheKey);
-
-    // if (cached) {
-    //   logger.info(`Cache hit for wishlist ${cacheKey}`);
-    //   return JSON.parse(cached);
-    // }
-
     const skip = (page - 1) * limit;
     const query = { user: userId, status: { $in: status } };
 
@@ -327,10 +293,8 @@ wishlistSchema.statics.getUserWishlist = async function ({
       timestamp: new Date()
     };
 
-    // await redis.set(cacheKey, JSON.stringify(result), 'EX', CACHE_TTL);
     return result;
   } catch (error) {
-    logger.error('Error fetching wishlist:', error);
     throw error;
   }
 };
@@ -340,7 +304,6 @@ wishlistSchema.statics.isInWishlist = async function ({ userId, productId }) {
   try {
     return await this.exists({ user: userId, product: productId, status: { $in: ['ACTIVE', 'PENDING'] } });
   } catch (error) {
-    logger.error('Error checking wishlist:', error);
     throw error;
   }
 };
@@ -362,12 +325,8 @@ wishlistSchema.statics.clearWishlist = async function (userId, clearedBy) {
       }
     );
 
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Cleared wishlist for user ${userId}`);
-
     return result;
   } catch (error) {
-    logger.error('Error clearing wishlist:', error);
     throw error;
   }
 };
@@ -375,14 +334,6 @@ wishlistSchema.statics.clearWishlist = async function (userId, clearedBy) {
 // Get comprehensive wishlist statistics
 wishlistSchema.statics.getWishlistStats = async function (userId) {
   try {
-    // const cacheKey = `${CACHE_PREFIX}:wishlist:stats:${userId}`;
-    // const cached = await redis.get(cacheKey);
-
-    // if (cached) {
-    //   logger.info(`Cache hit for wishlist stats ${cacheKey}`);
-    //   return JSON.parse(cached);
-    // }
-
     const [totalItems, priorityBreakdown, statusBreakdown, recentItems, categoryBreakdown, tagBreakdown] = await Promise.all([
       this.countDocuments({ user: userId, status: { $in: ['ACTIVE', 'PENDING'] } }),
       this.aggregate([
@@ -429,10 +380,8 @@ wishlistSchema.statics.getWishlistStats = async function (userId) {
       lastUpdated: new Date()
     };
 
-    // await redis.set(cacheKey, JSON.stringify(stats), 'EX', CACHE_TTL);
     return stats;
   } catch (error) {
-    logger.error('Error fetching wishlist stats:', error);
     throw error;
   }
 };
@@ -457,12 +406,9 @@ wishlistSchema.statics.bulkAddToWishlist = async function ({ userId, productIds,
     }));
 
     const result = await this.bulkWrite(operations);
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Bulk added ${productIds.length} products to wishlist for user ${userId}`);
 
     return result;
   } catch (error) {
-    logger.error('Error in bulk add to wishlist:', error);
     throw error;
   }
 };
@@ -492,12 +438,9 @@ wishlistSchema.statics.bulkUpdateWishlist = async function ({ userId, productIds
     }));
 
     const result = await this.bulkWrite(operations);
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${userId}`);
-    logger.info(`Bulk updated ${productIds.length} wishlist items for user ${userId}`);
 
     return result;
   } catch (error) {
-    logger.error('Error in bulk update wishlist:', error);
     throw error;
   }
 };
@@ -524,13 +467,10 @@ wishlistSchema.statics.exportWishlist = async function ({ userId, format = 'json
     });
 
     if (format === 'csv') {
-      // return exportToCSV(formattedItems, `wishlist_${userId}_${Date.now()}.csv`);
-      return formattedItems
+      return formattedItems;
     }
-    // return exportToJSON(formattedItems);
-    return formattedItems
+    return formattedItems;
   } catch (error) {
-    logger.error('Error exporting wishlist:', error);
     throw error;
   }
 };
@@ -555,13 +495,10 @@ wishlistSchema.statics.exportFeaturedItems = async function ({ userId, limit = 1
     }));
 
     if (format === 'csv') {
-      // return exportToCSV(formattedItems, `featured_wishlist_${userId}_${Date.now()}.csv`);
-      return formattedItems
+      return formattedItems;
     }
-    // return exportToJSON(formattedItems);
-    return formattedItems
+    return formattedItems;
   } catch (error) {
-    logger.error('Error exporting featured items:', error);
     throw error;
   }
 };
@@ -576,7 +513,6 @@ wishlistSchema.statics.getAuditTrail = async function ({ userId, productId }) {
 
     return item?.auditTrail || [];
   } catch (error) {
-    logger.error('Error fetching audit trail:', error);
     throw error;
   }
 };
@@ -622,11 +558,9 @@ wishlistSchema.methods.updateItem = async function ({ notes, priority, tags, upd
     });
 
     await this.save();
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${this.user}`);
 
     return this;
   } catch (error) {
-    logger.error('Error updating wishlist item:', error);
     throw error;
   }
 };
@@ -644,11 +578,9 @@ wishlistSchema.methods.softDelete = async function (deletedBy) {
     });
 
     await this.save();
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${this.user}`);
 
     return this;
   } catch (error) {
-    logger.error('Error soft deleting wishlist item:', error);
     throw error;
   }
 };
@@ -667,11 +599,9 @@ wishlistSchema.methods.archive = async function (archivedBy) {
     });
 
     await this.save();
-    // await redis.del(`${CACHE_PREFIX}:wishlist:${this.user}`);
 
     return this;
   } catch (error) {
-    logger.error('Error archiving wishlist item:', error);
     throw error;
   }
 };
@@ -683,11 +613,6 @@ wishlistSchema.post('save', function (error, doc, next) {
   } else {
     next(error);
   }
-});
-
-// Query middleware for logging
-wishlistSchema.post(/find/, function (docs) {
-  logger.info(`Wishlist query executed, found ${Array.isArray(docs) ? docs.length : 1} items`);
 });
 
 const Wishlist = mongoose.model('Wishlist', wishlistSchema);

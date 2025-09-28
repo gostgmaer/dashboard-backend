@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 const csvWriter = require('csv-writer').createObjectCsvWriter; // For export, install: npm i csv-writer
 const fs = require('fs');
 
-const logger = new Logger('PaymentsController');
+// const logger = new Logger('PaymentsController');
 
 // Validation Functions
 const createPaymentValidator = [
@@ -214,7 +214,7 @@ const getPaymentsByTagValidator = [
 
 // Helper function to handle errors
 const handleError = (res, err, defaultMessage = 'Internal server error') => {
-  logger.error(err.message, { stack: err.stack });
+  //logger.error(err.message, { stack: err.stack });
   if (err.name === 'ValidationError') {
     return res.status(400).json({ error: 'Validation failed', details: err.message });
   }
@@ -868,7 +868,7 @@ class PaymentController {
       const payment = await PaymentModel.create(paymentData);
       const formattedPayment = payment.toAPIResponse();
 
-      logger.info('Payment created', { paymentId: payment.paymentId, customerId: req.user.id });
+      // logger.info('Payment created', { paymentId: payment.paymentId, customerId: req.user.id });
       res.status(201).json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to create payment');
@@ -908,7 +908,7 @@ class PaymentController {
 
       await transactionLog.save();
     } catch (error) {
-      logger.error('Failed to log transaction', { error });
+      //logger.error('Failed to log transaction', { error });
     }
   }
 
@@ -984,7 +984,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Payment status updated', { paymentId: id, newStatus: status, updatedBy });
+      // logger.info('Payment status updated', { paymentId: id, newStatus: status, updatedBy });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to update payment status');
@@ -1018,7 +1018,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Refund added', { paymentId: id, refundAmount: amount });
+      // logger.info('Refund added', { paymentId: id, refundAmount: amount });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to add refund');
@@ -1046,7 +1046,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Dispute added', { paymentId: id, disputeAmount: amount });
+      // logger.info('Dispute added', { paymentId: id, disputeAmount: amount });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to add dispute');
@@ -1076,7 +1076,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Payment captured', { paymentId: id });
+      // logger.info('Payment captured', { paymentId: id });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to capture payment');
@@ -1146,7 +1146,7 @@ class PaymentController {
       }
 
       const result = await PaymentModel.bulkUpdateStatus(paymentIds, status, updatedBy, note);
-      logger.info('Bulk status update', { paymentIds: paymentIds.length, newStatus: status });
+      // logger.info('Bulk status update', { paymentIds: paymentIds.length, newStatus: status });
       res.json({ success: true, data: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount } });
     } catch (err) {
       handleError(res, err, 'Failed to bulk update status');
@@ -1167,7 +1167,7 @@ class PaymentController {
       }
 
       const result = await PaymentModel.bulkCancelPayments(paymentIds, reason, updatedBy);
-      logger.info('Bulk cancel', { paymentIds: paymentIds.length });
+      // logger.info('Bulk cancel', { paymentIds: paymentIds.length });
       res.json({ success: true, data: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount } });
     } catch (err) {
       handleError(res, err, 'Failed to bulk cancel payments');
@@ -1339,7 +1339,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Payment marked as paid', { paymentId: id });
+      // logger.info('Payment marked as paid', { paymentId: id });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to mark payment as paid');
@@ -1393,7 +1393,7 @@ class PaymentController {
       }
 
       await PaymentModel.deleteOne({ _id: id });
-      logger.info('Payment deleted', { paymentId: id });
+      // logger.info('Payment deleted', { paymentId: id });
       res.json({ success: true, message: 'Payment deleted successfully' });
     } catch (err) {
       handleError(res, err, 'Failed to delete payment');
@@ -1434,7 +1434,7 @@ class PaymentController {
 
         await csv.writeRecords(payments.map(p => ({ ...p, createdAt: p.createdAt.toISOString() })));
         res.download(fileName, (err) => {
-          if (err) logger.error('Export error', err);
+          if (err) //logger.error('Export error', err);
           fs.unlinkSync(fileName);
         });
       }
@@ -1476,7 +1476,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Dispute resolved', { paymentId: id, disputeId, status });
+      // logger.info('Dispute resolved', { paymentId: id, disputeId, status });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to resolve dispute');
@@ -1959,10 +1959,10 @@ class PaymentController {
       await payment.updateStatus(status, `Webhook from provider: ${status}`, 'webhook');
       await PaymentModel.updateOne({ _id: payment._id }, updateData);
 
-      logger.info('Webhook processed', { paymentId: payment.paymentId, status });
+      // logger.info('Webhook processed', { paymentId: payment.paymentId, status });
       res.status(200).json({ success: true, message: 'Webhook processed' });
     } catch (err) {
-      logger.error('Webhook error', err);
+      //logger.error('Webhook error', err);
       res.status(500).json({ error: 'Webhook processing failed' });
     }
   }
@@ -2247,7 +2247,7 @@ class PaymentController {
         { $addToSet: { tags: tag } }
       );
 
-      logger.info('Bulk tags added', { paymentIds: paymentIds.length, tag });
+      // logger.info('Bulk tags added', { paymentIds: paymentIds.length, tag });
       res.json({ success: true, data: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount } });
     } catch (err) {
       handleError(res, err, 'Failed to bulk add tags');
@@ -2439,7 +2439,7 @@ class PaymentController {
       const updatedPayment = await PaymentModel.findById(paymentId);
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      logger.info('Payment failure simulated', { paymentId, reason });
+      // logger.info('Payment failure simulated', { paymentId, reason });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to simulate payment failure');
@@ -2523,13 +2523,13 @@ class PaymentController {
 
       const result = Object.values(formattedRates).sort((a, b) => a.period.localeCompare(b.period));
 
-      logger.info('Fetched payment method success rates over time', {
-        granularity,
-        paymentMethod,
-        dateFrom,
-        dateTo,
-        totalPeriods: result.length
-      });
+      // logger.info('Fetched payment method success rates over time', {
+      //   granularity,
+      //   paymentMethod,
+      //   dateFrom,
+      //   dateTo,
+      //   totalPeriods: result.length
+      // });
 
       res.json({ success: true, data: result });
     } catch (err) {
@@ -2612,7 +2612,7 @@ class PaymentController {
         results.push({ paymentId: payment._id, status: 'success', refundAmount });
       }
 
-      logger.info('Bulk refunds processed', { paymentCount: paymentIds.length, amountPercentage });
+      // logger.info('Bulk refunds processed', { paymentCount: paymentIds.length, amountPercentage });
       res.json({ success: true, data: results });
     } catch (err) {
       handleError(res, err, 'Failed to process bulk refunds');
