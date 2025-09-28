@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 
 const User = require('../models/user');
 const otpService = require('../services/otpService');
-const deviceDetector = require('../services/deviceDetector');
+const DeviceDetector = require('../services/DeviceDetector');
 
 /**
  * 🛡️ ENTERPRISE AUTHENTICATION MIDDLEWARE
@@ -105,7 +105,7 @@ class authAccess {
             tokenData.lastUsed = new Date();
             
             // Device and security analysis
-            const deviceInfo = deviceDetector.detectDevice(req);
+            const deviceInfo = DeviceDetector.detectDevice(req);
             req.deviceInfo = deviceInfo;
 
             // Check device-based security
