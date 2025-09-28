@@ -1,6 +1,6 @@
 const Wishlist = require('../models/wishlist');
 const { validationResult } = require('express-validator');
-const logger = require('../config/logger');
+// const logger = require('../config/logger');
 // const { APIError, formatResponse } = require('../utils/apiUtils');
 // const { validateWishlistInput, validateBulkWishlistInput } = require('../middleware/validators');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
@@ -35,7 +35,7 @@ const wishlistController = {
 
       return res.status(201).json(formatResponse('Wishlist item added successfully', wishlistItem.toJSONSafe()));
     } catch (error) {
-      logger.error('Error in addToWishlist:', error);
+      //logger.error('Error in addToWishlist:', error);
       next(error);
     }
   },
@@ -63,7 +63,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist item approved successfully', wishlistItem.toJSONSafe()));
     } catch (error) {
-      logger.error('Error in approveWishlistItem:', error);
+      //logger.error('Error in approveWishlistItem:', error);
       next(error);
     }
   },
@@ -91,7 +91,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist item removed successfully', wishlistItem.toJSONSafe()));
     } catch (error) {
-      logger.error('Error in removeFromWishlist:', error);
+      //logger.error('Error in removeFromWishlist:', error);
       next(error);
     }
   },
@@ -119,7 +119,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist item restored successfully', wishlistItem.toJSONSafe()));
     } catch (error) {
-      logger.error('Error in restoreWishlistItem:', error);
+      //logger.error('Error in restoreWishlistItem:', error);
       next(error);
     }
   },
@@ -149,7 +149,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist retrieved successfully', wishlist));
     } catch (error) {
-      logger.error('Error in getUserWishlist:', error);
+      //logger.error('Error in getUserWishlist:', error);
       next(error);
     }
   },
@@ -169,7 +169,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist check completed', { isInWishlist: exists }));
     } catch (error) {
-      logger.error('Error in isInWishlist:', error);
+      //logger.error('Error in isInWishlist:', error);
       next(error);
     }
   },
@@ -189,7 +189,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist cleared successfully', { affected: result.nModified }));
     } catch (error) {
-      logger.error('Error in clearWishlist:', error);
+      //logger.error('Error in clearWishlist:', error);
       next(error);
     }
   },
@@ -209,7 +209,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist statistics retrieved successfully', stats));
     } catch (error) {
-      logger.error('Error in getWishlistStats:', error);
+      //logger.error('Error in getWishlistStats:', error);
       next(error);
     }
   },
@@ -235,7 +235,7 @@ const wishlistController = {
 
       return res.status(201).json(formatResponse('Bulk add to wishlist successful', result));
     } catch (error) {
-      logger.error('Error in bulkAddToWishlist:', error);
+      //logger.error('Error in bulkAddToWishlist:', error);
       next(error);
     }
   },
@@ -260,7 +260,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Bulk update wishlist successful', result));
     } catch (error) {
-      logger.error('Error in bulkUpdateWishlist:', error);
+      //logger.error('Error in bulkUpdateWishlist:', error);
       next(error);
     }
   },
@@ -291,7 +291,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist exported successfully', exportedData));
     } catch (error) {
-      logger.error('Error in exportWishlist:', error);
+      //logger.error('Error in exportWishlist:', error);
       next(error);
     }
   },
@@ -322,7 +322,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Featured items exported successfully', exportedData));
     } catch (error) {
-      logger.error('Error in exportFeaturedItems:', error);
+      //logger.error('Error in exportFeaturedItems:', error);
       next(error);
     }
   },
@@ -342,7 +342,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Audit trail retrieved successfully', auditTrail));
     } catch (error) {
-      logger.error('Error in getAuditTrail:', error);
+      //logger.error('Error in getAuditTrail:', error);
       next(error);
     }
   },
@@ -373,7 +373,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist item updated successfully', updatedItem.toJSONSafe()));
     } catch (error) {
-      logger.error('Error in updateWishlistItem:', error);
+      //logger.error('Error in updateWishlistItem:', error);
       next(error);
     }
   },
@@ -398,7 +398,7 @@ const wishlistController = {
 
       return res.status(200).json(formatResponse('Wishlist item archived successfully', archivedItem.toJSONSafe()));
     } catch (error) {
-      logger.error('Error in archiveWishlistItem:', error);
+      //logger.error('Error in archiveWishlistItem:', error);
       next(error);
     }
   }

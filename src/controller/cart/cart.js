@@ -1,5 +1,5 @@
 const Cart = require('../../models/cart');
-const logger = require('../../config/logger');
+// const logger = require('../../config/logger');
 const mongoose = require('mongoose');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // Manual validation helper
@@ -32,7 +32,7 @@ exports.addItem = async (req, res) => {
       message: 'Item added to cart successfully'
     });
   } catch (error) {
-    logger.error(`Add item error: ${error.message}`);
+    //logger.error(`Add item error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -55,7 +55,7 @@ exports.removeItem = async (req, res) => {
       message: 'Item removed from cart successfully'
     });
   } catch (error) {
-    logger.error(`Remove item error: ${error.message}`);
+    //logger.error(`Remove item error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -85,7 +85,7 @@ exports.updateQuantity = async (req, res) => {
       message: 'Cart item quantity updated successfully'
     });
   } catch (error) {
-    logger.error(`Update quantity error: ${error.message}`);
+    //logger.error(`Update quantity error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -102,7 +102,7 @@ exports.clearCart = async (req, res) => {
       message: 'Cart cleared successfully'
     });
   } catch (error) {
-    logger.error(`Clear cart error: ${error.message}`);
+    //logger.error(`Clear cart error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -118,7 +118,7 @@ exports.getCart = async (req, res) => {
       message: 'Cart retrieved successfully'
     });
   } catch (error) {
-    logger.error(`Get cart error: ${error.message}`);
+    //logger.error(`Get cart error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -142,7 +142,7 @@ exports.applyDiscount = async (req, res) => {
       message: 'Discount applied successfully'
     });
   } catch (error) {
-    logger.error(`Apply discount error: ${error.message}`);
+    //logger.error(`Apply discount error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -170,7 +170,7 @@ exports.mergeCart = async (req, res) => {
       message: 'Carts merged successfully'
     });
   } catch (error) {
-    logger.error(`Merge cart error: ${error.message}`);
+    //logger.error(`Merge cart error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -193,7 +193,7 @@ exports.setMetadata = async (req, res) => {
       message: 'Metadata updated successfully'
     });
   } catch (error) {
-    logger.error(`Set metadata error: ${error.message}`);
+    //logger.error(`Set metadata error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -217,7 +217,7 @@ exports.getPaginatedCarts = async (req, res) => {
       message: 'Carts retrieved successfully'
     });
   } catch (error) {
-    logger.error(`Get paginated carts error: ${error.message}`);
+    //logger.error(`Get paginated carts error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -237,7 +237,7 @@ exports.getAbandonedCarts = async (req, res) => {
       message: 'Abandoned carts retrieved successfully'
     });
   } catch (error) {
-    logger.error(`Get abandoned carts error: ${error.message}`);
+    //logger.error(`Get abandoned carts error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -261,7 +261,7 @@ exports.bulkUpdateCartStatus = async (req, res) => {
       message: 'Cart statuses updated successfully'
     });
   } catch (error) {
-    logger.error(`Bulk update cart status error: ${error.message}`);
+    //logger.error(`Bulk update cart status error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -284,7 +284,7 @@ exports.getCartAnalytics = async (req, res) => {
       message: 'Cart analytics retrieved successfully'
     });
   } catch (error) {
-    logger.error(`Cart analytics error: ${error.message}`);
+    //logger.error(`Cart analytics error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -304,7 +304,7 @@ exports.removeProductFromAllCarts = async (req, res) => {
       message: 'Product removed from all carts successfully'
     });
   } catch (error) {
-    logger.error(`Remove product from all carts error: ${error.message}`);
+    //logger.error(`Remove product from all carts error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -324,7 +324,7 @@ exports.clearAllCarts = async (req, res) => {
       message: 'All carts cleared successfully'
     });
   } catch (error) {
-    logger.error(`Clear all carts error: ${error.message}`);
+    //logger.error(`Clear all carts error: ${error.message}`);
     res.status(500).json({ success: false, message: error.message });
   }
 };
