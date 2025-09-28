@@ -1,4 +1,5 @@
 const User = require('../models/user');
+const DeviceDetector = require('../services/DeviceDetector');
 const jwt = require('jsonwebtoken');
 const Order = require('../models/orders');
 const Product = require('../models/products');
@@ -12,11 +13,8 @@ const { APIError, formatResponse, standardResponse, errorResponse } = require('.
 // const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
-const DeviceDetector = require('../services/DeviceDetector');
 const otpService = require('../services/otpService');
 const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTemplate } = require('../email/emailTemplate');
-const { removeKeysFromObject } = require('../utils/helper');
-const NotificationService = require('../services/NotificationService');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
 const { jwtSecret } = require('../config/setting');
 
