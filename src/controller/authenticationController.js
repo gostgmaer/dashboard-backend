@@ -191,7 +191,7 @@ class authController {
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-      await NotificationMiddleware.onUserCreate(req, res, () => { });
+      await NotificationMiddleware.onUserCreate(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -485,7 +485,7 @@ class authController {
       );
     } catch (error) {
       console.error('Login error:', error);
-      NotificationMiddleware.onLoginFailed(req, res, () => { });
+      NotificationMiddleware.onLoginFailed(req, res, () => {});
       return errorResponse(res, error.message, 500, error.message);
     }
   }
@@ -522,7 +522,7 @@ class authController {
         },
         'Login successful'
       );
-      NotificationMiddleware.onLoginSuccess(req, res, () => { });
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
     } catch (error) {
       console.error('Login error:', error);
       return errorResponse(res, error.message, 500, error.message);
@@ -592,7 +592,7 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-      NotificationMiddleware.onLoginSuccess(req, res, () => { });
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -604,7 +604,6 @@ class authController {
             fullName: user.fullName,
             role: user.role?.name,
             isVerified: user.isVerified,
-
           },
           tokens,
           '2fa_verified': true,
@@ -626,7 +625,7 @@ class authController {
     try {
       const { tempToken, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-    } catch (error) { }
+    } catch (error) {}
   }
   /**
    * MFA verification - Step 2
@@ -890,7 +889,7 @@ class authController {
 
       const result = await user.changePassword(currentPassword, newPassword);
       await user.logSecurityEvent('password_changed', 'Password changed successfully', 'medium', deviceInfo);
-      NotificationMiddleware.onPasswordChange(req, res, () => { });
+      NotificationMiddleware.onPasswordChange(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -901,7 +900,6 @@ class authController {
         },
         'Password changed successfully'
       );
-
     } catch (error) {
       console.error('Change password error:', error);
       return errorResponse(res, error.message || 'Failed to change password', 500);
@@ -1105,7 +1103,7 @@ class authController {
       await user.revokeAllTokens('password_reset');
       await user.save();
       await user.logSecurityEvent('password_reset_completed', 'Password reset completed', 'high', deviceInfo);
- NotificationMiddleware.onPasswordReset(req, res, () => { });
+      NotificationMiddleware.onPasswordReset(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -1115,7 +1113,6 @@ class authController {
         },
         'Password reset successfully'
       );
-     
     } catch (error) {
       console.error('Reset password error:', error);
       return errorResponse(res, error.message || 'Failed to reset password', 500);
@@ -1290,7 +1287,7 @@ class authController {
 
       if (result) {
         await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
-  NotificationMiddleware.onEmailVerified(req, res, () => { });
+        NotificationMiddleware.onEmailVerified(req, res, () => {});
         return standardResponse(
           res,
           true,
@@ -1300,7 +1297,6 @@ class authController {
           'Email verified successfully'
         );
       }
-    
     } catch (error) {
       console.error('Verify email error:', error);
       return errorResponse(res, error.message || 'Email verification failed', 500);
@@ -1640,7 +1636,7 @@ class authController {
     try {
       await req.user.updateProfile(req.body);
       res.locals.changes = req.body;
-      NotificationMiddleware.onUserUpdate(req, res, () => { });
+      NotificationMiddleware.onUserUpdate(req, res, () => {});
       return standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
@@ -1661,7 +1657,7 @@ class authController {
 
       const profilePicture = await req.user.updateProfilePicture(url);
       return standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
-      NotificationMiddleware.onUserUpdate(req, res, () => { });
+      NotificationMiddleware.onUserUpdate(req, res, () => {});
     } catch (error) {
       console.error('Update profile picture error:', error);
       return errorResponse(res, 'Failed to update profile picture', 500, error.message);
