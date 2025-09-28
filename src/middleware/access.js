@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 
 const User = require('../models/user');
 const otpService = require('../services/otpService');
-const DeviceDetector = require('../services/DeviceDetector');
+const DeviceDetector = require('../services/deviceDetector');
 
 /**
  * 🛡️ ENTERPRISE AUTHENTICATION MIDDLEWARE

@@ -1,5 +1,5 @@
 const User = require('../models/user');
-const DeviceDetector = require('../services/DeviceDetector');
+const DeviceDetector = require('../services/deviceDetector');
 const jwt = require('jsonwebtoken');
 const Order = require('../models/orders');
 const Product = require('../models/products');
