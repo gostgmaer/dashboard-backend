@@ -8,7 +8,7 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const { enviroment } = require('../config/setting');
-
+   const Product = require('../models/products'); // Assumed Product model
 /**
  * 🚀 CONSOLIDATED PRODUCT ROUTES
  * 
@@ -46,15 +46,15 @@ const bulkOperationLimiter = rateLimit({
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const productId = req.params.id || req.params.identifier;
-    if (productId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
-      const Product = require('../models/Product'); // Assumed Product model
+    if (productId) { // Superadmin bypass in authorize
+   
       const product = await Product.findById(productId);
       if (!product) {
         return res.status(404).json({ success: false, message: 'Product not found' });
       }
-      if (product.userId.toString() !== req.user.id) { // Restrict to own products
-        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s product' });
-      }
+      // if (product.userId.toString() !== req.user.id) { // Restrict to own products
+      //   return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s product' });
+      // }
     }
     next();
   } catch (err) {
@@ -173,7 +173,7 @@ router.get('/:identifier',
 router.post('/',
   authMiddleware,
   authorize('products', 'write'),
-  productValidation.create,
+  // productValidation.create,
   ProductController.createProduct
 );
 

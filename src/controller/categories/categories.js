@@ -5,6 +5,8 @@ class CategoryController {
 
   // Basic Create
   static async create(req, res) {
+
+  
     try {
       const category = new Category(req.body);
       if (req.user) category.created_by = req.user._id;

@@ -39,7 +39,7 @@ const instanceCheckMiddleware = async (req, res, next) => {
 
 // Validation schemas for create, update and others (trimmed for brevity)
 const categoryValidation = {
-  create: [
+    create: [
     body('title').isString().isLength({ min: 1, max: 100 }).trim().escape(),
     body('descriptions').optional().isString().isLength({ max: 1000 }).trim().escape(),
     body('parent').optional().isMongoId(),
@@ -83,7 +83,7 @@ const categoryValidation = {
 router.post('/',
   authMiddleware,
   authorize('categories', 'write'),
-  categoryValidation.create,
+  // categoryValidation.create,
   categoryController.create
 );
 
