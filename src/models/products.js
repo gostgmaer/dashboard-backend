@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 
 const variantSchema = new mongoose.Schema({
-  sku: { type: String, required: true, unique: true },
+  sku: { type: String },
   title: { type: String },  // e.g., 'Red, Size M'
   price: { type: Number, required: true },
   discount: { type: Number, default: 0 },
@@ -175,7 +175,7 @@ const productSchema = new mongoose.Schema(
     accessories: [{ type: String }],
     replacementParts: [{ type: String }],
     customAttributes: { type: Map, of: String },
-    variants: [variantSchema],
+    // variants: [variantSchema] || null,
     mainImage: { type: String },
     images: { type: [Object] },
     downloadableFiles: [

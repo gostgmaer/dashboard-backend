@@ -141,11 +141,7 @@ class ProductController {
             await product.save();
 
             // Populate the created product
-            await product.populate([
-                { path: 'categories', select: 'name slug' },
-                { path: 'brand', select: 'name logo' },
-                { path: 'created_by', select: 'name email' }
-            ]);
+        
 
             return standardResponse(
                 res,
@@ -158,10 +154,10 @@ class ProductController {
         } catch (error) {
             console.error('Create product error:', error);
 
-            if (error.code === 11000) {
-                const field = Object.keys(error.keyPattern)[0];
-                return errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
-            }
+            // if (error.code === 11000) {
+            //     const field = Object.keys(error.keyPattern)[0];
+            //     return errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
+            // }
 
             return errorResponse(res, 'Failed to create product', 500, error.message);
         }

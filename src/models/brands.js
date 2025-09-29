@@ -89,24 +89,7 @@ brandSchema.pre("deleteOne", { document: true, query: false }, async function (n
 });
 
 // Middleware: Log changes to an audit collection
-brandSchema.post("save", async function (doc, next) {
-  const AuditLog = mongoose.model("AuditLog", new mongoose.Schema({
-    entity: String,
-    entityId: mongoose.Schema.Types.ObjectId,
-    action: String,
-    performedBy: mongoose.Schema.Types.ObjectId,
-    changes: Object,
-    createdAt: { type: Date, default: Date.now }
-  }));
-  await AuditLog.create({
-    entity: "Brand",
-    entityId: doc._id,
-    action: doc.isNew ? "create" : "update",
-    performedBy: doc.updated_by || doc.created_by,
-    changes: doc.toObject(),
-  });
-  next();
-});
+
 
 // Virtual: Get full brand URL
 brandSchema.virtual("brandUrl").get(function () {
