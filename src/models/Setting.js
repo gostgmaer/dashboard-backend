@@ -99,9 +99,9 @@ settingSchema.statics.getSettings = async function () {
 };
 
 // Update settings (create if not exists)
-settingSchema.statics.updateSettings = async function (data, updatedBy) {
+settingSchema.statics.updateSettings = async function (data, updated_by) {
   const updateData = { ...data };
-  if (updatedBy) updateData.updated_by = updatedBy;
+  if (updated_by) updateData.updated_by = updated_by;
 
   return this.findOneAndUpdate({}, updateData, {
     upsert: true,

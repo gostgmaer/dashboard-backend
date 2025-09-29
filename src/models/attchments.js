@@ -169,9 +169,9 @@ attachmentSchema.methods.exceedsSizeLimit = function (maxMB) {
 
 
 // Replace file metadata (e.g., after re-upload)
-attachmentSchema.methods.replaceFile = async function (newFileData, updatedBy) {
+attachmentSchema.methods.replaceFile = async function (newFileData, updated_by) {
   Object.assign(this, newFileData);
-  if (updatedBy) this.updated_by = updatedBy;
+  if (updated_by) this.updated_by = updated_by;
   await this.save();
   return this;
 };
@@ -224,7 +224,7 @@ attachmentSchema.methods.getFileExtension = function () {
 attachmentSchema.methods.archiveFile = async function (archivedBy) {
   this.status = "archived";
   this.updatedAt = new Date();
-  if (archivedBy) this.updatedBy = archivedBy;
+  if (archivedBy) this.updated_by = archivedBy;
   await this.save();
   return this;
 };

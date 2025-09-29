@@ -62,7 +62,7 @@ const getAllPermissions = async (req, res) => {
     const {
       filter = {},
       page = 1,
-      limit = 50,
+      limit = 10,
       sort = "createdAt",
       order = "desc",
       isDeleted = false,

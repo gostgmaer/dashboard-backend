@@ -107,10 +107,10 @@ categorySchema.methods.toggleFeatured = async function () {
   return this.save();
 };
 
-// Change the status and update updatedBy user
+// Change the status and update updated_by user
 categorySchema.methods.changeStatus = async function (newStatus, userId) {
   this.status = newStatus;
-  this.updatedBy = userId;
+  this.updated_by = userId;
   return this.save();
 };
 
@@ -410,7 +410,7 @@ categorySchema.statics.getAllWithDetailedStats = async function ({
   sortOrder = "asc",
   filters = {},
   search = "",
-  populate = [], // array of strings like ['createdBy', 'parent']
+  populate = [], // array of strings like ['created_by', 'parent']
   includeDeleted = false
 }) {
   const baseMatch = includeDeleted ? {} : { isDeleted: false };
@@ -431,8 +431,8 @@ categorySchema.statics.getAllWithDetailedStats = async function ({
   const skip = (page - 1) * limit;
 
   const populateMap = {
-    createdBy: { from: "users", localField: "createdBy", foreignField: "_id", as: "createdBy" },
-    updatedBy: { from: "users", localField: "updatedBy", foreignField: "_id", as: "updatedBy" },
+    created_by: { from: "users", localField: "created_by", foreignField: "_id", as: "created_by" },
+    updated_by: { from: "users", localField: "updated_by", foreignField: "_id", as: "updated_by" },
     parent: { from: "categories", localField: "parent", foreignField: "_id", as: "parent" }
   };
 
@@ -565,11 +565,11 @@ categorySchema.statics.getAllWithDetailedStats = async function ({
 
 categorySchema.statics.getSingleWithDetailedStats = function ({
   categoryId,
-  populate = []  // array of string paths like ['createdBy', 'parent']
+  populate = []  // array of string paths like ['created_by', 'parent']
 }) {
   const populateMap = {
-    createdBy: { from: "users", localField: "createdBy", foreignField: "_id", as: "createdBy" },
-    updatedBy: { from: "users", localField: "updatedBy", foreignField: "_id", as: "updatedBy" },
+    created_by: { from: "users", localField: "created_by", foreignField: "_id", as: "created_by" },
+    updated_by: { from: "users", localField: "updated_by", foreignField: "_id", as: "updated_by" },
     parent:    { from: "categories", localField: "parent", foreignField: "_id", as: "parent" }
   };
 

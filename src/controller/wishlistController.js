@@ -27,7 +27,7 @@ const wishlistController = {
       const wishlistItem = await Wishlist.addToWishlist({
         userId,
         productId,
-        createdBy: req.user._id,
+        created_by: req.user._id,
         notes,
         priority,
         tags
@@ -228,7 +228,7 @@ const wishlistController = {
       const result = await Wishlist.bulkAddToWishlist({
         userId,
         productIds,
-        createdBy: req.user._id,
+        created_by: req.user._id,
         priority,
         tags
       });
@@ -255,7 +255,7 @@ const wishlistController = {
         userId,
         productIds,
         updates,
-        updatedBy: req.user._id
+        updated_by: req.user._id
       });
 
       return res.status(200).json(formatResponse('Bulk update wishlist successful', result));
@@ -368,7 +368,7 @@ const wishlistController = {
         notes,
         priority,
         tags,
-        updatedBy: req.user._id
+        updated_by: req.user._id
       });
 
       return res.status(200).json(formatResponse('Wishlist item updated successfully', updatedItem.toJSONSafe()));

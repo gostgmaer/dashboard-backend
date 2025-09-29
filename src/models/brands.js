@@ -102,7 +102,7 @@ brandSchema.post("save", async function (doc, next) {
     entity: "Brand",
     entityId: doc._id,
     action: doc.isNew ? "create" : "update",
-    performedBy: doc.updatedBy || doc.createdBy,
+    performedBy: doc.updated_by || doc.created_by,
     changes: doc.toObject(),
   });
   next();

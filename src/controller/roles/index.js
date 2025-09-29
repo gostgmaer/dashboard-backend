@@ -68,8 +68,8 @@ const getRoleStatistics = async (req, res) => {
       includePermissionDetails: req.query.includePermissionDetails !== "false",
 
       // extra filters
-      createdBy: req.query.createdBy || null,
-      updatedBy: req.query.updatedBy || null,
+      created_by: req.query.created_by || null,
+      updated_by: req.query.updated_by || null,
       isDefault: req.query.isDefault !== undefined ? req.query.isDefault === "true" : null,
       createdFrom: req.query.createdFrom || null,
       createdTo: req.query.createdTo || null,

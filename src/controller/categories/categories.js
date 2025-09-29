@@ -7,7 +7,7 @@ class CategoryController {
   static async create(req, res) {
     try {
       const category = new Category(req.body);
-      if (req.user) category.createdBy = req.user._id;
+      if (req.user) category.created_by = req.user._id;
       await category.save();
       return standardResponse(res, true, category, "Category created", 201);
     } catch (error) {
@@ -76,7 +76,7 @@ class CategoryController {
     try {
       const { id } = req.params;
       const updateData = req.body;
-      if (req.user) updateData.updatedBy = req.user._id;
+      if (req.user) updateData.updated_by = req.user._id;
 
       const category = await Category.findById(id);
       if (!category) {

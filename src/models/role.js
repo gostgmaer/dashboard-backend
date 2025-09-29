@@ -27,8 +27,8 @@ const FILTER_DEFINITIONS = {
   hasUsers: { type: 'boolean' },
   permissionCount: { type: 'range', operators: ['gt', 'gte', 'lt', 'lte', 'eq'] },
   categoryCount: { type: 'range', operators: ['gt', 'gte', 'lt', 'lte', 'eq'] },
-  createdBy: { type: 'objectId' },
-  updatedBy: { type: 'objectId' },
+  created_by: { type: 'objectId' },
+  updated_by: { type: 'objectId' },
   dateRange: { type: 'dateRange' }
 };
 
@@ -253,8 +253,8 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     search = '',
     isActive = null,
     includePermissionDetails = true,
-    createdBy = null,
-    updatedBy = null,
+    created_by = null,
+    updated_by = null,
     isDefault = null,
     createdFrom = null,
     createdTo = null,
@@ -280,12 +280,12 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     filter.isDefault = isDefault;
   }
 
-  if (createdBy) {
-    filter.created_by = createdBy;
+  if (created_by) {
+    filter.created_by = created_by;
   }
 
-  if (updatedBy) {
-    filter.updated_by = updatedBy;
+  if (updated_by) {
+    filter.updated_by = updated_by;
   }
 
   if (createdFrom || createdTo) {

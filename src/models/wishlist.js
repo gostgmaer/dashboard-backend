@@ -149,13 +149,13 @@ wishlistSchema.pre(/find/, function (next) {
 // ===== Static Methods =====
 
 // Add item to wishlist
-wishlistSchema.statics.addToWishlist = async function ({ userId, productId, createdBy, notes, priority, tags }) {
+wishlistSchema.statics.addToWishlist = async function ({ userId, productId, created_by, notes, priority, tags }) {
   try {
     const wishlistItem = await this.findOneAndUpdate(
       { user: userId, product: productId, status: { $in: ['ACTIVE', 'PENDING'] } },
       {
         $setOnInsert: {
-          created_by: createdBy,
+          created_by: created_by,
           notes,
           priority,
           tags,
@@ -387,14 +387,14 @@ wishlistSchema.statics.getWishlistStats = async function (userId) {
 };
 
 // Bulk add to wishlist
-wishlistSchema.statics.bulkAddToWishlist = async function ({ userId, productIds, createdBy, priority = 'MEDIUM', tags = [] }) {
+wishlistSchema.statics.bulkAddToWishlist = async function ({ userId, productIds, created_by, priority = 'MEDIUM', tags = [] }) {
   try {
     const operations = productIds.map(productId => ({
       updateOne: {
         filter: { user: userId, product: productId, status: { $in: ['ACTIVE', 'PENDING'] } },
         update: {
           $setOnInsert: {
-            created_by: createdBy,
+            created_by: created_by,
             status: 'PENDING',
             priority,
             tags,
@@ -414,7 +414,7 @@ wishlistSchema.statics.bulkAddToWishlist = async function ({ userId, productIds,
 };
 
 // Bulk update wishlist items
-wishlistSchema.statics.bulkUpdateWishlist = async function ({ userId, productIds, updates, updatedBy }) {
+wishlistSchema.statics.bulkUpdateWishlist = async function ({ userId, productIds, updates, updated_by }) {
   try {
     const operations = productIds.map(productId => ({
       updateOne: {
@@ -422,13 +422,13 @@ wishlistSchema.statics.bulkUpdateWishlist = async function ({ userId, productIds
         update: {
           $set: {
             ...updates,
-            updated_by: updatedBy,
+            updated_by: updated_by,
             updatedAt: new Date()
           },
           $push: {
             auditTrail: {
               action: 'UPDATE',
-              performedBy: updatedBy,
+              performedBy: updated_by,
               timestamp: new Date(),
               changes: updates
             }
@@ -531,14 +531,14 @@ wishlistSchema.methods.toJSONSafe = function () {
     tags: this.tags,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
-    createdBy: this.created_by,
-    updatedBy: this.updated_by,
+    created_by: this.created_by,
+    updated_by: this.updated_by,
     auditTrail: this.auditTrail
   };
 };
 
 // Update wishlist item
-wishlistSchema.methods.updateItem = async function ({ notes, priority, tags, updatedBy }) {
+wishlistSchema.methods.updateItem = async function ({ notes, priority, tags, updated_by }) {
   try {
     const changes = {};
     if (notes !== undefined) changes.notes = notes;
@@ -548,11 +548,11 @@ wishlistSchema.methods.updateItem = async function ({ notes, priority, tags, upd
     this.notes = notes;
     this.priority = priority;
     this.tags = tags;
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.updatedAt = new Date();
     this.auditTrail.push({
       action: 'UPDATE',
-      performedBy: updatedBy,
+      performedBy: updated_by,
       timestamp: new Date(),
       changes
     });

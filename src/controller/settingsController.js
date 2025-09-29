@@ -55,8 +55,8 @@ const settingController = {
                 });
             }
 
-            const updatedBy = req.user?.id || 'system';
-            const settings = await Setting.updateSettings(req.body, updatedBy);
+            const updated_by = req.user?.id || 'system';
+            const settings = await Setting.updateSettings(req.body, updated_by);
             res.status(200).json({
                 success: true,
                 data: settings,

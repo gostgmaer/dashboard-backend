@@ -10,7 +10,7 @@ const ACTIONS = {
 
 const allowedFilterFields = ['name', 'action', 'category', 'isActive']; // whitelist filterable fields
 const allowedSortFields = ['name', 'category', 'createdAt', 'updatedAt', 'action'];
-const defaultExcludeFields = ['__v', 'createdBy', 'updatedBy', 'isDeleted']; // fields to exclude by default
+const defaultExcludeFields = ['__v', 'created_by', 'updated_by', 'isDeleted']; // fields to exclude by default
 
 const permissionSchema = new mongoose.Schema(
   {
@@ -112,7 +112,7 @@ permissionSchema.statics.getAll = async function (options = {}) {
   const {
     filter = {},
     page = 1,
-    limit = 50,
+    limit = 20,
     isDeleted = false,
     sort = { createdAt: -1 },
     selectFields = null, // comma separated string of fields or array of fields
