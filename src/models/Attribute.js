@@ -100,12 +100,12 @@ const attributeSchema = new mongoose.Schema(
       type: Boolean,
       default: false, // Indicates if the attribute is global across products
     },
-    createdBy: {
+    created_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // Reference to the User model (who created the attribute)
       required: true,
     },
-    updatedBy: {
+    updated_by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // Reference to the User model (who last updated the attribute)
     },

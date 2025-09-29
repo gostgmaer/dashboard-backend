@@ -6272,7 +6272,7 @@ static async onTicketUpdated(req, res, next) {
         ticketNumber: ticket.ticketNumber,
         updateType: update.type,
         message: update.message,
-        updatedBy: update.updatedBy,
+        updated_by: update.updated_by,
         updatedAt: new Date()
       },
       channels: ['IN_APP', 'EMAIL'],

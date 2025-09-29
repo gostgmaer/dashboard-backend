@@ -184,7 +184,7 @@ const addTimelineEntryValidator = [
   param('id').isMongoId().withMessage('Invalid payment ID'),
   body('status').isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
   body('note').optional().isString().trim().withMessage('Note must be a string'),
-  body('updatedBy').optional().isString().trim().withMessage('UpdatedBy must be a string'),
+  body('updated_by').optional().isString().trim().withMessage('updated_by must be a string'),
   body('additionalData').optional().isObject().withMessage('Additional data must be an object'),
 ];
 
@@ -962,7 +962,7 @@ class PaymentController {
       }
 
       const { id } = req.params;
-      const { status, note = '', updatedBy = req.user.role || 'customer' } = req.body;
+      const { status, note = '', updated_by = req.user.role || 'customer' } = req.body;
 
       const payment = await PaymentModel.findById(id).populate('customerId');
       if (!payment) {
@@ -980,11 +980,11 @@ class PaymentController {
         return res.status(400).json({ error: 'Invalid status transition' });
       }
 
-      await payment.updateStatus(status, note, updatedBy);
+      await payment.updateStatus(status, note, updated_by);
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
-      // logger.info('Payment status updated', { paymentId: id, newStatus: status, updatedBy });
+      // logger.info('Payment status updated', { paymentId: id, newStatus: status, updated_by });
       res.json({ success: true, data: formattedPayment });
     } catch (err) {
       handleError(res, err, 'Failed to update payment status');
@@ -999,7 +999,7 @@ class PaymentController {
       }
 
       const { id } = req.params;
-      const { amount, reason, createdBy = req.user.id } = req.body;
+      const { amount, reason, created_by = req.user.id } = req.body;
 
       const payment = await PaymentModel.findById(id).populate('customerId');
       if (!payment) {
@@ -1014,7 +1014,7 @@ class PaymentController {
         return res.status(400).json({ error: 'Refund amount exceeds refundable amount' });
       }
 
-      await payment.addRefund({ amount, reason, createdBy });
+      await payment.addRefund({ amount, reason, created_by });
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
@@ -1056,7 +1056,7 @@ class PaymentController {
   static async capturePayment(req, res) {
     try {
       const { id } = req.params;
-      const { note = 'Payment captured', updatedBy = req.user.role || 'merchant' } = req.body;
+      const { note = 'Payment captured', updated_by = req.user.role || 'merchant' } = req.body;
 
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ error: 'Invalid payment ID' });
@@ -1072,7 +1072,7 @@ class PaymentController {
         return res.status(400).json({ error: 'Payment cannot be captured' });
       }
 
-      await payment.capturePayment(note, updatedBy);
+      await payment.capturePayment(note, updated_by);
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
@@ -1139,13 +1139,13 @@ class PaymentController {
       }
 
       const { paymentIds } = req.body;
-      const { status, updatedBy = 'admin', note = '' } = req.body;
+      const { status, updated_by = 'admin', note = '' } = req.body;
 
       if (!Array.isArray(paymentIds) || paymentIds.length === 0) {
         return res.status(400).json({ error: 'Invalid payment IDs' });
       }
 
-      const result = await PaymentModel.bulkUpdateStatus(paymentIds, status, updatedBy, note);
+      const result = await PaymentModel.bulkUpdateStatus(paymentIds, status, updated_by, note);
       // logger.info('Bulk status update', { paymentIds: paymentIds.length, newStatus: status });
       res.json({ success: true, data: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount } });
     } catch (err) {
@@ -1160,13 +1160,13 @@ class PaymentController {
       }
 
       const { paymentIds } = req.body;
-      const { reason = 'Cancelled by system', updatedBy = 'system' } = req.body;
+      const { reason = 'Cancelled by system', updated_by = 'system' } = req.body;
 
       if (!Array.isArray(paymentIds) || paymentIds.length === 0) {
         return res.status(400).json({ error: 'Invalid payment IDs' });
       }
 
-      const result = await PaymentModel.bulkCancelPayments(paymentIds, reason, updatedBy);
+      const result = await PaymentModel.bulkCancelPayments(paymentIds, reason, updated_by);
       // logger.info('Bulk cancel', { paymentIds: paymentIds.length });
       res.json({ success: true, data: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount } });
     } catch (err) {
@@ -1927,7 +1927,7 @@ class PaymentController {
           timeline.reduce((sum, _, i, arr) => i < arr.length - 1 ?
             sum + (arr[i + 1].timestamp - arr[i].timestamp) : sum, 0) / (timeline.length - 1) : 0,
         eventsByUpdater: timeline.reduce((acc, event) => {
-          acc[event.updatedBy] = (acc[event.updatedBy] || 0) + 1;
+          acc[event.updated_by] = (acc[event.updated_by] || 0) + 1;
           return acc;
         }, {})
       };
@@ -1975,7 +1975,7 @@ class PaymentController {
       }
 
       const { id } = req.params;
-      const { status, note, updatedBy = 'admin', additionalData = {} } = req.body;
+      const { status, note, updated_by = 'admin', additionalData = {} } = req.body;
 
       const payment = await PaymentModel.findById(id).populate('customerId');
       if (!payment) {
@@ -1986,7 +1986,7 @@ class PaymentController {
         return res.status(403).json({ error: 'Admin access required' });
       }
 
-      await payment.addTimelineEntry(status, note, updatedBy, additionalData);
+      await payment.addTimelineEntry(status, note, updated_by, additionalData);
       const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
       const formattedPayment = updatedPayment.toAPIResponse();
 
@@ -2585,7 +2585,7 @@ class PaymentController {
         return res.status(400).json({ error: 'Validation failed', details: errors.array() });
       }
 
-      const { paymentIds, amountPercentage, reason = 'Bulk refund', createdBy = req.user.id } = req.body;
+      const { paymentIds, amountPercentage, reason = 'Bulk refund', created_by = req.user.id } = req.body;
 
       if (req.user.role !== 'admin') {
         return res.status(403).json({ error: 'Admin access required' });
@@ -2608,7 +2608,7 @@ class PaymentController {
           continue;
         }
 
-        await payment.addRefund({ amount: refundAmount, reason, createdBy });
+        await payment.addRefund({ amount: refundAmount, reason, created_by });
         results.push({ paymentId: payment._id, status: 'success', refundAmount });
       }
 

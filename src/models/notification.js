@@ -183,8 +183,8 @@ const notificationSchema = new Schema(
     metadata: { type: Map, of: Schema.Types.Mixed },
     isArchived: { type: Boolean, default: false, index: true },
     archivedAt: Date,
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
-    updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
@@ -455,11 +455,11 @@ notificationSchema.pre('save', async function (next) {
       });
     }
     // Audit creation/update fields
-    if (this.isNew && !this.createdBy && this.constructor.currentUser) {
-      this.createdBy = this.constructor.currentUser;
+    if (this.isNew && !this.created_by && this.constructor.currentUser) {
+      this.created_by = this.constructor.currentUser;
     }
     if (!this.isNew && this.constructor.currentUser) {
-      this.updatedBy = this.constructor.currentUser;
+      this.updated_by = this.constructor.currentUser;
     }
     // Archiving logic
     if (this.isModified('isArchived')) {

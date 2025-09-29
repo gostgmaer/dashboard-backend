@@ -145,7 +145,7 @@ cartSchema.pre('remove', async function(next) {
 });
 
 // Instance Methods
-cartSchema.methods.addItem = async function(productId, quantity = 1, updatedBy, itemDiscount = 0) {
+cartSchema.methods.addItem = async function(productId, quantity = 1, updated_by, itemDiscount = 0) {
   try {
     if (quantity <= 0) throw new Error('Quantity must be positive');
     if (itemDiscount < 0 || itemDiscount > 100) throw new Error('Invalid item discount percentage');
@@ -171,7 +171,7 @@ cartSchema.methods.addItem = async function(productId, quantity = 1, updatedBy, 
       this.items.push({ product: productId, quantity, itemDiscount });
     }
 
-    this.updated_by = updatedBy || this.created_by;
+    this.updated_by = updated_by || this.created_by;
     await this.save();
     return this.populate('items.product');
   } catch (error) {
@@ -179,7 +179,7 @@ cartSchema.methods.addItem = async function(productId, quantity = 1, updatedBy, 
   }
 };
 
-cartSchema.methods.removeItem = async function(productId, updatedBy) {
+cartSchema.methods.removeItem = async function(productId, updated_by) {
   try {
     const item = this.items.find(
       item => item.product.toString() === productId.toString()
@@ -195,7 +195,7 @@ cartSchema.methods.removeItem = async function(productId, updatedBy) {
     this.items = this.items.filter(
       item => item.product.toString() !== productId.toString()
     );
-    this.updated_by = updatedBy || this.created_by;
+    this.updated_by = updated_by || this.created_by;
     await this.save();
     return this.populate('items.product');
   } catch (error) {
@@ -203,7 +203,7 @@ cartSchema.methods.removeItem = async function(productId, updatedBy) {
   }
 };
 
-cartSchema.methods.updateQuantity = async function(productId, quantity, updatedBy, itemDiscount) {
+cartSchema.methods.updateQuantity = async function(productId, quantity, updated_by, itemDiscount) {
   try {
     if (quantity <= 0) throw new Error('Quantity must be positive');
     if (itemDiscount !== undefined && (itemDiscount < 0 || itemDiscount > 100)) {
@@ -229,7 +229,7 @@ cartSchema.methods.updateQuantity = async function(productId, quantity, updatedB
 
     item.quantity = quantity;
     if (itemDiscount !== undefined) item.itemDiscount = itemDiscount;
-    this.updated_by = updatedBy || this.created_by;
+    this.updated_by = updated_by || this.created_by;
     await this.save();
     return this.populate('items.product');
   } catch (error) {
@@ -237,7 +237,7 @@ cartSchema.methods.updateQuantity = async function(productId, quantity, updatedB
   }
 };
 
-cartSchema.methods.clearCart = async function(updatedBy) {
+cartSchema.methods.clearCart = async function(updated_by) {
   try {
     // Release all stock
     for (const item of this.items) {
@@ -248,7 +248,7 @@ cartSchema.methods.clearCart = async function(updatedBy) {
     }
 
     this.items = [];
-    this.updated_by = updatedBy || this.created_by;
+    this.updated_by = updated_by || this.created_by;
     await this.save();
     return this;
   } catch (error) {
@@ -285,10 +285,10 @@ cartSchema.methods.hasProduct = function(productId) {
   return this.items.some(item => item.product.toString() === productId.toString());
 };
 
-cartSchema.methods.mergeCart = async function(otherCart, updatedBy) {
+cartSchema.methods.mergeCart = async function(otherCart, updated_by) {
   try {
     for (const otherItem of otherCart.items) {
-      await this.addItem(otherItem.product, otherItem.quantity, updatedBy, otherItem.itemDiscount);
+      await this.addItem(otherItem.product, otherItem.quantity, updated_by, otherItem.itemDiscount);
     }
     return this.populate('items.product');
   } catch (error) {
@@ -296,10 +296,10 @@ cartSchema.methods.mergeCart = async function(otherCart, updatedBy) {
   }
 };
 
-cartSchema.methods.setMetadata = async function(key, value, updatedBy) {
+cartSchema.methods.setMetadata = async function(key, value, updated_by) {
   try {
     this.metadata.set(key, value);
-    this.updated_by = updatedBy || this.created_by;
+    this.updated_by = updated_by || this.created_by;
     await this.save();
     return this;
   } catch (error) {

@@ -330,7 +330,7 @@ paymentSchema.statics.getFailedAttemptsSummary = async function (options = {}) {
   ]);
 };
 
-paymentSchema.statics.bulkCancelPayments = async function (paymentIds, reason = 'Cancelled by system', updatedBy = 'system') {
+paymentSchema.statics.bulkCancelPayments = async function (paymentIds, reason = 'Cancelled by system', updated_by = 'system') {
   return this.updateMany(
     { _id: { $in: paymentIds }, status: { $in: ['PENDING', 'AUTHORIZED'] } },
     {
@@ -340,7 +340,7 @@ paymentSchema.statics.bulkCancelPayments = async function (paymentIds, reason = 
           status: 'CANCELLED',
           timestamp: new Date(),
           note: reason,
-          updatedBy
+          updated_by
         }
       }
     }
@@ -424,7 +424,7 @@ paymentSchema.statics.findRequiringAction = async function () {
 };
 
 // Bulk update payment status
-paymentSchema.statics.bulkUpdateStatus = async function (paymentIds, newStatus, updatedBy = 'system', note = '') {
+paymentSchema.statics.bulkUpdateStatus = async function (paymentIds, newStatus, updated_by = 'system', note = '') {
   return this.updateMany(
     { _id: { $in: paymentIds } },
     {
@@ -434,7 +434,7 @@ paymentSchema.statics.bulkUpdateStatus = async function (paymentIds, newStatus, 
           status: newStatus,
           timestamp: new Date(),
           note,
-          updatedBy
+          updated_by
         }
       }
     }
@@ -576,7 +576,7 @@ paymentSchema.statics.getTrackingHistory = async function (paymentId) {
       status: event.status,
       timestamp: event.timestamp,
       note: event.note,
-      updatedBy: event.updatedBy,
+      updated_by: event.updated_by,
       additionalData: event.additionalData
     }))
   };
@@ -585,19 +585,19 @@ paymentSchema.statics.getTrackingHistory = async function (paymentId) {
 // INSTANCE METHODS
 
 // Add timeline entry
-paymentSchema.methods.addTimelineEntry = function (status, note, updatedBy = 'system', additionalData = {}) {
+paymentSchema.methods.addTimelineEntry = function (status, note, updated_by = 'system', additionalData = {}) {
   this.timeline.push({
     status,
     timestamp: new Date(),
     note,
-    updatedBy,
+    updated_by,
     additionalData
   });
   return this.save();
 };
 
 // Update payment status with timeline
-paymentSchema.methods.updateStatus = function (newStatus, note = '', updatedBy = 'system') {
+paymentSchema.methods.updateStatus = function (newStatus, note = '', updated_by = 'system') {
   if (this.status !== newStatus) {
     this.status = newStatus;
     this.updatedAt = new Date();
@@ -606,7 +606,7 @@ paymentSchema.methods.updateStatus = function (newStatus, note = '', updatedBy =
       this.processedAt = new Date();
     }
 
-    return this.addTimelineEntry(newStatus, note, updatedBy);
+    return this.addTimelineEntry(newStatus, note, updated_by);
   }
   return this; // Return unchanged if status is the same
 };
@@ -642,22 +642,22 @@ paymentSchema.methods.addRefund = function (refundData) {
   return this.save();
 };
 
-paymentSchema.methods.incrementAttempts = function (note = 'Payment attempt failed', updatedBy = 'system') {
+paymentSchema.methods.incrementAttempts = function (note = 'Payment attempt failed', updated_by = 'system') {
   this.attempts += 1;
   if (this.attempts >= this.maxAttempts) {
     this.status = 'FAILED';
     note = `${note} - Max attempts reached`;
   }
-  return this.addTimelineEntry(this.status, note, updatedBy);
+  return this.addTimelineEntry(this.status, note, updated_by);
 };
 
-paymentSchema.methods.capturePayment = function (note = 'Payment captured', updatedBy = 'system') {
+paymentSchema.methods.capturePayment = function (note = 'Payment captured', updated_by = 'system') {
   if (!this.canCapture()) {
     throw new Error('Payment cannot be captured');
   }
   this.status = 'COMPLETED';
   this.processedAt = new Date();
-  return this.addTimelineEntry('COMPLETED', note, updatedBy);
+  return this.addTimelineEntry('COMPLETED', note, updated_by);
 };
 
 // Check if payment can be captured
@@ -730,9 +730,9 @@ paymentSchema.pre('save', function (next) {
 
   next();
 });
-paymentSchema.methods.updateMetadata = function (metadataUpdate, note = 'Metadata updated', updatedBy = 'system') {
+paymentSchema.methods.updateMetadata = function (metadataUpdate, note = 'Metadata updated', updated_by = 'system') {
   this.metadata = { ...this.metadata, ...metadataUpdate };
-  return this.addTimelineEntry(this.status, note, updatedBy);
+  return this.addTimelineEntry(this.status, note, updated_by);
 };
 
 // Format payment for API response
@@ -847,11 +847,11 @@ PaymentSchema.statics.getRefundStats = function (dateRange = {}) {
   ]);
 };
 // Mark payment as paid
-paymentSchema.methods.markAsPaid = function (note = 'Payment marked as paid', updatedBy = 'system') {
+paymentSchema.methods.markAsPaid = function (note = 'Payment marked as paid', updated_by = 'system') {
   if (this.status !== 'COMPLETED') {
     this.status = 'COMPLETED';
     this.processedAt = new Date();
-    return this.addTimelineEntry('COMPLETED', note, updatedBy);
+    return this.addTimelineEntry('COMPLETED', note, updated_by);
   }
   return this; // Return unchanged if already completed
 };
@@ -889,7 +889,7 @@ paymentSchema.pre('save', function (next) {
       status: 'EXPIRED',
       timestamp: new Date(),
       note: 'Payment expired automatically',
-      updatedBy: 'system'
+      updated_by: 'system'
     });
   }
 
@@ -968,8 +968,8 @@ class PaymentModel {
     return this.model.findRequiringAction();
   }
 
-  bulkUpdateStatus(paymentIds, newStatus, updatedBy, note) {
-    return this.model.bulkUpdateStatus(paymentIds, newStatus, updatedBy, note);
+  bulkUpdateStatus(paymentIds, newStatus, updated_by, note) {
+    return this.model.bulkUpdateStatus(paymentIds, newStatus, updated_by, note);
   }
 
   getPaymentSummary(filters) {

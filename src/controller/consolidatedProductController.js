@@ -123,8 +123,8 @@ class ProductController {
 
             // Set created/updated by
             if (req.user) {
-                productData.createdBy = req.user.id;
-                productData.updatedBy = req.user.id;
+                productData.created_by = req.user.id;
+                productData.updated_by = req.user.id;
             }
 
             // Auto-calculate fields
@@ -144,7 +144,7 @@ class ProductController {
             await product.populate([
                 { path: 'categories', select: 'name slug' },
                 { path: 'brand', select: 'name logo' },
-                { path: 'createdBy', select: 'name email' }
+                { path: 'created_by', select: 'name email' }
             ]);
 
             return standardResponse(
@@ -354,8 +354,8 @@ class ProductController {
                 { path: 'brand', select: 'name logo description website' },
                 { path: 'reviews', select: 'rating comment user createdAt', populate: { path: 'user', select: 'name avatar' } },
                 { path: 'relatedProducts', select: 'title mainImage basePrice salePrice status availability' },
-                { path: 'createdBy', select: 'name email' },
-                { path: 'updatedBy', select: 'name email' },
+                { path: 'created_by', select: 'name email' },
+                { path: 'updated_by', select: 'name email' },
                 { path: 'bundleContents.product', select: 'title mainImage basePrice salePrice' }
             ];
 
@@ -419,11 +419,11 @@ class ProductController {
             // Remove fields that shouldn't be directly updated
             delete updateData._id;
             delete updateData.createdAt;
-            delete updateData.createdBy;
+            delete updateData.created_by;
 
             // Auto-update fields
             if (req.user) {
-                updateData.updatedBy = req.user.id;
+                updateData.updated_by = req.user.id;
             }
             updateData.updatedAt = new Date();
 
@@ -466,7 +466,7 @@ class ProductController {
             ).populate([
                 { path: 'categories', select: 'name slug' },
                 { path: 'brand', select: 'name logo' },
-                { path: 'updatedBy', select: 'name email' }
+                { path: 'updated_by', select: 'name email' }
             ]);
 
             if (!product) {
@@ -1880,7 +1880,7 @@ class ProductController {
                 inventory: newStock,
                 currentStockLevel: newStock,
                 lastRestocked: new Date(),
-                updatedBy: req.user?.id
+                updated_by: req.user?.id
             };
 
             // Update availability based on new stock

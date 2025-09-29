@@ -114,12 +114,12 @@ reviewSchema.methods.reportReview = async function () {
    ========================= */
 
 // Edit review content
-reviewSchema.methods.editReview = async function ({ title, review, rating, images, updatedBy }) {
+reviewSchema.methods.editReview = async function ({ title, review, rating, images, updated_by }) {
   if (title) this.title = title;
   if (review) this.review = review;
   if (rating) this.rating = rating;
   if (images) this.images = images;
-  if (updatedBy) this.updated_by = updatedBy;
+  if (updated_by) this.updated_by = updated_by;
   await this.save();
   return this;
 };

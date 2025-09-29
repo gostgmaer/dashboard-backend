@@ -39,7 +39,7 @@ const getBrand = asyncHandler(async (req, res) => {
   // Try finding by ID or slug
   brand = await Brand.findOne({
     $or: [{ _id: identifier }, { slug: identifier }],
-  }).populate("createdBy updatedBy", "name email");
+  }).populate("created_by updated_by", "name email");
   
   if (!brand) throw createError(404, "Brand not found");
   
@@ -56,7 +56,7 @@ const updateBrand = asyncHandler(async (req, res) => {
   
   Object.assign(brand, {
     ...req.body,
-    updatedBy: req.user?._id,
+    updated_by: req.user?._id,
   });
   await brand.save();
   

@@ -216,13 +216,13 @@ addressSchema.post('save', async function (doc, next) {
 
 /**
  * Sets this address as the default for the user, unsetting other defaults.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.setAsDefault = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.setAsDefault = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can update');
   }
   try {
@@ -231,10 +231,10 @@ addressSchema.methods.setAsDefault = async function (updatedBy, permissions = {}
       { $set: { isDefault: false } }
     );
     this.isDefault = true;
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'updated',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: [{ field: 'isDefault', value: 'true' }],
     });
@@ -255,21 +255,21 @@ addressSchema.methods.formatAddress = function () {
 
 /**
  * Soft deletes the address by setting its status to 'deleted'.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.softDelete = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.softDelete = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can delete');
   }
   try {
     this.status = 'deleted';
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'soft_deleted',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: [],
     });
@@ -282,21 +282,21 @@ addressSchema.methods.softDelete = async function (updatedBy, permissions = {}) 
 
 /**
  * Archives the address by setting its status to 'archived'.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.archive = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.archive = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can archive');
   }
   try {
     this.status = 'archived';
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'archived',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: [],
     });
@@ -310,13 +310,13 @@ addressSchema.methods.archive = async function (updatedBy, permissions = {}) {
 /**
  * Partially updates the address with allowed fields.
  * @param {Object} updates - The fields to update.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.partialUpdate = async function (updates, updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.partialUpdate = async function (updates, updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can update');
   }
   try {
@@ -341,10 +341,10 @@ addressSchema.methods.partialUpdate = async function (updates, updatedBy, permis
         this[key] = updates[key];
       }
     }
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'updated',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: Object.keys(updates).map((key) => ({ field: key, value: String(updates[key]) })),
     });
@@ -357,13 +357,13 @@ addressSchema.methods.partialUpdate = async function (updates, updatedBy, permis
 
 /**
  * Clones the address to create a new draft address.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The cloned address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.cloneAddress = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.cloneAddress = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can clone');
   }
   try {
@@ -383,8 +383,8 @@ addressSchema.methods.cloneAddress = async function (updatedBy, permissions = {}
       coordinates: this.coordinates,
       tags: this.tags,
       isVerified: false,
-      created_by: updatedBy,
-      updated_by: updatedBy,
+      created_by: updated_by,
+      updated_by: updated_by,
     };
     const clonedAddress = new this.model('Address')(clonedData);
     await clonedAddress.save();
@@ -433,22 +433,22 @@ addressSchema.methods.compareAddress = function (otherAddress) {
 
 /**
  * Restores a deleted or archived address to active status.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The restored address document.
  * @throws {Error} If the operation fails or address is not restorable.
  */
-addressSchema.methods.restore = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.restore = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can restore');
   }
   try {
     if (this.status === 'deleted' || this.status === 'archived') {
       this.status = 'active';
-      this.updated_by = updatedBy;
+      this.updated_by = updated_by;
       this.history.push({
         action: 'restored',
-        user: updatedBy,
+        user: updated_by,
         timestamp: new Date(),
         changes: [],
       });
@@ -464,23 +464,23 @@ addressSchema.methods.restore = async function (updatedBy, permissions = {}) {
 /**
  * Adds a tag to the address if not already present.
  * @param {String} tag - The tag to add.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.addTag = async function (tag, updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.addTag = async function (tag, updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can add tags');
   }
   try {
     if (!this.tags) this.tags = [];
     if (!this.tags.includes(tag)) {
       this.tags.push(tag);
-      this.updated_by = updatedBy;
+      this.updated_by = updated_by;
       this.history.push({
         action: 'tag_added',
-        user: updatedBy,
+        user: updated_by,
         timestamp: new Date(),
         changes: [{ field: 'tag', value: tag }],
       });
@@ -495,13 +495,13 @@ addressSchema.methods.addTag = async function (tag, updatedBy, permissions = {})
 /**
  * Removes a tag from the address if present.
  * @param {String} tag - The tag to remove.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.removeTag = async function (tag, updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.removeTag = async function (tag, updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can remove tags');
   }
   try {
@@ -509,10 +509,10 @@ addressSchema.methods.removeTag = async function (tag, updatedBy, permissions = 
     const index = this.tags.indexOf(tag);
     if (index !== -1) {
       this.tags.splice(index, 1);
-      this.updated_by = updatedBy;
+      this.updated_by = updated_by;
       this.history.push({
         action: 'tag_removed',
-        user: updatedBy,
+        user: updated_by,
         timestamp: new Date(),
         changes: [{ field: 'tag', value: tag }],
       });
@@ -526,23 +526,23 @@ addressSchema.methods.removeTag = async function (tag, updatedBy, permissions = 
 
 /**
  * Clears all tags from the address.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.clearTags = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.clearTags = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can clear tags');
   }
   try {
     if (this.tags && this.tags.length > 0) {
       const removedTags = this.tags.slice();
       this.tags = [];
-      this.updated_by = updatedBy;
+      this.updated_by = updated_by;
       this.history.push({
         action: 'tag_removed',
-        user: updatedBy,
+        user: updated_by,
         timestamp: new Date(),
         changes: removedTags.map((tag) => ({ field: 'tag', value: tag })),
       });
@@ -557,13 +557,13 @@ addressSchema.methods.clearTags = async function (updatedBy, permissions = {}) {
 /**
  * Merges fields from another address into this one if they are empty.
  * @param {mongoose.Types.ObjectId} otherAddressId - The ID of the address to merge.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.mergeAddress = async function (otherAddressId, updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.mergeAddress = async function (otherAddressId, updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can merge');
   }
   try {
@@ -593,10 +593,10 @@ addressSchema.methods.mergeAddress = async function (otherAddressId, updatedBy, 
       }
     }
     if (changes.length > 0) {
-      this.updated_by = updatedBy;
+      this.updated_by = updated_by;
       this.history.push({
         action: 'merged',
-        user: updatedBy,
+        user: updated_by,
         timestamp: new Date(),
         changes,
       });
@@ -612,21 +612,21 @@ addressSchema.methods.mergeAddress = async function (otherAddressId, updatedBy, 
  * Updates the coordinates of the address.
  * @param {Number} lat - The latitude.
  * @param {Number} lng - The longitude.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.updateCoordinates = async function (lat, lng, updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.updateCoordinates = async function (lat, lng, updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can update coordinates');
   }
   try {
     this.coordinates = { type: 'Point', coordinates: [lng, lat] };
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'updated',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: [{ field: 'coordinates', value: `lat: ${lat}, lng: ${lng}` }],
     });
@@ -640,21 +640,21 @@ addressSchema.methods.updateCoordinates = async function (lat, lng, updatedBy, p
 /**
  * Updates the label of the address.
  * @param {String} label - The new label.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the operation fails or user is unauthorized.
  */
-addressSchema.methods.setLabel = async function (label, updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.setLabel = async function (label, updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can update label');
   }
   try {
     this.label = label;
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'label_changed',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: [{ field: 'label', value: label }],
     });
@@ -667,13 +667,13 @@ addressSchema.methods.setLabel = async function (label, updatedBy, permissions =
 
 /**
  * Validates the address using an external geocoding service and marks it as verified.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If validation fails or user is unauthorized.
  */
-addressSchema.methods.verifyAddress = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.verifyAddress = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can verify');
   }
   try {
@@ -682,10 +682,10 @@ addressSchema.methods.verifyAddress = async function (updatedBy, permissions = {
     // if (!result.valid) throw new Error('Invalid address');
     // this.coordinates = { type: 'Point', coordinates: [result.lng, result.lat] };
     this.isVerified = true;
-    this.updated_by = updatedBy;
+    this.updated_by = updated_by;
     this.history.push({
       action: 'verified',
-      user: updatedBy,
+      user: updated_by,
       timestamp: new Date(),
       changes: [{ field: 'isVerified', value: 'true' }],
     });
@@ -698,13 +698,13 @@ addressSchema.methods.verifyAddress = async function (updatedBy, permissions = {
 
 /**
  * Standardizes the address format based on country-specific rules.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If standardization fails or user is unauthorized.
  */
-addressSchema.methods.standardizeAddress = async function (updatedBy, permissions = {}) {
-  if (!this.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+addressSchema.methods.standardizeAddress = async function (updated_by, permissions = {}) {
+  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can standardize');
   }
   try {
@@ -717,10 +717,10 @@ addressSchema.methods.standardizeAddress = async function (updatedBy, permission
     //   this.city = standardized.city;
     // }
     if (changes.length > 0) {
-      this.updated_by = updatedBy;
+      this.updated_by = updated_by;
       this.history.push({
         action: 'standardized',
-        user: updatedBy,
+        user: updated_by,
         timestamp: new Date(),
         changes,
       });
@@ -793,27 +793,27 @@ addressSchema.statics.getUserAddresses = async function (userId, { page = 1, lim
 /**
  * Soft deletes all addresses for a user.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Object>} Update result.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.removeUserAddresses = async function (userId, updatedBy, permissions = {}) {
+addressSchema.statics.removeUserAddresses = async function (userId, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updatedBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
     throw new Error('Unauthorized: Only admins can delete addresses for other users');
   }
   return this.updateMany(
     { user: userId },
     {
       status: 'deleted',
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'soft_deleted',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [],
         },
@@ -825,27 +825,27 @@ addressSchema.statics.removeUserAddresses = async function (userId, updatedBy, p
 /**
  * Archives all non-deleted addresses for a user.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Object>} Update result.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.bulkArchiveAddresses = async function (userId, updatedBy, permissions = {}) {
+addressSchema.statics.bulkArchiveAddresses = async function (userId, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updatedBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
     throw new Error('Unauthorized: Only admins can archive addresses for other users');
   }
   return this.updateMany(
     { user: userId, status: { $ne: 'deleted' } },
     {
       status: 'archived',
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'archived',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [],
         },
@@ -857,27 +857,27 @@ addressSchema.statics.bulkArchiveAddresses = async function (userId, updatedBy, 
 /**
  * Restores all deleted or archived addresses for a user.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Object>} Update result.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.bulkRestoreAddresses = async function (userId, updatedBy, permissions = {}) {
+addressSchema.statics.bulkRestoreAddresses = async function (userId, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updatedBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
     throw new Error('Unauthorized: Only admins can restore addresses for other users');
   }
   return this.updateMany(
     { user: userId, status: { $in: ['deleted', 'archived'] } },
     {
       status: 'active',
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'restored',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [],
         },
@@ -956,12 +956,12 @@ addressSchema.statics.findNearbyAddresses = async function (lat, lng, maxDistanc
  * Updates the status of a specific address.
  * @param {mongoose.Types.ObjectId} addressId - The ID of the address.
  * @param {String} status - The new status.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The updated address document.
  * @throws {Error} If the address ID is invalid or user is unauthorized.
  */
-addressSchema.statics.updateAddressStatus = async function (addressId, status, updatedBy, permissions = {}) {
+addressSchema.statics.updateAddressStatus = async function (addressId, status, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(addressId)) {
     throw new Error('Invalid address ID');
   }
@@ -969,18 +969,18 @@ addressSchema.statics.updateAddressStatus = async function (addressId, status, u
   if (!address) {
     throw new Error('Address not found');
   }
-  if (!address.user.equals(updatedBy) && !permissions.canManageAllAddresses) {
+  if (!address.user.equals(updated_by) && !permissions.canManageAllAddresses) {
     throw new Error('Unauthorized: Only the address owner or admin can update status');
   }
   return this.findByIdAndUpdate(
     addressId,
     {
       status,
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'status_changed',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [{ field: 'status', value: status }],
         },
@@ -994,27 +994,27 @@ addressSchema.statics.updateAddressStatus = async function (addressId, status, u
  * Updates the status of all non-deleted addresses for a user.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
  * @param {String} status - The new status.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Object>} Update result.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.bulkUpdateStatus = async function (userId, status, updatedBy, permissions = {}) {
+addressSchema.statics.bulkUpdateStatus = async function (userId, status, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updatedBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
     throw new Error('Unauthorized: Only admins can update status for other users');
   }
   return this.updateMany(
     { user: userId, status: { $ne: 'deleted' } },
     {
       status,
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'status_changed',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [{ field: 'status', value: status }],
         },
@@ -1075,16 +1075,16 @@ addressSchema.statics.searchAddresses = async function (userId, query, { page = 
  * Creates multiple addresses for a user in a batch.
  * @param {Array} addresses - Array of address objects.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} createdBy - The ID of the user creating the addresses.
+ * @param {mongoose.Types.ObjectId} created_by - The ID of the user creating the addresses.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Array>} List of created addresses.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.batchCreateAddresses = async function (addresses, userId, createdBy, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(createdBy)) {
+addressSchema.statics.batchCreateAddresses = async function (addresses, userId, created_by, permissions = {}) {
+  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(created_by)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== createdBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== created_by.toString()) {
     throw new Error('Unauthorized: Only admins can create addresses for other users');
   }
   const errors = await this.validateBatchAddresses(addresses);
@@ -1094,8 +1094,8 @@ addressSchema.statics.batchCreateAddresses = async function (addresses, userId, 
   const docs = addresses.map((addr) => ({
     ...addr,
     user: userId,
-    created_by: createdBy,
-    updated_by: createdBy,
+    created_by: created_by,
+    updated_by: created_by,
     status: addr.status || 'draft',
     isVerified: false,
   }));
@@ -1171,27 +1171,27 @@ addressSchema.statics.findDuplicateAddresses = async function (userId) {
  * Adds a tag to multiple addresses for a user.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
  * @param {String} tag - The tag to add.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Object>} Update result.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.addTagToMultiple = async function (userId, tag, updatedBy, permissions = {}) {
+addressSchema.statics.addTagToMultiple = async function (userId, tag, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updatedBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
     throw new Error('Unauthorized: Only admins can add tags for other users');
   }
   return this.updateMany(
     { user: userId, status: { $ne: 'deleted' } },
     {
       $addToSet: { tags: tag },
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'tag_added',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [{ field: 'tag', value: tag }],
         },
@@ -1204,27 +1204,27 @@ addressSchema.statics.addTagToMultiple = async function (userId, tag, updatedBy,
  * Removes a tag from multiple addresses for a user.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
  * @param {String} tag - The tag to remove.
- * @param {mongoose.Types.ObjectId} updatedBy - The ID of the user making the change.
+ * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Object>} Update result.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.removeTagFromMultiple = async function (userId, tag, updatedBy, permissions = {}) {
+addressSchema.statics.removeTagFromMultiple = async function (userId, tag, updated_by, permissions = {}) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updatedBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
     throw new Error('Unauthorized: Only admins can remove tags for other users');
   }
   return this.updateMany(
     { user: userId, status: { $ne: 'deleted' }, tags: tag },
     {
       $pull: { tags: tag },
-      updated_by: updatedBy,
+      updated_by: updated_by,
       $push: {
         history: {
           action: 'tag_removed',
-          user: updatedBy,
+          user: updated_by,
           timestamp: new Date(),
           changes: [{ field: 'tag', value: tag }],
         },
@@ -1283,16 +1283,16 @@ addressSchema.statics.exportUserAddresses = async function (userId, format = 'js
  * Imports addresses from a JSON array for a user.
  * @param {Array} addresses - Array of address objects.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} createdBy - The ID of the user creating the addresses.
+ * @param {mongoose.Types.ObjectId} created_by - The ID of the user creating the addresses.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Array>} List of created addresses.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.importUserAddresses = async function (addresses, userId, createdBy, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(createdBy)) {
+addressSchema.statics.importUserAddresses = async function (addresses, userId, created_by, permissions = {}) {
+  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(created_by)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== createdBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== created_by.toString()) {
     throw new Error('Unauthorized: Only admins can import addresses for other users');
   }
   const errors = await this.validateBatchAddresses(addresses);
@@ -1302,8 +1302,8 @@ addressSchema.statics.importUserAddresses = async function (addresses, userId, c
   const docs = addresses.map((addr) => ({
     ...addr,
     user: userId,
-    created_by: createdBy,
-    updated_by: createdBy,
+    created_by: created_by,
+    updated_by: created_by,
     status: addr.status || 'draft',
     isVerified: false,
   }));
@@ -1351,16 +1351,16 @@ addressSchema.statics.findByLabel = async function (userId, label, { page = 1, l
 /**
  * Creates a sample address for testing purposes.
  * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} createdBy - The ID of the user creating the address.
+ * @param {mongoose.Types.ObjectId} created_by - The ID of the user creating the address.
  * @param {Object} permissions - User permissions for RBAC.
  * @returns {Promise<Address>} The created address document.
  * @throws {Error} If the user ID is invalid or user is unauthorized.
  */
-addressSchema.statics.createSampleAddress = async function (userId, createdBy, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(createdBy)) {
+addressSchema.statics.createSampleAddress = async function (userId, created_by, permissions = {}) {
+  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(created_by)) {
     throw new Error('Invalid user ID');
   }
-  if (!permissions.canManageAllAddresses && userId.toString() !== createdBy.toString()) {
+  if (!permissions.canManageAllAddresses && userId.toString() !== created_by.toString()) {
     throw new Error('Unauthorized: Only admins can create sample addresses for other users');
   }
   const sample = {
@@ -1373,8 +1373,8 @@ addressSchema.statics.createSampleAddress = async function (userId, createdBy, p
     state: 'Sample State',
     country: 'IN',
     postalCode: '123456',
-    created_by: createdBy,
-    updated_by: createdBy,
+    created_by: created_by,
+    updated_by: created_by,
     isVerified: false,
   };
   return this.create(sample);

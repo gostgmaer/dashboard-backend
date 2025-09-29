@@ -26,7 +26,7 @@ const instanceCheckMiddleware = async (req, res, next) => {
       const Category = require('../models/categories');
       const category = await Category.findById(categoryId);
       if (!category) return res.status(404).json({ success: false, message: 'Category not found' });
-      if (category.createdBy.toString() !== req.user.id) {
+      if (category.created_by.toString() !== req.user.id) {
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s category' });
       }
     }

@@ -416,10 +416,10 @@ settingSchema.statics.getSettings = async function () {
   return settings;
 };
 
-settingSchema.statics.updateSettings = async function (data, updatedBy) {
+settingSchema.statics.updateSettings = async function (data, updated_by) {
   const updateData = { ...data };
-  if (updatedBy) {
-    updateData.updatedBy = updatedBy;
+  if (updated_by) {
+    updateData.updated_by = updated_by;
   }
   return this.findOneAndUpdate({}, updateData, {
     upsert: true,

@@ -39,16 +39,16 @@ contactUsSchema.methods.getFullName = function () {
 };
 
 // Mark as resolved
-contactUsSchema.methods.markResolved = async function (updatedBy) {
+contactUsSchema.methods.markResolved = async function (updated_by) {
   this.status = 'Resolved';
-  if (updatedBy) this.updated_by = updatedBy;
+  if (updated_by) this.updated_by = updated_by;
   return this.save();
 };
 
 // Mark as pending
-contactUsSchema.methods.markPending = async function (updatedBy) {
+contactUsSchema.methods.markPending = async function (updated_by) {
   this.status = 'Pending';
-  if (updatedBy) this.updated_by = updatedBy;
+  if (updated_by) this.updated_by = updated_by;
   return this.save();
 };
 

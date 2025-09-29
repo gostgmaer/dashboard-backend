@@ -2852,8 +2852,19 @@ userSchema.method({
 
   async deleteAccount() {
     this.status = 'deleted';
-    this.email = null;
+    this.isDeleted=false;
+    this.emailVerified=false;
+    this.emailVerificationTokens=[];
+    this.isVerified=false;
+    this.loginHistory = [];
+    this.activeSessions = [];
+    this.refreshTokens = [];
+    this.securityEvents = [];
+    this.favoriteProducts = [];
+    this.shoppingCart = null;
+    this.wishList = null;
     this.hash_password = null;
+
     this.tokens = [];
     await this.save();
   },

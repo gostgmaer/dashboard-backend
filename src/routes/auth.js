@@ -12,7 +12,7 @@ const {
   accountConfirm, getProfile, getRefreshToken,checkAuth,chechUser,
   customsignIn,updateProfile
 } = require("../controller/authentication/auth");
-const UpdatebyMiddleWare = require("../middleware/updatedBy");
+const UpdatebyMiddleWare = require("../middleware/updated_by");
 const userMiddleWare = require("../middleware/userAccess");
 
 const {

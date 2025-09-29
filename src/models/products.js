@@ -199,8 +199,8 @@ const productSchema = new mongoose.Schema(
     isAvailable: { type: Boolean, default: true },
     metaTitle: { type: String },
     metaDescription: { type: String },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     returnPolicy: { type: String },
     warranty: { type: String },
     shippingDetails: { type: String },
@@ -3070,7 +3070,7 @@ productSchema.static._validateFilters = async function (filters, includeInactive
     // ObjectId references
     category: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
     brand: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
-    createdBy: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
+    created_by: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
 
     // Categories array
     categories: (val) => {

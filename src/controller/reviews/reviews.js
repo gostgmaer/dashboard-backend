@@ -77,7 +77,7 @@ const updateReview = async (req, res) => {
       review: req.body.review,
       rating: req.body.rating,
       images: req.body.images,
-      updatedBy: req.user?._id || req.body.updated_by
+      updated_by: req.user?._id || req.body.updated_by
     });
 
     res.json(review.toResponse());
