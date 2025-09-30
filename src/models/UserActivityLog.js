@@ -236,7 +236,7 @@ const userActivityLogSchema = new mongoose.Schema(
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true, // Index for performance when querying by time
+      // index: true, // Index for performance when querying by time
     },
   },
   {
@@ -249,7 +249,7 @@ const userActivityLogSchema = new mongoose.Schema(
 userActivityLogSchema.index({ userId: 1, timestamp: -1 }); // User activities by time
 userActivityLogSchema.index({ userId: 1, category: 1, timestamp: -1 }); // User activities by category
 userActivityLogSchema.index({ method: 1, route: 1 }); // Route analytics
-userActivityLogSchema.index({ timestamp: -1 }); // Recent activities
+// userActivityLogSchema.index({ timestamp: -1 }); // Recent activities
 userActivityLogSchema.index({ priority: 1, timestamp: -1 }); // High priority activities
 userActivityLogSchema.index({ isSensitive: 1, timestamp: -1 }); // Sensitive operations
 
