@@ -4,10 +4,11 @@ const Order = require('../models/orders');
 const mongoose = require('mongoose');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 const { validationResult } = require('express-validator');
-const {buildFilters}=require('../utils/helper');
+const { buildFilters } = require('../utils/helper');
 const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
+const ActivityHelper = require('../utils/activityHelpers');
 
 /**
  * 🚀 CONSOLIDATED ROBUST PRODUCT CONTROLLER
@@ -137,7 +138,13 @@ class ProductController {
       await product.save();
 
       // Populate the created product
-
+  // Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'product', 'create', {
+        id: product._id,
+        name: product.name,
+        category: product.category,
+        price: product.price,
+      });
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product created successfully', 201);
     } catch (error) {
       console.error('Create product error:', error);
@@ -268,6 +275,7 @@ class ProductController {
           search: search || null,
         },
       };
+   
 
       return standardResponse(res, true, response, `Retrieved ${enrichedProducts.length} products`);
     } catch (error) {
@@ -339,7 +347,12 @@ class ProductController {
         isExpired: product.isExpired(),
         needsRestock: product.needsRestock(),
       };
-
+   // Optional: Set custom activity info using middleware helper
+      req.setActivity('viewed product details', {
+        productId: product.id,
+        productName: product.title,
+        category: product.category.name,
+      });
       return standardResponse(res, true, enrichedProduct, 'Product retrieved successfully');
     } catch (error) {
       console.error('Failed to fetch product:', error);
@@ -416,7 +429,13 @@ class ProductController {
       if (!product) {
         return errorResponse(res, 'Product not found', 404);
       }
-
+// Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'product', 'Update', {
+        id: product._id,
+        name: product.title,
+        category: product.category,
+        price: product.price,
+      });
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product updated successfully');
     } catch (error) {
       console.error('Failed to update product:', error);
@@ -459,7 +478,13 @@ class ProductController {
         await Product.bulkDelete([id]);
         result = { _id: id };
       }
-
+// Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'product', 'Update', {
+        id: product._id,
+        name: product.title,
+        category: product.category,
+        price: product.price,
+      });
       return standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'Product permanently deleted' : 'Product deleted successfully');
     } catch (error) {
       console.error('Failed to delete product:', error);

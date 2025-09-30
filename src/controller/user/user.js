@@ -1,6 +1,7 @@
 const { StatusCodes, ReasonPhrases } = require('http-status-codes');
 const User = require('../../models/user'); // Adjust path if needed
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
+const ActivityHelper = require('../../utils/activityHelpers');
 // Create a new user
 const createUser = async (req, res) => {
   try {
@@ -9,6 +10,16 @@ const createUser = async (req, res) => {
       await user.setPassword(req.body.password);
     }
     const saved = await user.save();
+
+// Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'User', 'Create', {
+        id: saved._id,
+         username: saved.username,
+         email: saved.email,
+         firstName: saved.firstName,
+         lastName: saved.lastName
+      });
+
     res.status(StatusCodes.CREATED).json({
       statusCode: StatusCodes.CREATED,
       status: ReasonPhrases.CREATED,

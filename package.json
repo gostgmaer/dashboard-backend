@@ -49,6 +49,7 @@
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "mailgen": "^2.0.28",
+    "mime": "^3.0.0",
     "mongoose": "^8.18.1",
     "mongoose-dynamic-schemas": "^1.2.6",
     "morgan": "^1.10.1",

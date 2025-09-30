@@ -11,7 +11,8 @@ const { APIError, formatResponse, standardResponse, errorResponse } = require('.
 const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
-const {buildFilters}=require('../utils/helper');
+const { buildFilters } = require('../utils/helper');
+const ActivityHelper = require('../utils/activityHelpers');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
  *
@@ -242,7 +243,14 @@ class UserController {
         { path: 'role', select: 'name permissions' },
         { path: 'created_by', select: 'name email' },
       ]);
-
+      // Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'User', 'create', {
+        id: user._id,
+        role: user.role.name,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      });
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);
@@ -554,7 +562,14 @@ class UserController {
       if (!user) {
         return UserController.errorResponse(res, 'User not found', 404);
       }
-
+   // Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'User', 'updated', {
+        id: user._id,
+        role: user.role.name,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      });
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User updated successfully');
     } catch (error) {
       console.error('Failed to update user:', error);

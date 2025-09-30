@@ -32,7 +32,10 @@ const wishlistController = {
         priority,
         tags
       });
-
+// Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'WithList', 'Create', {
+        id: wishlistItem._id,
+      });
       return res.status(201).json(formatResponse('Wishlist item added successfully', wishlistItem.toJSONSafe()));
     } catch (error) {
       //logger.error('Error in addToWishlist:', error);
@@ -88,6 +91,11 @@ const wishlistController = {
       if (!wishlistItem) {
         throw new APIError('Wishlist item not found', 404);
       }
+
+      // Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'WithList', 'Create', {
+        id: wishlistItem._id,
+      });
 
       return res.status(200).json(formatResponse('Wishlist item removed successfully', wishlistItem.toJSONSafe()));
     } catch (error) {
@@ -370,7 +378,10 @@ const wishlistController = {
         tags,
         updated_by: req.user._id
       });
-
+// Using manual logging with detailed info
+      await ActivityHelper.logCRUD(req, 'WithList', 'Update', {
+        id: wishlistItem._id,
+      });
       return res.status(200).json(formatResponse('Wishlist item updated successfully', updatedItem.toJSONSafe()));
     } catch (error) {
       //logger.error('Error in updateWishlistItem:', error);
