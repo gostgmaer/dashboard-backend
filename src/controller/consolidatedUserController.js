@@ -11,10 +11,10 @@ const { APIError, formatResponse, standardResponse, errorResponse } = require('.
 const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
-
+const {buildFilters}=require('../utils/helper');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
- * 
+ *
  * Features:
  * ✅ Complete CRUD operations
  * ✅ All 120+ model methods exposed
@@ -67,14 +67,9 @@ class UserController {
   }
 
   static calculateProfileCompleteness(user) {
-    const requiredFields = [
-      'firstName', 'lastName', 'email', 'phoneNumber',
-      'dateOfBirth', 'gender', 'profilePicture'
-    ];
+    const requiredFields = ['firstName', 'lastName', 'email', 'phoneNumber', 'dateOfBirth', 'gender', 'profilePicture'];
 
-    const completedFields = requiredFields.filter(field =>
-      user[field] !== null && user[field] !== undefined && user[field] !== ''
-    );
+    const completedFields = requiredFields.filter((field) => user[field] !== null && user[field] !== undefined && user[field] !== '');
 
     const addressComplete = user.address && user.address.length > 0;
     const paymentComplete = user.paymentMethods && user.paymentMethods.length > 0;
@@ -96,8 +91,7 @@ class UserController {
         userScore: this.calculateUserScore(userObj),
         activityLevel: this.getUserActivityLevel(userObj),
         profileCompleteness: this.calculateProfileCompleteness(userObj),
-        accountAge: userObj.createdAt ?
-          Math.floor((new Date() - new Date(userObj.createdAt)) / (1000 * 60 * 60 * 24)) : 0
+        accountAge: userObj.createdAt ? Math.floor((new Date() - new Date(userObj.createdAt)) / (1000 * 60 * 60 * 24)) : 0,
       };
     }
 
@@ -131,7 +125,6 @@ class UserController {
    * CREATE USER - with validation and auto-calculations
    */
 
-
   static async registerUser(req, res) {
     // Validate incoming request data via express-validator middleware
     const errors = validationResult(req);
@@ -140,22 +133,20 @@ class UserController {
     }
 
     try {
-
       const { email, username, password, confirmPassword, ...otherData } = req.body;
-
 
       // Validation
       if (!email || !username || !password) {
         return res.status(400).json({
           success: false,
-          message: 'Email, username, and password are required'
+          message: 'Email, username, and password are required',
         });
       }
 
       if (password !== confirmPassword) {
         return res.status(400).json({
           success: false,
-          message: 'Passwords do not match'
+          message: 'Passwords do not match',
         });
       }
 
@@ -165,22 +156,22 @@ class UserController {
         return res.status(400).json({
           success: false,
           message: 'Password does not meet requirements',
-          passwordRequirements: passwordStrength.checks
+          passwordRequirements: passwordStrength.checks,
         });
       }
 
-
-
       // Call schema method for registration
       // Register user
-      const registrationResult = await User.registerUserWithAuth({
-        email,
-        username,
-        password,
-        confirmPassword,
-        ...otherData
-      }, req.deviceInfo);
-
+      const registrationResult = await User.registerUserWithAuth(
+        {
+          email,
+          username,
+          password,
+          confirmPassword,
+          ...otherData,
+        },
+        req.deviceInfo
+      );
 
       // Send verification email
       try {
@@ -201,7 +192,8 @@ class UserController {
         return res.status(200).json({
           success: true,
           message: `Registration successful and welcome email sent${emailResult.usedFallback ? ' via fallback' : ''}`,
-          messageId: emailResult.messageId, user: user.id
+          messageId: emailResult.messageId,
+          user: user.id,
         });
       } else {
         return res.status(500).json({
@@ -212,7 +204,7 @@ class UserController {
       }
     } catch (err) {
       // Handle errors (e.g., duplicate keys, validation)
-      res.status(500).json({ error: err.message || 'Registration failed.', status: false, });
+      res.status(500).json({ error: err.message || 'Registration failed.', status: false });
     }
   }
   static async createUser(req, res) {
@@ -248,16 +240,10 @@ class UserController {
       // Populate the created user
       await user.populate([
         { path: 'role', select: 'name permissions' },
-        { path: 'created_by', select: 'name email' }
+        { path: 'created_by', select: 'name email' },
       ]);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(user),
-        'User created successfully',
-        201
-      );
+      return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);
       if (error.code === 11000) {
@@ -273,20 +259,9 @@ class UserController {
    */
   static async getUsers(req, res) {
     try {
-      const {
-        page = 1,
-        limit = 10,
-        sort = 'createdAt',
-        order = 'desc',
-        search,
-        populate,
-        status,
-        role,
-        subscriptionType,
-        isVerified,
-        ...otherFilters
-      } = req.query;
+      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, populate, status, role, subscriptionType, isVerified, ...otherFilters } = req.query;
 
+      otherFilters = buildFilters(otherFilters);
 
       // Build query filters
       const filters = { status: { $ne: 'deleted' } };
@@ -311,10 +286,9 @@ class UserController {
       // Replace original otherFilters with normalized version
       // otherFilters = normalizedOtherFilters;
 
-      Object.keys(normalizedOtherFilters).forEach(key => {
+      Object.keys(normalizedOtherFilters).forEach((key) => {
         const value = normalizedOtherFilters[key];
         if (value && value !== '' && value !== 'undefined') {
-
           switch (key) {
             case 'interests':
             case 'tags':
@@ -340,15 +314,9 @@ class UserController {
         }
       });
 
-
       // Add search functionality
       if (search) {
-        filters.$or = [
-          { firstName: { $regex: search, $options: 'i' } },
-          { lastName: { $regex: search, $options: 'i' } },
-          { email: { $regex: search, $options: 'i' } },
-          { username: { $regex: search, $options: 'i' } }
-        ];
+        filters.$or = [{ firstName: { $regex: search, $options: 'i' } }, { lastName: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }, { username: { $regex: search, $options: 'i' } }];
       }
 
       // Build sort object
@@ -358,7 +326,7 @@ class UserController {
       // Default population for list view
       const defaultPopulate = [
         { path: 'role', select: 'name permissions' },
-        { path: 'created_by', select: 'name email' }
+        { path: 'created_by', select: 'name email' },
       ];
 
       // Use model's pagination method
@@ -366,16 +334,14 @@ class UserController {
         page: Number(page),
         limit: Number(limit),
         filters,
-        sort: sortObj
+        sort: sortObj,
       });
 
       // Enrich users with calculated fields
-      const data = result.items.map(user =>
-        UserController.enrichUser(user)
-      );
+      const data = result.items.map((user) => UserController.enrichUser(user));
 
       const response = {
-        users: data.map(u => {
+        users: data.map((u) => {
           return {
             id: u._id,
             theme: u.preferences?.theme || '',
@@ -414,50 +380,44 @@ class UserController {
             userScore: u.userScore,
             activityLevel: u.activityLevel,
             profileCompleteness: u.profileCompleteness,
-            accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24))
-          }
-        }), pagination: {
+            accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24)),
+          };
+        }),
+        pagination: {
           currentPage: result.page,
           totalPages: result.pages,
           totalUsers: result.total,
           hasNext: result.page < result.pages,
           hasPrev: result.page > 1,
-          limit: Number(limit)
+          limit: Number(limit),
         },
         filters: {
           applied: Object.keys(filters).length - 1,
-          search: search || null
-        }
-      }
+          search: search || null,
+        },
+      };
 
-
-      return UserController.standardResponse(
-        res,
-        true,
-        response,
-        `Retrieved ${result.total} users`
-      );
+      return UserController.standardResponse(res, true, response, `Retrieved ${result.total} users`);
     } catch (error) {
       console.error('Error in getUsers:', error);
       return UserController.errorResponse(res, 'Failed to fetch users', 500, error.message);
     }
   }
 
-
   static async getUserByIdentifier(req, res) {
     try {
       const { identifier } = req.params;
 
       if (!identifier) {
-        return res.status(400).json({ error: "Identifier parameter is required" });
+        return res.status(400).json({ error: 'Identifier parameter is required' });
       }
 
       let u = await User.findUserFullDetails(identifier);
 
       if (!u) {
-        return res.status(404).json({ error: "User not found" });
+        return res.status(404).json({ error: 'User not found' });
       }
-      u = UserController.enrichUser(u)
+      u = UserController.enrichUser(u);
       const data = {
         theme: u.preferences.theme || '',
         language: u.preferences.language || '',
@@ -495,15 +455,9 @@ class UserController {
         userScore: u.userScore,
         activityLevel: u.activityLevel,
         profileCompleteness: u.profileCompleteness,
-        accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24))
-      }
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(data),
-        'User created successfully',
-        200
-      );
+        accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24)),
+      };
+      return UserController.standardResponse(res, true, UserController.enrichUser(data), 'User created successfully', 200);
     } catch (error) {
       return UserController.errorResponse(res, 'Failed to Fetch user', 500, error.message);
     }
@@ -522,55 +476,36 @@ class UserController {
       }
 
       // Comprehensive population for single user view
-      const defaultPopulate = [
-        { path: 'role', select: 'name permissions description' },
-        { path: 'address' },
-        { path: 'orders', select: 'orderNumber status total createdAt' },
-        { path: 'favoriteProducts', select: 'title mainImage basePrice' },
-        { path: 'shoppingCart' },
-        { path: 'wishList' },
-        { path: 'referredBy', select: 'name email' },
-        { path: 'created_by', select: 'name email' },
-        { path: 'updated_by', select: 'name email' }
-      ];
+      const defaultPopulate = [{ path: 'role', select: 'name permissions description' }, { path: 'address' }, { path: 'orders', select: 'orderNumber status total createdAt' }, { path: 'favoriteProducts', select: 'title mainImage basePrice' }, { path: 'shoppingCart' }, { path: 'wishList' }, { path: 'referredBy', select: 'name email' }, { path: 'created_by', select: 'name email' }, { path: 'updated_by', select: 'name email' }];
 
       const user = await User.findOne({
         _id: id,
-        status: { $ne: 'deleted' }
+        status: { $ne: 'deleted' },
       }).populate(defaultPopulate);
 
       if (!user) {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-
-
-
       // Get additional statistics
       const userStats = await user.getUserStatistics();
 
       const enrichedUser = {
         ...UserController.enrichUser(user),
-        statistics: userStats
+        statistics: userStats,
       };
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUser,
-        'User retrieved successfully'
-      );
+      return UserController.standardResponse(res, true, enrichedUser, 'User retrieved successfully');
     } catch (error) {
       console.error('Failed to fetch user:', error);
       return UserController.errorResponse(res, 'Failed to fetch user', 500, error.message);
     }
   }
 
-
   static async getMyProfileStatisticsController(req, res) {
     try {
       if (!req.user) {
-        return res.status(401).json({ message: "Unauthorized" });
+        return res.status(401).json({ message: 'Unauthorized' });
       }
 
       const profileStats = await req.user.getMyProfileStatistics();
@@ -581,7 +516,6 @@ class UserController {
       return res.status(500).json({ success: false, message: 'Server Error' });
     }
   }
-
 
   /**
    * UPDATE USER - with smart field updates and auto-calculations
@@ -612,25 +546,16 @@ class UserController {
       }
       updateData.updatedAt = new Date();
 
-      const user = await User.findOneAndUpdate(
-        { _id: id, status: { $ne: 'deleted' } },
-        { $set: updateData },
-        { new: true, runValidators: true }
-      ).populate([
+      const user = await User.findOneAndUpdate({ _id: id, status: { $ne: 'deleted' } }, { $set: updateData }, { new: true, runValidators: true }).populate([
         { path: 'role', select: 'name permissions' },
-        { path: 'updated_by', select: 'name email' }
+        { path: 'updated_by', select: 'name email' },
       ]);
 
       if (!user) {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(user),
-        'User updated successfully'
-      );
+      return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User updated successfully');
     } catch (error) {
       console.error('Failed to update user:', error);
       if (error.code === 11000) {
@@ -663,7 +588,7 @@ class UserController {
         // Permanent delete
         result = await User.findOneAndDelete({
           _id: id,
-          status: { $ne: 'deleted' }
+          status: { $ne: 'deleted' },
         });
       } else {
         // Soft delete using model method
@@ -671,12 +596,7 @@ class UserController {
         result = { _id: id };
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { id: result._id },
-        permanent === 'true' ? 'User permanently deleted' : 'User deleted successfully'
-      );
+      return UserController.standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'User permanently deleted' : 'User deleted successfully');
     } catch (error) {
       console.error('Failed to delete user:', error);
       return UserController.errorResponse(res, 'Failed to delete user', 500, error.message);
@@ -698,11 +618,7 @@ class UserController {
         return UserController.errorResponse(res, 'Email/username and password are required', 400);
       }
       // Authenticate user
-      const authResult = await User.authenticateUser(
-        identifier,
-        password,
-        req.deviceInfo
-      );
+      const authResult = await User.authenticateUser(identifier, password, req.deviceInfo);
       const user = authResult.user;
 
       // const user = await User.findByEmail(email);
@@ -712,11 +628,7 @@ class UserController {
       // Check if MFA is required
       if (authResult.requiresMFA) {
         // Generate and send OTP
-        const otpResult = await user.generateOTP(
-          process.env.DEFAULT_OTP_TYPE || 'email',
-          'login',
-          req.deviceInfo
-        );
+        const otpResult = await user.generateOTP(process.env.DEFAULT_OTP_TYPE || 'email', 'login', req.deviceInfo);
 
         return res.status(200).json({
           success: true,
@@ -725,7 +637,7 @@ class UserController {
           otpSent: otpResult.success,
           otpType: otpResult.type,
           tempToken: generateSecureToken(), // Temporary token for MFA step
-          userId: user._id
+          userId: user._id,
         });
       }
 
@@ -741,10 +653,10 @@ class UserController {
             username: user.username,
             fullName: user.fullName,
             role: user.role?.name,
-            isVerified: user.isVerified
+            isVerified: user.isVerified,
           },
           tokens,
-          requiresMFA: false
+          requiresMFA: false,
         },
         'Login successful'
       );
@@ -755,8 +667,8 @@ class UserController {
   }
 
   /**
- * MFA verification - Step 2
- */
+   * MFA verification - Step 2
+   */
   async verifyMFA(req, res) {
     try {
       const { userId, mfaCode, tempToken } = req.body;
@@ -764,7 +676,7 @@ class UserController {
       if (!userId || !mfaCode) {
         return res.status(400).json({
           success: false,
-          message: 'User ID and MFA code are required'
+          message: 'User ID and MFA code are required',
         });
       }
 
@@ -772,7 +684,7 @@ class UserController {
       if (!user) {
         return res.status(404).json({
           success: false,
-          message: 'User not found'
+          message: 'User not found',
         });
       }
 
@@ -782,7 +694,7 @@ class UserController {
       if (!isValid) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid or expired MFA code'
+          message: 'Invalid or expired MFA code',
         });
       }
 
@@ -801,16 +713,15 @@ class UserController {
             username: user.username,
             fullName: user.fullName,
             role: user.role?.name,
-            isVerified: user.isVerified
+            isVerified: user.isVerified,
           },
-          tokens
-        }
+          tokens,
+        },
       });
-
     } catch (error) {
       res.status(401).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -831,13 +742,12 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Logout successful'
+        message: 'Logout successful',
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Logout failed'
+        message: 'Logout failed',
       });
     }
   }
@@ -857,13 +767,12 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Logged out from all devices'
+        message: 'Logged out from all devices',
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Failed to logout from all devices'
+        message: 'Failed to logout from all devices',
       });
     }
   }
@@ -878,20 +787,20 @@ class UserController {
       if (!refreshToken) {
         return res.status(400).json({
           success: false,
-          message: 'Refresh token is required'
+          message: 'Refresh token is required',
         });
       }
 
       // Find user by refresh token
       const user = await User.findOne({
         'tokens.refreshToken': refreshToken,
-        'tokens.isRevoked': false
+        'tokens.isRevoked': false,
       });
 
       if (!user) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid refresh token'
+          message: 'Invalid refresh token',
         });
       }
 
@@ -901,13 +810,12 @@ class UserController {
       res.status(200).json({
         success: true,
         message: 'Token refreshed successfully',
-        data: { tokens }
+        data: { tokens },
       });
-
     } catch (error) {
       res.status(401).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -926,30 +834,19 @@ class UserController {
       let sendResult;
       switch (type) {
         case 'email':
-          sendResult = await otpService.sendEmailOTP(
-            user.email,
-            otpResult.code || '000000',
-            purpose
-          );
+          sendResult = await otpService.sendEmailOTP(user.email, otpResult.code || '000000', purpose);
           break;
         case 'sms':
           if (!user.phoneNumber) {
             throw new Error('Phone number not configured');
           }
-          sendResult = await otpService.sendSMSOTP(
-            user.phoneNumber,
-            otpResult.code || '000000',
-            purpose
-          );
+          sendResult = await otpService.sendSMSOTP(user.phoneNumber, otpResult.code || '000000', purpose);
           break;
         case 'voice':
           if (!user.phoneNumber) {
             throw new Error('Phone number not configured');
           }
-          sendResult = await otpService.sendVoiceOTP(
-            user.phoneNumber,
-            otpResult.code || '000000'
-          );
+          sendResult = await otpService.sendVoiceOTP(user.phoneNumber, otpResult.code || '000000');
           break;
       }
 
@@ -959,14 +856,13 @@ class UserController {
         data: {
           type,
           expiresAt: otpResult.expiresAt,
-          sent: sendResult?.success || false
-        }
+          sent: sendResult?.success || false,
+        },
       });
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -982,7 +878,7 @@ class UserController {
       if (!code) {
         return res.status(400).json({
           success: false,
-          message: 'OTP code is required'
+          message: 'OTP code is required',
         });
       }
 
@@ -991,19 +887,18 @@ class UserController {
       if (isValid) {
         res.status(200).json({
           success: true,
-          message: 'OTP verified successfully'
+          message: 'OTP verified successfully',
         });
       } else {
         res.status(400).json({
           success: false,
-          message: 'Invalid or expired OTP code'
+          message: 'Invalid or expired OTP code',
         });
       }
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -1020,17 +915,16 @@ class UserController {
       if (!currentPassword || !newPassword || !confirmPassword) {
         return res.status(400).json({
           success: false,
-          message: 'All fields are required'
+          message: 'All fields are required',
         });
       }
 
       if (newPassword !== confirmPassword) {
         return res.status(400).json({
           success: false,
-          message: 'New passwords do not match'
+          message: 'New passwords do not match',
         });
       }
-
 
       // Password strength check
       const passwordStrength = checkPasswordStrength(newPassword);
@@ -1038,7 +932,7 @@ class UserController {
         return res.status(400).json({
           success: false,
           message: 'Password does not meet requirements',
-          passwordRequirements: passwordStrength.checks
+          passwordRequirements: passwordStrength.checks,
         });
       }
 
@@ -1048,25 +942,17 @@ class UserController {
         // Log password change
         await user.logAuthEvent('password_change', req.deviceInfo, true);
 
-        return UserController.standardResponse(
-          res,
-          true,
-          result,
-          'Password changed successfully'
-        )
+        return UserController.standardResponse(res, true, result, 'Password changed successfully');
       }
-
-
     } catch (error) {
       console.error('Change password error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to change password', 500);
     }
   }
 
-
   /**
-  * Enable MFA
-  */
+   * Enable MFA
+   */
   static async enableMFA(req, res) {
     try {
       const { method = 'totp' } = req.body;
@@ -1075,7 +961,7 @@ class UserController {
       if (user.mfaEnabled) {
         return res.status(400).json({
           success: false,
-          message: 'MFA is already enabled'
+          message: 'MFA is already enabled',
         });
       }
 
@@ -1084,13 +970,12 @@ class UserController {
       res.status(200).json({
         success: true,
         message: 'MFA setup initiated',
-        data: mfaSetup
+        data: mfaSetup,
       });
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -1106,7 +991,7 @@ class UserController {
       if (!code) {
         return res.status(400).json({
           success: false,
-          message: 'Verification code is required'
+          message: 'Verification code is required',
         });
       }
 
@@ -1117,19 +1002,18 @@ class UserController {
 
         res.status(200).json({
           success: true,
-          message: 'MFA enabled successfully'
+          message: 'MFA enabled successfully',
         });
       } else {
         res.status(400).json({
           success: false,
-          message: 'Invalid verification code'
+          message: 'Invalid verification code',
         });
       }
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -1145,14 +1029,14 @@ class UserController {
       if (!user.mfaEnabled) {
         return res.status(400).json({
           success: false,
-          message: 'MFA is not enabled'
+          message: 'MFA is not enabled',
         });
       }
 
       if (!code) {
         return res.status(400).json({
           success: false,
-          message: 'Verification code is required'
+          message: 'Verification code is required',
         });
       }
 
@@ -1163,18 +1047,16 @@ class UserController {
 
         res.status(200).json({
           success: true,
-          message: 'MFA disabled successfully'
+          message: 'MFA disabled successfully',
         });
       }
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
-
 
   /**
    * Initiate password reset
@@ -1198,14 +1080,13 @@ class UserController {
         success: true,
         message: result.message,
         data: {
-          otpType: result.otpType
-        }
+          otpType: result.otpType,
+        },
       });
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -1219,17 +1100,16 @@ class UserController {
       if (!email || !otpCode || !newPassword || !confirmPassword || !token) {
         return res.status(400).json({
           success: false,
-          message: 'All fields are required'
+          message: 'All fields are required',
         });
       }
 
       if (newPassword !== confirmPassword) {
         return res.status(400).json({
           success: false,
-          message: 'Passwords do not match'
+          message: 'Passwords do not match',
         });
       }
-
 
       if (!token || !newPassword) {
         return UserController.errorResponse(res, 'Token and new password are required', 400);
@@ -1250,12 +1130,7 @@ class UserController {
       user.resetTokenExpiration = null;
       await user.save();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Password reset successfully'
-      );
+      return UserController.standardResponse(res, true, null, 'Password reset successfully');
     } catch (error) {
       console.error('Reset password error:', error);
       return UserController.errorResponse(res, 'Failed to reset password', 500, error.message);
@@ -1280,12 +1155,7 @@ class UserController {
 
       await user.confirmEmail(token);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Email confirmed successfully'
-      );
+      return UserController.standardResponse(res, true, null, 'Email confirmed successfully');
     } catch (error) {
       console.error('Confirm email error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to confirm email', 400);
@@ -1301,14 +1171,14 @@ class UserController {
       const now = new Date();
 
       const activeSessions = user.tokens
-        .filter(token => !token.isRevoked && token.expiresAt > now)
-        .map(token => ({
+        .filter((token) => !token.isRevoked && token.expiresAt > now)
+        .map((token) => ({
           tokenId: token._id,
           deviceId: token.deviceId,
           ipAddress: token.ipAddress,
           createdAt: token.createdAt,
           expiresAt: token.expiresAt,
-          isCurrent: token.token === req.token
+          isCurrent: token.token === req.token,
         }));
 
       res.status(200).json({
@@ -1316,14 +1186,13 @@ class UserController {
         data: {
           activeSessions,
           totalSessions: activeSessions.length,
-          maxSessions: user.concurrentSessionLimit
-        }
+          maxSessions: user.concurrentSessionLimit,
+        },
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Failed to retrieve active sessions'
+        message: 'Failed to retrieve active sessions',
       });
     }
   }
@@ -1339,15 +1208,15 @@ class UserController {
       if (!tokenId) {
         return res.status(400).json({
           success: false,
-          message: 'Token ID is required'
+          message: 'Token ID is required',
         });
       }
 
-      const tokenData = user.tokens.find(t => t._id.toString() === tokenId);
+      const tokenData = user.tokens.find((t) => t._id.toString() === tokenId);
       if (!tokenData) {
         return res.status(404).json({
           success: false,
-          message: 'Session not found'
+          message: 'Session not found',
         });
       }
 
@@ -1355,13 +1224,12 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Session revoked successfully'
+        message: 'Session revoked successfully',
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Failed to revoke session'
+        message: 'Failed to revoke session',
       });
     }
   }
@@ -1373,7 +1241,7 @@ class UserController {
     try {
       const user = req.user;
 
-      const devices = user.devices.map(device => ({
+      const devices = user.devices.map((device) => ({
         deviceId: device.deviceId,
         deviceName: device.deviceName,
         deviceType: device.deviceType,
@@ -1383,18 +1251,17 @@ class UserController {
         lastUsed: device.lastUsed,
         isActive: device.isActive,
         isTrusted: device.isTrusted,
-        registeredAt: device.registeredAt
+        registeredAt: device.registeredAt,
       }));
 
       res.status(200).json({
         success: true,
-        data: { devices }
+        data: { devices },
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Failed to retrieve devices'
+        message: 'Failed to retrieve devices',
       });
     }
   }
@@ -1410,7 +1277,7 @@ class UserController {
       if (!deviceId) {
         return res.status(400).json({
           success: false,
-          message: 'Device ID is required'
+          message: 'Device ID is required',
         });
       }
 
@@ -1418,13 +1285,12 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Device removed successfully'
+        message: 'Device removed successfully',
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Failed to remove device'
+        message: 'Failed to remove device',
       });
     }
   }
@@ -1440,7 +1306,7 @@ class UserController {
       if (!deviceId) {
         return res.status(400).json({
           success: false,
-          message: 'Device ID is required'
+          message: 'Device ID is required',
         });
       }
 
@@ -1448,13 +1314,12 @@ class UserController {
 
       res.status(200).json({
         success: true,
-        message: 'Device trusted successfully'
+        message: 'Device trusted successfully',
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: 'Failed to trust device'
+        message: 'Failed to trust device',
       });
     }
   }
@@ -1466,18 +1331,18 @@ class UserController {
       if (!token) {
         return res.status(400).json({
           success: false,
-          message: 'Verification token is required'
+          message: 'Verification token is required',
         });
       }
 
       const user = await User.findOne({
-        'emailVerificationTokens.token': token
+        'emailVerificationTokens.token': token,
       });
 
       if (!user) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid or expired verification token'
+          message: 'Invalid or expired verification token',
         });
       }
 
@@ -1488,19 +1353,18 @@ class UserController {
 
         res.status(200).json({
           success: true,
-          message: 'Email verified successfully'
+          message: 'Email verified successfully',
         });
       } else {
         res.status(400).json({
           success: false,
-          message: 'Email verification failed'
+          message: 'Email verification failed',
         });
       }
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -1519,12 +1383,7 @@ class UserController {
 
       const verified = await user.verifyUser();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { verified },
-        'User verified successfully'
-      );
+      return UserController.standardResponse(res, true, { verified }, 'User verified successfully');
     } catch (error) {
       console.error('Verify user error:', error);
       return UserController.errorResponse(res, 'Failed to verify user', 500, error.message);
@@ -1549,12 +1408,7 @@ class UserController {
 
       const updatedUser = await user.updateProfile(req.body);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(updatedUser),
-        'Profile updated successfully'
-      );
+      return UserController.standardResponse(res, true, UserController.enrichUser(updatedUser), 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
       return UserController.errorResponse(res, 'Failed to update profile', 500, error.message);
@@ -1580,12 +1434,7 @@ class UserController {
 
       const profilePicture = await user.updateProfilePicture(url);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { profilePicture },
-        'Profile picture updated successfully'
-      );
+      return UserController.standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
     } catch (error) {
       console.error('Update profile picture error:', error);
       return UserController.errorResponse(res, 'Failed to update profile picture', 500, error.message);
@@ -1611,12 +1460,7 @@ class UserController {
 
       const result = await user.updateEmail(newEmail);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        result,
-        'Email updated successfully'
-      );
+      return UserController.standardResponse(res, true, result, 'Email updated successfully');
     } catch (error) {
       console.error('Update email error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to update email', 500);
@@ -1642,12 +1486,7 @@ class UserController {
 
       const phoneNumber = await user.updatePhoneNumber(newPhone);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { phoneNumber },
-        'Phone number updated successfully'
-      );
+      return UserController.standardResponse(res, true, { phoneNumber }, 'Phone number updated successfully');
     } catch (error) {
       console.error('Update phone number error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to update phone number', 500);
@@ -1677,12 +1516,7 @@ class UserController {
 
       const wishlist = await user.addToWishlist(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        wishlist,
-        'Product added to wishlist'
-      );
+      return UserController.standardResponse(res, true, wishlist, 'Product added to wishlist');
     } catch (error) {
       console.error('Add to wishlist error:', error);
       return UserController.errorResponse(res, 'Failed to add to wishlist', 500, error.message);
@@ -1708,12 +1542,7 @@ class UserController {
 
       const wishlist = await user.removeFromWishlist(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        wishlist,
-        'Product removed from wishlist'
-      );
+      return UserController.standardResponse(res, true, wishlist, 'Product removed from wishlist');
     } catch (error) {
       console.error('Remove from wishlist error:', error);
       return UserController.errorResponse(res, 'Failed to remove from wishlist', 500, error.message);
@@ -1734,12 +1563,7 @@ class UserController {
 
       const result = await user.clearWishlist();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        result,
-        'Wishlist cleared successfully'
-      );
+      return UserController.standardResponse(res, true, result, 'Wishlist cleared successfully');
     } catch (error) {
       console.error('Clear wishlist error:', error);
       return UserController.errorResponse(res, 'Failed to clear wishlist', 500, error.message);
@@ -1760,12 +1584,7 @@ class UserController {
 
       const count = await user.getWishlistCount();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { count },
-        'Wishlist count retrieved'
-      );
+      return UserController.standardResponse(res, true, { count }, 'Wishlist count retrieved');
     } catch (error) {
       console.error('Get wishlist count error:', error);
       return UserController.errorResponse(res, 'Failed to get wishlist count', 500, error.message);
@@ -1795,12 +1614,7 @@ class UserController {
 
       const favorites = await user.addFavoriteProduct(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        favorites,
-        'Product added to favorites'
-      );
+      return UserController.standardResponse(res, true, favorites, 'Product added to favorites');
     } catch (error) {
       console.error('Add favorite product error:', error);
       return UserController.errorResponse(res, 'Failed to add favorite product', 500, error.message);
@@ -1826,12 +1640,7 @@ class UserController {
 
       const favorites = await user.removeFavoriteProduct(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        favorites,
-        'Product removed from favorites'
-      );
+      return UserController.standardResponse(res, true, favorites, 'Product removed from favorites');
     } catch (error) {
       console.error('Remove favorite product error:', error);
       return UserController.errorResponse(res, 'Failed to remove favorite product', 500, error.message);
@@ -1857,12 +1666,7 @@ class UserController {
 
       await user.moveItemWishlistToFavorites(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Item moved from wishlist to favorites'
-      );
+      return UserController.standardResponse(res, true, null, 'Item moved from wishlist to favorites');
     } catch (error) {
       console.error('Move item wishlist to favorites error:', error);
       return UserController.errorResponse(res, 'Failed to move item', 500, error.message);
@@ -1892,12 +1696,7 @@ class UserController {
 
       const cart = await user.addToCart(productId, quantity);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        cart,
-        'Product added to cart'
-      );
+      return UserController.standardResponse(res, true, cart, 'Product added to cart');
     } catch (error) {
       console.error('Add to cart error:', error);
       return UserController.errorResponse(res, 'Failed to add to cart', 500, error.message);
@@ -1923,12 +1722,7 @@ class UserController {
 
       const cart = await user.removeFromCart(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        cart,
-        'Product removed from cart'
-      );
+      return UserController.standardResponse(res, true, cart, 'Product removed from cart');
     } catch (error) {
       console.error('Remove from cart error:', error);
       return UserController.errorResponse(res, 'Failed to remove from cart', 500, error.message);
@@ -1954,12 +1748,7 @@ class UserController {
 
       const cart = await user.updateCartItemQuantity(productId, quantity);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        cart,
-        'Cart item quantity updated'
-      );
+      return UserController.standardResponse(res, true, cart, 'Cart item quantity updated');
     } catch (error) {
       console.error('Update cart item quantity error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to update cart item quantity', 500);
@@ -1980,12 +1769,7 @@ class UserController {
 
       const cart = await user.clearCart();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        cart,
-        'Cart cleared successfully'
-      );
+      return UserController.standardResponse(res, true, cart, 'Cart cleared successfully');
     } catch (error) {
       console.error('Clear cart error:', error);
       return UserController.errorResponse(res, 'Failed to clear cart', 500, error.message);
@@ -2006,12 +1790,7 @@ class UserController {
 
       const total = await user.calculateCartTotal();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { total },
-        'Cart total calculated'
-      );
+      return UserController.standardResponse(res, true, { total }, 'Cart total calculated');
     } catch (error) {
       console.error('Calculate cart total error:', error);
       return UserController.errorResponse(res, 'Failed to calculate cart total', 500, error.message);
@@ -2032,12 +1811,7 @@ class UserController {
 
       const count = await user.getCartItemCount();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { count },
-        'Cart item count retrieved'
-      );
+      return UserController.standardResponse(res, true, { count }, 'Cart item count retrieved');
     } catch (error) {
       console.error('Get cart item count error:', error);
       return UserController.errorResponse(res, 'Failed to get cart item count', 500, error.message);
@@ -2063,12 +1837,7 @@ class UserController {
 
       await user.moveItemCartToWishlist(productId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Item moved from cart to wishlist'
-      );
+      return UserController.standardResponse(res, true, null, 'Item moved from cart to wishlist');
     } catch (error) {
       console.error('Move item cart to wishlist error:', error);
       return UserController.errorResponse(res, 'Failed to move item', 500, error.message);
@@ -2093,12 +1862,7 @@ class UserController {
 
       const preferences = await user.updatePreferences(req.body);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        preferences,
-        'Preferences updated successfully'
-      );
+      return UserController.standardResponse(res, true, preferences, 'Preferences updated successfully');
     } catch (error) {
       console.error('Update preferences error:', error);
       return UserController.errorResponse(res, 'Failed to update preferences', 500, error.message);
@@ -2119,12 +1883,7 @@ class UserController {
 
       const newsletter = await user.toggleNewsletterSubscription();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { newsletter },
-        'Newsletter subscription toggled'
-      );
+      return UserController.standardResponse(res, true, { newsletter }, 'Newsletter subscription toggled');
     } catch (error) {
       console.error('Toggle newsletter subscription error:', error);
       return UserController.errorResponse(res, 'Failed to toggle newsletter subscription', 500, error.message);
@@ -2145,12 +1904,7 @@ class UserController {
 
       const notifications = await user.toggleNotifications();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { notifications },
-        'Notifications toggled'
-      );
+      return UserController.standardResponse(res, true, { notifications }, 'Notifications toggled');
     } catch (error) {
       console.error('Toggle notifications error:', error);
       return UserController.errorResponse(res, 'Failed to toggle notifications', 500, error.message);
@@ -2176,12 +1930,7 @@ class UserController {
 
       const updatedTheme = await user.setThemePreference(theme);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { theme: updatedTheme },
-        'Theme preference updated'
-      );
+      return UserController.standardResponse(res, true, { theme: updatedTheme }, 'Theme preference updated');
     } catch (error) {
       console.error('Set theme preference error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to set theme preference', 500);
@@ -2207,12 +1956,7 @@ class UserController {
 
       await user.updateLanguagePreference(languageCode);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { language: languageCode },
-        'Language preference updated'
-      );
+      return UserController.standardResponse(res, true, { language: languageCode }, 'Language preference updated');
     } catch (error) {
       console.error('Update language preference error:', error);
       return UserController.errorResponse(res, 'Failed to update language preference', 500, error.message);
@@ -2242,12 +1986,7 @@ class UserController {
 
       const totalPoints = await user.addLoyaltyPoints(points);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { loyaltyPoints: totalPoints },
-        'Loyalty points added'
-      );
+      return UserController.standardResponse(res, true, { loyaltyPoints: totalPoints }, 'Loyalty points added');
     } catch (error) {
       console.error('Add loyalty points error:', error);
       return UserController.errorResponse(res, 'Failed to add loyalty points', 500, error.message);
@@ -2273,12 +2012,7 @@ class UserController {
 
       const totalPoints = await user.redeemLoyaltyPoints(points);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { loyaltyPoints: totalPoints },
-        'Loyalty points redeemed'
-      );
+      return UserController.standardResponse(res, true, { loyaltyPoints: totalPoints }, 'Loyalty points redeemed');
     } catch (error) {
       console.error('Redeem loyalty points error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to redeem loyalty points', 500);
@@ -2304,12 +2038,7 @@ class UserController {
 
       const success = await user.transferLoyaltyPoints(toUserId, points);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { success },
-        'Loyalty points transferred'
-      );
+      return UserController.standardResponse(res, true, { success }, 'Loyalty points transferred');
     } catch (error) {
       console.error('Transfer loyalty points error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to transfer loyalty points', 500);
@@ -2330,12 +2059,7 @@ class UserController {
 
       await user.resetLoyaltyPoints();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { loyaltyPoints: 0 },
-        'Loyalty points reset'
-      );
+      return UserController.standardResponse(res, true, { loyaltyPoints: 0 }, 'Loyalty points reset');
     } catch (error) {
       console.error('Reset loyalty points error:', error);
       return UserController.errorResponse(res, 'Failed to reset loyalty points', 500, error.message);
@@ -2365,12 +2089,7 @@ class UserController {
 
       const subscription = await user.activateSubscription(type);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        subscription,
-        'Subscription updated'
-      );
+      return UserController.standardResponse(res, true, subscription, 'Subscription updated');
     } catch (error) {
       console.error('Update subscription error:', error);
       return UserController.errorResponse(res, 'Failed to update subscription', 500, error.message);
@@ -2391,12 +2110,7 @@ class UserController {
 
       const status = await user.cancelSubscription();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { subscriptionStatus: status },
-        'Subscription cancelled'
-      );
+      return UserController.standardResponse(res, true, { subscriptionStatus: status }, 'Subscription cancelled');
     } catch (error) {
       console.error('Cancel subscription error:', error);
       return UserController.errorResponse(res, 'Failed to cancel subscription', 500, error.message);
@@ -2427,12 +2141,7 @@ class UserController {
 
       const updatedStatus = await user.updateStatus(status);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { status: updatedStatus },
-        'User status updated'
-      );
+      return UserController.standardResponse(res, true, { status: updatedStatus }, 'User status updated');
     } catch (error) {
       console.error('Update status error:', error);
       return UserController.errorResponse(res, 'Failed to update status', 500, error.message);
@@ -2454,12 +2163,7 @@ class UserController {
 
       await user.deactivateAccount(reason);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Account deactivated'
-      );
+      return UserController.standardResponse(res, true, null, 'Account deactivated');
     } catch (error) {
       console.error('Deactivate account error:', error);
       return UserController.errorResponse(res, 'Failed to deactivate account', 500, error.message);
@@ -2477,7 +2181,7 @@ class UserController {
       if (!req.user.role || req.user.role.name !== 'admin') {
         return res.status(403).json({
           success: false,
-          message: 'Access denied. Admin role required.'
+          message: 'Access denied. Admin role required.',
         });
       }
 
@@ -2491,15 +2195,14 @@ class UserController {
           username: user.username,
           email: user.email,
           status: user.status,
-          updatedAt: user.updatedAt
-        }
+          updatedAt: user.updatedAt,
+        },
       });
-
     } catch (error) {
       console.error('Activate user error:', error);
       return res.status(400).json({
         success: false,
-        message: error.message || 'Failed to activate user'
+        message: error.message || 'Failed to activate user',
       });
     }
   }
@@ -2515,7 +2218,7 @@ class UserController {
       if (!req.user.role || req.user.role.name !== 'admin') {
         return res.status(403).json({
           success: false,
-          message: 'Access denied. Admin role required.'
+          message: 'Access denied. Admin role required.',
         });
       }
 
@@ -2523,7 +2226,7 @@ class UserController {
       if (userId === adminId.toString()) {
         return res.status(400).json({
           success: false,
-          message: 'Cannot deactivate your own account'
+          message: 'Cannot deactivate your own account',
         });
       }
 
@@ -2537,15 +2240,14 @@ class UserController {
           username: user.username,
           email: user.email,
           status: user.status,
-          updatedAt: user.updatedAt
-        }
+          updatedAt: user.updatedAt,
+        },
       });
-
     } catch (error) {
       console.error('Deactivate user error:', error);
       return res.status(400).json({
         success: false,
-        message: error.message || 'Failed to deactivate user'
+        message: error.message || 'Failed to deactivate user',
       });
     }
   }
@@ -2564,12 +2266,7 @@ class UserController {
 
       await user.reactivateAccount();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Account reactivated'
-      );
+      return UserController.standardResponse(res, true, null, 'Account reactivated');
     } catch (error) {
       console.error('Reactivate account error:', error);
       return UserController.errorResponse(res, 'Failed to reactivate account', 500, error.message);
@@ -2591,12 +2288,7 @@ class UserController {
 
       await user.lockAccount(durationMs || 3600000); // Default 1 hour
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Account locked'
-      );
+      return UserController.standardResponse(res, true, null, 'Account locked');
     } catch (error) {
       console.error('Lock account error:', error);
       return UserController.errorResponse(res, 'Failed to lock account', 500, error.message);
@@ -2617,12 +2309,7 @@ class UserController {
 
       await user.unlockAccount();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Account unlocked'
-      );
+      return UserController.standardResponse(res, true, null, 'Account unlocked');
     } catch (error) {
       console.error('Unlock account error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to unlock account', 500);
@@ -2647,12 +2334,7 @@ class UserController {
 
       const addresses = await user.addAddress(req.body);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        addresses,
-        'Address added successfully'
-      );
+      return UserController.standardResponse(res, true, addresses, 'Address added successfully');
     } catch (error) {
       console.error('Add address error:', error);
       return UserController.errorResponse(res, 'Failed to add address', 500, error.message);
@@ -2678,12 +2360,7 @@ class UserController {
 
       const addresses = await user.removeAddress(addressId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        addresses,
-        'Address removed successfully'
-      );
+      return UserController.standardResponse(res, true, addresses, 'Address removed successfully');
     } catch (error) {
       console.error('Remove address error:', error);
       return UserController.errorResponse(res, 'Failed to remove address', 500, error.message);
@@ -2709,12 +2386,7 @@ class UserController {
 
       const addresses = await user.setDefaultAddress(addressId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        addresses,
-        'Default address set'
-      );
+      return UserController.standardResponse(res, true, addresses, 'Default address set');
     } catch (error) {
       console.error('Set default address error:', error);
       return UserController.errorResponse(res, 'Failed to set default address', 500, error.message);
@@ -2739,12 +2411,7 @@ class UserController {
 
       const paymentMethods = await user.addPaymentMethod(req.body);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        paymentMethods,
-        'Payment method added'
-      );
+      return UserController.standardResponse(res, true, paymentMethods, 'Payment method added');
     } catch (error) {
       console.error('Add payment method error:', error);
       return UserController.errorResponse(res, 'Failed to add payment method', 500, error.message);
@@ -2770,12 +2437,7 @@ class UserController {
 
       const paymentMethods = await user.removePaymentMethod(methodId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        paymentMethods,
-        'Payment method removed'
-      );
+      return UserController.standardResponse(res, true, paymentMethods, 'Payment method removed');
     } catch (error) {
       console.error('Remove payment method error:', error);
       return UserController.errorResponse(res, 'Failed to remove payment method', 500, error.message);
@@ -2801,12 +2463,7 @@ class UserController {
 
       const paymentMethods = await user.setDefaultPaymentMethod(methodId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        paymentMethods,
-        'Default payment method set'
-      );
+      return UserController.standardResponse(res, true, paymentMethods, 'Default payment method set');
     } catch (error) {
       console.error('Set default payment method error:', error);
       return UserController.errorResponse(res, 'Failed to set default payment method', 500, error.message);
@@ -2831,12 +2488,7 @@ class UserController {
 
       const socialMedia = await user.updateSocialMedia(req.body);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        socialMedia,
-        'Social media updated'
-      );
+      return UserController.standardResponse(res, true, socialMedia, 'Social media updated');
     } catch (error) {
       console.error('Update social media error:', error);
       return UserController.errorResponse(res, 'Failed to update social media', 500, error.message);
@@ -2862,12 +2514,7 @@ class UserController {
 
       await user.linkSocialAccount(platform, socialId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Social account linked'
-      );
+      return UserController.standardResponse(res, true, null, 'Social account linked');
     } catch (error) {
       console.error('Link social account error:', error);
       return UserController.errorResponse(res, 'Failed to link social account', 500, error.message);
@@ -2893,12 +2540,7 @@ class UserController {
 
       await user.unlinkSocialAccount(platform);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Social account unlinked'
-      );
+      return UserController.standardResponse(res, true, null, 'Social account unlinked');
     } catch (error) {
       console.error('Unlink social account error:', error);
       return UserController.errorResponse(res, 'Failed to unlink social account', 500, error.message);
@@ -2919,12 +2561,7 @@ class UserController {
 
       const socialMedia = await user.clearAllSocialLinks();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        socialMedia,
-        'All social links cleared'
-      );
+      return UserController.standardResponse(res, true, socialMedia, 'All social links cleared');
     } catch (error) {
       console.error('Clear all social links error:', error);
       return UserController.errorResponse(res, 'Failed to clear social links', 500, error.message);
@@ -2954,12 +2591,7 @@ class UserController {
 
       const interests = await user.addInterest(interest);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        interests,
-        'Interest added'
-      );
+      return UserController.standardResponse(res, true, interests, 'Interest added');
     } catch (error) {
       console.error('Add interest error:', error);
       return UserController.errorResponse(res, 'Failed to add interest', 500, error.message);
@@ -2985,12 +2617,7 @@ class UserController {
 
       const interests = await user.removeInterest(interest);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        interests,
-        'Interest removed'
-      );
+      return UserController.standardResponse(res, true, interests, 'Interest removed');
     } catch (error) {
       console.error('Remove interest error:', error);
       return UserController.errorResponse(res, 'Failed to remove interest', 500, error.message);
@@ -3016,12 +2643,7 @@ class UserController {
 
       await user.addInterestCategory(category);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Interest category added'
-      );
+      return UserController.standardResponse(res, true, null, 'Interest category added');
     } catch (error) {
       console.error('Add interest category error:', error);
       return UserController.errorResponse(res, 'Failed to add interest category', 500, error.message);
@@ -3042,12 +2664,7 @@ class UserController {
 
       const interests = await user.clearInterests();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        interests,
-        'Interests cleared'
-      );
+      return UserController.standardResponse(res, true, interests, 'Interests cleared');
     } catch (error) {
       console.error('Clear interests error:', error);
       return UserController.errorResponse(res, 'Failed to clear interests', 500, error.message);
@@ -3072,12 +2689,7 @@ class UserController {
 
       await user.invalidateAllSessions();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'All sessions invalidated'
-      );
+      return UserController.standardResponse(res, true, null, 'All sessions invalidated');
     } catch (error) {
       console.error('Invalidate all sessions error:', error);
       return UserController.errorResponse(res, 'Failed to invalidate sessions', 500, error.message);
@@ -3103,12 +2715,7 @@ class UserController {
 
       await user.revokeToken(token);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Token revoked'
-      );
+      return UserController.standardResponse(res, true, null, 'Token revoked');
     } catch (error) {
       console.error('Revoke token error:', error);
       return UserController.errorResponse(res, 'Failed to revoke token', 500, error.message);
@@ -3129,12 +2736,7 @@ class UserController {
 
       await user.updateLoginTimestamp();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Login timestamp updated'
-      );
+      return UserController.standardResponse(res, true, null, 'Login timestamp updated');
     } catch (error) {
       console.error('Update login timestamp error:', error);
       return UserController.errorResponse(res, 'Failed to update login timestamp', 500, error.message);
@@ -3155,12 +2757,7 @@ class UserController {
 
       await user.incrementFailedLogins();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Failed login count incremented'
-      );
+      return UserController.standardResponse(res, true, null, 'Failed login count incremented');
     } catch (error) {
       console.error('Increment failed logins error:', error);
       return UserController.errorResponse(res, 'Failed to increment failed logins', 500, error.message);
@@ -3181,12 +2778,7 @@ class UserController {
 
       await user.resetFailedLogins();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Failed login count reset'
-      );
+      return UserController.standardResponse(res, true, null, 'Failed login count reset');
     } catch (error) {
       console.error('Reset failed logins error:', error);
       return UserController.errorResponse(res, 'Failed to reset failed logins', 500, error.message);
@@ -3216,12 +2808,7 @@ class UserController {
 
       await user.addOrder(orderId);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        null,
-        'Order added'
-      );
+      return UserController.standardResponse(res, true, null, 'Order added');
     } catch (error) {
       console.error('Add order error:', error);
       return UserController.errorResponse(res, 'Failed to add order', 500, error.message);
@@ -3242,12 +2829,7 @@ class UserController {
 
       const orders = await user.getOrderHistory();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        orders,
-        'Order history retrieved'
-      );
+      return UserController.standardResponse(res, true, orders, 'Order history retrieved');
     } catch (error) {
       console.error('Get order history error:', error);
       return UserController.errorResponse(res, 'Failed to get order history', 500, error.message);
@@ -3272,12 +2854,7 @@ class UserController {
 
       const stats = await user.getUserStatistics();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        stats,
-        'User statistics retrieved'
-      );
+      return UserController.standardResponse(res, true, stats, 'User statistics retrieved');
     } catch (error) {
       console.error('Get user statistics error:', error);
       return UserController.errorResponse(res, 'Failed to get user statistics', 500, error.message);
@@ -3298,12 +2875,7 @@ class UserController {
 
       const report = await user.getUserReport();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        report,
-        'User report retrieved'
-      );
+      return UserController.standardResponse(res, true, report, 'User report retrieved');
     } catch (error) {
       console.error('Get user report error:', error);
       return UserController.errorResponse(res, 'Failed to get user report', 500, error.message);
@@ -3324,12 +2896,7 @@ class UserController {
 
       const summary = await user.getActivitySummary();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        summary,
-        'Activity summary retrieved'
-      );
+      return UserController.standardResponse(res, true, summary, 'Activity summary retrieved');
     } catch (error) {
       console.error('Get activity summary error:', error);
       return UserController.errorResponse(res, 'Failed to get activity summary', 500, error.message);
@@ -3355,12 +2922,7 @@ class UserController {
 
       const result = await user.dynamicUpdate(field, value);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { [field]: result },
-        `${field} updated successfully`
-      );
+      return UserController.standardResponse(res, true, { [field]: result }, `${field} updated successfully`);
     } catch (error) {
       console.error('Dynamic update error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to update field', 500);
@@ -3387,12 +2949,7 @@ class UserController {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(user),
-        'User found by email'
-      );
+      return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User found by email');
     } catch (error) {
       console.error('Find by email error:', error);
       return UserController.errorResponse(res, 'Failed to find user by email', 500, error.message);
@@ -3415,12 +2972,7 @@ class UserController {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(user),
-        'User found by username'
-      );
+      return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User found by username');
     } catch (error) {
       console.error('Find by username error:', error);
       return UserController.errorResponse(res, 'Failed to find user by username', 500, error.message);
@@ -3439,14 +2991,9 @@ class UserController {
       }
 
       const users = await User.searchUsers(keyword);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Users search completed'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Users search completed');
     } catch (error) {
       console.error('Search users error:', error);
       return UserController.errorResponse(res, 'Failed to search users', 500, error.message);
@@ -3465,14 +3012,9 @@ class UserController {
       }
 
       const users = await User.searchByEmailOrUsername(term);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Search completed'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Search completed');
     } catch (error) {
       console.error('Search by email or username error:', error);
       return UserController.errorResponse(res, 'Failed to search by email or username', 500, error.message);
@@ -3491,14 +3033,9 @@ class UserController {
       }
 
       const users = await User.dynamicSearch(field, value);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Dynamic search completed'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Dynamic search completed');
     } catch (error) {
       console.error('Dynamic search error:', error);
       return UserController.errorResponse(res, error.message || 'Failed to perform dynamic search', 500);
@@ -3517,14 +3054,9 @@ class UserController {
       }
 
       const users = await User.getUsersByStatus(status);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Users retrieved by status'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Users retrieved by status');
     } catch (error) {
       console.error('Get users by status error:', error);
       return UserController.errorResponse(res, 'Failed to get users by status', 500, error.message);
@@ -3537,14 +3069,9 @@ class UserController {
   static async getActiveUsers(req, res) {
     try {
       const users = await User.getActiveUsers();
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Active users retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Active users retrieved');
     } catch (error) {
       console.error('Get active users error:', error);
       return UserController.errorResponse(res, 'Failed to get active users', 500, error.message);
@@ -3557,14 +3084,9 @@ class UserController {
   static async getVerifiedUsers(req, res) {
     try {
       const users = await User.getVerifiedUsers();
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Verified users retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Verified users retrieved');
     } catch (error) {
       console.error('Get verified users error:', error);
       return UserController.errorResponse(res, 'Failed to get verified users', 500, error.message);
@@ -3583,14 +3105,9 @@ class UserController {
       }
 
       const users = await User.findByRole(role);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Users retrieved by role'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Users retrieved by role');
     } catch (error) {
       console.error('Get users by role error:', error);
       return UserController.errorResponse(res, 'Failed to get users by role', 500, error.message);
@@ -3603,14 +3120,9 @@ class UserController {
   static async getAdmins(req, res) {
     try {
       const admins = await User.getAdmins();
-      const enrichedAdmins = admins.map(user => UserController.enrichUser(user));
+      const enrichedAdmins = admins.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedAdmins,
-        'Admin users retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedAdmins, 'Admin users retrieved');
     } catch (error) {
       console.error('Get admins error:', error);
       return UserController.errorResponse(res, 'Failed to get admin users', 500, error.message);
@@ -3623,14 +3135,9 @@ class UserController {
   static async getCustomers(req, res) {
     try {
       const customers = await User.getCustomers();
-      const enrichedCustomers = customers.map(user => UserController.enrichUser(user));
+      const enrichedCustomers = customers.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedCustomers,
-        'Customer users retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedCustomers, 'Customer users retrieved');
     } catch (error) {
       console.error('Get customers error:', error);
       return UserController.errorResponse(res, 'Failed to get customer users', 500, error.message);
@@ -3649,14 +3156,9 @@ class UserController {
       }
 
       const users = await User.getUsersBySubscriptionType(subscriptionType);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Users retrieved by subscription type'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Users retrieved by subscription type');
     } catch (error) {
       console.error('Get users by subscription type error:', error);
       return UserController.errorResponse(res, 'Failed to get users by subscription type', 500, error.message);
@@ -3670,14 +3172,9 @@ class UserController {
     try {
       const days = parseInt(req.query.days) || 30;
       const users = await User.findActiveWithinDays(days);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        `Active users within ${days} days retrieved`
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, `Active users within ${days} days retrieved`);
     } catch (error) {
       console.error('Find active within days error:', error);
       return UserController.errorResponse(res, 'Failed to find active users within days', 500, error.message);
@@ -3691,14 +3188,9 @@ class UserController {
     try {
       const limit = parseInt(req.query.limit) || 10;
       const users = await User.getTopLoyalUsers(limit);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Top loyal users retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Top loyal users retrieved');
     } catch (error) {
       console.error('Get top loyal users error:', error);
       return UserController.errorResponse(res, 'Failed to get top loyal users', 500, error.message);
@@ -3711,14 +3203,9 @@ class UserController {
   static async getNeverLoggedInUsers(req, res) {
     try {
       const users = await User.getNeverLoggedInUsers();
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Never logged in users retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Never logged in users retrieved');
     } catch (error) {
       console.error('Get never logged in users error:', error);
       return UserController.errorResponse(res, 'Failed to get never logged in users', 500, error.message);
@@ -3736,12 +3223,7 @@ class UserController {
         return UserController.errorResponse(res, 'No users found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        UserController.enrichUser(user),
-        'Oldest user retrieved'
-      );
+      return UserController.standardResponse(res, true, UserController.enrichUser(user), 'Oldest user retrieved');
     } catch (error) {
       console.error('Find oldest user error:', error);
       return UserController.errorResponse(res, 'Failed to find oldest user', 500, error.message);
@@ -3755,14 +3237,9 @@ class UserController {
     try {
       const threshold = parseInt(req.query.threshold) || 5;
       const users = await User.findUsersWithFailedLogins(threshold);
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Users with failed logins retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Users with failed logins retrieved');
     } catch (error) {
       console.error('Find users with failed logins error:', error);
       return UserController.errorResponse(res, 'Failed to find users with failed logins', 500, error.message);
@@ -3775,14 +3252,9 @@ class UserController {
   static async findUsersWithIncompleteProfiles(req, res) {
     try {
       const users = await User.findUsersWithIncompleteProfiles();
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Users with incomplete profiles retrieved'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Users with incomplete profiles retrieved');
     } catch (error) {
       console.error('Find users with incomplete profiles error:', error);
       return UserController.errorResponse(res, 'Failed to find users with incomplete profiles', 500, error.message);
@@ -3804,7 +3276,7 @@ class UserController {
         return UserController.errorResponse(res, 'Valid IDs array and role are required', 400);
       }
 
-      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
       if (validIds.length !== ids.length) {
         return UserController.errorResponse(res, 'Some user IDs are invalid', 400);
       }
@@ -3817,7 +3289,7 @@ class UserController {
         {
           matchedCount: result.matchedCount,
           modifiedCount: result.modifiedCount,
-          role: role
+          role: role,
         },
         'Roles updated successfully'
       );
@@ -3838,7 +3310,7 @@ class UserController {
         return UserController.errorResponse(res, 'Valid IDs array is required', 400);
       }
 
-      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
       if (validIds.length !== ids.length) {
         return UserController.errorResponse(res, 'Some user IDs are invalid', 400);
       }
@@ -3851,7 +3323,7 @@ class UserController {
         {
           matchedCount: result.matchedCount,
           modifiedCount: result.modifiedCount,
-          deletedCount: validIds.length
+          deletedCount: validIds.length,
         },
         'Users deleted successfully'
       );
@@ -3873,7 +3345,7 @@ class UserController {
         return UserController.errorResponse(res, 'Valid IDs array and status are required', 400);
       }
 
-      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
       if (validIds.length !== ids.length) {
         return UserController.errorResponse(res, 'Some user IDs are invalid', 400);
       }
@@ -3886,7 +3358,7 @@ class UserController {
         {
           matchedCount: result.matchedCount,
           modifiedCount: result.modifiedCount,
-          status: status
+          status: status,
         },
         'Status updated successfully'
       );
@@ -3907,7 +3379,7 @@ class UserController {
         return UserController.errorResponse(res, 'Valid IDs array and positive points are required', 400);
       }
 
-      const validIds = ids.filter(id => mongoose.Types.ObjectId.isValid(id));
+      const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
       if (validIds.length !== ids.length) {
         return UserController.errorResponse(res, 'Some user IDs are invalid', 400);
       }
@@ -3920,7 +3392,7 @@ class UserController {
         {
           matchedCount: result.matchedCount,
           modifiedCount: result.modifiedCount,
-          points: points
+          points: points,
         },
         'Loyalty points added successfully'
       );
@@ -3941,12 +3413,7 @@ class UserController {
     try {
       const counts = await User.getUserCountByRole();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        counts,
-        'User count by role retrieved'
-      );
+      return UserController.standardResponse(res, true, counts, 'User count by role retrieved');
     } catch (error) {
       console.error('Get user count by role error:', error);
       return UserController.errorResponse(res, 'Failed to get user count by role', 500, error.message);
@@ -3960,12 +3427,7 @@ class UserController {
     try {
       const counts = await User.getUserCountBySubscription();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        counts,
-        'User count by subscription retrieved'
-      );
+      return UserController.standardResponse(res, true, counts, 'User count by subscription retrieved');
     } catch (error) {
       console.error('Get user count by subscription error:', error);
       return UserController.errorResponse(res, 'Failed to get user count by subscription', 500, error.message);
@@ -3979,12 +3441,7 @@ class UserController {
     try {
       const counts = await User.getUserCountByCountry();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        counts,
-        'User count by country retrieved'
-      );
+      return UserController.standardResponse(res, true, counts, 'User count by country retrieved');
     } catch (error) {
       console.error('Get user count by country error:', error);
       return UserController.errorResponse(res, 'Failed to get user count by country', 500, error.message);
@@ -3998,12 +3455,7 @@ class UserController {
     try {
       const average = await User.getAverageLoyaltyPoints();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { average },
-        'Average loyalty points retrieved'
-      );
+      return UserController.standardResponse(res, true, { average }, 'Average loyalty points retrieved');
     } catch (error) {
       console.error('Get average loyalty points error:', error);
       return UserController.errorResponse(res, 'Failed to get average loyalty points', 500, error.message);
@@ -4017,12 +3469,7 @@ class UserController {
     try {
       const average = await User.getAverageOrdersPerUser();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { average },
-        'Average orders per user retrieved'
-      );
+      return UserController.standardResponse(res, true, { average }, 'Average orders per user retrieved');
     } catch (error) {
       console.error('Get average orders per user error:', error);
       return UserController.errorResponse(res, 'Failed to get average orders per user', 500, error.message);
@@ -4036,12 +3483,7 @@ class UserController {
     try {
       const brackets = await User.getUserLoyaltyBrackets();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        brackets,
-        'User loyalty brackets retrieved'
-      );
+      return UserController.standardResponse(res, true, brackets, 'User loyalty brackets retrieved');
     } catch (error) {
       console.error('Get user loyalty brackets error:', error);
       return UserController.errorResponse(res, 'Failed to get user loyalty brackets', 500, error.message);
@@ -4056,12 +3498,7 @@ class UserController {
       const limit = parseInt(req.query.limit) || 10;
       const interests = await User.getTopUserInterests(limit);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        interests,
-        'Top user interests retrieved'
-      );
+      return UserController.standardResponse(res, true, interests, 'Top user interests retrieved');
     } catch (error) {
       console.error('Get top user interests error:', error);
       return UserController.errorResponse(res, 'Failed to get top user interests', 500, error.message);
@@ -4076,12 +3513,7 @@ class UserController {
       const days = parseInt(req.query.days) || 30;
       const data = await User.getRegistrationsOverTime(days);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        data,
-        'Registration data retrieved'
-      );
+      return UserController.standardResponse(res, true, data, 'Registration data retrieved');
     } catch (error) {
       console.error('Get registrations over time error:', error);
       return UserController.errorResponse(res, 'Failed to get registration data', 500, error.message);
@@ -4096,12 +3528,7 @@ class UserController {
       const days = parseInt(req.query.days) || 30;
       const data = await User.getLoginActivityOverTime(days);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        data,
-        'Login activity data retrieved'
-      );
+      return UserController.standardResponse(res, true, data, 'Login activity data retrieved');
     } catch (error) {
       console.error('Get login activity over time error:', error);
       return UserController.errorResponse(res, 'Failed to get login activity data', 500, error.message);
@@ -4115,12 +3542,7 @@ class UserController {
     try {
       const stats = await User.getTableStatistics();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        stats,
-        'Table statistics retrieved'
-      );
+      return UserController.standardResponse(res, true, stats, 'Table statistics retrieved');
     } catch (error) {
       console.error('Get table statistics error:', error);
       return UserController.errorResponse(res, 'Failed to get table statistics', 500, error.message);
@@ -4134,12 +3556,7 @@ class UserController {
     try {
       const report = await User.getTableReport();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        report,
-        'Table report retrieved'
-      );
+      return UserController.standardResponse(res, true, report, 'Table report retrieved');
     } catch (error) {
       console.error('Get table report error:', error);
       return UserController.errorResponse(res, 'Failed to get table report', 500, error.message);
@@ -4162,12 +3579,7 @@ class UserController {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        report,
-        'User report retrieved'
-      );
+      return UserController.standardResponse(res, true, report, 'User report retrieved');
     } catch (error) {
       console.error('Get user report by ID static error:', error);
       return UserController.errorResponse(res, 'Failed to get user report', 500, error.message);
@@ -4190,12 +3602,7 @@ class UserController {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        summary,
-        'Activity summary retrieved'
-      );
+      return UserController.standardResponse(res, true, summary, 'Activity summary retrieved');
     } catch (error) {
       console.error('Get activity summary by ID static error:', error);
       return UserController.errorResponse(res, 'Failed to get activity summary', 500, error.message);
@@ -4219,15 +3626,11 @@ class UserController {
       // Add default filter to exclude deleted users
       parsedFilters.status = { $ne: 'deleted' };
 
-      const users = await User.find(parsedFilters).populate([
-        { path: 'role', select: 'name' },
-        { path: 'address' },
-        { path: 'orders', select: 'orderNumber status total createdAt' }
-      ]);
+      const users = await User.find(parsedFilters).populate([{ path: 'role', select: 'name' }, { path: 'address' }, { path: 'orders', select: 'orderNumber status total createdAt' }]);
 
       if (format === 'csv') {
         // Convert to CSV format
-        const csv = users.map(user => ({
+        const csv = users.map((user) => ({
           id: user._id,
           username: user.username,
           email: user.email,
@@ -4237,7 +3640,7 @@ class UserController {
           loyaltyPoints: user.loyaltyPoints,
           subscriptionType: user.subscriptionType,
           createdAt: user.createdAt,
-          lastLogin: user.lastLogin
+          lastLogin: user.lastLogin,
         }));
 
         const fields = Object.keys(csv[0] || {});
@@ -4254,7 +3657,7 @@ class UserController {
         return UserController.standardResponse(
           res,
           true,
-          users.map(user => UserController.enrichUser(user)),
+          users.map((user) => UserController.enrichUser(user)),
           'Users exported successfully'
         );
       }
@@ -4281,18 +3684,13 @@ class UserController {
         subscriptionCounts,
         loyaltyBrackets,
         topInterests,
-        exportedAt: new Date()
+        exportedAt: new Date(),
       };
 
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', 'attachment; filename=user-statistics.json');
 
-      return UserController.standardResponse(
-        res,
-        true,
-        exportData,
-        'User statistics exported'
-      );
+      return UserController.standardResponse(res, true, exportData, 'User statistics exported');
     } catch (error) {
       console.error('Export user statistics error:', error);
       return UserController.errorResponse(res, 'Failed to export user statistics', 500, error.message);
@@ -4313,7 +3711,7 @@ class UserController {
       const results = {
         created: 0,
         updated: 0,
-        errors: []
+        errors: [],
       };
 
       for (let userData of users) {
@@ -4334,17 +3732,12 @@ class UserController {
         } catch (error) {
           results.errors.push({
             email: userData.email,
-            error: error.message
+            error: error.message,
           });
         }
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        results,
-        'Users import completed'
-      );
+      return UserController.standardResponse(res, true, results, 'Users import completed');
     } catch (error) {
       console.error('Import users data error:', error);
       return UserController.errorResponse(res, 'Failed to import users data', 500, error.message);
@@ -4363,39 +3756,34 @@ class UserController {
       const { limit = 20, sortBy = 'loginFrequency' } = req.query;
 
       const sortOptions = {
-        'loginFrequency': { lastLogin: -1 },
-        'loyaltyPoints': { loyaltyPoints: -1 },
-        'orders': { 'orders.length': -1 },
-        'activity': { updatedAt: -1 }
+        loginFrequency: { lastLogin: -1 },
+        loyaltyPoints: { loyaltyPoints: -1 },
+        orders: { 'orders.length': -1 },
+        activity: { updatedAt: -1 },
       };
 
       const sortObj = sortOptions[sortBy] || { lastLogin: -1 };
 
       const users = await User.find({
-        status: { $ne: 'deleted' }
+        status: { $ne: 'deleted' },
       })
         .populate([
           { path: 'role', select: 'name' },
-          { path: 'orders', select: 'total status createdAt' }
+          { path: 'orders', select: 'total status createdAt' },
         ])
         .sort(sortObj)
         .limit(parseInt(limit));
 
-      const enrichedUsers = users.map(user => ({
+      const enrichedUsers = users.map((user) => ({
         ...UserController.enrichUser(user),
         analytics: {
           profileCompleteness: UserController.calculateProfileCompleteness(user),
           activityLevel: UserController.getUserActivityLevel(user),
-          userScore: UserController.calculateUserScore(user)
-        }
+          userScore: UserController.calculateUserScore(user),
+        },
       }));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        `Retrieved ${enrichedUsers.length} users with analytics sorted by ${sortBy}`
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, `Retrieved ${enrichedUsers.length} users with analytics sorted by ${sortBy}`);
     } catch (error) {
       console.error('Get users with analytics error:', error);
       return UserController.errorResponse(res, 'Failed to get users with analytics', 500, error.message);
@@ -4415,25 +3803,25 @@ class UserController {
         {
           $match: {
             createdAt: { $gte: fromDate, $lte: toDate },
-            status: { $ne: 'deleted' }
-          }
+            status: { $ne: 'deleted' },
+          },
         },
         {
           $group: {
             _id: null,
             totalUsers: { $sum: 1 },
             verifiedUsers: {
-              $sum: { $cond: [{ $eq: ['$isVerified', true] }, 1, 0] }
+              $sum: { $cond: [{ $eq: ['$isVerified', true] }, 1, 0] },
             },
             activeUsers: {
-              $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+              $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] },
             },
             avgLoyaltyPoints: { $avg: '$loyaltyPoints' },
             premiumUsers: {
-              $sum: { $cond: [{ $eq: ['$subscriptionType', 'premium'] }, 1, 0] }
-            }
-          }
-        }
+              $sum: { $cond: [{ $eq: ['$subscriptionType', 'premium'] }, 1, 0] },
+            },
+          },
+        },
       ]);
 
       const result = metrics[0] || {
@@ -4441,15 +3829,10 @@ class UserController {
         verifiedUsers: 0,
         activeUsers: 0,
         avgLoyaltyPoints: 0,
-        premiumUsers: 0
+        premiumUsers: 0,
       };
 
-      return UserController.standardResponse(
-        res,
-        true,
-        result,
-        'User engagement metrics retrieved'
-      );
+      return UserController.standardResponse(res, true, result, 'User engagement metrics retrieved');
     } catch (error) {
       console.error('Get user engagement metrics error:', error);
       return UserController.errorResponse(res, 'Failed to get user engagement metrics', 500, error.message);
@@ -4474,12 +3857,7 @@ class UserController {
         await user.save();
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        user.favoriteProducts,
-        'Added to favorites'
-      );
+      return UserController.standardResponse(res, true, user.favoriteProducts, 'Added to favorites');
     } catch (error) {
       console.error('Add favorite error:', error);
       return UserController.errorResponse(res, 'Failed to add favorite', 500, error.message);
@@ -4494,17 +3872,10 @@ class UserController {
       }
 
       const productId = req.params.id;
-      user.favoriteProducts = user.favoriteProducts.filter(
-        pid => pid.toString() !== productId
-      );
+      user.favoriteProducts = user.favoriteProducts.filter((pid) => pid.toString() !== productId);
       await user.save();
 
-      return UserController.standardResponse(
-        res,
-        true,
-        user.favoriteProducts,
-        'Removed from favorites'
-      );
+      return UserController.standardResponse(res, true, user.favoriteProducts, 'Removed from favorites');
     } catch (error) {
       console.error('Remove favorite error:', error);
       return UserController.errorResponse(res, 'Failed to remove favorite', 500, error.message);
@@ -4513,22 +3884,16 @@ class UserController {
 
   static async listFavorites(req, res) {
     try {
-      const user = await User.findById(req.user.id)
-        .populate({
-          path: 'favoriteProducts',
-          select: 'title basePrice mainImage'
-        });
+      const user = await User.findById(req.user.id).populate({
+        path: 'favoriteProducts',
+        select: 'title basePrice mainImage',
+      });
 
       if (!user) {
         return UserController.errorResponse(res, 'User not found', 404);
       }
 
-      return UserController.standardResponse(
-        res,
-        true,
-        user.favoriteProducts,
-        'Favorites retrieved successfully'
-      );
+      return UserController.standardResponse(res, true, user.favoriteProducts, 'Favorites retrieved successfully');
     } catch (error) {
       console.error('List favorites error:', error);
       return UserController.errorResponse(res, 'Failed to fetch favorites', 500, error.message);
@@ -4548,18 +3913,13 @@ class UserController {
       // Get recommendations based on user's interests, past orders, etc.
       const recommendations = await Product.find({
         categories: { $in: user.interests || [] },
-        status: 'active'
+        status: 'active',
       })
         .sort({ soldCount: -1 })
         .limit(10)
         .select('title basePrice mainImage');
 
-      return UserController.standardResponse(
-        res,
-        true,
-        recommendations,
-        'Recommendations retrieved successfully'
-      );
+      return UserController.standardResponse(res, true, recommendations, 'Recommendations retrieved successfully');
     } catch (error) {
       console.error('Get recommendations error:', error);
       return UserController.errorResponse(res, 'Failed to fetch recommendations', 500, error.message);
@@ -4576,26 +3936,21 @@ class UserController {
       const results = [];
       fs.createReadStream(req.file.path)
         .pipe(csv())
-        .on('data', data => results.push(data))
+        .on('data', (data) => results.push(data))
         .on('end', async () => {
           try {
-            const ops = results.map(item => ({
+            const ops = results.map((item) => ({
               updateOne: {
                 filter: { email: item.email },
                 update: { $set: item },
-                upsert: true
-              }
+                upsert: true,
+              },
             }));
 
             await User.bulkWrite(ops);
             fs.unlinkSync(req.file.path);
 
-            return UserController.standardResponse(
-              res,
-              true,
-              { imported: results.length },
-              `Imported ${results.length} users`
-            );
+            return UserController.standardResponse(res, true, { imported: results.length }, `Imported ${results.length} users`);
           } catch (error) {
             fs.unlinkSync(req.file.path);
             throw error;
@@ -4610,7 +3965,7 @@ class UserController {
   static async exportCSV(req, res) {
     try {
       const users = await User.find({
-        status: { $ne: 'deleted' }
+        status: { $ne: 'deleted' },
       }).lean();
 
       if (users.length === 0) {
@@ -4645,21 +4000,16 @@ class UserController {
             totalUsers: { $sum: 1 },
             avgLoyaltyPoints: { $avg: '$loyaltyPoints' },
             verifiedUsers: {
-              $sum: { $cond: [{ $eq: ['$isVerified', true] }, 1, 0] }
+              $sum: { $cond: [{ $eq: ['$isVerified', true] }, 1, 0] },
             },
             activeSubscriptions: {
-              $sum: { $cond: [{ $ne: ['$subscriptionType', 'free'] }, 1, 0] }
-            }
-          }
-        }
+              $sum: { $cond: [{ $ne: ['$subscriptionType', 'free'] }, 1, 0] },
+            },
+          },
+        },
       ]);
 
-      return UserController.standardResponse(
-        res,
-        true,
-        metrics[0] || {},
-        'User metrics retrieved successfully'
-      );
+      return UserController.standardResponse(res, true, metrics[0] || {}, 'User metrics retrieved successfully');
     } catch (error) {
       console.error('Get user metrics error:', error);
       return UserController.errorResponse(res, 'Failed to fetch user metrics', 500, error.message);
@@ -4671,25 +4021,20 @@ class UserController {
       const limit = Number(req.query.limit) || 10;
 
       const popularUsers = await User.find({
-        status: { $ne: 'deleted' }
+        status: { $ne: 'deleted' },
       })
         .sort({ loyaltyPoints: -1, 'orders.length': -1 })
         .limit(limit)
         .select('username email loyaltyPoints orders createdAt')
         .populate('orders', 'total status');
 
-      const enrichedUsers = popularUsers.map(user => ({
+      const enrichedUsers = popularUsers.map((user) => ({
         ...user.toObject(),
         totalSpent: user.orders.reduce((sum, order) => sum + (order.total || 0), 0),
-        orderCount: user.orders.length
+        orderCount: user.orders.length,
       }));
 
-      return UserController.standardResponse(
-        res,
-        true,
-        enrichedUsers,
-        'Popularity metrics retrieved successfully'
-      );
+      return UserController.standardResponse(res, true, enrichedUsers, 'Popularity metrics retrieved successfully');
     } catch (error) {
       console.error('Get popularity metrics error:', error);
       return UserController.errorResponse(res, 'Failed to fetch popularity metrics', 500, error.message);
@@ -4714,12 +4059,7 @@ class UserController {
       // Here you would typically integrate with a notification service
       // For now, we'll just simulate sending a notification
 
-      return UserController.standardResponse(
-        res,
-        true,
-        { sent: true, userId: id, title, message, type },
-        'Notification sent successfully'
-      );
+      return UserController.standardResponse(res, true, { sent: true, userId: id, title, message, type }, 'Notification sent successfully');
     } catch (error) {
       console.error('Send notification error:', error);
       return UserController.errorResponse(res, 'Failed to send notification', 500, error.message);
@@ -4729,14 +4069,7 @@ class UserController {
   // 6. Advanced Search with Filters
   static async advancedSearch(req, res) {
     try {
-      const {
-        query,
-        filters = {},
-        sort = 'createdAt',
-        order = 'desc',
-        page = 1,
-        limit = 20
-      } = req.query;
+      const { query, filters = {}, sort = 'createdAt', order = 'desc', page = 1, limit = 20 } = req.query;
 
       // Parse filters if string
       const parsedFilters = typeof filters === 'string' ? JSON.parse(filters) : filters;
@@ -4745,12 +4078,7 @@ class UserController {
       const searchQuery = { status: { $ne: 'deleted' }, ...parsedFilters };
 
       if (query) {
-        searchQuery.$or = [
-          { firstName: { $regex: query, $options: 'i' } },
-          { lastName: { $regex: query, $options: 'i' } },
-          { email: { $regex: query, $options: 'i' } },
-          { username: { $regex: query, $options: 'i' } }
-        ];
+        searchQuery.$or = [{ firstName: { $regex: query, $options: 'i' } }, { lastName: { $regex: query, $options: 'i' } }, { email: { $regex: query, $options: 'i' } }, { username: { $regex: query, $options: 'i' } }];
       }
 
       const sortObj = {};
@@ -4758,16 +4086,9 @@ class UserController {
 
       const skip = (page - 1) * limit;
 
-      const [users, total] = await Promise.all([
-        User.find(searchQuery)
-          .populate('role', 'name')
-          .sort(sortObj)
-          .skip(skip)
-          .limit(parseInt(limit)),
-        User.countDocuments(searchQuery)
-      ]);
+      const [users, total] = await Promise.all([User.find(searchQuery).populate('role', 'name').sort(sortObj).skip(skip).limit(parseInt(limit)), User.countDocuments(searchQuery)]);
 
-      const enrichedUsers = users.map(user => UserController.enrichUser(user));
+      const enrichedUsers = users.map((user) => UserController.enrichUser(user));
 
       return UserController.standardResponse(
         res,
@@ -4779,8 +4100,8 @@ class UserController {
             totalPages: Math.ceil(total / limit),
             totalUsers: total,
             hasNext: page * limit < total,
-            hasPrev: page > 1
-          }
+            hasPrev: page > 1,
+          },
         },
         'Advanced search completed'
       );
@@ -4789,8 +4110,6 @@ class UserController {
       return UserController.errorResponse(res, 'Advanced search failed', 500, error.message);
     }
   }
-
-
 
   static async assignUserRoleById(req, res, next) {
     try {
@@ -4814,16 +4133,17 @@ class UserController {
       // Optionally populate role details
       await user.populate('role');
 
-      res.status(200).json(formatResponse('Role assigned to user successfully', {
-        id: user._id,
-        email: user.email,
-        role: user.role.name
-      }));
+      res.status(200).json(
+        formatResponse('Role assigned to user successfully', {
+          id: user._id,
+          email: user.email,
+          role: user.role.name,
+        })
+      );
     } catch (err) {
       next(err);
     }
   }
-
 }
 
 module.exports = UserController;

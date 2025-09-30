@@ -527,6 +527,21 @@ function removeKeysFromObject(obj, keysToRemove) {
   return newObj;
 }
 
+
+
+function buildFilters(query) {
+  const filters = {};
+
+  Object.keys(query).forEach((key) => {
+    if (key.startsWith("filter_") && query[key]) {
+      const cleanKey = key.replace("filter_", ""); // remove prefix
+      filters[cleanKey] = { $regex: query[key], $options: "i" }; // partial match
+    }
+  });
+
+  return filters;
+}
+
 function formatRelativeDuration(dateInput) {
   // Convert input to Date object
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
@@ -569,5 +584,5 @@ module.exports = {
   agGridFilterToMongoQuery,
   sendResponse,
   sendError,
-  formatRelativeDuration,
+  formatRelativeDuration,buildFilters
 };

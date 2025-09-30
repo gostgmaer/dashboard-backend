@@ -154,7 +154,7 @@ const productValidation = {
 
 // GET /api/products - Get all products with advanced filtering
 router.get('/',
-  productValidation.query,
+  // productValidation.query,
   ProductController.getProducts
 );
 router.get('/all',
