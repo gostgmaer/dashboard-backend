@@ -7,6 +7,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
+const mime = require('mime');
 const helmet = require('helmet');
 const { ProductRoute } = require('./src/routes/consolidatedProductRoutes');
 const { UserRoute } = require('./src/routes/userRoutes');
@@ -35,15 +36,42 @@ const NotificationMiddleware = require('./src/middleware/notificationMiddleware'
 const { notificationRoute } = require('./src/routes/notificationRoutes');
 const { AttachmentUpload } = require('./src/routes/fileUploader');
 const LoggerService = require("./src/services/logger");
+
+
+
+const { activityLogger, attachActivityHelpers, errorActivityLogger } = require('./src/middleware/activityLogger');
+// const { userActivityroute } = require('./src/routes/activity');
+
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
-// Import other feature routes similarly...
+// Import other feature routes similarly...\\
+
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:4000",
+  "https://yourdomain.com"
+];
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());                 // Security headers
-app.use(cors());                   // Enable CORS
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps, curl)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);                // Enable CORS
 app.use(morgan('dev'));            // HTTP request logging
 app.use(express.json());           // Parse JSON body
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded body
@@ -63,10 +91,39 @@ verifyEmailConnection().then((result) => console.log(result));
 
 notificationService.socketService = socketService;
 
-app.use(LoggerService.expressRequestLogger());
+// app.use(LoggerService.expressRequestLogger());
 
 // Assuming your uploads folder is ./uploads relative to your project root
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.use(attachActivityHelpers);
+
+// 2. Then add the global activity logger
+app.use(activityLogger({
+  excludeRoutes: [
+    '/health',
+    '/favicon.ico', 
+    '/robots.txt',
+    '/sitemap.xml',
+    '/api/docs', // API documentation
+    '/static', // Static files
+  ],
+  excludeMethods: ['OPTIONS', 'HEAD'],
+  logAnonymous: false, // Set to true to log unauthenticated requests
+  skipSuccessfulGET: false, // Set to true for better performance
+}));
+
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"), {
+    setHeaders: (res, filePath) => {
+      // auto-detect MIME type
+      const type = mime.getType(filePath);
+      if (type) {
+        res.setHeader("Content-Type", type);
+      }
+    },
+  })
+);
 app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
 app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
 app.use('/api/users', checkRoute("UserRoute", UserRoute));
@@ -90,6 +147,13 @@ app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
 app.use('/api/files', checkRoute("Attachment Files", AttachmentUpload));
 
+
+// Activity analytics endpoints (optional)
+// app.use('/api/activity', checkRoute("User Logs",userActivityroute)); // We'll create this
+
+
+// Error handling middleware with activity logging
+app.use(errorActivityLogger);
 
 // Mount other feature routes here...
 app.get("/", (req, res) => {

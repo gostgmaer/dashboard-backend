@@ -17,6 +17,7 @@ const otpService = require('../services/otpService');
 const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTemplate } = require('../email/emailTemplate');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
 const { jwtSecret } = require('../config/setting');
+const ActivityHelper = require('../utils/activityHelpers');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -190,6 +191,7 @@ class authController {
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
       await NotificationMiddleware.onUserCreate(req, res, () => {});
+      
       return standardResponse(
         res,
         true,
@@ -383,6 +385,12 @@ class authController {
       res.locals.user = user;
       // const user = await User.findByEmail(email);
       if (!user) {
+          // Log failed login attempt
+        await ActivityHelper.logAuth(req, 'login attempt', 'failed', {
+          email,
+          reason: 'user not found',
+          suspiciousActivity: true,
+        });
         return errorResponse(res, 'Invalid Email/username or password', 401);
       }
 
@@ -438,6 +446,14 @@ class authController {
           console.error('OTP generation failed:', error);
         }
         const tokens = await user.generateTokens(deviceInfo);
+          // Log successful login
+      await ActivityHelper.logAuth(req, 'login', 'success', {
+        userId: user._id,
+        email: user.email,
+        loginMethod: 'password',
+        tokenGenerated: true,
+      });
+
         return standardResponse(
           res,
           true,
@@ -464,7 +480,13 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-
+  // Log successful login
+      await ActivityHelper.logAuth(req, 'login', 'success', {
+        userId: user._id,
+        email: user.email,
+        loginMethod: 'password',
+        tokenGenerated: true,
+      });
       return standardResponse(
         res,
         true,
@@ -500,6 +522,13 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
+  // Log successful login
+      await ActivityHelper.logAuth(req, 'login', 'success', {
+        userId: user._id,
+        email: user.email,
+        loginMethod: 'password',
+        tokenGenerated: true,
+      });
 
       return standardResponse(
         res,
@@ -522,7 +551,9 @@ class authController {
       );
       NotificationMiddleware.onLoginSuccess(req, res, () => {});
     } catch (error) {
-      console.error('Login error:', error);
+     await ActivityHelper.logAuth(req, 'login attempt', 'error', {
+        error: error.message,
+      });
       return errorResponse(res, error.message, 500, error.message);
     }
   }
