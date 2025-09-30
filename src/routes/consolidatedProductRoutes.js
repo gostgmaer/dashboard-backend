@@ -5,8 +5,8 @@ const { body, query, param, validationResult } = require('express-validator');
 const {authMiddleware} = require('../middleware/auth');
 const authorize = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
+// const multer = require('multer');
+// const upload = multer({ dest: 'uploads/' });
 const { enviroment } = require('../config/setting');
    const Product = require('../models/products'); // Assumed Product model
 /**
@@ -625,13 +625,13 @@ router.get('/recommendations/:id',
 );
 
 // 3. Import/Export
-router.post('/import',
-  authMiddleware,
-  authorize('products', 'write'),
-  bulkOperationLimiter,
-  upload.single('file'),
-  ProductController.importCSV
-);
+// router.post('/import',
+//   authMiddleware,
+//   authorize('products', 'write'),
+//   bulkOperationLimiter,
+//   upload.single('file'),
+//   ProductController.importCSV
+// );
 
 router.get('/export',
   authMiddleware,
