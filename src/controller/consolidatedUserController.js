@@ -349,7 +349,7 @@ class UserController {
       const data = result.items.map((user) => UserController.enrichUser(user));
 
       const response = {
-        users: data.map((u) => {
+        result: data.map((u) => {
           return {
             id: u._id,
             theme: u.preferences?.theme || '',
@@ -392,9 +392,9 @@ class UserController {
           };
         }),
         pagination: {
-          currentPage: result.page,
+          page: result.page,
           totalPages: result.pages,
-          totalUsers: result.total,
+          total: result.total,
           hasNext: result.page < result.pages,
           hasPrev: result.page > 1,
           limit: Number(limit),
