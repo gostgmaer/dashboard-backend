@@ -3663,6 +3663,7 @@ userSchema.statics.getAverageOrdersPerUser = async function () {
     }
 
     await user.handleSuccessfulLogin(deviceInfo);
+    await user.updateLastLogin();
     await user.createSession(deviceInfo);
     return {
       user,
