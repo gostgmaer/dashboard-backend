@@ -532,15 +532,23 @@ function removeKeysFromObject(obj, keysToRemove) {
 function buildFilters(query) {
   const filters = {};
 
-  Object.keys(query).forEach((key) => {
-    if (key.startsWith("filter_") && query[key]) {
-      const cleanKey = key.replace("filter_", ""); // remove prefix
-      filters[cleanKey] = { $regex: query[key], $options: "i" }; // partial match
+  // Pick only keys starting with filter_
+  const filterKeys = Object.keys(query).filter((key) => key.startsWith("filter_"));
+
+  if (filterKeys.length === 0) {
+    return query;
+  }
+
+  filterKeys.forEach((key) => {
+    if (query[key]) {
+      const cleanKey = key.replace("filter_", "");
+      filters[cleanKey] = { $regex: query[key], $options: "i" };
     }
   });
 
   return filters;
 }
+
 
 function formatRelativeDuration(dateInput) {
   // Convert input to Date object

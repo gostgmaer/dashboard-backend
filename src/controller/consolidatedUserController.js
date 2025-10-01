@@ -11,7 +11,7 @@ const { APIError, formatResponse, standardResponse, errorResponse } = require('.
 const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
-const { buildFilters } = require('../utils/helper');
+const { buildFilters, formatRelativeDuration } = require('../utils/helper');
 const ActivityHelper = require('../utils/activityHelpers');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -286,8 +286,8 @@ class UserController {
       for (var key in otherFilters) {
         var value = otherFilters[key];
         if (value && value !== '' && value !== 'undefined') {
-          var normalizedKey = key.startsWith('filter_') ? key.replace('filter_', '') : key;
-          normalizedOtherFilters[normalizedKey] = value;
+         
+          normalizedOtherFilters[key] = value;
         }
       }
 
@@ -356,6 +356,8 @@ class UserController {
             language: u.preferences?.language || '',
             currency: u.preferences?.currency || 'USD',
             notifications: u.preferences?.notifications,
+            createdAt:u.createdAt,
+            updatedAt:u.updatedAt,
             newsletter: u.preferences?.newsletter,
             username: u.username,
             email: u.email,
@@ -376,6 +378,7 @@ class UserController {
             failedLoginAttempts: u.failedLoginAttempts,
             consecutiveFailedAttempts: u.consecutiveFailedAttempts,
             lockoutUntil: u.lockoutUntil,
+            lastLogin: formatRelativeDuration (u.lastLogin),
             lastLoginAttempt: u.lastLoginAttempt,
             twoFactorEnabled: u.otpSettings?.enable || false,
             addresscount: Array.isArray(u.address) ? u.address.length : 0,
