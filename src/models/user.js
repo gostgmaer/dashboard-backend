@@ -2852,10 +2852,10 @@ userSchema.method({
 
   async deleteAccount() {
     this.status = 'deleted';
-    this.isDeleted=false;
-    this.emailVerified=false;
-    this.emailVerificationTokens=[];
-    this.isVerified=false;
+    this.isDeleted = false;
+    this.emailVerified = false;
+    this.emailVerificationTokens = [];
+    this.isVerified = false;
     this.loginHistory = [];
     this.activeSessions = [];
     this.refreshTokens = [];
@@ -4079,6 +4079,162 @@ userSchema.statics.authenticateViaSocial = async function (socialData, deviceInf
     throw new Error(`Social authentication failed: ${error.message}`);
   }
 };
+
+userSchema.statics.getDashboardStats = async function () {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // STATUS
+  const [totalUsers, activeUsers, inactiveUsers, verifiedUsers, newsletterSubscribed] = await Promise.all([
+    this.countDocuments({}),
+    this.countDocuments({ status: "active" }),
+    this.countDocuments({ status: "inactive" }),
+    this.countDocuments({ isVerified: true }),
+    this.countDocuments({ "preferences.newsletter": true }),
+  ]);
+  const unverifiedUsers = totalUsers - verifiedUsers;
+  const newsletterUnsubscribed = totalUsers - newsletterSubscribed;
+
+  // NEW USERS
+  const [newUsersToday, newUsersThisWeek, newUsersThisMonth] = await Promise.all([
+    this.countDocuments({ createdAt: { $gte: startOfDay } }),
+    this.countDocuments({ createdAt: { $gte: startOfWeek } }),
+    this.countDocuments({ createdAt: { $gte: startOfMonth } }),
+  ]);
+
+  // USERS WITH/WITHOUT ORDERS
+  const [usersWithOrders, usersWithoutOrders] = await Promise.all([
+    this.countDocuments({ orders: { $exists: true, $not: { $size: 0 } } }),
+    this.countDocuments({ $or: [{ orders: { $size: 0 } }, { orders: { $exists: false } }] })
+  ]);
+
+  // ROLE, DEVICE, COUNTRY GROUPING
+  const [
+    usersByRole,
+    usersByDevice,
+    usersByCountry,
+    usersByStatus,
+    usersWithNewsletter,
+    usersByVerification
+  ] = await Promise.all([
+    this.aggregate([{ $group: { _id: "$role", value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: "$deviceInfo.type", value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: "$location.country", value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: "$status", value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: "$preferences.newsletter", value: { $sum: 1 } } }]),
+    this.aggregate([
+      {
+        $group: {
+          _id: null,
+          emailVerified: { $sum: { $cond: ["$emailVerified", 1, 0] } },
+          phoneVerified: { $sum: { $cond: ["$phoneVerified", 1, 0] } },
+          twoFactorEnabled: { $sum: { $cond: ["$twoFactorAuth.enabled", 1, 0] } }
+        }
+      }
+    ])
+  ]);
+
+  // RECENT USERS
+  const recentUsers = await this.find({})
+    .sort({ createdAt: -1 })
+    .limit(5)
+    .select([
+      "_id", "firstName", "lastName", "email", "role", "status", "lastLogin",
+      "createdAt", "location.country", "phoneNumber", "orders", "preferences.newsletter", "deviceInfo.type", "activityLogs", "isVerified"
+    ]).lean();
+
+  // TOP SPENDING USERS (requires orders population fully)
+  const topSpendingUsers = await this.aggregate([
+    {
+      $project: {
+        name: { $concat: ["$firstName", " ", "$lastName"] },
+        totalSpent: { $ifNull: ["$totalSpent", 0] }
+      }
+    },
+    { $sort: { totalSpent: -1 } },
+    { $limit: 3 }
+  ]);
+
+  // ORDER/VISITOR STATS (replace with Order/Session/Log models if needed)
+  const averageOrderValue = 75; // Use Order.aggregate for real calcs
+  const totalOrders = 320; // Use Order.countDocuments
+  const averageSessionDuration = "15m 30s"; // Placeholder, compute from session logs
+  const pagesPerSession = 5.2; // Placeholder, compute from activity logs
+  const bounceRate = "18%"; // Placeholder
+  const dailyActiveUsers = 1020; // Placeholder
+  const weeklyActiveUsers = 1350; // Placeholder
+  const monthlyActiveUsers = 1480; // Placeholder
+  const churnedUsers30Days = 75; // Placeholder
+
+  // NEW/RETURNING USERS (approximate for dashboard, real calc needs session/logs)
+  const newVsReturningUsers = {
+    newUsers: newUsersThisMonth,
+    returningUsers: totalUsers - newUsersThisMonth
+  };
+
+  // USER GROWTH RATE (e.g., new users this month vs last month)
+  const userGrowthRate = "12%"; // Placeholder; compute true percentage
+
+  return {
+    stats: {
+      totalUsers,
+      activeUsers,
+      inactiveUsers,
+      newUsersToday,
+      newUsersThisWeek,
+      newUsersThisMonth,
+      verifiedUsers,
+      unverifiedUsers,
+      usersWithOrders,
+      usersWithoutOrders,
+      newsletterSubscribed,
+      newsletterUnsubscribed,
+      averageSessionDuration,
+      pagesPerSession,
+      bounceRate,
+      dailyActiveUsers,
+      weeklyActiveUsers,
+      monthlyActiveUsers,
+      churnedUsers30Days,
+      newVsReturningUsers,
+      userGrowthRate,
+      averageOrderValue,
+      totalOrders
+    },
+    usersByRole: usersByRole.map(r => ({ name: r._id, value: r.value })),
+    usersByDevice: usersByDevice.map(d => ({ name: d._id, value: d.value })),
+    usersByCountry: usersByCountry.map(c => ({ country: c._id, count: c.value })),
+    usersByStatus: usersByStatus.map(s => ({ status: s._id, count: s.value })),
+    usersWithNewsletter: usersWithNewsletter.map(u => ({ status: u._id ? "Subscribed" : "Unsubscribed", count: u.value })),
+    usersByVerification: {
+      emailVerified: usersByVerification[0]?.emailVerified || 0,
+      phoneVerified: usersByVerification[0]?.phoneVerified || 0,
+      twoFactorEnabled: usersByVerification[0]?.twoFactorEnabled || 0
+    },
+    recentUsers: recentUsers.map(u => ({
+      id: u._id,
+      name: `${u.firstName} ${u.lastName}`,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      lastActive: u.lastLogin,
+      joinedAt: u.createdAt,
+      country: u.location?.country,
+      phone: u.phoneNumber,
+      ordersCount: u.orders?.length || 0,
+      totalSpent: u.totalSpent || 0,
+      preferredDevice: u.deviceInfo?.type,
+      newsletterSubscribed: (u.preferences?.newsletter ? true : false) || false,
+      lastLogin: u.lastLogin,
+      activityLogs: u.activityLogs,
+      isVerified: u.isVerified
+    })),
+    topSpendingUsers
+  }
+}
+
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
