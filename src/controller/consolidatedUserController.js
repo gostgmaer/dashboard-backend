@@ -286,7 +286,7 @@ class UserController {
       for (var key in otherFilters) {
         var value = otherFilters[key];
         if (value && value !== '' && value !== 'undefined') {
-         
+
           normalizedOtherFilters[key] = value;
         }
       }
@@ -356,8 +356,8 @@ class UserController {
             language: u.preferences?.language || '',
             currency: u.preferences?.currency || 'USD',
             notifications: u.preferences?.notifications,
-            createdAt:u.createdAt,
-            updatedAt:u.updatedAt,
+            createdAt: u.createdAt,
+            updatedAt: u.updatedAt,
             newsletter: u.preferences?.newsletter,
             username: u.username,
             email: u.email,
@@ -378,7 +378,7 @@ class UserController {
             failedLoginAttempts: u.failedLoginAttempts,
             consecutiveFailedAttempts: u.consecutiveFailedAttempts,
             lockoutUntil: u.lockoutUntil,
-            lastLogin: formatRelativeDuration (u.lastLogin),
+            lastLogin: formatRelativeDuration(u.lastLogin),
             lastLoginAttempt: u.lastLoginAttempt,
             twoFactorEnabled: u.otpSettings?.enable || false,
             addresscount: Array.isArray(u.address) ? u.address.length : 0,
@@ -565,7 +565,7 @@ class UserController {
       if (!user) {
         return UserController.errorResponse(res, 'User not found', 404);
       }
-   // Using manual logging with detailed info
+      // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'User', 'updated', {
         id: user._id,
         role: user.role.name,
@@ -4128,6 +4128,24 @@ class UserController {
       return UserController.errorResponse(res, 'Advanced search failed', 500, error.message);
     }
   }
+
+
+
+  // Controller to get dashboard stats
+  static async getUserStats(req, res, next) {
+    try {
+      const stats = await User.getUserStats();
+      return standardResponse(
+        res,
+        true,
+        stats,
+        'fetched dashboard stats'
+      );
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      return errorResponse(res, 'Error fetching dashboard stats', 500, error.message)
+    }
+  };
 
   static async assignUserRoleById(req, res, next) {
     try {

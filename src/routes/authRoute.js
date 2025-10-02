@@ -48,6 +48,8 @@ authRoute.post('/login', authLimiter, authController.login);
 authRoute.post('/verify-otp', authLimiter, authController.verifyOTPAndLogin);
 authRoute.post('/resend-otp', authLimiter, authController.resendOTP);
 authRoute.post('/social-auth', authLimiter, authController.socialLogin);
+authRoute.post('/social/:provider', authLimiter, authController.initiateSocialLogin);
+authRoute.post('/social/:provider/callback', authLimiter, authController.handleSocialCallback);
 authRoute.post('/forgot-password', authLimiter, authController.forgotPassword);
 authRoute.post('/reset-password/:token', authLimiter, authController.resetPassword);
 authRoute.post('/verify-user/:id', authMiddleware, authorize('users', 'update'), authController.verifyUser);
@@ -124,8 +126,11 @@ authRoute.patch('/profile', authMiddleware, authController.updateProfile);
 authRoute.patch('/profile-picture', authMiddleware, authController.updateProfilePicture);
 authRoute.patch('/email', authMiddleware, authorize('users', 'update'), authController.updateEmail);
 authRoute.patch('/phone', authMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
-authRoute.post('/social/link', authMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
-authRoute.post('/social/unlink', authMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
+authRoute.post('/social/:provider/link', authMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
+authRoute.post('/social/:provider/link/callback', authMiddleware, authorize('users', 'update'), authController.handleLinkingCallback);
+authRoute.post('/social/:provider/unlink', authMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
+authRoute.post('/social/accounts', authMiddleware, authorize('users', 'update'), authController.getLinkedAccounts);
+authRoute.post('/social/:provider/status', authMiddleware, authorize('users', 'update'), authController.checkSocialStatus);
 authRoute.delete('/social/clear/:id', authMiddleware, authorize('users', 'update'), authController.clearAllSocialLinks);
 
 // ========================================

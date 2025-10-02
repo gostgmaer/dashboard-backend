@@ -1,7 +1,7 @@
-const mongoose = require("mongoose");
+
 const Permission = require("./permission");
-
-
+const User = require("./user");
+const mongoose = require("mongoose");
 
 
 // 🔹 Predefined role names
@@ -44,7 +44,7 @@ const roleSchema = new mongoose.Schema(
     description: { type: String, trim: true },
     permissions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Permission" }],
     isDefault: { type: Boolean, default: false },
-     isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
@@ -391,9 +391,9 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
     avgPermissionsPerRole:
       formattedRoles.length > 0
         ? Math.round(
-            formattedRoles.reduce((sum, r) => sum + r.permissionsCount, 0) /
-            formattedRoles.length
-          )
+          formattedRoles.reduce((sum, r) => sum + r.permissionsCount, 0) /
+          formattedRoles.length
+        )
         : 0
   };
 
@@ -413,6 +413,194 @@ roleSchema.statics.getRoleStatistics = async function (options = {}) {
   };
 };
 
+roleSchema.statics.getCompleteRoleStatistics = async function () {
+  try {
+    const User = require('./user');
+
+    // Basic role counts
+    const totalRoles = await this.countDocuments({});
+    const activeRoles = await this.countDocuments({ isActive: true });
+    const inactiveRoles = await this.countDocuments({ isActive: false });
+    const deletedRoles = await this.countDocuments({ isDeleted: true });
+    const defaultRoles = await this.countDocuments({ isDefault: true });
+
+
+    // Get all roles with populated permissions
+    const allRoles = await this.find({ isDeleted: false })
+      .populate('permissions')
+      .populate('created_by', 'name email')
+      .populate('updated_by', 'name email');
+
+
+
+    const userCountMap = {};
+    // Total users in system
+    const totalUsers = await User.countDocuments();
+    // User assignment statistics
+    const userAssignmentStats = await User.aggregate([
+      {
+        $lookup: {
+          from: 'roles',            // name of the roles collection (check your DB for exact name)
+          localField: 'role',       // field in User documents
+          foreignField: '_id',      // field in Role documents
+          as: 'roleData'
+        }
+      },
+      {
+        $unwind: {
+          path: '$roleData',
+          preserveNullAndEmptyArrays: true  // keep users even if they have no role assigned
+        }
+      },
+      {
+        $group: {
+          _id: '$role',
+          name: { $first: '$roleData.name' },  // role name from joined roleData
+          userCount: { $sum: 1 }
+        }
+      }
+    ]);
+
+    let totalUsersAssigned = 0;
+    userAssignmentStats.forEach(stat => {
+      if (stat._id) {
+        userCountMap[stat._id.toString()] = stat.userCount;
+        totalUsersAssigned += stat.userCount;
+      }
+    });
+
+    // Unassigned user count
+    const unassignedUsersCount = totalUsers - totalUsersAssigned;
+
+    // Permission statistics
+    const allPermissions = await Permission.find({});
+    const totalPermissions = allPermissions.length;
+    const activePermissions = allPermissions.filter(p => p.isActive !== false).length;
+
+    // Permissions by category
+    const permissionsByCategory = allPermissions.reduce((acc, perm) => {
+      const category = perm.category || 'uncategorized';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(perm);
+      return acc;
+    }, {});
+
+    // Role-specific statistics
+    const roleDetails = allRoles.map(role => {
+      const userCount = userCountMap[role._id.toString()] || 0;
+      const permissionsByRoleCategory = role.permissions.reduce((acc, perm) => {
+        const category = perm.category || 'uncategorized';
+        if (!acc[category]) acc[category] = 0;
+        acc[category]++;
+        return acc;
+      }, {});
+
+      return {
+        id: role._id,
+        name: role.name,
+        description: role.description,
+        isActive: role.isActive,
+        isDefault: role.isDefault,
+        userCount,
+        permissionCount: role.permissions.length,
+        permissionsByCategory: permissionsByRoleCategory,
+        categoriesCount: Object.keys(permissionsByRoleCategory).length,
+        createdAt: role.createdAt,
+        updatedAt: role.updatedAt,
+        created_by: role.created_by,
+        updated_by: role.updated_by,
+        isInUse: userCount > 0
+      };
+    });
+
+    // Advanced statistics
+    const rolesInUse = roleDetails.filter(r => r.userCount > 0).length;
+    const unusedRoles = roleDetails.filter(r => r.userCount === 0).length;
+    const avgPermissionsPerRole = totalRoles > 0 ?
+      Math.round(roleDetails.reduce((sum, r) => sum + r.permissionCount, 0) / totalRoles) : 0;
+
+    // Most/least used roles
+    const sortedByUsers = [...roleDetails].sort((a, b) => b.userCount - a.userCount);
+    const mostUsedRole = sortedByUsers[0];
+    const leastUsedRole = sortedByUsers[sortedByUsers.length - 1];
+
+    // Most/least permissions
+    const sortedByPermissions = [...roleDetails].sort((a, b) => b.permissionCount - a.permissionCount);
+    const roleWithMostPermissions = sortedByPermissions[0];
+    const roleWithLeastPermissions = sortedByPermissions[sortedByPermissions.length - 1];
+
+    // Category statistics
+    const categoryStats = {};
+    Object.keys(permissionsByCategory).forEach(category => {
+      const perms = permissionsByCategory[category];
+      categoryStats[category] = {
+        totalPermissions: perms.length,
+        activePermissions: perms.filter(p => p.isActive !== false).length,
+        rolesUsingCategory: roleDetails.filter(r =>
+          Object.keys(r.permissionsByCategory).includes(category)
+        ).length
+      };
+    });
+
+    return {
+      summary: {
+        totalRoles,
+        activeRoles,
+        inactiveRoles,
+        deletedRoles,
+        defaultRoles,
+        rolesInUse,
+        unusedRoles,
+        totalUsersAssigned,
+        unassignedUsers: unassignedUsersCount,
+        totalPermissions,
+        activePermissions,
+        totalCategories: Object.keys(permissionsByCategory).length,
+        avgPermissionsPerRole
+      },
+      roleBreakdown: {
+        mostUsedRole: mostUsedRole ? {
+          name: mostUsedRole.name,
+          userCount: mostUsedRole.userCount
+        } : null,
+        leastUsedRole: leastUsedRole ? {
+          name: leastUsedRole[leastUsedRole.length - 1].name,
+          userCount: leastUsedRole[leastUsedRole.length - 1].userCount
+        } : null,
+        roleWithMostPermissions: roleWithMostPermissions ? {
+          name: roleWithMostPermissions.name,
+          permissionCount: roleWithMostPermissions.permissionCount
+        } : null,
+        roleWithLeastPermissions: roleWithLeastPermissions ? {
+          name: roleWithLeastPermissions[leastUsedRole.length - 1].name,
+          permissionCount: roleWithLeastPermissions[leastUsedRole.length - 1].permissionCount
+        } : null
+      },
+      detailedRoles: roleDetails,
+      permissionStatistics: {
+        totalPermissions,
+        activePermissions,
+        inactivePermissions: totalPermissions - activePermissions,
+        categoriesBreakdown: categoryStats
+      },
+      userDistribution: [
+        ...userAssignmentStats.map(stat => ({
+          roleId: stat._id,
+          roleName: stat.name,
+          userCount: stat.userCount
+        })),
+        {
+          roleId: 'Unassigned',
+          roleName: 'Unassigned Users',
+          userCount: unassignedUsersCount
+        }
+      ],
+      unassignedUsers: unassignedUsersCount
+    };
+  } catch (error) {
+    throw new Error(`Error generating role statistics: ${error.message}`);
+  }
+};
 
 
 const Role = mongoose.model("Role", roleSchema);

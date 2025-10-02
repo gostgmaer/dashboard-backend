@@ -719,6 +719,26 @@ const getDefaultRoleId = async (req, res) => {
   }
 };
 
+
+const getCompleteRoleStatistics = async (req, res) => {
+  try {
+    const stats = await Role.getCompleteRoleStatistics();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Complete role statistics retrieved successfully',
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error getting complete role statistics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve role statistics',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   create,
   getAll,
@@ -748,5 +768,5 @@ module.exports = {
   syncPermissions,
   searchRoles,
   bulkDeactivate,
-  bulkActivate,
+  bulkActivate,getCompleteRoleStatistics
 };
