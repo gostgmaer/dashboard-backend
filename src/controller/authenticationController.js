@@ -190,8 +190,8 @@ class authController {
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-      await NotificationMiddleware.onUserCreate(req, res, () => {});
-      
+      await NotificationMiddleware.onUserCreate(req, res, () => { });
+
       return standardResponse(
         res,
         true,
@@ -385,7 +385,7 @@ class authController {
       res.locals.user = user;
       // const user = await User.findByEmail(email);
       if (!user) {
-          // Log failed login attempt
+        // Log failed login attempt
         await ActivityHelper.logAuth(req, 'login attempt', 'failed', {
           email,
           reason: 'user not found',
@@ -446,13 +446,13 @@ class authController {
           console.error('OTP generation failed:', error);
         }
         const tokens = await user.generateTokens(deviceInfo);
-          // Log successful login
-      await ActivityHelper.logAuth(req, 'login', 'success', {
-        userId: user._id,
-        email: user.email,
-        loginMethod: 'password',
-        tokenGenerated: true,
-      });
+        // Log successful login
+        await ActivityHelper.logAuth(req, 'login', 'success', {
+          userId: user._id,
+          email: user.email,
+          loginMethod: 'password',
+          tokenGenerated: true,
+        });
 
         return standardResponse(
           res,
@@ -480,7 +480,7 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-  // Log successful login
+      // Log successful login
       await ActivityHelper.logAuth(req, 'login', 'success', {
         userId: user._id,
         email: user.email,
@@ -505,27 +505,33 @@ class authController {
       );
     } catch (error) {
       console.error('Login error:', error);
-      NotificationMiddleware.onLoginFailed(req, res, () => {});
+      NotificationMiddleware.onLoginFailed(req, res, () => { });
       return errorResponse(res, error.message, 500, error.message);
     }
   }
   static async socialLogin(req, res) {
     try {
-      const { identifier, profileData, deviceTrust = false } = req.body;
+
+      const { identifier, profileData, deviceTrust = false, provider, providerId, email, name, profile, } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
+      if (!provider || !providerId || !email || !name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields' });
+
+      }
+    const { user, isNewUser } = await verifyAndLinkUser({ provider, providerId, email, name, profile });
 
       // Authenticate user
       const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
-      let user = authResult.user;
-      res.locals.user = user;
-      const tokens = await user.generateTokens(deviceInfo);
+      let u = authResult.user;
+      res.locals.user = u;
+      const tokens = await u.generateTokens(deviceInfo);
       if (deviceTrust) {
-        await user.trustDevice(deviceInfo.deviceId);
+        await u.trustDevice(deviceInfo.deviceId);
       }
-  // Log successful login
+      // Log successful login
       await ActivityHelper.logAuth(req, 'login', 'success', {
-        userId: user._id,
-        email: user.email,
+        userId: u._id,
+        email: u.email,
         loginMethod: 'password',
         tokenGenerated: true,
       });
@@ -535,23 +541,23 @@ class authController {
         true,
         {
           user: {
-            id: user._id,
-            email: user.email,
-            image: user.profilePicture,
-            username: user.username,
-            fullName: user.fullName,
-            role: user.role?.name,
-            isVerified: user.isVerified,
-            hasActiveTOTP: user.hasActiveTOTP,
+            id: u._id,
+            email: u.email,
+            image: u.profilePicture,
+            username: u.username,
+            fullName: u.fullName,
+            role: u.role?.name,
+            isVerified: u.isVerified,
+            hasActiveTOTP: u.hasActiveTOTP,
           },
           tokens,
           requiresMFA: false,
         },
         'Login successful'
       );
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
     } catch (error) {
-     await ActivityHelper.logAuth(req, 'login attempt', 'error', {
+      await ActivityHelper.logAuth(req, 'login attempt', 'error', {
         error: error.message,
       });
       return errorResponse(res, error.message, 500, error.message);
@@ -621,7 +627,7 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -654,7 +660,7 @@ class authController {
     try {
       const { tempToken, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-    } catch (error) {}
+    } catch (error) { }
   }
   /**
    * MFA verification - Step 2
@@ -918,7 +924,7 @@ class authController {
 
       const result = await user.changePassword(currentPassword, newPassword);
       await user.logSecurityEvent('password_changed', 'Password changed successfully', 'medium', deviceInfo);
-      NotificationMiddleware.onPasswordChange(req, res, () => {});
+      NotificationMiddleware.onPasswordChange(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -1132,7 +1138,7 @@ class authController {
       await user.revokeAllTokens('password_reset');
       await user.save();
       await user.logSecurityEvent('password_reset_completed', 'Password reset completed', 'high', deviceInfo);
-      NotificationMiddleware.onPasswordReset(req, res, () => {});
+      NotificationMiddleware.onPasswordReset(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -1316,7 +1322,7 @@ class authController {
 
       if (result) {
         await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
-        NotificationMiddleware.onEmailVerified(req, res, () => {});
+        NotificationMiddleware.onEmailVerified(req, res, () => { });
         return standardResponse(
           res,
           true,
@@ -1353,45 +1359,45 @@ class authController {
     }
   }
 
-  static async linkSocialAccount(req, res) {
-    try {
-      const { provider, providerId, email } = req.body;
-      const userId = req.user.id; // from JWT middleware
+  // static async linkSocialAccount(req, res) {
+  //   try {
+  //     const { provider, providerId, email } = req.body;
+  //     const userId = req.user.id; // from JWT middleware
 
-      const user = await User.findById(userId);
-      const linkedAccount = await user.linkSocialAccount(provider, providerId, email, true);
+  //     const user = await User.findById(userId);
+  //     const linkedAccount = await user.linkSocialAccount(provider, providerId, email, true);
 
-      res.json({
-        success: true,
-        message: `${provider} account linked successfully`,
-        account: {
-          provider: linkedAccount.provider,
-          email: linkedAccount.email,
-          connectedAt: linkedAccount.connectedAt,
-        },
-      });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       message: `${provider} account linked successfully`,
+  //       account: {
+  //         provider: linkedAccount.provider,
+  //         email: linkedAccount.email,
+  //         connectedAt: linkedAccount.connectedAt,
+  //       },
+  //     });
+  //   } catch (error) {
+  //     res.status(400).json({ success: false, message: error.message });
+  //   }
+  // }
 
-  static async unlinkSocialAccount(req, res) {
-    try {
-      const { provider, providerId } = req.body;
-      const userId = req.user.id;
+  // static async unlinkSocialAccount(req, res) {
+  //   try {
+  //     const { provider, providerId } = req.body;
+  //     const userId = req.user.id;
 
-      const user = await User.findById(userId);
-      await user.unlinkSocialAccount(provider, providerId);
+  //     const user = await User.findById(userId);
+  //     await user.unlinkSocialAccount(provider, providerId);
 
-      res.json({
-        success: true,
-        message: `${provider} account unlinked successfully`,
-        socialAccounts: user.getSocialAccounts(),
-      });
-    } catch (error) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
+  //     res.json({
+  //       success: true,
+  //       message: `${provider} account unlinked successfully`,
+  //       socialAccounts: user.getSocialAccounts(),
+  //     });
+  //   } catch (error) {
+  //     res.status(400).json({ success: false, message: error.message });
+  //   }
+  // }
   /**
    * Get active sessions
    */
@@ -1665,7 +1671,7 @@ class authController {
     try {
       await req.user.updateProfile(req.body);
       res.locals.changes = req.body;
-      NotificationMiddleware.onUserUpdate(req, res, () => {});
+      NotificationMiddleware.onUserUpdate(req, res, () => { });
       return standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
@@ -1686,7 +1692,7 @@ class authController {
 
       const profilePicture = await req.user.updateProfilePicture(url);
       return standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
-      NotificationMiddleware.onUserUpdate(req, res, () => {});
+      NotificationMiddleware.onUserUpdate(req, res, () => { });
     } catch (error) {
       console.error('Update profile picture error:', error);
       return errorResponse(res, 'Failed to update profile picture', 500, error.message);
@@ -1748,54 +1754,54 @@ class authController {
   /**
    * LINK SOCIAL ACCOUNT
    */
-  static async linkSocialAccount(req, res) {
-    try {
-      const { id } = req.params;
-      const { platform, socialId } = req.body;
+  // static async linkSocialAccount(req, res) {
+  //   try {
+  //     const { id } = req.params;
+  //     const { platform, socialId } = req.body;
 
-      if (!platform || !socialId) {
-        return errorResponse(res, 'Platform and social ID are required', 400);
-      }
+  //     if (!platform || !socialId) {
+  //       return errorResponse(res, 'Platform and social ID are required', 400);
+  //     }
 
-      const user = await User.findById(id);
-      if (!user) {
-        return errorResponse(res, 'User not found', 404);
-      }
+  //     const user = await User.findById(id);
+  //     if (!user) {
+  //       return errorResponse(res, 'User not found', 404);
+  //     }
 
-      await user.linkSocialAccount(platform, socialId);
+  //     await user.linkSocialAccount(platform, socialId);
 
-      return standardResponse(res, true, null, 'Social account linked');
-    } catch (error) {
-      console.error('Link social account error:', error);
-      return errorResponse(res, 'Failed to link social account', 500, error.message);
-    }
-  }
+  //     return standardResponse(res, true, null, 'Social account linked');
+  //   } catch (error) {
+  //     console.error('Link social account error:', error);
+  //     return errorResponse(res, 'Failed to link social account', 500, error.message);
+  //   }
+  // }
 
   /**
    * UNLINK SOCIAL ACCOUNT
    */
-  static async unlinkSocialAccount(req, res) {
-    try {
-      const { id } = req.params;
-      const { platform } = req.body;
+  // static async unlinkSocialAccount(req, res) {
+  //   try {
+  //     const { id } = req.params;
+  //     const { platform } = req.body;
 
-      if (!platform) {
-        return errorResponse(res, 'Platform is required', 400);
-      }
+  //     if (!platform) {
+  //       return errorResponse(res, 'Platform is required', 400);
+  //     }
 
-      const user = await User.findById(id);
-      if (!user) {
-        return errorResponse(res, 'User not found', 404);
-      }
+  //     const user = await User.findById(id);
+  //     if (!user) {
+  //       return errorResponse(res, 'User not found', 404);
+  //     }
 
-      await user.unlinkSocialAccount(platform);
+  //     await user.unlinkSocialAccount(platform);
 
-      return standardResponse(res, true, null, 'Social account unlinked');
-    } catch (error) {
-      console.error('Unlink social account error:', error);
-      return errorResponse(res, 'Failed to unlink social account', 500, error.message);
-    }
-  }
+  //     return standardResponse(res, true, null, 'Social account unlinked');
+  //   } catch (error) {
+  //     console.error('Unlink social account error:', error);
+  //     return errorResponse(res, 'Failed to unlink social account', 500, error.message);
+  //   }
+  // }
 
   /**
    * CLEAR ALL SOCIAL LINKS
@@ -2945,6 +2951,252 @@ class authController {
       });
     }
   }
-}
 
+
+  /**
+    * Initialize social login (redirect to provider)
+    */
+  static async initiateSocialLogin(req, res, next) {
+    const { provider } = req.params;
+    const validProviders = ['google', 'facebook', 'twitter', 'github'];
+
+    if (!validProviders.includes(provider)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid social provider'
+      });
+    }
+
+    // Store device info in session for later use
+    req.session.deviceInfo = {
+      userAgent: req.get('User-Agent'),
+      ipAddress: req.ip,
+      deviceId: crypto.randomBytes(16).toString('hex'),
+      timestamp: new Date()
+    };
+
+    // Initiate passport authentication
+    passport.authenticate(provider, {
+      scope: getScopeForProvider(provider)
+    })(req, res, next);
+  }
+
+  /**
+   * Handle social login callback
+   */
+  static async handleSocialCallback(req, res, next) {
+    const { provider } = req.params;
+
+    passport.authenticate(provider, { session: false }, async (err, socialData, info) => {
+      try {
+        if (err) {
+          console.error('Social auth error:', err);
+          return res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
+        }
+
+        if (!socialData) {
+          return res.redirect(`${process.env.CLIENT_URL}/login?error=access_denied`);
+        }
+
+        // Get device info from session
+        const deviceInfo = req.session.deviceInfo || {
+          userAgent: req.get('User-Agent'),
+          ipAddress: req.ip,
+          deviceId: crypto.randomBytes(16).toString('hex')
+        };
+
+        // Authenticate or create user
+        const { user, isNewUser } = await User.authenticateViaSocial(socialData, deviceInfo);
+
+        // Generate tokens
+        const tokens = await user.generateTokens(deviceInfo);
+
+        // Clear device info from session
+        delete req.session.deviceInfo;
+
+        // Redirect with tokens
+        const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?` +
+          `token=${tokens.accessToken}&` +
+          `refresh=${tokens.refreshToken}&` +
+          `new_user=${isNewUser}`;
+
+        res.redirect(redirectUrl);
+
+      } catch (error) {
+        console.error('Social callback error:', error);
+        res.redirect(`${process.env.CLIENT_URL}/login?error=processing_failed`);
+      }
+    })(req, res, next);
+  }
+
+  /**
+   * Link additional social account to existing user
+   */
+  static async linkSocialAccount(req, res) {
+    try {
+      const { provider } = req.params;
+      const user = req.user; // From auth middleware
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      // Store user ID in session for linking after OAuth
+      req.session.linkingUserId = user._id.toString();
+      req.session.isLinking = true;
+
+      // Initiate OAuth flow
+      passport.authenticate(provider, {
+        scope: getScopeForProvider(provider)
+      })(req, res);
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to initiate social account linking',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Handle social account linking callback
+   */
+  static async handleLinkingCallback(req, res, next) {
+    const { provider } = req.params;
+
+    passport.authenticate(provider, { session: false }, async (err, socialData, info) => {
+      try {
+        if (err || !socialData) {
+          return res.redirect(`${process.env.CLIENT_URL}/profile?link_error=failed`);
+        }
+
+        const userId = req.session.linkingUserId;
+        if (!userId) {
+          return res.redirect(`${process.env.CLIENT_URL}/profile?link_error=session_expired`);
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+          return res.redirect(`${process.env.CLIENT_URL}/profile?link_error=user_not_found`);
+        }
+
+        // Link the social account
+        await user.linkSocialAccount(
+          socialData.provider,
+          socialData.providerId,
+          socialData.email,
+          true
+        );
+
+        // Clear session
+        delete req.session.linkingUserId;
+        delete req.session.isLinking;
+
+        res.redirect(`${process.env.CLIENT_URL}/profile?link_success=${provider}`);
+
+      } catch (error) {
+        console.error('Social linking error:', error);
+        res.redirect(`${process.env.CLIENT_URL}/profile?link_error=processing_failed`);
+      }
+    })(req, res, next);
+  }
+
+  /**
+   * Unlink social account
+   */
+  static async unlinkSocialAccount(req, res) {
+    try {
+      const { provider } = req.params;
+      const user = req.user;
+
+      const unlinkedAccount = await user.unlinkSocialAccount(provider, null);
+
+      res.json({
+        success: true,
+        message: `${provider} account unlinked successfully`,
+        unlinkedAccount: {
+          provider: unlinkedAccount.provider,
+          email: unlinkedAccount.email,
+          connectedAt: unlinkedAccount.connectedAt
+        }
+      });
+
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Get user's linked social accounts
+   */
+  static async getLinkedAccounts(req, res) {
+    try {
+      const user = req.user;
+      const linkedAccounts = user.getSocialAccounts();
+
+      res.json({
+        success: true,
+        linkedAccounts,
+        availableProviders: ['google', 'facebook', 'twitter', 'github']
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch linked accounts',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Check social account status
+   */
+  static async checkSocialStatus(req, res) {
+    try {
+      const { provider } = req.params;
+      const user = req.user;
+
+      const hasProvider = user.hasSocialProvider(provider);
+      const socialAccount = user.getSocialAccount(provider);
+
+      res.json({
+        success: true,
+        hasProvider,
+        accountInfo: socialAccount ? {
+          provider: socialAccount.provider,
+          email: socialAccount.email,
+          verified: socialAccount.verified,
+          connectedAt: socialAccount.connectedAt
+        } : null
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to check social status',
+        error: error.message
+      });
+    }
+  }
+}
+/**
+ * Get OAuth scopes for each provider
+ */
+function getScopeForProvider(provider) {
+  const scopes = {
+    google: ['profile', 'email'],
+    facebook: ['email', 'public_profile'],
+    twitter: ['tweet.read', 'users.read'],
+    github: ['user:email', 'read:user']
+  };
+  return scopes[provider] || [];
+}
 module.exports = authController;

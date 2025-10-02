@@ -971,7 +971,7 @@ router.get('/:id/statistics',
 // GET /api/users/:id/report - Get user report
 router.get('/:id/report',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -981,7 +981,7 @@ router.get('/:id/report',
 // GET /api/users/:id/activity-summary - Get activity summary
 router.get('/:id/activity-summary',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -1253,7 +1253,7 @@ router.get('/analytics/top-interests',
 // GET /api/users/analytics/registrations-over-time - Get registrations over time
 router.get('/analytics/registrations-over-time',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   query('period').optional().isIn(['day', 'week', 'month', 'year']).withMessage('Invalid period'),
   validate,
   UserController.getRegistrationsOverTime
@@ -1262,7 +1262,7 @@ router.get('/analytics/registrations-over-time',
 // GET /api/users/analytics/login-activity-over-time - Get login activity over time
 router.get('/analytics/login-activity-over-time',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   query('period').optional().isIn(['day', 'week', 'month', 'year']).withMessage('Invalid period'),
   validate,
   UserController.getLoginActivityOverTime
@@ -1271,21 +1271,21 @@ router.get('/analytics/login-activity-over-time',
 // GET /api/users/analytics/table-statistics - Get table statistics
 router.get('/analytics/table-statistics',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   UserController.getTableStatistics
 );
 
 // GET /api/users/analytics/table-report - Get table report
 router.get('/analytics/table-report',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   UserController.getTableReport
 );
 
 // GET /api/users/analytics/user-report/:userId - Get user report by ID
 router.get('/analytics/user-report/:userId',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -1295,7 +1295,7 @@ router.get('/analytics/user-report/:userId',
 // GET /api/users/analytics/activity-summary/:userId - Get activity summary by ID
 router.get('/analytics/activity-summary/:userId',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -1305,7 +1305,7 @@ router.get('/analytics/activity-summary/:userId',
 // GET /api/users/analytics/users-with-analytics - Get users with analytics
 router.get('/analytics/users-with-analytics',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
   validate,
   UserController.getUsersWithAnalytics
@@ -1314,12 +1314,17 @@ router.get('/analytics/users-with-analytics',
 // GET /api/users/analytics/user-engagement - Get user engagement metrics
 router.get('/analytics/user-engagement',
   authMiddleware,
-  authorize('users', 'report'),
+  authorize('users', 'full'),
   query('period').optional().isIn(['day', 'week', 'month', 'year']).withMessage('Invalid period'),
   validate,
   UserController.getUserEngagementMetrics
 );
 
+router.get('/analytics',
+  authMiddleware,
+  authorize('users', 'full'),
+  UserController.getUserStats
+);
 // ========================================
 // 📤 EXPORT/IMPORT ROUTES
 // ========================================

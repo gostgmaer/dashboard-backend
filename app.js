@@ -15,7 +15,6 @@ const settingRoute = require('./src/routes/settingRoutes');
 const reviewRoute = require('./src/routes/reviewRoutes');
 const { permissionRoute } = require('./src/routes/permissionRoute');
 const { orderRoutes } = require('./src/routes/orderRoutes');
-const logRoute = require('./src/routes/logs');
 const discountRoute = require('./src/routes/discount');
 const couponRouter = require('./src/routes/couponRoutes');
 const contactsRoute = require('./src/routes/contact');
@@ -33,6 +32,10 @@ const socketService = require('./src/services/socketService');
 const notificationService = require('./src/services/NotificationService');
 const NotificationMiddleware = require('./src/middleware/notificationMiddleware');
 const { notificationRoute } = require('./src/routes/notificationRoutes');
+// Import routes
+const resumeRoutes = require('./src/controller/resume/Resume_Routes');
+const templateRoutes = require('./src/controller/resume/Template_Routes');
+
 const { AttachmentUpload } = require('./src/routes/fileUploader');
 const LoggerService = require("./src/services/logger");
 // Import routes
@@ -83,13 +86,14 @@ app.use('/api/auth', checkRoute("authRoute", authRoute));
 app.use('/api/attributes', checkRoute("attributeRouter", attributeRouter));
 app.use('/api/attachments', checkRoute("attachmentRoutes", attachmentRoutes));
 app.use('/api/addresses', checkRoute("addressRoute", addressRoute));
-app.use('/api/logs', checkRoute("logRoute", logRoute));
 app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
 app.use('/api/files', checkRoute("Attachment Files", AttachmentUpload));
-
+// API Routes
+app.use('/api/resumes', resumeRoutes);
+app.use('/api/templates', templateRoutes);
 
 // Mount other feature routes here...
 app.get("/", (req, res) => {
