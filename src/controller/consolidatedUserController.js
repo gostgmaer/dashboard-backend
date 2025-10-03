@@ -4134,7 +4134,7 @@ class UserController {
   // Controller to get dashboard stats
   static async getUserStats(req, res, next) {
     try {
-      const stats = await User.getUserStats();
+      const stats =   await User.getUserStats();
       return standardResponse(
         res,
         true,
@@ -4147,6 +4147,21 @@ class UserController {
     }
   };
 
+    // Controller to get dashboard stats
+  static async getDashboardStats(req, res, next) {
+    try {
+      const stats =   await User.getDashboardStats();
+      return standardResponse(
+        res,
+        true,
+        stats,
+        'fetched dashboard stats'
+      );
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      return errorResponse(res, 'Error fetching dashboard stats', 500, error.message)
+    }
+  };
   static async assignUserRoleById(req, res, next) {
     try {
       const { userId } = req.params;
@@ -4180,6 +4195,10 @@ class UserController {
       next(err);
     }
   }
+
+
+
+
 }
 
 module.exports = UserController;
