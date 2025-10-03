@@ -9,6 +9,7 @@ const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
 const ActivityHelper = require('../utils/activityHelpers');
+const DeviceDetector = require('../services/deviceDetector');
 
 /**
  * 🚀 CONSOLIDATED ROBUST PRODUCT CONTROLLER
@@ -138,7 +139,7 @@ class ProductController {
       await product.save();
 
       // Populate the created product
-  // Using manual logging with detailed info
+      // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'product', 'create', {
         id: product._id,
         name: product.name,
@@ -170,7 +171,7 @@ class ProductController {
       //         availableMethods: Object.keys(Product.schema?.statics || {})
       //     });
       // }
-
+      const deviceinfo = DeviceDetector.detectDevice(req)
       let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, populate, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
 
       // Build query filters
@@ -275,7 +276,7 @@ class ProductController {
           search: search || null,
         },
       };
-   
+
 
       return standardResponse(res, true, response, `Retrieved ${enrichedProducts.length} products`);
     } catch (error) {
@@ -347,7 +348,7 @@ class ProductController {
         isExpired: product.isExpired(),
         needsRestock: product.needsRestock(),
       };
-   // Optional: Set custom activity info using middleware helper
+      // Optional: Set custom activity info using middleware helper
       req.setActivity('viewed product details', {
         productId: product.id,
         productName: product.title,
@@ -429,7 +430,7 @@ class ProductController {
       if (!product) {
         return errorResponse(res, 'Product not found', 404);
       }
-// Using manual logging with detailed info
+      // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'product', 'Update', {
         id: product._id,
         name: product.title,
@@ -478,7 +479,7 @@ class ProductController {
         await Product.bulkDelete([id]);
         result = { _id: id };
       }
-// Using manual logging with detailed info
+      // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'product', 'Update', {
         id: product._id,
         name: product.title,
