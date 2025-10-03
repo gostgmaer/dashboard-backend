@@ -383,9 +383,7 @@ class authController {
       let user = authResult.user;
 
       res.locals.user = user;
-      // const user = await User.findByEmail(email);
       if (!user) {
-        // Log failed login attempt
         await ActivityHelper.logAuth(req, 'login attempt', 'failed', {
           email,
           reason: 'user not found',

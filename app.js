@@ -61,6 +61,11 @@ function checkRoute(name, route) {
   return route;
 }
 
+app.use((req, res, next) => {
+  res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+  res.setHeader('Critical-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+  next();
+});
 
 verifyEmailConnection().then((result) => console.log(result));
 
@@ -97,11 +102,11 @@ app.use('/api/templates', templateRoutes);
 
 // Mount other feature routes here...
 app.get("/", (req, res) => {
-  res.send("APP is working!");
+  res.send("APP is working!", JSON.stringify(req));
 });
 
 app.get("/api", (req, res) => {
-  res.send("API is working!");
+  res.send("api is working!", JSON.stringify(req));
 });
 // Healthcheck endpoint
 app.get('/health', (req, res) => {

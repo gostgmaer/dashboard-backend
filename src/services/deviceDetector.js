@@ -14,50 +14,66 @@ const UAParser = require('ua-parser-js');
  */
 
 class DeviceDetector {
-    
+
     /**
      * Detect and analyze device information from request
      */
     static detectDevice(req) {
         const userAgent = req.headers['user-agent'] || '';
         const ip = this.getClientIP(req);
-        const parser = new UAParser(userAgent);
-        const result = parser.getResult();
+        const parser = new UAParser(req);
+        const result = UAParser(req.headers).withClientHints();
+        let osName = result.os.name || 'Unknown';
+        let osVersion = result.os.version || 'Unknown';
+        const platform = req.headers['sec-ch-ua-platform']?.replace(/"/g, '') || '';
+        const platformVersion = req.headers['sec-ch-ua-platform-version']?.replace(/"/g, '') || '';
 
+        if (platform.toLowerCase() === 'windows' && platformVersion) {
+            const majorVersion = parseFloat(platformVersion.split('.')[0]);
+            if (majorVersion >= 13) {
+                osName = 'Windows';
+                osVersion = '11';
+            }
+        }
+
+        // Log if key hints are missing
+        if (platform.toLowerCase() === 'windows' && !platformVersion) {
+            console.warn('Missing Sec-CH-UA-Platform-Version header; OS detection may default to Windows 10. Ensure server sends Accept-CH header.');
+        }
         const deviceInfo = {
             // Basic identifiers
             userAgent,
             ipAddress: ip,
             deviceId: this.generateDeviceId(req),
             fingerprint: this.generateFingerprint(req),
-            
+
             // Parsed device information
             browser: {
                 name: result.browser.name || 'Unknown',
                 version: result.browser.version || 'Unknown',
                 major: result.browser.major || 'Unknown'
             },
-            
+
             os: {
                 name: result.os.name || 'Unknown',
                 version: result.os.version || 'Unknown'
             },
-            
+
             device: {
                 vendor: result.device.vendor || 'Unknown',
                 model: result.device.model || 'Unknown',
                 type: result.device.type || this.guessDeviceType(userAgent)
             },
-            
+
             // Geolocation
             location: this.getLocationFromIP(ip),
-            
+
             // Additional headers
             headers: this.extractRelevantHeaders(req),
-            
+
             // Security indicators
             security: this.analyzeSecurityIndicators(req),
-            
+
             // Timestamp
             detectedAt: new Date()
         };
@@ -122,15 +138,15 @@ class DeviceDetector {
         const xCluster = req.headers['x-cluster-client-ip'];
 
         let ip = xForwardedFor?.split(',')[0]?.trim() ||
-                xRealIP ||
-                cfConnectingIP ||
-                xClientIP ||
-                xForwarded ||
-                xCluster ||
-                req.connection?.remoteAddress ||
-                req.socket?.remoteAddress ||
-                req.ip ||
-                '127.0.0.1';
+            xRealIP ||
+            cfConnectingIP ||
+            xClientIP ||
+            xForwarded ||
+            xCluster ||
+            req.connection?.remoteAddress ||
+            req.socket?.remoteAddress ||
+            req.ip ||
+            '127.0.0.1';
 
         // Clean up IPv4-mapped IPv6 addresses
         if (ip.startsWith('::ffff:')) {
@@ -189,14 +205,14 @@ class DeviceDetector {
      */
     static guessDeviceType(userAgent) {
         const ua = userAgent.toLowerCase();
-        
+
         if (/mobile|android|iphone|ipad|ipod|blackberry|windows phone/.test(ua)) {
             if (/ipad|tablet/.test(ua)) {
                 return 'tablet';
             }
             return 'mobile';
         }
-        
+
         if (/smart-tv|smarttv|googletv|appletv|hbbtv|pov_tv|netcast\.tv/.test(ua)) {
             return 'smarttv';
         }
@@ -358,7 +374,7 @@ class DeviceDetector {
             'java/', 'node-fetch', 'axios', 'http.rb'
         ];
 
-        return automatedSignatures.some(signature => 
+        return automatedSignatures.some(signature =>
             userAgent.toLowerCase().includes(signature.toLowerCase())
         );
     }
@@ -431,8 +447,8 @@ class DeviceDetector {
         const os = deviceInfo.os?.name || 'Unknown OS';
         const osVersion = deviceInfo.os?.version || '';
         const deviceType = deviceInfo.device?.type || 'unknown';
-        const location = deviceInfo.location?.city ? 
-            `${deviceInfo.location.city}, ${deviceInfo.location.country}` : 
+        const location = deviceInfo.location?.city ?
+            `${deviceInfo.location.city}, ${deviceInfo.location.country}` :
             deviceInfo.location?.country || 'Unknown Location';
 
         return {

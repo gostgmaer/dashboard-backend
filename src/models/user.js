@@ -170,6 +170,7 @@ const userSchema = new mongoose.Schema(
       {
         sessionId: { type: String, required: true },
         deviceId: { type: String, required: true },
+        borwser: { type: String },
         createdAt: { type: Date, default: Date.now },
         lastActivity: { type: Date, default: Date.now },
         expiresAt: { type: Date, required: true },
@@ -389,6 +390,73 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
+
+  async cleanupTokensForDevice(tokenData) {
+    try {
+      const { deviceId } = tokenData;
+      if (!deviceId ) {
+        throw new Error('deviceId and browser are required for token cleanup');
+      }
+
+      const now = new Date();
+      let expiredTokensRemoved = 0;
+      let duplicateTokensRemoved = 0;
+      const initialTokenCount = this.authTokens.length;
+      const removedTokensByType = {};
+
+      // Remove expired tokens and tokens from same device+browser
+      const cleanedTokens = this.authTokens.filter(token => {
+        // Remove expired tokens
+        if (token.expiresAt < now) {
+          expiredTokensRemoved++;
+          return false;
+        }
+        // Remove tokens from same deviceId + browser (all types)
+        const hasSameDevice = token.deviceId === deviceId;
+        // const hasSameBrowser = token.deviceInfo?.browser === browser.name;
+        if (hasSameDevice) {
+          duplicateTokensRemoved++;
+          // Track removed tokens by type
+          removedTokensByType[token.type] = (removedTokensByType[token.type] || 0) + 1;
+          return false;
+        }
+        return true;
+      });
+
+      // Update the authTokens array
+      this.authTokens = cleanedTokens;
+      await this.save();
+
+      // Log security event
+      if (expiredTokensRemoved > 0 || duplicateTokensRemoved > 0) {
+        await this.logSecurityEvent(
+          'tokens_cleaned_up',
+          `Cleaned up ${expiredTokensRemoved} expired tokens and ${duplicateTokensRemoved} duplicate tokens for device ${deviceId}`,
+          'low',
+          {
+            deviceId,
+            expiredTokensRemoved,
+            duplicateTokensRemoved,
+            removedTokensByType
+          }
+        );
+      }
+
+      return {
+        success: true,
+        initialTokenCount,
+        finalTokenCount: this.authTokens.length,
+        expiredTokensRemoved,
+        duplicateTokensRemoved,
+        removedTokensByType,
+        totalTokensRemoved: expiredTokensRemoved + duplicateTokensRemoved
+      };
+
+    } catch (error) {
+      throw new Error(`Token cleanup failed: ${error.message}`);
+    }
+  },
+
   async initiatePasswordReset({ method = 'link', originUrl } = {}, deviceInfo = {}) {
     if (!originUrl) {
       throw new Error('originUrl is required');
@@ -1241,10 +1309,10 @@ userSchema.method({
 
   // Create session for this user
   async createSession(sessionData) {
-    const { sessionId = crypto.randomUUID(), deviceId, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
+    const { sessionId = crypto.randomUUID(), deviceId,browser, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
 
     // Clean expired sessions first
-    await this.cleanupExpiredSessions();
+    await this.cleanupExpiredSessions(sessionData);
 
     // Check session limit
     const activeSessionsCount = this.activeSessions.filter((s) => s.isActive).length;
@@ -1261,6 +1329,7 @@ userSchema.method({
     // Add new session
     const newSession = {
       sessionId,
+      browser:browser.name,
       deviceId: deviceId || crypto.randomUUID(),
       createdAt: new Date(),
       lastActivity: new Date(),
@@ -1437,25 +1506,38 @@ userSchema.method({
   },
 
   // Clean up expired sessions for this user
-  async cleanupExpiredSessions() {
+  async cleanupExpiredSessions(device) {
     const now = new Date();
-    let hasExpiredSessions = false;
+    let hasSessionChanged = false;
+    const { deviceId } = device;
 
     // 1. Mark expired sessions inactive
     this.activeSessions.forEach((session) => {
       const expiresAt = new Date(session.expiresAt);
       if (expiresAt < now && session.isActive) {
         session.isActive = false;
-        hasExpiredSessions = true;
+        hasSessionChanged = true;
       }
     });
 
-    // 2. Remove all inactive sessions
-    const initialLength = this.activeSessions.length;
-    this.activeSessions = this.activeSessions.filter((session) => session.isActive);
+    // 2. Remove sessions for this device+browser and all inactive/expired sessions
+    const beforeCleanup = this.activeSessions.length;
+    this.activeSessions = this.activeSessions.filter((session) => {
+      const sameDevice = session.deviceId === deviceId;
+      const isActive = session.isActive;
+      const expiresAt = new Date(session.expiresAt);
 
-    // 3. Save only if something changed
-    if (hasExpiredSessions || this.activeSessions.length < initialLength) {
+      // Remove if matches device+browser OR if expired/inactive
+      if (sameDevice || !isActive || expiresAt < now) {
+        hasSessionChanged = true;
+        return false;
+      }
+
+      return true;
+    });
+
+    // 3. Save only if anything changed
+    if (hasSessionChanged || this.activeSessions.length < beforeCleanup) {
       await this.save();
     }
 
@@ -1523,8 +1605,8 @@ userSchema.method({
       const deviceId = deviceInfo.deviceId || crypto.randomBytes(16).toString('hex');
 
       // Clean up expired tokens
-      this.removeExpiredAuthTokens();
-      await User.cleanupExpiredTokens();
+      // this.removeExpiredAuthTokens();
+      // await User.cleanupExpiredTokens();
 
       // Check session limit
       const activeSessions = this.authTokens.filter((t) => !t.isRevoked && t.expiresAt > new Date());
@@ -1552,7 +1634,7 @@ userSchema.method({
         browser: deviceInfo.browser.name,
         ipAddress: deviceInfo.ipAddress,
       };
-
+      await this.cleanupTokensForDevice(deviceInfo)
       await this.authTokens.push({
         token: accessToken,
         type: 'access',
@@ -1572,6 +1654,7 @@ userSchema.method({
 
       // Register/update device
       await this.registerDevice(deviceInfo);
+
       await this.save();
 
       return {
@@ -4395,6 +4478,6 @@ userSchema.statics.getUserStats = async function () {
   };
 };
 
-const User =  mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
 
 module.exports = User;
