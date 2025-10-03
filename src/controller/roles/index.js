@@ -25,24 +25,32 @@ const getAll = async (req, res) => {
     let roles;
 
     if (search) {
-      roles = await Role.searchRoles(search).populate('permissions');
+      roles = await Role.searchRoles(search); // No permissions populating
     } else if (activeOnly === 'true') {
-      roles = await Role.getActiveRoles().populate('permissions');
+      roles = await Role.getActiveRoles();
     } else {
-      roles = await Role.find().sort({ name: 1 }).populate('permissions');
+      roles = await Role.find().sort({ name: 1 });
     }
 
-    // Count users for each role
-    // adjust path to your User model
     const rolesWithCounts = await Promise.all(
       roles.map(async (role) => {
+        // Count users by role
         const userCount = await User.countDocuments({ role: role._id });
+        // Count permissions by length of permissions id array
+        const permissionsCount = role.permissions ? role.permissions.length : 0;
+
+        // Return role object excluding permissions array
+        const roleObj = role.toObject();
+        delete roleObj.permissions;
+
         return {
-          ...role.toObject(), // full role data
+          ...roleObj,
           userCount,
+          permissionsCount
         };
       })
     );
+
     await standardResponse(res, true, rolesWithCounts, "Roles retrieved successfully");
   } catch (error) {
     await errorResponse(res, error.message, 500, null, error.message);
