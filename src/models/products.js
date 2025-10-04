@@ -3542,6 +3542,285 @@ productSchema.statics._formatFilterResults = async function (result, params) {
   };
 }
 
+productSchema.statics.getCompleteProductDashboardStatistics = async function () {
+  try {
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const [
+      // Basic Counts & Flags
+      totalProducts,
+      activeProducts,
+      deletedProducts,
+      draftProducts,
+      publishedProducts,
+      featuredProducts,
+      trendingProducts,
+      newArrivals,
+      bestsellers,
+      productsOnSale,
+
+      // Inventory Stats
+      inventoryValue,
+      inventoryUnits,
+      outOfStockCount,
+      lowStockCount,
+      healthyStockCount,
+      autoRestockCount,
+      avgInventory,
+      inventoryByLocation,
+
+      // Sales & Revenue Stats
+      totalRevenue,
+      totalUnitsSold,
+      avgSellingPrice,
+      productsWithSales,
+      productsWithoutSales,
+      topRevenueProducts,
+      revenueByCategory,
+      revenueByBrand,
+
+      // Pricing Stats
+      avgBasePrice,
+      highestPricedProduct,
+      lowestPricedProduct,
+      priceDistribution,
+      productsWithDiscounts,
+      avgDiscountValue,
+      profitMarginAnalysis,
+
+      // Engagement Stats
+      totalViews,
+      avgViews,
+      mostViewedProducts,
+      productsWithReviews,
+      totalReviews,
+      avgRating,
+      conversionRate,
+      ratingDistribution,
+
+      // Attribute Statistics
+      productsByType,
+      productsByGender,
+      productsByAgeGroup,
+      productsBySeason,
+      productsByColor,
+      productsBySize,
+      ecoFriendlyCount,
+
+      // Enhanced Top Products & Distributions
+      topProductByCategory,
+      topProductByBrand,
+      stockDistribution,
+      topSellingProducts,
+      topDiscountedProducts,
+      topDiscountedProductsCount,
+      recentlyAddedProducts,
+      lowStockProductsCount,
+      topRatedProducts,
+      mostViewedProductsEnhanced,
+      thisMonthProducts
+
+    ] = await Promise.all([
+
+      // Counts and flags
+      Product.countDocuments({}),
+      Product.countDocuments({ status: 'active', isDeleted: false }),
+      Product.countDocuments({ isDeleted: true }),
+      Product.countDocuments({ status: 'draft' }),
+      Product.countDocuments({ status: 'published' }),
+      Product.countDocuments({ isFeatured: true }),
+      Product.countDocuments({ trending: true }),
+      Product.countDocuments({ newArrival: true }),
+      Product.countDocuments({ bestseller: true }),
+      Product.countDocuments({ onSale: true }),
+
+      // Inventory aggregations
+      Product.aggregate([{ $group: { _id: null, total: { $sum: { $multiply: ['$basePrice', '$inventory'] } } } }]),
+      Product.aggregate([{ $group: { _id: null, total: { $sum: '$inventory' } } }]),
+      Product.countDocuments({ inventory: 0, isDeleted: false }),
+      Product.countDocuments({ $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] }, isDeleted: false }),
+      Product.countDocuments({ $expr: { $gte: ['$inventory', '$lowStockThreshold'] }, isDeleted: false }),
+      Product.countDocuments({ autoRestockEnabled: true }),
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$inventory' } } }]),
+      Product.aggregate([{ $match: { stockLocation: { $ne: null }, isDeleted: false } }, { $group: { _id: '$stockLocation', count: { $sum: 1 } } }]),
+
+      // Sales & revenue
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: { $multiply: ['$basePrice', '$soldCount'] } } } }]),
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$soldCount' } } }]),
+      Product.aggregate([{ $match: { soldCount: { $gt: 0 }, isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$basePrice' } } }]),
+      Product.countDocuments({ soldCount: { $gt: 0 }, isDeleted: false }),
+      Product.countDocuments({ soldCount: 0, isDeleted: false }),
+      Product.aggregate([
+        { $match: { isDeleted: false } },
+        { $addFields: { revenue: { $multiply: ['$basePrice', '$soldCount'] } } },
+        { $sort: { revenue: -1 } },
+        { $limit: 10 },
+        { $project: { title: 1, mainImage: 1 } }
+      ]),
+      Product.aggregate([
+        { $match: { isDeleted: false } },
+        { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'categoryData' } },
+        { $unwind: '$categoryData' },
+        { $group: { _id: '$categoryData.name', count: { $sum: 1 } } }
+      ]),
+      Product.aggregate([
+        { $match: { isDeleted: false } },
+        { $lookup: { from: 'brands', localField: 'brand', foreignField: '_id', as: 'brandData' } },
+        { $unwind: '$brandData' },
+        { $group: { _id: '$brandData.name', count: { $sum: 1 } } }
+      ]),
+
+      // Pricing stats
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$basePrice' } } }]),
+      Product.findOne({ isDeleted: false }).sort({ basePrice: -1 }).select('title _id mainImage'),
+      Product.findOne({ isDeleted: false }).sort({ basePrice: 1 }).select('title _id mainImage'),
+      Product.aggregate([{ $match: { isDeleted: false } }, { $bucket: { groupBy: '$basePrice', boundaries: [0, 50, 100, 250, 500, 1000, 5000], default: '5000+', output: { count: { $sum: 1 } } } }]),
+      Product.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
+      Product.aggregate([{ $match: { discountType: { $ne: 'none' }, isDeleted: false } }, { $group: { _id: null, avgDiscount: { $avg: '$discountValue' } } }]),
+      Product.aggregate([{ $match: { costPrice: { $gt: 0 }, basePrice: { $gt: 0 }, isDeleted: false } }, { $addFields: { profitMargin: { $multiply: [{ $divide: [{ $subtract: ['$basePrice', '$costPrice'] }, '$basePrice'] }, 100] } } }, { $group: { _id: null, avgMargin: { $avg: '$profitMargin' }, minMargin: { $min: '$profitMargin' }, maxMargin: { $max: '$profitMargin' }, productsWithMargin: { $sum: 1 } } }]),
+
+      // Engagement stats
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$views' } } }]),
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$views' } } }]),
+      Product.find({ isDeleted: false }).sort({ views: -1 }).limit(10).select('title _id mainImage'),
+      Product.countDocuments({ 'reviews.totalReviews': { $gt: 0 }, isDeleted: false }),
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$reviews.totalReviews' } } }]),
+      Product.aggregate([{ $match: { 'reviews.averageRating': { $exists: true }, isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$reviews.averageRating' } } }]),
+      Product.aggregate([{ $match: { views: { $gt: 0 }, isDeleted: false } }, { $group: { _id: null, avgConversion: { $avg: { $divide: ['$soldCount', '$views'] } } } }]),
+      Product.aggregate([{ $match: { 'reviews.averageRating': { $exists: true }, isDeleted: false } }, { $bucket: { groupBy: '$reviews.averageRating', boundaries: [0, 1, 2, 3, 4, 5], default: 'Unrated', output: { count: { $sum: 1 } } } }]),
+
+      // Attribute stats
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$productType', count: { $sum: 1 } } }]),
+      Product.aggregate([{ $match: { gender: { $ne: null }, isDeleted: false } }, { $group: { _id: '$gender', count: { $sum: 1 } } }]),
+      Product.aggregate([{ $match: { ageGroup: { $ne: null }, isDeleted: false } }, { $group: { _id: '$ageGroup', count: { $sum: 1 } } }]),
+      Product.aggregate([{ $match: { season: { $ne: null }, isDeleted: false } }, { $group: { _id: '$season', count: { $sum: 1 } } }]),
+      Product.aggregate([{ $match: { color: { $ne: null }, isDeleted: false } }, { $group: { _id: '$color', count: { $sum: 1 } } }]),
+      Product.aggregate([{ $match: { size: { $ne: null }, isDeleted: false } }, { $group: { _id: '$size', count: { $sum: 1 } } }]),
+      Product.countDocuments({ ecoFriendly: true, isDeleted: false }),
+
+      // Enhanced top products & counts
+      Product.aggregate([
+        { $match: { isDeleted: false } },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            as: 'categoryData'
+          }
+        },
+        { $unwind: '$categoryData' },
+        { $addFields: { revenue: { $multiply: ['$basePrice', '$soldCount'] } } },
+        { $sort: { revenue: -1 } },
+        {
+          $group: {
+            _id: '$categoryData.name',
+            product: { $first: { title: '$title', _id: '$_id', mainImage: '$mainImage' } }
+          }
+        }
+      ]),
+      Product.aggregate([
+        { $match: { isDeleted: false } },
+        {
+          $lookup: {
+            from: 'brands',
+            localField: 'brand',
+            foreignField: '_id',
+            as: 'brandData'
+          }
+        },
+        { $unwind: '$brandData' },
+        { $addFields: { revenue: { $multiply: ['$basePrice', '$soldCount'] } } },
+        { $sort: { revenue: -1 } },
+        {
+          $group: {
+            _id: '$brandData.name',
+            product: { $first: { title: '$title', _id: '$_id', mainImage: '$mainImage' } }
+          }
+        }
+      ]),
+      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$stockLocation', count: { $sum: 1 } } }]),
+      Product.find({ isDeleted: false }).sort({ soldCount: -1 }).limit(10).select('title _id mainImage'),
+      Product.find({ discountType: { $ne: 'none' }, isDeleted: false }).sort({ discountValue: -1 }).limit(10).select('title _id mainImage'),
+      Product.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
+      Product.find({ isDeleted: false }).sort({ createdAt: -1 }).limit(10).select('title _id mainImage'),
+      Product.countDocuments({
+        $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] },
+        isDeleted: false
+      }),
+      Product.find({ 'reviews.averageRating': { $exists: true }, isDeleted: false }).sort({ 'reviews.averageRating': -1 }).limit(10).select('title _id mainImage'),
+      Product.find({ isDeleted: false }).sort({ views: -1 }).limit(10).select('title _id mainImage'),
+      Product.countDocuments({
+        createdAt: { $gte: startOfMonth },
+        isDeleted: false,
+      }),
+    ]);
+
+    return {
+      totalProducts,
+      activeProducts,
+      deletedProducts,
+      draftProducts,
+      publishedProducts,
+      featuredProducts,
+      trendingProducts,
+      newArrivals,
+      bestsellers,
+      productsOnSale,
+      totalInventoryValue: inventoryValue[0]?.total || 0,
+      totalInventoryUnits: inventoryUnits[0]?.total || 0,
+      outOfStockCount,
+      lowStockCount,
+      healthyStockCount,
+      autoRestockCount,
+      avgInventoryPerProduct: avgInventory[0]?.avg || 0,
+      inventoryByLocation,
+      totalRevenue: totalRevenue[0]?.total || 0,
+      totalUnitsSold: totalUnitsSold[0]?.total || 0,
+      avgSellingPrice: avgSellingPrice[0]?.avg || 0,
+      productsWithSales,
+      productsWithoutSales,
+      topRevenueProducts,
+      revenueByCategory,
+      revenueByBrand,
+      avgBasePrice: avgBasePrice[0]?.avg || 0,
+      highestPricedProduct,
+      lowestPricedProduct,
+      priceDistribution,
+      productsWithDiscounts,
+      avgDiscountValue: avgDiscountValue[0]?.avgDiscount || 0,
+      profitMarginAnalysis: profitMarginAnalysis[0] || {},
+      totalProductViews: totalViews[0]?.total || 0,
+      avgViewsPerProduct: avgViews[0]?.avg || 0,
+      mostViewedProducts,
+      productsWithReviews,
+      totalReviews: totalReviews[0]?.total || 0,
+      avgRating: avgRating[0]?.avg || 0,
+      conversionRate: conversionRate[0]?.avgConversion || 0,
+      ratingDistribution,
+      productsByType,
+      productsByGender,
+      productsByAgeGroup,
+      productsBySeason,
+      productsByColor,
+      productsBySize,
+      ecoFriendlyProducts: ecoFriendlyCount,
+      topProductByCategory,
+      topProductByBrand,
+      stockDistribution,
+      topSellingProducts,
+      topDiscountedProducts,
+      topDiscountedProductsCount,
+      recentlyAddedProducts,
+      lowStockProductsCount,
+      topRatedProducts,
+      mostViewedProductsEnhanced,
+      thisMonthProducts
+    };
+  } catch (error) {
+    console.error('Error fetching complete product dashboard statistics:', error);
+    throw error;
+  }
+}
 
 
 const Product = mongoose.model('Product', productSchema);

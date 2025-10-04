@@ -262,7 +262,7 @@ class ProductController {
       const enrichedProducts = result.results.map((product) => ProductController.enrichProduct(product));
 
       const response = {
-        products: enrichedProducts,
+        result: enrichedProducts,
         pagination: {
           currentPage: result.page,
           totalPages: result.pages,
@@ -2054,6 +2054,20 @@ class ProductController {
       res.status(500).json({ success: false, message: 'Failed to download file', error: err.message });
     }
   }
+  static async getProductDashboardStats(req, res) {
+    try {
+      const stats =  await Product.getCompleteProductDashboardStatistics();
+      return standardResponse(
+        res,
+        true,
+       stats,
+        ` product statuses successfully fetch`
+      );
+    } catch (error) {
+      console.error('Error getting product dashboard stats:', error);
+      return errorResponse(res, 'Failed to fetch statuses', 500, error.message);
+    }
+  };
 }
 
 module.exports = ProductController;
