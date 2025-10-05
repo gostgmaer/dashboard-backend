@@ -3,7 +3,7 @@ const { jwtSecret, refressSecret, applicaionName, host, confirmPath, resetPath, 
 const User = require('../../models/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const sessionStore = require('../../db/sessionConnact');
+
 const createMailOptions = require('../../email/mailOptions');
 const transporter = require('../../email/mailTransporter');
 const { generateTokens, setCookiesOnHeader } = require('../../lib/service');
@@ -501,23 +501,23 @@ const singout = async (req, res) => {
       } else {
         // Successfully destroyed the session, now remove it from the database
 
-        sessionStore.destroy(sessionId, (destroyErr) => {
-          if (destroyErr) {
-            res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-              message: destroyErr.message,
-              statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
-              status: ReasonPhrases.INTERNAL_SERVER_ERROR,
-              cause: destroyErr,
-            });
-          } else {
-            // Redirect to a logout success page or another route
-            res.status(StatusCodes.OK).json({
-              message: 'Logout Success',
-              statusCode: StatusCodes.OK,
-              status: ReasonPhrases.OK,
-            });
-          }
-        });
+        // sessionStore.destroy(sessionId, (destroyErr) => {
+        //   if (destroyErr) {
+        //     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        //       message: destroyErr.message,
+        //       statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
+        //       status: ReasonPhrases.INTERNAL_SERVER_ERROR,
+        //       cause: destroyErr,
+        //     });
+        //   } else {
+        //     // Redirect to a logout success page or another route
+        //     res.status(StatusCodes.OK).json({
+        //       message: 'Logout Success',
+        //       statusCode: StatusCodes.OK,
+        //       status: ReasonPhrases.OK,
+        //     });
+        //   }
+        // });
       }
     });
   } catch (error) {
