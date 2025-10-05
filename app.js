@@ -68,7 +68,6 @@ app.use((req, res, next) => {
 });
 
 verifyEmailConnection().then((result) => console.log(result));
-
 notificationService.socketService = socketService;
 
 app.use(LoggerService.expressRequestLogger());
