@@ -9,7 +9,7 @@ const projectSchema = new Schema(
     endDate: { type: Date },
     url: { type: String },
     technologies: [{ type: String }],
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User' },
     resume: { type: Schema.Types.ObjectId, ref: 'Resume' },
 
     image: {
