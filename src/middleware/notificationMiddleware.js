@@ -3302,7 +3302,7 @@ class NotificationMiddleware {
             const product = res.locals.createdProduct;
 
             // Notify admins/staff
-            const staff = await User.find({ role: { $in: ['admin', 'product_manager'] } });
+            const staff = await User.find({ role: { $in: ['admin', 'product_manager','super_admin'] } });
 
             for (const member of staff) {
                 await notificationService.create({
@@ -3310,6 +3310,40 @@ class NotificationMiddleware {
                     type: 'PRODUCT_CREATED',
                     title: 'New Product Added',
                     message: `New product "${product.name}" has been added to the catalog.`,
+                    data: {
+                        productId: product._id,
+                        productName: product.name,
+                        category: product.category,
+                        price: product.price
+                    },
+                    priority: 'MEDIUM',
+                    channels: ['IN_APP'],
+                    metadata: {
+                        category: 'product',
+                        relatedResource: product._id,
+                        resourceModel: 'Product',
+                        actionUrl: `/admin/products/${product._id}`
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error creating product created notification:', error);
+        }
+        next();
+    }
+    static async onProductUpdated(req, res, next) {
+        try {
+            const product = res.locals.updateProduct;
+
+            // Notify admins/staff
+            const staff = await User.find({ role: { $in: ['admin', 'product_manager','super_admin'] } });
+
+            for (const member of staff) {
+                await notificationService.create({
+                    recipient: member._id,
+                    type: 'PRODUCT_UPDATE',
+                    title: 'Product Updated',
+                    message: `product "${product.name}" has been Update to the catalog.`,
                     data: {
                         productId: product._id,
                         productName: product.name,

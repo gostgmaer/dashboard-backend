@@ -2912,22 +2912,7 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
       subscriptionStatistics: { subscriptionProducts: subscriptionStats }
     };
   };
-productSchema.static.advancedFilter = async function (queryParams = {}) {
-  try {
-    const params = this._validateAndSanitizeParams(queryParams);
-    const pipeline = this._buildAdvancedPipeline(params);
 
-    // Execute with timeout and memory limits
-    const results = await this.aggregate(pipeline)
-      .maxTimeMS(30000) // 30 second timeout
-      .allowDiskUse(true) // Allow disk usage for large datasets
-      .exec();
-
-    return this._formatFilterResults(results[0], params);
-  } catch (error) {
-    throw new Error(`Advanced filtering failed: ${error.message}`);
-  }
-}
 productSchema.static._validateAndSanitizeParams = async function (params) {
   const {
     // Pagination

@@ -10,6 +10,7 @@ const { Parser } = require('json2csv');
 const fs = require('fs');
 const ActivityHelper = require('../utils/activityHelpers');
 const DeviceDetector = require('../services/deviceDetector');
+const NotificationMiddleware = require('../middleware/notificationMiddleware');
 
 /**
  * 🚀 CONSOLIDATED ROBUST PRODUCT CONTROLLER
@@ -104,6 +105,7 @@ class ProductController {
    */
   static async createProduct(req, res) {
     try {
+      const deviceinfo = DeviceDetector.detectDevice(req);
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return errorResponse(res, 'Validation failed', 400, errors.array());
@@ -137,23 +139,17 @@ class ProductController {
 
       const product = new Product(productData);
       await product.save();
-
-      // Populate the created product
-      // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'product', 'create', {
         id: product._id,
         name: product.name,
         category: product.category,
         price: product.price,
       });
+         res.locals.product = product
+      await NotificationMiddleware.onUserCreate(req, res, () => { });
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product created successfully', 201);
     } catch (error) {
       console.error('Create product error:', error);
-
-      // if (error.code === 11000) {
-      //     const field = Object.keys(error.keyPattern)[0];
-      //     return errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
-      // }
 
       return errorResponse(res, 'Failed to create product', 500, error.message);
     }
@@ -164,25 +160,20 @@ class ProductController {
    */
   static async getProducts(req, res) {
     try {
-      // Check if getPaginatedProducts exists
-      // if (!Product.getPaginatedProducts) {
-      //     console.error('Product.getPaginatedProducts is undefined. Check products.js import and static method definition.');
-      //     return errorResponse(res, 'Server configuration error: getPaginatedProducts method not found', 500, {
-      //         availableMethods: Object.keys(Product.schema?.statics || {})
-      //     });
-      // }
-      const deviceinfo = DeviceDetector.detectDevice(req)
-      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, populate, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
 
-      // Build query filters
+
+      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
+
+      page = Number(page);
+      limit = Number(limit);
+
+      // --- Filters ---
       const filters = { deletedAt: { $exists: false } };
 
-      // Apply specific filters
       if (status) filters.status = status;
       if (productType) filters.productType = productType;
       if (category) filters.categories = category;
 
-      // Price range filter
       if (minPrice || maxPrice) {
         filters.basePrice = {};
         if (minPrice) filters.basePrice.$gte = Number(minPrice);
@@ -191,8 +182,7 @@ class ProductController {
 
       otherFilters = buildFilters(otherFilters);
 
-      // Apply additional filters dynamically
-      Object.keys(otherFilters).forEach((key) => {
+      for (const key of Object.keys(otherFilters)) {
         const value = otherFilters[key];
         if (value && value !== '' && value !== 'undefined') {
           switch (key) {
@@ -217,68 +207,57 @@ class ProductController {
               }
           }
         }
-      });
+      }
 
-      // Add search functionality
+      // --- Search ---
       if (search) {
         filters.$or = [{ title: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { tags: { $regex: search, $options: 'i' } }, { 'descriptions.short': { $regex: search, $options: 'i' } }];
       }
 
-      // Build sort object
+      // --- Sort ---
       const sortObj = {};
       sortObj[sort] = order === 'desc' ? -1 : 1;
 
-      // Default population for list view (minimal for performance)
-      const defaultPopulate = ['category', 'brand'];
+      // --- Count total ---
+      const total = await Product.countDocuments(filters);
 
-      // Custom population if specified
-      let populateOptions = defaultPopulate;
-      if (populate) {
-        const populateFields = populate.split(',');
-        populateOptions = populateFields.map((field) => {
-          const trimmedField = field.trim();
-          switch (trimmedField) {
-            case 'reviews':
-              return { path: 'reviews', select: 'rating comment user createdAt', populate: { path: 'user', select: 'name' } };
-            case 'relatedProducts':
-              return { path: 'relatedProducts', select: 'title mainImage basePrice status' };
-            case 'bundleContents':
-              return { path: 'bundleContents.product', select: 'title mainImage basePrice' };
-            default:
-              return { path: trimmedField };
-          }
-        });
-      }
+      // --- Query ---
+      let query = Product.find(filters)
+        .sort(sortObj)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select('title brand category basePrice status _id slug sku createdAt inventory isFeatured bestSeller') // ✅ Only required fields
+        .populate({ path: 'brand', select: 'name' })
+        .populate({ path: 'category', select: 'name' })
+        .lean(); // ✅ Fast, returns plain JS objects
 
-      const result = await Product.getPaginatedProducts({
-        page: Number(page),
-        limit: Number(limit),
-        filters,
-        sort: sortObj,
-        populateOptions,
-      });
+      const products = await query.exec();
 
-      // Enrich products with calculated fields
-      const enrichedProducts = result.results.map((product) => ProductController.enrichProduct(product));
+      // --- Transform _id → id ---
+      const result = products.map((p) => ({
+        ...p,
+        id: p._id,
+        _id: undefined,
+      }));
 
+      // --- Response ---
       const response = {
-        result: enrichedProducts,
+        result,
         pagination: {
-          currentPage: result.page,
-          totalPages: result.pages,
-          totalProducts: result.total,
-          hasNext: result.page < result.pages,
-          hasPrev: result.page > 1,
-          limit: Number(limit),
+          page,
+          totalPages: Math.ceil(total / limit),
+          total,
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          limit,
         },
         filters: {
-          applied: Object.keys(filters).length - 1, // -1 for deletedAt filter
+          applied: Object.keys(filters).length - 1,
           search: search || null,
         },
       };
 
-
-      return standardResponse(res, true, response, `Retrieved ${enrichedProducts.length} products`);
+      return standardResponse(res, true, response, `Retrieved ${result.length} products`);
     } catch (error) {
       console.error('Error in getProducts:', error);
       return errorResponse(res, 'Failed to fetch products', 500, error.message);
@@ -437,6 +416,8 @@ class ProductController {
         category: product.category,
         price: product.price,
       });
+        res.locals.product = product
+      await NotificationMiddleware.onProductUpdated(req, res, () => { });
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product updated successfully');
     } catch (error) {
       console.error('Failed to update product:', error);
@@ -479,6 +460,8 @@ class ProductController {
         await Product.bulkDelete([id]);
         result = { _id: id };
       }
+
+        res.locals.product = result
       // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'product', 'Update', {
         id: product._id,
@@ -486,6 +469,7 @@ class ProductController {
         category: product.category,
         price: product.price,
       });
+      await NotificationMiddleware.onProductDeleted(req, res, () => { });
       return standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'Product permanently deleted' : 'Product deleted successfully');
     } catch (error) {
       console.error('Failed to delete product:', error);
@@ -560,7 +544,8 @@ class ProductController {
       }
 
       const result = await Product.bulkUpdateStatus(validIds, status);
-
+      res.locals.product = result
+      await NotificationMiddleware.onProductBackInStock(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -1010,7 +995,8 @@ class ProductController {
 
       product.markAsOutOfStock();
       await product.save();
-
+   res.locals.product = product
+       NotificationMiddleware.onProductOutOfStock(req, res, () => { });
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product marked as out of stock');
     } catch (error) {
       console.error('Failed to mark as out of stock:', error);
@@ -1246,7 +1232,8 @@ class ProductController {
       }
 
       await product.restock(quantity);
-
+  res.locals.product = product
+       NotificationMiddleware.onProductBackInStock(req, res, () => { });
       return standardResponse(res, true, ProductController.enrichProduct(product), `Product restocked with ${quantity} units successfully`);
     } catch (error) {
       console.error('Failed to restock product:', error);
@@ -1665,7 +1652,8 @@ class ProductController {
         { path: 'categories', select: 'name slug' },
         { path: 'brand', select: 'name logo' },
       ]);
-
+ res.locals.product = updatedProduct
+       NotificationMiddleware.onProductOutOfStockDual(req, res, () => { });
       return standardResponse(res, true, ProductController.enrichProduct(updatedProduct), `Stock updated successfully. New stock: ${newStock}`);
     } catch (error) {
       console.error('Update stock error:', error);
@@ -2056,18 +2044,13 @@ class ProductController {
   }
   static async getProductDashboardStats(req, res) {
     try {
-      const stats =  await Product.getCompleteProductDashboardStatistics();
-      return standardResponse(
-        res,
-        true,
-       stats,
-        ` product statuses successfully fetch`
-      );
+      const stats = await Product.getCompleteProductDashboardStatistics();
+      return standardResponse(res, true, stats, ` product statuses successfully fetch`);
     } catch (error) {
       console.error('Error getting product dashboard stats:', error);
       return errorResponse(res, 'Failed to fetch statuses', 500, error.message);
     }
-  };
+  }
 }
 
 module.exports = ProductController;
