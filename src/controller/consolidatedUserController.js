@@ -13,6 +13,7 @@ const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
 const { buildFilters, formatRelativeDuration } = require('../utils/helper');
 const ActivityHelper = require('../utils/activityHelpers');
+const NotificationMiddleware = require('../middleware/notificationMiddleware');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
  *
@@ -190,11 +191,14 @@ class UserController {
 
       // Return response
       if (emailResult.success) {
+
+         res.locals.createdUser=registrationResult
+         NotificationMiddleware.onUserCreate(req, res, () => { });
         return res.status(200).json({
           success: true,
           message: `Registration successful and welcome email sent${emailResult.usedFallback ? ' via fallback' : ''}`,
           messageId: emailResult.messageId,
-          user: user.id,
+          user: registrationResult.id,
         });
       } else {
         return res.status(500).json({
@@ -251,6 +255,8 @@ class UserController {
         firstName: user.firstName,
         lastName: user.lastName
       });
+      res.locals.createdUser=user
+         NotificationMiddleware.onUserCreate(req, res, () => { });
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);
@@ -573,6 +579,8 @@ class UserController {
         firstName: user.firstName,
         lastName: user.lastName
       });
+      res.locals.user=user
+         NotificationMiddleware.onUserUpdate(req, res, () => { });
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User updated successfully');
     } catch (error) {
       console.error('Failed to update user:', error);
@@ -613,7 +621,8 @@ class UserController {
         await user.deleteAccount();
         result = { _id: id };
       }
-
+  res.locals.deletedUser=user
+         NotificationMiddleware.onUserDelete(req, res, () => { });
       return UserController.standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'User permanently deleted' : 'User deleted successfully');
     } catch (error) {
       console.error('Failed to delete user:', error);
@@ -4183,7 +4192,9 @@ class UserController {
 
       // Optionally populate role details
       await user.populate('role');
-
+  res.locals.user=user
+    res.locals.newRole=user.role.name
+         NotificationMiddleware.onRoleAssign(req, res, () => { });
       res.status(200).json(
         formatResponse('Role assigned to user successfully', {
           id: user._id,
