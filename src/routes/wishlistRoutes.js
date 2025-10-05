@@ -141,7 +141,7 @@ const wishlistValidation = {
 // GET /api/wishlist/:userId - Get user's wishlist with advanced filtering
 router.get('/:userId', 
   authMiddleware,
-  authorize('wishlist', 'read'),
+
   instanceCheckMiddleware,
   wishlistValidation.query,
   WishlistController.getUserWishlist
@@ -150,7 +150,7 @@ router.get('/:userId',
 // POST /api/wishlist - Add item to wishlist
 router.post('/', 
   authMiddleware,
-  authorize('wishlist', 'write'),
+
   wishlistValidation.create,
   WishlistController.addToWishlist
 );
@@ -158,7 +158,7 @@ router.post('/',
 // PUT /api/wishlist/:userId/:productId - Update wishlist item
 router.put('/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   instanceCheckMiddleware,
   wishlistValidation.update,
   WishlistController.updateWishlistItem
@@ -167,7 +167,7 @@ router.put('/:userId/:productId',
 // DELETE /api/wishlist/:userId/:productId - Remove item from wishlist
 router.delete('/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   param('productId').isMongoId().withMessage('Invalid product ID'),
@@ -182,7 +182,7 @@ router.delete('/:userId/:productId',
 // POST /api/wishlist/approve/:userId/:productId - Approve pending wishlist item
 router.post('/approve/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   param('productId').isMongoId().withMessage('Invalid product ID'),
@@ -193,7 +193,7 @@ router.post('/approve/:userId/:productId',
 // POST /api/wishlist/restore/:userId/:productId - Restore deleted wishlist item
 router.post('/restore/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   param('productId').isMongoId().withMessage('Invalid product ID'),
@@ -204,7 +204,7 @@ router.post('/restore/:userId/:productId',
 // POST /api/wishlist/archive/:userId/:productId - Archive wishlist item
 router.post('/archive/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   param('productId').isMongoId().withMessage('Invalid product ID'),
@@ -215,7 +215,7 @@ router.post('/archive/:userId/:productId',
 // GET /api/wishlist/check/:userId/:productId - Check if product is in wishlist
 router.get('/check/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'read'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   param('productId').isMongoId().withMessage('Invalid product ID'),
@@ -226,7 +226,7 @@ router.get('/check/:userId/:productId',
 // DELETE /api/wishlist/clear/:userId - Clear user's wishlist
 router.delete('/clear/:userId', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   instanceCheckMiddleware,
   bulkOperationLimiter,
   param('userId').isMongoId().withMessage('Invalid user ID'),
@@ -241,7 +241,7 @@ router.delete('/clear/:userId',
 // POST /api/wishlist/bulk/add - Bulk add to wishlist
 router.post('/bulk/add', 
   authMiddleware,
-  authorize('wishlist', 'write'),
+
   bulkOperationLimiter,
   wishlistValidation.bulkAdd,
   WishlistController.bulkAddToWishlist
@@ -250,7 +250,7 @@ router.post('/bulk/add',
 // PUT /api/wishlist/bulk/update - Bulk update wishlist items
 router.put('/bulk/update', 
   authMiddleware,
-  authorize('wishlist', 'update'),
+
   bulkOperationLimiter,
   wishlistValidation.bulkUpdate,
   WishlistController.bulkUpdateWishlist
@@ -263,7 +263,7 @@ router.put('/bulk/update',
 // GET /api/wishlist/stats/:userId - Get wishlist statistics
 router.get('/stats/:userId', 
   authMiddleware,
-  authorize('wishlist', 'view'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -273,7 +273,7 @@ router.get('/stats/:userId',
 // GET /api/wishlist/audit/:userId/:productId - Get audit trail for wishlist item
 router.get('/audit/:userId/:productId', 
   authMiddleware,
-  authorize('wishlist', 'report'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   param('productId').isMongoId().withMessage('Invalid product ID'),
@@ -288,7 +288,7 @@ router.get('/audit/:userId/:productId',
 // GET /api/wishlist/export/:userId - Export wishlist
 router.get('/export/:userId', 
   authMiddleware,
-  authorize('wishlist', 'view'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   wishlistValidation.export,
@@ -298,7 +298,7 @@ router.get('/export/:userId',
 // GET /api/wishlist/export/featured/:userId - Export featured wishlist items
 router.get('/export/featured/:userId', 
   authMiddleware,
-  authorize('wishlist', 'view'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50').toInt(),
@@ -338,7 +338,7 @@ router.use(routeOrderMiddleware);
 
 router.get('/docs/routes', 
   authMiddleware,
-  authorize('wishlist', 'view'),
+
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

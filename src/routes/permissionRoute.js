@@ -79,48 +79,48 @@ const permissionValidation = {
 // ========================================
 // 📋 CORE CRUD OPERATIONS
 // ========================================
-router.post('/', authMiddleware, authorize('permission', 'write'), permissionValidation.create, permissionController.createPermission);
-router.get('/', authMiddleware, authorize('permission', 'read'), permissionController.getAllPermissions);
-router.get('/states', authMiddleware, authorize('permission', 'read'), permissionController.getGroupedPermissions);
+router.post('/', authMiddleware,  permissionValidation.create, permissionController.createPermission);
+router.get('/', authMiddleware,  permissionController.getAllPermissions);
+router.get('/states', authMiddleware,  permissionController.getGroupedPermissions);
 
 // ========================================
 // 🔍 SEARCH & FILTER OPERATIONS
 // ========================================
-router.get('/active', authMiddleware, authorize('permission', 'read'), permissionController.getActivePermissions);
-router.get('/inactive', authMiddleware, authorize('permission', 'read'), permissionController.getInactivePermissions);
-router.get('/search/name', authMiddleware, authorize('permission', 'read'), permissionController.searchPermissionsByName);
-router.get('/search', authMiddleware, authorize('permission', 'read'), permissionValidation.search, permissionController.searchPermissions);
-router.get('/category/:category', authMiddleware, authorize('permission', 'read'), permissionValidation.category, permissionController.getPermissionsByCategory);
-router.get('/grouped', authMiddleware, authorize('permission', 'read'), permissionController.getPermissionsGrouped);
-router.get('/exists/:name', authMiddleware, authorize('permission', 'report'), param('name').isString().isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters'), permissionController.checkPermissionExists);
-router.post('/create-if-not-exists', authMiddleware, authorize('permission', 'write'), permissionValidation.create, permissionController.createIfNotExists);
+router.get('/active', authMiddleware,  permissionController.getActivePermissions);
+router.get('/inactive', authMiddleware,  permissionController.getInactivePermissions);
+router.get('/search/name', authMiddleware,  permissionController.searchPermissionsByName);
+router.get('/search', authMiddleware,  permissionValidation.search, permissionController.searchPermissions);
+router.get('/category/:category', authMiddleware,  permissionValidation.category, permissionController.getPermissionsByCategory);
+router.get('/grouped', authMiddleware,  permissionController.getPermissionsGrouped);
+router.get('/exists/:name', authMiddleware,  param('name').isString().isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters'), permissionController.checkPermissionExists);
+router.post('/create-if-not-exists', authMiddleware,  permissionValidation.create, permissionController.createIfNotExists);
 
 // ========================================
 // 📦 BULK OPERATIONS
 // ========================================
-router.post('/bulk', authMiddleware, authorize('permission', 'write'), permissionValidation.bulkCreate, permissionController.bulkCreatePermissions);
-router.patch('/bulk-enable', authMiddleware, authorize('permission', 'update'), permissionValidation.bulk, permissionController.bulkEnablePermissions);
-router.patch('/bulk-disable', authMiddleware, authorize('permission', 'update'), permissionValidation.bulk, permissionController.bulkDisablePermissions);
-router.delete('/bulk', authMiddleware, authorize('permission', 'delete'), permissionValidation.bulk, permissionController.bulkDeletePermissions);
+router.post('/bulk', authMiddleware,  permissionValidation.bulkCreate, permissionController.bulkCreatePermissions);
+router.patch('/bulk-enable', authMiddleware,  permissionValidation.bulk, permissionController.bulkEnablePermissions);
+router.patch('/bulk-disable', authMiddleware,  permissionValidation.bulk, permissionController.bulkDisablePermissions);
+router.delete('/bulk', authMiddleware, permissionValidation.bulk, permissionController.bulkDeletePermissions);
 
 // ========================================
 // 🛠 PERMISSION MANAGEMENT
 // ========================================
-router.patch('/:id/disable', authMiddleware, authorize('permission', 'update'), param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.disablePermission);
-router.patch('/:id/enable', authMiddleware, authorize('permission', 'update'), param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.enablePermission);
-router.patch('/:id/rename', authMiddleware, authorize('permission', 'update'), permissionValidation.rename, permissionController.renamePermission);
-router.patch('/:id/description', authMiddleware, authorize('permission', 'update'), permissionValidation.description, permissionController.updatePermissionDescription);
-router.patch('/:id/category', authMiddleware, authorize('permission', 'update'), permissionValidation.changeCategory, permissionController.changePermissionCategory);
-router.patch('/:id/toggle-active', authMiddleware, authorize('permission', 'update'), param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.togglePermissionActive);
-router.get('/:id/api-response', authMiddleware, authorize('permission', 'update'), param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.getPermissionAPIResponse);
+router.patch('/:id/disable', authMiddleware,  param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.disablePermission);
+router.patch('/:id/enable', authMiddleware,  param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.enablePermission);
+router.patch('/:id/rename', authMiddleware,  permissionValidation.rename, permissionController.renamePermission);
+router.patch('/:id/description', authMiddleware,  permissionValidation.description, permissionController.updatePermissionDescription);
+router.patch('/:id/category', authMiddleware,  permissionValidation.changeCategory, permissionController.changePermissionCategory);
+router.patch('/:id/toggle-active', authMiddleware,  param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.togglePermissionActive);
+router.get('/:id/api-response', authMiddleware,  param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.getPermissionAPIResponse);
 
 // ========================================
 // 📋 DYNAMIC ROUTES (MUST BE LAST)
 // ========================================
-router.get('/:id', authMiddleware, authorize('permission', 'read'), param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.getSinglePermission);
-router.put('/:id', authMiddleware, authorize('permission', 'update'), permissionValidation.update, permissionController.updatePermission);
-router.patch('/:id', authMiddleware, authorize('permission', 'update'), permissionValidation.update, permissionController.updatePermission);
-router.delete('/:id', authMiddleware, authorize('permission', 'delete'), param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.deletePermission);
+router.get('/:id', authMiddleware,  param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.getSinglePermission);
+router.put('/:id', authMiddleware,  permissionValidation.update, permissionController.updatePermission);
+router.patch('/:id', authMiddleware,  permissionValidation.update, permissionController.updatePermission);
+router.delete('/:id', authMiddleware, param('id').isMongoId().withMessage('Invalid permission ID'), permissionController.deletePermission);
 
 // ========================================
 // 📝 ROUTE DOCUMENTATION ENDPOINT

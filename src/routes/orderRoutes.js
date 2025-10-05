@@ -201,7 +201,7 @@ const orderValidation = {
 // POST /api/orders - Create a new order
 router.post('/', 
   authMiddleware,
-  authorize('orders', 'write'),
+
   orderValidation.create,
   orderController.createOrder
 );
@@ -209,7 +209,7 @@ router.post('/',
 // GET /api/orders/:id - Get order by ID
 router.get('/:id', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.getOrderById
@@ -226,7 +226,7 @@ router.get('/',
 // PUT /api/orders/:id - Update order
 router.put('/:id', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.update,
   orderController.updateOrder
@@ -235,7 +235,7 @@ router.put('/:id',
 // DELETE /api/orders/:id - Delete order
 router.delete('/:id', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.deleteOrder
@@ -248,7 +248,7 @@ router.delete('/:id',
 // PUT /api/orders/:id/pay - Mark order as paid
 router.put('/:id/pay', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.markAsPaid
@@ -257,7 +257,7 @@ router.put('/:id/pay',
 // PUT /api/orders/:id/refund - Refund order
 router.put('/:id/refund', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.refundOrder
@@ -266,7 +266,7 @@ router.put('/:id/refund',
 // PUT /api/orders/bulk-refund - Bulk refund orders
 router.put('/bulk-refund', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   bulkOperationLimiter,
   orderValidation.bulkUpdate,
   orderController.bulkRefundOrders
@@ -275,7 +275,7 @@ router.put('/bulk-refund',
 // PUT /api/orders/:id/redeem-points - Redeem loyalty points
 router.put('/:id/redeem-points', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.redeemPoints,
   orderController.redeemLoyaltyPoints
@@ -288,7 +288,7 @@ router.put('/:id/redeem-points',
 // PUT /api/orders/:id/status - Update order status
 router.put('/:id/status', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('status').isIn(['pending', 'processing', 'shipped', 'delivered', 'canceled']).withMessage('Invalid status'),
@@ -299,7 +299,7 @@ router.put('/:id/status',
 // PUT /api/orders/bulk-status - Bulk update order status
 router.put('/bulk-status', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   bulkOperationLimiter,
   orderValidation.bulkUpdate,
   orderController.bulkUpdateOrderStatus
@@ -308,7 +308,7 @@ router.put('/bulk-status',
 // POST /api/orders/:id/split - Split order
 router.post('/:id/split', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.split,
   orderController.splitOrder
@@ -317,7 +317,7 @@ router.post('/:id/split',
 // PUT /api/orders/:id/tracking - Add tracking info
 router.put('/:id/tracking', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.tracking,
   orderController.addTrackingInfo
@@ -326,7 +326,7 @@ router.put('/:id/tracking',
 // PUT /api/orders/:id/mark-delivered - Mark order as delivered
 router.put('/:id/mark-delivered', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.markOrderAsDelivered
@@ -335,7 +335,7 @@ router.put('/:id/mark-delivered',
 // PUT /api/orders/:id/priority - Set priority level
 router.put('/:id/priority', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.priority,
   orderController.setPriorityLevel
@@ -348,7 +348,7 @@ router.put('/:id/priority',
 // PUT /api/orders/:id/items/:itemIndex/quantity - Update item quantity
 router.put('/:id/items/:itemIndex/quantity', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.itemQuantity,
   orderController.updateItemQuantity
@@ -357,7 +357,7 @@ router.put('/:id/items/:itemIndex/quantity',
 // PUT /api/orders/:id/gift-message - Add gift message
 router.put('/:id/gift-message', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('message').optional().isString().withMessage('Message must be a string').isLength({ max: 200 }).withMessage('Message cannot exceed 200 characters').trim().escape(),
@@ -368,7 +368,7 @@ router.put('/:id/gift-message',
 // PUT /api/orders/:id/apply-coupon - Apply coupon
 router.put('/:id/apply-coupon', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.coupon,
   orderController.applyCoupon
@@ -381,7 +381,7 @@ router.put('/:id/apply-coupon',
 // POST /api/orders/:id/request-return - Request return
 router.post('/:id/request-return', 
   authMiddleware,
-  authorize('orders', 'write'),
+
   instanceCheckMiddleware,
   orderValidation.returnRequest,
   orderController.requestReturn
@@ -390,7 +390,7 @@ router.post('/:id/request-return',
 // PUT /api/orders/:id/resolve-return - Resolve return request
 router.put('/:id/resolve-return', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.resolveReturn,
   orderController.resolveReturnRequest
@@ -399,7 +399,7 @@ router.put('/:id/resolve-return',
 // GET /api/orders/return-requests - Get return requests
 router.get('/return-requests', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   orderValidation.query,
   orderController.getReturnRequests
 );
@@ -411,7 +411,7 @@ router.get('/return-requests',
 // GET /api/orders/top-customers - Get top customers
 router.get('/top-customers', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   orderValidation.query,
   orderController.getTopCustomers
 );
@@ -419,7 +419,7 @@ router.get('/top-customers',
 // GET /api/orders/user/:userId/history - Get customer order history
 router.get('/user/:userId/history', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -434,7 +434,7 @@ router.get('/user/:userId/history',
 // GET /api/orders/analytics/stats - Get order statistics
 router.get('/analytics/stats', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getOrderStats
 );
@@ -442,7 +442,7 @@ router.get('/analytics/stats',
 // GET /api/orders/analytics/trends - Get order trends
 router.get('/analytics/trends', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getOrderTrends
 );
@@ -450,7 +450,7 @@ router.get('/analytics/trends',
 // GET /api/orders/analytics/revenue-by-source - Get revenue by source
 router.get('/analytics/revenue-by-source', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getRevenueBySource
 );
@@ -458,7 +458,7 @@ router.get('/analytics/revenue-by-source',
 // GET /api/orders/analytics/product-performance - Get product performance
 router.get('/analytics/product-performance', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getProductPerformance
 );
@@ -466,7 +466,7 @@ router.get('/analytics/product-performance',
 // GET /api/orders/analytics/conversion-funnel - Get order conversion funnel
 router.get('/analytics/conversion-funnel', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getOrderConversionFunnel
 );
@@ -474,7 +474,7 @@ router.get('/analytics/conversion-funnel',
 // GET /api/orders/featured - Get featured orders
 router.get('/featured', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   orderValidation.query,
   orderController.getFeaturedOrders
 );
@@ -482,7 +482,7 @@ router.get('/featured',
 // GET /api/orders/low-stock - Get low stock orders
 router.get('/low-stock', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   orderValidation.query,
   orderController.getLowStockOrders
 );
@@ -490,7 +490,7 @@ router.get('/low-stock',
 // GET /api/orders/analytics/average-order-value - Get average order value
 router.get('/analytics/average-order-value', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getAverageOrderValue
 );
@@ -498,7 +498,7 @@ router.get('/analytics/average-order-value',
 // GET /api/orders/search-by-customer - Search orders by customer name
 router.get('/search-by-customer', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   query('customerName').isString().withMessage('Customer name must be a string').trim().escape(),
   orderValidation.query,
   orderController.searchOrdersByCustomerName
@@ -507,7 +507,7 @@ router.get('/search-by-customer',
 // GET /api/orders/analytics/by-payment-method - Get orders by payment method
 router.get('/analytics/by-payment-method', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getOrdersByPaymentMethod
 );
@@ -515,7 +515,7 @@ router.get('/analytics/by-payment-method',
 // GET /api/orders/analytics/delayed-orders - Get delayed orders
 router.get('/analytics/delayed-orders', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   orderValidation.query,
   orderController.getDelayedOrders
 );
@@ -523,7 +523,7 @@ router.get('/analytics/delayed-orders',
 // GET /api/orders/analytics/loyalty-points-summary - Get loyalty points summary
 router.get('/analytics/loyalty-points-summary', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getLoyaltyPointsSummary
 );
@@ -535,7 +535,7 @@ router.get('/analytics/loyalty-points-summary',
 // GET /api/orders/:id/estimate-delivery - Estimate delivery
 router.get('/:id/estimate-delivery', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.estimateDelivery
@@ -544,7 +544,7 @@ router.get('/:id/estimate-delivery',
 // GET /api/orders/:id/summary - Get order summary
 router.get('/:id/summary', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.getOrderSummary
@@ -553,7 +553,7 @@ router.get('/:id/summary',
 // POST /api/orders/:id/reorder - Reorder
 router.post('/:id/reorder', 
   authMiddleware,
-  authorize('orders', 'write'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.reorder
@@ -566,7 +566,7 @@ router.post('/:id/reorder',
 // GET /api/orders/fraudulent - Get fraudulent orders
 router.get('/fraudulent', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   orderValidation.query,
   orderController.getFraudulentOrders
 );
@@ -574,7 +574,7 @@ router.get('/fraudulent',
 // GET /api/orders/:id/compliance-check - Check order compliance
 router.get('/:id/compliance-check', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.checkOrderCompliance
@@ -583,7 +583,7 @@ router.get('/:id/compliance-check',
 // PUT /api/orders/:id/flag - Flag order
 router.put('/:id/flag', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('reason').isString().withMessage('Reason must be a string').isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters').trim().escape(),
@@ -598,7 +598,7 @@ router.put('/:id/flag',
 // POST /api/orders/validate-stock - Validate stock in bulk
 router.post('/validate-stock', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   bulkOperationLimiter,
   body('orderIds').isArray({ min: 1 }).withMessage('Order IDs array is required'),
   body('orderIds.*').isMongoId().withMessage('Invalid order ID in array'),
@@ -609,7 +609,7 @@ router.post('/validate-stock',
 // POST /api/orders/update-stock - Update stock in bulk
 router.post('/update-stock', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   bulkOperationLimiter,
   body('updates').isArray({ min: 1 }).withMessage('Updates array is required'),
   body('updates.*.orderId').isMongoId().withMessage('Invalid order ID in updates'),
@@ -622,7 +622,7 @@ router.post('/update-stock',
 // GET /api/orders/export - Export orders report
 router.get('/export', 
   authMiddleware,
-  authorize('orders', 'view'),
+
   bulkOperationLimiter,
   orderValidation.export,
   orderController.exportOrdersReport
@@ -631,7 +631,7 @@ router.get('/export',
 // POST /api/orders/import - Import orders in bulk
 router.post('/import', 
   authMiddleware,
-  authorize('orders', 'write'),
+
   bulkOperationLimiter,
   body('orders').isArray({ min: 1 }).withMessage('Orders array is required'),
   body('orders.*.userId').isMongoId().withMessage('Invalid user ID in orders'),
@@ -646,7 +646,7 @@ router.post('/import',
 // GET /api/orders/:id/audit - Audit order changes
 router.get('/:id/audit', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.auditOrderChanges
@@ -655,7 +655,7 @@ router.get('/:id/audit',
 // POST /api/orders/status-notification - Push status notification
 router.post('/status-notification', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   body('orderId').isMongoId().withMessage('Invalid order ID'),
   body('status').isIn(['pending', 'processing', 'shipped', 'delivered', 'canceled']).withMessage('Invalid status'),
   validate,
@@ -665,7 +665,7 @@ router.post('/status-notification',
 // POST /api/orders/:id/log-event - Log order event
 router.post('/:id/log-event', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('eventType').isString().withMessage('Event type must be a string').trim().escape(),
@@ -677,7 +677,7 @@ router.post('/:id/log-event',
 // PUT /api/orders/:id/restore - Restore canceled order
 router.put('/:id/restore', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.restoreCanceledOrder
@@ -686,7 +686,7 @@ router.put('/:id/restore',
 // POST /api/orders/archive-completed - Archive completed orders
 router.post('/archive-completed', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   bulkOperationLimiter,
   body('beforeDate').isISO8601().withMessage('Valid before date is required'),
   validate,
@@ -696,7 +696,7 @@ router.post('/archive-completed',
 // POST /api/orders/:id/send-invoice - Send order invoice
 router.post('/:id/send-invoice', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.sendOrderInvoice
@@ -705,7 +705,7 @@ router.post('/:id/send-invoice',
 // GET /api/orders/historical-data - Get historical order data
 router.get('/historical-data', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getHistoricalOrderData
 );
@@ -713,7 +713,7 @@ router.get('/historical-data',
 // GET /api/orders/growth-stats - Get order growth stats
 router.get('/growth-stats', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   orderValidation.query,
   orderController.getOrderGrowthStats
 );
@@ -721,7 +721,7 @@ router.get('/growth-stats',
 // POST /api/orders/:id/rate-items - Rate order items
 router.post('/:id/rate-items', 
   authMiddleware,
-  authorize('orders', 'write'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('ratings').isArray({ min: 1 }).withMessage('Ratings array is required'),
@@ -734,7 +734,7 @@ router.post('/:id/rate-items',
 // POST /api/orders/:id/review - Review order experience
 router.post('/:id/review', 
   authMiddleware,
-  authorize('orders', 'write'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5').toInt(),
@@ -746,7 +746,7 @@ router.post('/:id/review',
 // GET /api/orders/:id/events-timeline - Get order events timeline
 router.get('/:id/events-timeline', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.getOrderEventsTimeline
@@ -755,7 +755,7 @@ router.get('/:id/events-timeline',
 // PUT /api/orders/:id/assign-agent - Assign order to agent
 router.put('/:id/assign-agent', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('agentId').isMongoId().withMessage('Invalid agent ID'),
@@ -766,7 +766,7 @@ router.put('/:id/assign-agent',
 // GET /api/orders/:id/track-route - Track order route
 router.get('/:id/track-route', 
   authMiddleware,
-  authorize('orders', 'read'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.trackOrderRoute
@@ -775,7 +775,7 @@ router.get('/:id/track-route',
 // GET /api/orders/:id/calculate-profit - Calculate order profit
 router.get('/:id/calculate-profit', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.calculateOrderProfit
@@ -784,7 +784,7 @@ router.get('/:id/calculate-profit',
 // GET /api/orders/:id/payment-reconciliation - Check payment reconciliation
 router.get('/:id/payment-reconciliation', 
   authMiddleware,
-  authorize('orders', 'report'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.checkOrderPaymentReconciliation
@@ -793,7 +793,7 @@ router.get('/:id/payment-reconciliation',
 // POST /api/orders/:id/flag-return-abuse - Flag suspected return abuse
 router.post('/:id/flag-return-abuse', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('reason').isString().withMessage('Reason must be a string').isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters').trim().escape(),
@@ -804,7 +804,7 @@ router.post('/:id/flag-return-abuse',
 // POST /api/orders/:id/escalate - Handle order escalation
 router.post('/:id/escalate', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('reason').isString().withMessage('Reason must be a string').isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters').trim().escape(),
@@ -815,7 +815,7 @@ router.post('/:id/escalate',
 // POST /api/orders/:id/sync-erp - Sync order with ERP
 router.post('/:id/sync-erp', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.syncOrderWithERP
@@ -824,7 +824,7 @@ router.post('/:id/sync-erp',
 // POST /api/orders/:id/integrate-crm - Integrate order with CRM
 router.post('/:id/integrate-crm', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.integrateOrderWithCRM
@@ -833,7 +833,7 @@ router.post('/:id/integrate-crm',
 // PUT /api/orders/:id/lock-audit - Lock order for audit
 router.put('/:id/lock-audit', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.lockOrderForAudit
@@ -842,7 +842,7 @@ router.put('/:id/lock-audit',
 // PUT /api/orders/:id/release-lock - Release order lock
 router.put('/:id/release-lock', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   orderController.releaseOrderLock
@@ -851,7 +851,7 @@ router.put('/:id/release-lock',
 // PUT /api/orders/:id/cancel-admin - Cancel order by admin
 router.put('/:id/cancel-admin', 
   authMiddleware,
-  authorize('orders', 'update'),
+
   instanceCheckMiddleware,
   orderValidation.id,
   body('reason').isString().withMessage('Reason must be a string').isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters').trim().escape(),
@@ -894,8 +894,6 @@ router.use(routeOrderMiddleware);
 // ========================================
 
 router.get('/docs/routes',
-  authMiddleware,
-  authorize('orders', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

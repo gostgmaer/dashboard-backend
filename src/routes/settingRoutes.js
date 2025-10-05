@@ -149,7 +149,7 @@ const settingsValidation = {
 // POST /api/setting - Create new settings for a site/app
 settingRoute.post('/',
   authMiddleware,
-  authorize('settings', 'write'),
+
   settingsValidation.create,
   settingsCtrl.createSettings
 );
@@ -157,7 +157,7 @@ settingRoute.post('/',
 // GET /api/setting - List all settings (all sites/apps)
 settingRoute.get('/',
   authMiddleware,
-  authorize('settings', 'read'),
+
   settingsValidation.query,
   settingsCtrl.listAllSettings
 );
@@ -175,7 +175,7 @@ settingRoute.get('/:siteKey',
 // PUT /api/setting/:siteKey - Update settings for a specific site/app
 settingRoute.put('/:siteKey',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.update,
   settingsCtrl.updateSettingsBySite
@@ -184,7 +184,7 @@ settingRoute.put('/:siteKey',
 // DELETE /api/setting/:siteKey - Delete settings for a specific site/app
 settingRoute.delete('/:siteKey',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   param('siteKey').isString().withMessage('Site key must be a string').isLength({ min: 1, max: 50 }).withMessage('Site key must be between 1 and 50 characters').trim().escape(),
   validate,
@@ -198,7 +198,7 @@ settingRoute.delete('/:siteKey',
 // PATCH /api/setting/:siteKey/branding - Update branding settings
 settingRoute.patch('/:siteKey/branding',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('logoUrl').optional().isURL().withMessage('Logo URL must be a valid URL'),
@@ -210,7 +210,7 @@ settingRoute.patch('/:siteKey/branding',
 // PATCH /api/setting/:siteKey/branding/field - Update specific branding field
 settingRoute.patch('/:siteKey/branding/field',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('field').isString().withMessage('Field must be a string').trim().escape(),
@@ -222,7 +222,7 @@ settingRoute.patch('/:siteKey/branding/field',
 // PATCH /api/setting/:siteKey/seo - Update SEO settings
 settingRoute.patch('/:siteKey/seo',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('metaTitle').optional().isString().isLength({ max: 60 }).withMessage('Meta title cannot exceed 60 characters').trim().escape(),
@@ -234,7 +234,7 @@ settingRoute.patch('/:siteKey/seo',
 // PATCH /api/setting/:siteKey/payment-methods - Update payment methods
 settingRoute.patch('/:siteKey/payment-methods',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('methods').isArray().withMessage('Methods must be an array'),
@@ -246,7 +246,7 @@ settingRoute.patch('/:siteKey/payment-methods',
 // POST /api/setting/:siteKey/payment-methods - Add payment method
 settingRoute.post('/:siteKey/payment-methods',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.paymentMethod,
   settingsCtrl.addPaymentMethod
@@ -255,7 +255,7 @@ settingRoute.post('/:siteKey/payment-methods',
 // DELETE /api/setting/:siteKey/payment-methods - Remove payment method
 settingRoute.delete('/:siteKey/payment-methods',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.paymentMethod,
   settingsCtrl.removePaymentMethod
@@ -264,7 +264,7 @@ settingRoute.delete('/:siteKey/payment-methods',
 // PATCH /api/setting/:siteKey/contact-info - Update contact info
 settingRoute.patch('/:siteKey/contact-info',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('email').optional().isEmail().withMessage('Invalid email'),
@@ -276,7 +276,7 @@ settingRoute.patch('/:siteKey/contact-info',
 // PATCH /api/setting/:siteKey/shipping-options - Update shipping options
 settingRoute.patch('/:siteKey/shipping-options',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('options').isArray().withMessage('Shipping options must be an array'),
@@ -287,7 +287,7 @@ settingRoute.patch('/:siteKey/shipping-options',
 // PATCH /api/setting/:siteKey/email-templates - Update email templates
 settingRoute.patch('/:siteKey/email-templates',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('templates').isObject().withMessage('Templates must be an object'),
@@ -298,7 +298,7 @@ settingRoute.patch('/:siteKey/email-templates',
 // PATCH /api/setting/:siteKey/analytics - Update analytics settings
 settingRoute.patch('/:siteKey/analytics',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('trackingId').optional().isString().withMessage('Tracking ID must be a string').trim().escape(),
@@ -309,7 +309,7 @@ settingRoute.patch('/:siteKey/analytics',
 // PATCH /api/setting/:siteKey/currency-tax - Update currency and tax
 settingRoute.patch('/:siteKey/currency-tax',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('currency').optional().isString().isLength({ max: 3 }).withMessage('Currency must be a valid ISO 4217 code').trim().escape(),
@@ -321,7 +321,7 @@ settingRoute.patch('/:siteKey/currency-tax',
 // PATCH /api/setting/:siteKey/currency - Update currency
 settingRoute.patch('/:siteKey/currency',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('currency').isString().isLength({ max: 3 }).withMessage('Currency must be a valid ISO 4217 code').trim().escape(),
@@ -332,7 +332,7 @@ settingRoute.patch('/:siteKey/currency',
 // PATCH /api/setting/:siteKey/loyalty - Update loyalty program
 settingRoute.patch('/:siteKey/loyalty',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('pointsPerDollar').optional().isFloat({ min: 0 }).withMessage('Points per dollar must be a positive number'),
@@ -343,7 +343,7 @@ settingRoute.patch('/:siteKey/loyalty',
 // PATCH /api/setting/:siteKey/loyalty/increment - Increment loyalty points
 settingRoute.patch('/:siteKey/loyalty/increment',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('increment').isFloat({ min: 0 }).withMessage('Increment must be a positive number'),
@@ -354,7 +354,7 @@ settingRoute.patch('/:siteKey/loyalty/increment',
 // PATCH /api/setting/:siteKey/policies - Update policies
 settingRoute.patch('/:siteKey/policies',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('policies').isObject().withMessage('Policies must be an object'),
@@ -365,7 +365,7 @@ settingRoute.patch('/:siteKey/policies',
 // PATCH /api/setting/:siteKey/policy - Update specific policy
 settingRoute.patch('/:siteKey/policy',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('policyType').isString().withMessage('Policy type must be a string').trim().escape(),
@@ -377,7 +377,7 @@ settingRoute.patch('/:siteKey/policy',
 // PATCH /api/setting/:siteKey/featured-categories - Update featured categories
 settingRoute.patch('/:siteKey/featured-categories',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('categories').isArray().withMessage('Categories must be an array'),
@@ -389,7 +389,7 @@ settingRoute.patch('/:siteKey/featured-categories',
 // PATCH /api/setting/:siteKey/order-limits - Update order limits
 settingRoute.patch('/:siteKey/order-limits',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('maxOrderValue').optional().isFloat({ min: 0 }).withMessage('Max order value must be a positive number'),
@@ -405,7 +405,7 @@ settingRoute.patch('/:siteKey/order-limits',
 // PATCH /api/setting/:siteKey/maintenance - Toggle maintenance mode
 settingRoute.patch('/:siteKey/maintenance',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
@@ -416,7 +416,7 @@ settingRoute.patch('/:siteKey/maintenance',
 // PATCH /api/setting/:siteKey/maintenance-with-reason - Set maintenance mode with reason
 settingRoute.patch('/:siteKey/maintenance-with-reason',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
@@ -428,7 +428,7 @@ settingRoute.patch('/:siteKey/maintenance-with-reason',
 // PATCH /api/setting/:siteKey/live - Toggle live status
 settingRoute.patch('/:siteKey/live',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
@@ -439,7 +439,7 @@ settingRoute.patch('/:siteKey/live',
 // PATCH /api/setting/:siteKey/feature - Toggle feature flag
 settingRoute.patch('/:siteKey/feature',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.featureToggle,
   settingsCtrl.toggleFeature
@@ -457,7 +457,7 @@ settingRoute.get('/:siteKey/public',
 // GET /api/setting/:siteKey/section/:section - Get a specific section
 settingRoute.get('/:siteKey/section/:section',
   authMiddleware,
-  authorize('settings', 'read'),
+
   instanceCheckMiddleware,
   settingsValidation.section,
   settingsCtrl.getSection
@@ -466,7 +466,7 @@ settingRoute.get('/:siteKey/section/:section',
 // POST /api/setting/:siteKey/reset - Reset all settings to defaults
 settingRoute.post('/:siteKey/reset',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   resetOperationLimiter,
   settingsValidation.reset,
@@ -476,7 +476,7 @@ settingRoute.post('/:siteKey/reset',
 // POST /api/setting/:siteKey/reset-section - Reset a specific section to default
 settingRoute.post('/:siteKey/reset-section',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   resetOperationLimiter,
   settingsValidation.section,
@@ -486,7 +486,7 @@ settingRoute.post('/:siteKey/reset-section',
 // PATCH /api/setting/:siteKey/audit-update - Audit-aware generic update
 settingRoute.patch('/:siteKey/audit-update',
   authMiddleware,
-  authorize('settings', 'update'),
+
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('changes').isObject().withMessage('Changes must be an object'),
@@ -535,8 +535,6 @@ settingRoute.use(routeOrderMiddleware);
 // ========================================
 
 settingRoute.get('/docs/routes',
-  authMiddleware,
-  authorize('settings', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

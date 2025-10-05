@@ -147,7 +147,7 @@ const cartValidation = {
 // POST /api/cart/add - Add item to cart
 router.post('/add',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartValidation.addItem,
   cartController.addItem
@@ -156,7 +156,7 @@ router.post('/add',
 // DELETE /api/cart/remove/:productId - Remove item from cart
 router.delete('/remove/:productId',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartValidation.removeItem,
   cartController.removeItem
@@ -165,7 +165,7 @@ router.delete('/remove/:productId',
 // PATCH /api/cart/update/:productId - Update item quantity in cart
 router.patch('/update/:productId',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartValidation.updateQuantity,
   cartController.updateQuantity
@@ -174,7 +174,7 @@ router.patch('/update/:productId',
 // DELETE /api/cart/clear - Clear user's cart
 router.delete('/clear',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartController.clearCart
 );
@@ -182,7 +182,7 @@ router.delete('/clear',
 // GET /api/cart - Get user's cart
 router.get('/',
   authMiddleware,
-  authorize('cart', 'read'),
+
   instanceCheckMiddleware,
   cartController.getCart
 );
@@ -190,7 +190,7 @@ router.get('/',
 // POST /api/cart/discount - Apply discount to cart
 router.post('/discount',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartValidation.discount,
   cartController.applyDiscount
@@ -199,7 +199,7 @@ router.post('/discount',
 // POST /api/cart/merge - Merge cart (e.g., guest to user cart)
 router.post('/merge',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartValidation.merge,
   cartController.mergeCart
@@ -208,7 +208,7 @@ router.post('/merge',
 // POST /api/cart/metadata - Set cart metadata
 router.post('/metadata',
   authMiddleware,
-  authorize('cart', 'write'),
+
   instanceCheckMiddleware,
   cartValidation.metadata,
   cartController.setMetadata
@@ -221,7 +221,7 @@ router.post('/metadata',
 // GET /api/cart/paginated - Get paginated carts
 router.get('/paginated',
   authMiddleware,
-  authorize('cart', 'read'),
+
   bulkOperationLimiter,
   cartValidation.query,
   cartController.getPaginatedCarts
@@ -230,7 +230,7 @@ router.get('/paginated',
 // GET /api/cart/abandoned - Get abandoned carts
 router.get('/abandoned',
   authMiddleware,
-  authorize('cart', 'read'),
+
   bulkOperationLimiter,
   cartValidation.query,
   cartController.getAbandonedCarts
@@ -239,7 +239,7 @@ router.get('/abandoned',
 // PATCH /api/cart/bulk-update - Bulk update cart status
 router.patch('/bulk-update',
   authMiddleware,
-  authorize('cart', 'update'),
+
   bulkOperationLimiter,
   cartValidation.bulkUpdate,
   cartController.bulkUpdateCartStatus
@@ -248,7 +248,7 @@ router.patch('/bulk-update',
 // GET /api/cart/analytics - Get cart analytics
 router.get('/analytics',
   authMiddleware,
-  authorize('cart', 'report'),
+
   bulkOperationLimiter,
   cartValidation.analytics,
   cartController.getCartAnalytics
@@ -257,7 +257,7 @@ router.get('/analytics',
 // DELETE /api/cart/product/:productId - Remove product from all carts
 router.delete('/product/:productId',
   authMiddleware,
-  authorize('cart', 'update'),
+
   bulkOperationLimiter,
   cartValidation.removeProduct,
   cartController.removeProductFromAllCarts
@@ -266,7 +266,7 @@ router.delete('/product/:productId',
 // DELETE /api/cart/all - Clear all carts
 router.delete('/all',
   authMiddleware,
-  authorize('cart', 'update'),
+
   bulkOperationLimiter,
   cartController.clearAllCarts
 );
@@ -301,8 +301,6 @@ router.use(routeOrderMiddleware);
 // ========================================
 
 router.get('/docs/routes',
-  authMiddleware,
-  authorize('cart', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

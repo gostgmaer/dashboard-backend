@@ -225,42 +225,42 @@ const brandValidation = {
 
 // GET /api/brands - Get paginated brands
 BrandRoute.get('/', 
-  authorize('brands', 'read'),
+
   brandValidation.query,
   getPaginatedBrands
 );
 
 // GET /api/brands/active - Get active brands
 BrandRoute.get('/active', 
-  authorize('brands', 'read'),
+
   brandValidation.query,
   getActiveBrands
 );
 
 // GET /api/brands/featured - Get featured brands
 BrandRoute.get('/featured', 
-  authorize('brands', 'read'),
+
   brandValidation.query,
   getFeaturedBrands
 );
 
 // GET /api/brands/search - Search brands by keyword
 BrandRoute.get('/search', 
-  authorize('brands', 'read'),
+
   brandValidation.search,
   searchBrands
 );
 
 // GET /api/brands/top-rated - Get top-rated brands
 BrandRoute.get('/top-rated', 
-  authorize('brands', 'read'),
+
   brandValidation.query,
   getTopRatedBrands
 );
 
 // GET /api/brands/country/:country - Get brands by country
 BrandRoute.get('/country/:country', 
-  authorize('brands', 'read'),
+
   brandValidation.country,
   brandValidation.query,
   getBrandsByCountry
@@ -268,7 +268,7 @@ BrandRoute.get('/country/:country',
 
 // GET /api/brands/year-range - Get brands by year range
 BrandRoute.get('/year-range', 
-  authorize('brands', 'read'),
+
   brandValidation.yearRange,
   brandValidation.query,
   getBrandsByYearRange
@@ -276,14 +276,14 @@ BrandRoute.get('/year-range',
 
 // GET /api/brands/social-media - Get brands with social media
 BrandRoute.get('/social-media', 
-  authorize('brands', 'read'),
+
   brandValidation.query,
   getBrandsWithSocialMedia
 );
 
 // GET /api/brands/:idOrSlug - Get a single brand by ID or slug
 BrandRoute.get('/:idOrSlug', 
-  authorize('brands', 'read'),
+
   instanceCheckMiddleware,
   brandValidation.idOrSlug,
   getBrand
@@ -296,7 +296,7 @@ BrandRoute.get('/:idOrSlug',
 // POST /api/brands - Create a new brand
 BrandRoute.post('/', 
   authMiddleware,
-  authorize('brands', 'write'),
+
   brandValidation.create,
   createBrand
 );
@@ -304,7 +304,7 @@ BrandRoute.post('/',
 // PUT /api/brands/:id - Update a brand
 BrandRoute.put('/:id', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   instanceCheckMiddleware,
   brandValidation.update,
   updateBrand
@@ -313,7 +313,7 @@ BrandRoute.put('/:id',
 // DELETE /api/brands/:id - Hard delete a brand
 BrandRoute.delete('/:id', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid brand ID'),
   validate,
@@ -323,7 +323,7 @@ BrandRoute.delete('/:id',
 // POST /api/brands/bulk-status - Bulk update status
 BrandRoute.post('/bulk-status', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   bulkOperationLimiter,
   brandValidation.bulkStatus,
   bulkUpdateStatus
@@ -332,7 +332,7 @@ BrandRoute.post('/bulk-status',
 // POST /api/brands/bulk-feature - Bulk feature/unfeature
 BrandRoute.post('/bulk-feature', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   bulkOperationLimiter,
   brandValidation.bulkFeature,
   bulkFeatureToggle
@@ -341,7 +341,7 @@ BrandRoute.post('/bulk-feature',
 // POST /api/brands/soft-delete - Soft delete brands
 BrandRoute.post('/soft-delete', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   bulkOperationLimiter,
   brandValidation.softDelete,
   softDeleteBrands
@@ -350,7 +350,7 @@ BrandRoute.post('/soft-delete',
 // POST /api/brands/restore - Restore soft-deleted brands
 BrandRoute.post('/restore', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   bulkOperationLimiter,
   brandValidation.restore,
   restoreBrands
@@ -359,7 +359,7 @@ BrandRoute.post('/restore',
 // POST /api/brands/display-order - Update display order
 BrandRoute.post('/display-order', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   bulkOperationLimiter,
   brandValidation.displayOrder,
   updateDisplayOrder
@@ -368,7 +368,7 @@ BrandRoute.post('/display-order',
 // POST /api/brands/refresh-products - Refresh product counts
 BrandRoute.post('/refresh-products', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   bulkOperationLimiter,
   refreshProductCounts
 );
@@ -376,7 +376,7 @@ BrandRoute.post('/refresh-products',
 // POST /api/brands/:id/add-image - Add image to brand
 BrandRoute.post('/:id/add-image', 
   authMiddleware,
-  authorize('brands', 'write'),
+
   instanceCheckMiddleware,
   brandValidation.image,
   addBrandImage
@@ -385,7 +385,7 @@ BrandRoute.post('/:id/add-image',
 // POST /api/brands/:id/remove-image - Remove image from brand
 BrandRoute.post('/:id/remove-image', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid brand ID'),
   validate,
@@ -395,7 +395,7 @@ BrandRoute.post('/:id/remove-image',
 // PUT /api/brands/:id/contact - Update brand contact
 BrandRoute.put('/:id/contact', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   instanceCheckMiddleware,
   brandValidation.contact,
   updateBrandContact
@@ -404,7 +404,7 @@ BrandRoute.put('/:id/contact',
 // PUT /api/brands/:id/rating - Update brand rating
 BrandRoute.put('/:id/rating', 
   authMiddleware,
-  authorize('brands', 'update'),
+
   instanceCheckMiddleware,
   brandValidation.rating,
   updateBrandRating
@@ -442,8 +442,6 @@ BrandRoute.use(routeOrderMiddleware);
 // ========================================
 
 BrandRoute.get('/docs/routes', 
-  authMiddleware,
-  authorize('brands', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

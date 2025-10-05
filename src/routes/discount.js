@@ -147,7 +147,7 @@
   // POST /api/discount/rules - Create or update a discount rule
   discountRoute.post('/rules',
     authMiddleware,
-    authorize('discount.rule', 'write'),
+
     operationLimiter,
     discountValidation.rule,
     ctrl.upsertDiscountRule
@@ -156,7 +156,7 @@
   // PUT /api/discount/rules/:id - Update a discount rule
   discountRoute.put('/rules/:id',
     authMiddleware,
-    authorize('discount.rule', 'update'),
+
     instanceCheckMiddleware,
     operationLimiter,
     discountValidation.rule,
@@ -166,7 +166,7 @@
   // GET /api/discount/rules - List discount rules
   discountRoute.get('/rules',
     authMiddleware,
-    authorize('discount.rule', 'read'),
+
     discountValidation.query,
     ctrl.listDiscountRules
   );
@@ -174,7 +174,7 @@
   // PATCH /api/discount/rules/:id/toggle - Toggle discount rule active status
   discountRoute.patch('/rules/:id/toggle',
     authMiddleware,
-    authorize('discount.rule', 'update'),
+
     instanceCheckMiddleware,
     discountValidation.toggle,
     ctrl.toggleRuleActive
@@ -187,7 +187,7 @@
   // POST /api/discount/promo - Create or update a promo code
   discountRoute.post('/promo',
     authMiddleware,
-    authorize('promo', 'write'),
+
     operationLimiter,
     discountValidation.promo,
     ctrl.upsertPromoCode
@@ -196,7 +196,7 @@
   // PUT /api/discount/promo/:id - Update a promo code
   discountRoute.put('/promo/:id',
     authMiddleware,
-    authorize('promo', 'update'),
+
     instanceCheckMiddleware,
     operationLimiter,
     discountValidation.promo,
@@ -206,7 +206,7 @@
   // POST /api/discount/promo/apply - Apply promo code to cart
   discountRoute.post('/promo/apply',
     authMiddleware,
-    authorize('promo', 'write'),
+
     discountValidation.applyPromo,
     ctrl.applyPromoToCart
   );
@@ -218,7 +218,7 @@
   // POST /api/discount/preview/rules - Preview rules pricing
   discountRoute.post('/preview/rules',
     authMiddleware,
-    authorize('discount.rule', 'read'),
+
     discountValidation.preview,
     ctrl.previewRulesPricing
   );
@@ -226,7 +226,7 @@
   // POST /api/discount/checkout/discounts - Checkout with discounts
   discountRoute.post('/checkout/discounts',
     authMiddleware,
-    authorize('discount', 'write'),
+
     discountValidation.checkout,
     ctrl.checkoutWithDiscounts
   );

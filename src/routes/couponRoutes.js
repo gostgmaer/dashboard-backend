@@ -197,7 +197,7 @@ const couponValidation = {
 // POST /api/coupons - Add a new coupon
 couponRouter.post('/coupons',
   authMiddleware,
-  authorize('coupons', 'write'),
+
   instanceCheckMiddleware,
   couponValidation.addCoupon,
   addCoupon
@@ -206,7 +206,7 @@ couponRouter.post('/coupons',
 // POST /api/coupons/apply - Apply coupon to product
 couponRouter.post('/coupons/apply',
   authMiddleware,
-  authorize('coupons', 'write'),
+
   couponValidation.applyCouponToProduct,
   applyCouponToProduct
 );
@@ -214,7 +214,7 @@ couponRouter.post('/coupons/apply',
 // POST /api/coupons/bulk - Add multiple coupons
 couponRouter.post('/coupons/bulk',
   authMiddleware,
-  authorize('coupons', 'write'),
+
   bulkOperationLimiter,
   couponValidation.addAllCoupon,
   addAllCoupon
@@ -223,7 +223,7 @@ couponRouter.post('/coupons/bulk',
 // GET /api/coupons - Get all coupons
 couponRouter.get('/coupons',
   authMiddleware,
-  authorize('coupons', 'read'),
+
   couponValidation.getAllCoupons,
   getAllCoupons
 );
@@ -231,7 +231,7 @@ couponRouter.get('/coupons',
 // GET /api/coupons/active - Get only enabled coupons (showing)
 couponRouter.get('/coupons/active',
   authMiddleware,
-  authorize('coupons', 'read'),
+
   couponValidation.getShowingCoupons,
   getShowingCoupons
 );
@@ -239,7 +239,7 @@ couponRouter.get('/coupons/active',
 // GET /api/coupons/:id - Get a single coupon by ID
 couponRouter.get('/coupons/:id',
   authMiddleware,
-  authorize('coupons', 'read'),
+
   instanceCheckMiddleware,
   couponValidation.id,
   getCouponById
@@ -248,7 +248,7 @@ couponRouter.get('/coupons/:id',
 // PUT /api/coupons/:id - Update a single coupon by ID
 couponRouter.put('/coupons/:id',
   authMiddleware,
-  authorize('coupons', 'update'),
+
   instanceCheckMiddleware,
   couponValidation.updateCoupon,
   updateCoupon
@@ -257,7 +257,7 @@ couponRouter.put('/coupons/:id',
 // PATCH /api/coupons/bulk/update - Update many coupons
 couponRouter.patch('/coupons/bulk/update',
   authMiddleware,
-  authorize('coupons', 'update'),
+
   bulkOperationLimiter,
   couponValidation.updateManyCoupons,
   updateManyCoupons
@@ -266,7 +266,7 @@ couponRouter.patch('/coupons/bulk/update',
 // PUT /api/coupons/:id/status - Show/hide a coupon (update status)
 couponRouter.put('/coupons/:id/status',
   authMiddleware,
-  authorize('coupons', 'update'),
+
   instanceCheckMiddleware,
   couponValidation.updateStatus,
   updateStatus
@@ -275,7 +275,7 @@ couponRouter.put('/coupons/:id/status',
 // DELETE /api/coupons/:id - Delete a single coupon by ID
 couponRouter.delete('/coupons/:id',
   authMiddleware,
-  authorize('coupons', 'update'),
+
   instanceCheckMiddleware,
   couponValidation.id,
   deleteCoupon
@@ -284,7 +284,7 @@ couponRouter.delete('/coupons/:id',
 // PATCH /api/coupons/bulk/delete - Delete multiple coupons
 couponRouter.patch('/coupons/bulk/delete',
   authMiddleware,
-  authorize('coupons', 'update'),
+
   bulkOperationLimiter,
   couponValidation.deleteManyCoupons,
   deleteManyCoupons
@@ -314,8 +314,6 @@ couponRouter.use(routeOrderMiddleware);
 // ========================================
 
 couponRouter.get('/docs/routes',
-  authMiddleware,
-  authorize('coupons', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

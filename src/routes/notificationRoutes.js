@@ -31,7 +31,7 @@ router.patch('/read-all', authMiddleware, notificationController.markAllAsRead);
 router.delete('/:id', authMiddleware, notificationController.remove);
 
 // // Admin routes
-router.post('/', authMiddleware, authorize('notifications', 'write'), createNotificationValidation, notificationController.create);
-router.post('/bulk', authMiddleware, authorize('notifications', 'write'), notificationController.createBulk);
+router.post('/', authMiddleware,createNotificationValidation, notificationController.create);
+router.post('/bulk', authMiddleware, notificationController.createBulk);
 
 module.exports  = { notificationRoute: router };
