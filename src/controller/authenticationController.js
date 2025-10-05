@@ -1689,8 +1689,9 @@ class authController {
       }
 
       const profilePicture = await req.user.updateProfilePicture(url);
+       NotificationMiddleware.onUserUpdate(req, res, () => { });
       return standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
-      NotificationMiddleware.onUserUpdate(req, res, () => { });
+     
     } catch (error) {
       console.error('Update profile picture error:', error);
       return errorResponse(res, 'Failed to update profile picture', 500, error.message);
@@ -2634,7 +2635,7 @@ class authController {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
       });
-
+  NotificationMiddleware.onTwoFactorEnabled(req, res, () => { });
       return res.status(200).json({
         success: true,
         message: result.message,
@@ -2891,7 +2892,7 @@ class authController {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
       });
-
+  NotificationMiddleware.onTwoFactorDisabled(req, res, () => { });
       return res.status(200).json({
         success: true,
         message: 'OTP has been disabled for your account',
