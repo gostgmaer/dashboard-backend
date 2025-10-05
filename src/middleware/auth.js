@@ -13,20 +13,6 @@ const authMiddleware = async (req, res, next) => {
         if (!user) {
             return res.status(401).json({ success: false, message: 'Invalid token. User not found.' });
         }
-
-        // Check OTP required and validated status
-        // if (user.otpSettings?.enabled && user.otpSettings?.requireForLogin) {
-        //     if (user.currentOTP.verified || !user.twoFactorAuth.enabled||!user.twoFactorAuth.setupCompleted) {
-        //         return res.status(401).json({
-        //             success: false,
-        //             message: 'OTP verification required to access this resource.',
-        //             requiresOTP: true,
-        //             otpMethods: user.availableOTPMethods || [],
-        //         });
-        //     }
-        // }
-
-        // Attach user info to request and locals for further handlers
         req.user = user;
         req.body.created_by = user.id;
         req.body.updated_by = user.id;

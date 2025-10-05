@@ -208,7 +208,7 @@ router.post('/retry',
 
 router.post('/refund',
     authenticateToken,
-    authorize('admin', 'manager'),
+  
     validateRefundRequest,
     paymentsController.processRefund
 );
@@ -239,7 +239,7 @@ router.post('/webhook/stripe',
 // POST /api/payments - Create a new payment
 router.post('/',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.createPayment,
   paymentsController.createPayment
@@ -248,7 +248,7 @@ router.post('/',
 // GET /api/payments/:id - Get payment by ID
 router.get('/:id',
   authMiddleware,
-  authorize('payment', 'read'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.getPaymentById
@@ -257,7 +257,7 @@ router.get('/:id',
 // PUT /api/payments/:id/status - Update payment status
 router.put('/:id/status',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.updateStatus,
   paymentsController.updatePaymentStatus
@@ -266,7 +266,7 @@ router.put('/:id/status',
 // POST /api/payments/:id/refund - Request a refund
 router.post('/:id/refund',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.refund,
   paymentsController.addRefund
@@ -275,7 +275,7 @@ router.post('/:id/refund',
 // POST /api/payments/:id/dispute - Create a dispute
 router.post('/:id/dispute',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.dispute,
   paymentsController.addDispute
@@ -284,7 +284,7 @@ router.post('/:id/dispute',
 // POST /api/payments/:id/capture - Capture a payment
 router.post('/:id/capture',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.capture,
   paymentsController.capturePayment
@@ -293,7 +293,7 @@ router.post('/:id/capture',
 // GET /api/payments/:id/history - Get payment tracking history
 router.get('/:id/history',
   authMiddleware,
-  authorize('payment', 'read'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.getTrackingHistory
@@ -302,7 +302,7 @@ router.get('/:id/history',
 // POST /api/payments/:id/attempts - Increment payment attempts
 router.post('/:id/attempts',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.incrementAttempts
@@ -311,7 +311,7 @@ router.post('/:id/attempts',
 // POST /api/payments/:id/mark-paid - Mark payment as paid
 router.post('/:id/mark-paid',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.markAsPaid
@@ -320,7 +320,7 @@ router.post('/:id/mark-paid',
 // PUT /api/payments/:id/metadata - Update payment metadata
 router.put('/:id/metadata',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.metadata,
   paymentsController.updateMetadata
@@ -329,7 +329,7 @@ router.put('/:id/metadata',
 // POST /api/payments/:id/tags - Add tags to payment
 router.post('/:id/tags',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.tags,
   paymentsController.addTag
@@ -338,7 +338,7 @@ router.post('/:id/tags',
 // DELETE /api/payments/:id/tags - Remove tags from payment
 router.delete('/:id/tags',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.tags,
   paymentsController.removeTag
@@ -347,7 +347,7 @@ router.delete('/:id/tags',
 // PUT /api/payments/:id/notes - Update payment notes
 router.put('/:id/notes',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.updateNotes
@@ -360,7 +360,7 @@ router.put('/:id/notes',
 // GET /api/payments - List all payments (paginated)
 router.get('/',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   paymentValidation.listPayments,
   paymentsController.listPayments
@@ -369,7 +369,7 @@ router.get('/',
 // GET /api/analytics - Get payment analytics
 router.get('/analytics',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentValidation.analytics,
   paymentsController.getAnalytics
@@ -378,7 +378,7 @@ router.get('/analytics',
 // GET /api/suspicious - Get suspicious payments
 router.get('/suspicious',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentValidation.listPayments,
   paymentsController.getSuspiciousPayments
@@ -387,7 +387,7 @@ router.get('/suspicious',
 // GET /api/requiring-action - Get payments requiring action
 router.get('/requiring-action',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentValidation.listPayments,
   paymentsController.getPaymentsRequiringAction
@@ -396,7 +396,7 @@ router.get('/requiring-action',
 // PUT /api/bulk-update-status - Bulk update payment status
 router.put('/bulk-update-status',
   authMiddleware,
-  authorize('payment', 'update'),
+
   bulkOperationLimiter,
   paymentValidation.bulkUpdateStatus,
   paymentsController.bulkUpdateStatus
@@ -405,7 +405,7 @@ router.put('/bulk-update-status',
 // POST /api/bulk-cancel - Bulk cancel payments
 router.post('/bulk-cancel',
   authMiddleware,
-  authorize('payment', 'update'),
+
   bulkOperationLimiter,
   paymentValidation.bulkCancel,
   paymentsController.bulkCancelPayments
@@ -414,7 +414,7 @@ router.post('/bulk-cancel',
 // GET /api/summary - Get payment summary
 router.get('/summary',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getPaymentSummary
 );
@@ -422,7 +422,7 @@ router.get('/summary',
 // GET /api/failed-attempts - Get failed attempts summary
 router.get('/failed-attempts',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getFailedAttemptsSummary
 );
@@ -430,7 +430,7 @@ router.get('/failed-attempts',
 // GET /api/recent - Get recent payments
 router.get('/recent',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   paymentValidation.listPayments,
   paymentsController.getRecentPayments
@@ -439,7 +439,7 @@ router.get('/recent',
 // GET /api/provider-transaction/:providerTransactionId - Find payment by provider transaction ID
 router.get('/provider-transaction/:providerTransactionId',
   authMiddleware,
-  authorize('payment', 'read'),
+
   paymentValidation.providerTransaction,
   paymentsController.findByProviderTransactionId
 );
@@ -447,7 +447,7 @@ router.get('/provider-transaction/:providerTransactionId',
 // GET /api/order/:orderId - Find payments by order
 router.get('/order/:orderId',
   authMiddleware,
-  authorize('payment', 'read'),
+
   paymentValidation.orderPayments,
   paymentsController.findPaymentsByOrder
 );
@@ -455,7 +455,7 @@ router.get('/order/:orderId',
 // GET /api/payment-method/:sourceId - Find payments by payment method
 router.get('/payment-method/:sourceId',
   authMiddleware,
-  authorize('payment', 'read'),
+
   paymentValidation.paymentMethod,
   paymentsController.findPaymentsByPaymentMethod
 );
@@ -463,7 +463,7 @@ router.get('/payment-method/:sourceId',
 // DELETE /api/payments/:id - Delete a payment
 router.delete('/:id',
   authMiddleware,
-  authorize('payment', 'delete'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.deletePayment
@@ -472,7 +472,7 @@ router.delete('/:id',
 // GET /api/export - Export payments
 router.get('/export',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.exportPayments
 );
@@ -480,7 +480,7 @@ router.get('/export',
 // PUT /api/payments/:id/dispute/resolve - Resolve a dispute
 router.put('/:id/dispute/resolve',
   authMiddleware,
-  authorize('payment', 'update'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.resolveDispute
@@ -489,7 +489,7 @@ router.put('/:id/dispute/resolve',
 // PUT /api/payments/:id/dispute/status - Update dispute status
 router.put('/:id/dispute/status',
   authMiddleware,
-  authorize('payment', 'update'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.updateDisputeStatus
@@ -498,7 +498,7 @@ router.put('/:id/dispute/status',
 // GET /api/recurring - Get recurring payments
 router.get('/recurring',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   paymentValidation.listPayments,
   paymentsController.getRecurringPayments
@@ -507,7 +507,7 @@ router.get('/recurring',
 // GET /api/payments/:id/risk-score - Calculate risk score
 router.get('/:id/risk-score',
   authMiddleware,
-  authorize('payment', 'report'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.calculateRiskScore
@@ -516,7 +516,7 @@ router.get('/:id/risk-score',
 // GET /api/stats/processing-time - Get processing time stats
 router.get('/stats/processing-time',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getProcessingTimeStats
 );
@@ -524,7 +524,7 @@ router.get('/stats/processing-time',
 // GET /api/stats/refund-rates - Get refund rates
 router.get('/stats/refund-rates',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getRefundRates
 );
@@ -532,7 +532,7 @@ router.get('/stats/refund-rates',
 // GET /api/stats/success-rate-provider - Get success rate by provider
 router.get('/stats/success-rate-provider',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getSuccessRateByProvider
 );
@@ -540,7 +540,7 @@ router.get('/stats/success-rate-provider',
 // GET /api/stats/average-amount-method - Get average amount by method
 router.get('/stats/average-amount-method',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getAverageAmountByMethod
 );
@@ -548,7 +548,7 @@ router.get('/stats/average-amount-method',
 // GET /api/stats/currency-breakdown - Get currency breakdown
 router.get('/stats/currency-breakdown',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getCurrencyBreakdown
 );
@@ -556,7 +556,7 @@ router.get('/stats/currency-breakdown',
 // GET /api/stats/fee-summary - Get fee summary
 router.get('/stats/fee-summary',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getFeeSummary
 );
@@ -564,7 +564,7 @@ router.get('/stats/fee-summary',
 // GET /api/stats/dispute-analytics - Get dispute analytics
 router.get('/stats/dispute-analytics',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getDisputeAnalytics
 );
@@ -572,7 +572,7 @@ router.get('/stats/dispute-analytics',
 // GET /api/payments/:id/timeline-stats - Get timeline stats
 router.get('/:id/timeline-stats',
   authMiddleware,
-  authorize('payment', 'report'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.getTimelineStats
@@ -586,7 +586,7 @@ router.post('/webhook',
 // POST /api/payments/:id/timeline - Add timeline entry
 router.post('/:id/timeline',
   authMiddleware,
-  authorize('payment', 'write'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.addTimelineEntry
@@ -595,7 +595,7 @@ router.post('/:id/timeline',
 // GET /api/payments/:id/expired - Check if payment is expired
 router.get('/:id/expired',
   authMiddleware,
-  authorize('payment', 'read'),
+
   instanceCheckMiddleware,
   paymentValidation.getPayment,
   paymentsController.checkExpired
@@ -604,7 +604,7 @@ router.get('/:id/expired',
 // GET /api/tags-usage - Get tags usage
 router.get('/tags-usage',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getTagsUsage
 );
@@ -612,7 +612,7 @@ router.get('/tags-usage',
 // GET /api/search/notes - Search payments by notes
 router.get('/search/notes',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   query('q').isString().isLength({ max: 500 }).withMessage('Search query cannot exceed 500 characters').trim().escape(),
   validate,
@@ -622,7 +622,7 @@ router.get('/search/notes',
 // GET /api/tags/:tag - Get payments by tag
 router.get('/tags/:tag',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   param('tag').isString().isLength({ max: 50 }).withMessage('Tag cannot exceed 50 characters').trim().escape(),
   validate,
@@ -632,7 +632,7 @@ router.get('/tags/:tag',
 // POST /api/bulk-tags - Bulk add tags
 router.post('/bulk-tags',
   authMiddleware,
-  authorize('payment', 'update'),
+
   bulkOperationLimiter,
   paymentValidation.bulkTags,
   paymentsController.bulkAddTags
@@ -641,7 +641,7 @@ router.post('/bulk-tags',
 // GET /api/country/:country - Get payments by country
 router.get('/country/:country',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   paymentValidation.country,
   paymentsController.getPaymentsByCountry
@@ -650,7 +650,7 @@ router.get('/country/:country',
 // GET /api/currency/:currency - Get payments by currency
 router.get('/currency/:currency',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   paymentValidation.currency,
   paymentsController.getPaymentsByCurrency
@@ -659,7 +659,7 @@ router.get('/currency/:currency',
 // GET /api/stats/volume - Get volume by period
 router.get('/stats/volume',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentValidation.analytics,
   paymentsController.getVolumeByPeriod
@@ -668,7 +668,7 @@ router.get('/stats/volume',
 // GET /api/stats/top-customers - Get top customers
 router.get('/stats/top-customers',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentsController.getTopCustomers
 );
@@ -676,7 +676,7 @@ router.get('/stats/top-customers',
 // POST /api/simulate-failure - Simulate payment failure
 router.post('/simulate-failure',
   authMiddleware,
-  authorize('payment', 'write'),
+
   bulkOperationLimiter,
   paymentsController.simulatePaymentFailure
 );
@@ -684,7 +684,7 @@ router.post('/simulate-failure',
 // GET /api/stats/success-rates-time - Get success rates over time
 router.get('/stats/success-rates-time',
   authMiddleware,
-  authorize('payment', 'report'),
+
   bulkOperationLimiter,
   paymentValidation.analytics,
   paymentsController.getMethodSuccessRatesOverTime
@@ -693,7 +693,7 @@ router.get('/stats/success-rates-time',
 // GET /api/ip/:ipAddress - Get payments by IP
 router.get('/ip/:ipAddress',
   authMiddleware,
-  authorize('payment', 'read'),
+
   bulkOperationLimiter,
   param('ipAddress').isIP().withMessage('Invalid IP address'),
   validate,
@@ -703,7 +703,7 @@ router.get('/ip/:ipAddress',
 // POST /api/bulk-refunds - Bulk process refunds
 router.post('/bulk-refunds',
   authMiddleware,
-  authorize('payment', 'update'),
+
   bulkOperationLimiter,
   paymentValidation.bulkCancel,
   paymentsController.bulkProcessRefunds
@@ -729,8 +729,6 @@ router.use(routeOrderMiddleware);
 // ========================================
 
 router.get('/docs/routes',
-  authMiddleware,
-  authorize('payment', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

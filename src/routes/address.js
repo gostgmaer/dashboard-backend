@@ -211,7 +211,7 @@ const addressValidation = {
 // POST /addresses - Create a new address
 addressRoute.post('/',
   authMiddleware,
-  authorize('addresses', 'write'),
+
   addressValidation.create,
   addressController.createAddress
 );
@@ -223,7 +223,7 @@ addressRoute.get('/user',
 );
 addressRoute.get('/:id',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   instanceCheckMiddleware,
   addressValidation.delete,
   addressController.getAddressById
@@ -232,7 +232,7 @@ addressRoute.get('/:id',
 // PUT /addresses/:id - Update address (full update)
 addressRoute.put('/:id',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.update,
   addressController.updateAddress
@@ -244,7 +244,7 @@ addressRoute.put('/:id',
 // PATCH /addresses/:id - Partial update address
 addressRoute.patch('/:id',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.partialUpdate,
   addressController.partialUpdateAddress
@@ -253,7 +253,7 @@ addressRoute.patch('/:id',
 // PATCH /addresses/:id/set-default - Set address as default
 addressRoute.patch('/:id/set-default',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.setDefault,
   addressController.setAddressAsDefault
@@ -262,7 +262,7 @@ addressRoute.patch('/:id/set-default',
 // DELETE /addresses/:id - Soft delete address
 addressRoute.delete('/:id',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.delete,
   addressController.softDeleteAddress
@@ -271,7 +271,7 @@ addressRoute.delete('/:id',
 // PATCH /addresses/:id/archive - Archive address
 addressRoute.patch('/:id/archive',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.archive,
   addressController.archiveAddress
@@ -280,7 +280,7 @@ addressRoute.patch('/:id/archive',
 // PATCH /addresses/:id/restore - Restore address
 addressRoute.patch('/:id/restore',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.restore,
   addressController.restoreAddress
@@ -289,7 +289,7 @@ addressRoute.patch('/:id/restore',
 // POST /addresses/:id/clone - Clone address
 addressRoute.post('/:id/clone',
   authMiddleware,
-  authorize('addresses', 'write'),
+
   instanceCheckMiddleware,
   addressValidation.clone,
   addressController.cloneAddress
@@ -298,7 +298,7 @@ addressRoute.post('/:id/clone',
 // GET /addresses/:addressId1/compare/:addressId2 - Compare two addresses
 addressRoute.get('/:addressId1/compare/:addressId2',
   authMiddleware,
-  authorize('addresses', 'view'),
+
   instanceCheckMiddleware,
   addressValidation.compare,
   addressController.compareAddresses
@@ -307,21 +307,21 @@ addressRoute.get('/:addressId1/compare/:addressId2',
 // GET /addresses/default - Get default address
 addressRoute.get('/default',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   addressController.getDefaultAddress
 );
 
 // GET /addresses - Get all user addresses
 addressRoute.get('/',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   addressController.getUserAddresses
 );
 
 // DELETE /addresses - Remove all user addresses
 addressRoute.delete('/',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   bulkOperationLimiter,
   addressController.removeUserAddresses
 );
@@ -329,7 +329,7 @@ addressRoute.delete('/',
 // GET /addresses/nearby - Find nearby addresses
 addressRoute.get('/nearby',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   addressValidation.nearby,
   addressController.findNearbyAddresses
 );
@@ -337,7 +337,7 @@ addressRoute.get('/nearby',
 // PATCH /addresses/:id/status - Update address status
 addressRoute.patch('/:id/status',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.update,
   addressController.updateAddressStatus
@@ -346,7 +346,7 @@ addressRoute.patch('/:id/status',
 // PATCH /addresses/bulk/status - Bulk update address status
 addressRoute.patch('/bulk/status',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   bulkOperationLimiter,
   addressValidation.bulkStatus,
   addressController.bulkUpdateStatus
@@ -355,7 +355,7 @@ addressRoute.patch('/bulk/status',
 // GET /addresses/:id/history - Get address history
 addressRoute.get('/:id/history',
   authMiddleware,
-  authorize('addresses', 'view'),
+
   instanceCheckMiddleware,
   addressValidation.delete,
   addressController.getAddressHistory
@@ -364,7 +364,7 @@ addressRoute.get('/:id/history',
 // GET /addresses/search - Search addresses
 addressRoute.get('/search',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   addressValidation.search,
   addressController.searchAddresses
 );
@@ -372,7 +372,7 @@ addressRoute.get('/search',
 // POST /addresses/batch - Batch create addresses
 addressRoute.post('/batch',
   authMiddleware,
-  authorize('addresses', 'write'),
+
   bulkOperationLimiter,
   addressValidation.batchCreate,
   addressController.batchCreateAddresses
@@ -381,21 +381,21 @@ addressRoute.post('/batch',
 // GET /addresses/duplicates - Find duplicate addresses
 addressRoute.get('/duplicates',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   addressController.findDuplicateAddresses
 );
 
 // GET /addresses/status/count - Get address count by status
 addressRoute.get('/status/count',
   authMiddleware,
-  authorize('addresses', 'view'),
+
   addressController.getAddressCountByStatus
 );
 
 // PATCH /addresses/:id/add-tag - Add tag to address
 addressRoute.patch('/:id/add-tag',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.addTag,
   addressController.addTagToAddress
@@ -404,7 +404,7 @@ addressRoute.patch('/:id/add-tag',
 // PATCH /addresses/:id/remove-tag - Remove tag from address
 addressRoute.patch('/:id/remove-tag',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.removeTag,
   addressController.removeTagFromAddress
@@ -413,7 +413,7 @@ addressRoute.patch('/:id/remove-tag',
 // PATCH /addresses/bulk/add-tag - Add tag to multiple addresses
 addressRoute.patch('/bulk/add-tag',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   bulkOperationLimiter,
   addressValidation.bulkAddTag,
   addressController.addTagToMultiple
@@ -422,7 +422,7 @@ addressRoute.patch('/bulk/add-tag',
 // PATCH /addresses/:id/merge - Merge addresses
 addressRoute.patch('/:id/merge',
   authMiddleware,
-  authorize('addresses', 'update'),
+
   instanceCheckMiddleware,
   addressValidation.merge,
   addressController.mergeAddresses
@@ -431,7 +431,7 @@ addressRoute.patch('/:id/merge',
 // GET /addresses/export - Export user addresses
 addressRoute.get('/export',
   authMiddleware,
-  authorize('addresses', 'report'),
+
   bulkOperationLimiter,
   addressValidation.export,
   addressController.exportUserAddresses
@@ -440,7 +440,7 @@ addressRoute.get('/export',
 // GET /addresses/by-tag - Get addresses by tag
 addressRoute.get('/by-tag',
   authMiddleware,
-  authorize('addresses', 'read'),
+
   addressValidation.byTag,
   addressController.getAddressesByTag
 );
@@ -451,8 +451,7 @@ addressRoute.get('/by-tag',
 
 // GET /addresses/docs/routes - Get all available routes (dev only)
 addressRoute.get('/docs/routes',
-  authMiddleware,
-  authorize('addresses', 'view'),
+
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

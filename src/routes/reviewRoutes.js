@@ -130,7 +130,7 @@ const reviewValidation = {
 // POST /api/review - Create a new review
 reviewRoute.post('/', 
   authMiddleware,
-  authorize('reviews', 'write'),
+
   reviewValidation.create,
   reviewCtrl.createReview
 );
@@ -138,7 +138,7 @@ reviewRoute.post('/',
 // GET /api/review/:id - Get a review by ID
 reviewRoute.get('/:id', 
   authMiddleware,
-  authorize('reviews', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid review ID'),
   validate,
@@ -148,7 +148,7 @@ reviewRoute.get('/:id',
 // PUT /api/review/:id - Update a review
 reviewRoute.put('/:id', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   reviewValidation.update,
   reviewCtrl.updateReview
@@ -157,7 +157,7 @@ reviewRoute.put('/:id',
 // DELETE /api/review/:id - Delete a review
 reviewRoute.delete('/:id', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid review ID'),
   validate,
@@ -171,7 +171,7 @@ reviewRoute.delete('/:id',
 // GET /api/review/product/:productId - Get reviews by product
 reviewRoute.get('/product/:productId', 
   authMiddleware,
-  authorize('reviews', 'read'),
+
   param('productId').isMongoId().withMessage('Invalid product ID'),
   validate,
   reviewValidation.query,
@@ -181,7 +181,7 @@ reviewRoute.get('/product/:productId',
 // GET /api/review/user/:userId - Get reviews by user
 reviewRoute.get('/user/:userId', 
   authMiddleware,
-  authorize('reviews', 'read'),
+
   instanceCheckMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   validate,
@@ -192,7 +192,7 @@ reviewRoute.get('/user/:userId',
 // GET /api/review/rating/:rating - Get reviews by rating
 reviewRoute.get('/rating/:rating', 
   authMiddleware,
-  authorize('reviews', 'read'),
+
   param('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
   validate,
   reviewValidation.query,
@@ -202,7 +202,7 @@ reviewRoute.get('/rating/:rating',
 // GET /api/review/date-range - Get reviews by date range
 reviewRoute.get('/date-range', 
   authMiddleware,
-  authorize('reviews', 'read'),
+
   reviewValidation.dateRange,
   reviewValidation.query,
   reviewCtrl.getReviewsByDateRange
@@ -215,7 +215,7 @@ reviewRoute.get('/date-range',
 // GET /api/review/reported/all - Get all reported reviews
 reviewRoute.get('/reported/all', 
   authMiddleware,
-  authorize('reviews', 'report'),
+
   reviewValidation.query,
   reviewCtrl.getReportedReviews
 );
@@ -223,7 +223,7 @@ reviewRoute.get('/reported/all',
 // PATCH /api/review/:id/report - Report a review
 reviewRoute.patch('/:id/report', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid review ID'),
   body('reason').isString().withMessage('Reason must be a string').isLength({ max: 500 }).withMessage('Reason cannot exceed 500 characters').trim().escape(),
@@ -234,7 +234,7 @@ reviewRoute.patch('/:id/report',
 // PATCH /api/review/:id/unreport - Unreport a review
 reviewRoute.patch('/:id/unreport', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid review ID'),
   validate,
@@ -244,7 +244,7 @@ reviewRoute.patch('/:id/unreport',
 // PATCH /api/review/bulk-approve - Bulk approve reviews
 reviewRoute.patch('/bulk-approve', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   bulkOperationLimiter,
   reviewValidation.bulk,
   reviewCtrl.bulkApproveReviews
@@ -253,7 +253,7 @@ reviewRoute.patch('/bulk-approve',
 // DELETE /api/review/bulk-delete - Bulk delete reviews
 reviewRoute.delete('/bulk-delete', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   bulkOperationLimiter,
   reviewValidation.bulk,
   reviewCtrl.bulkDeleteReviews
@@ -266,7 +266,7 @@ reviewRoute.delete('/bulk-delete',
 // PATCH /api/review/:id/helpful - Mark review as helpful
 reviewRoute.patch('/:id/helpful', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid review ID'),
   validate,
@@ -280,7 +280,7 @@ reviewRoute.patch('/:id/helpful',
 // PATCH /api/review/:id/clear-images - Clear review images
 reviewRoute.patch('/:id/clear-images', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid review ID'),
   validate,
@@ -294,7 +294,7 @@ reviewRoute.patch('/:id/clear-images',
 // GET /api/review/stats/average/:productId - Get average rating for a product
 reviewRoute.get('/stats/average/:productId', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   param('productId').isMongoId().withMessage('Invalid product ID'),
   validate,
   reviewCtrl.getAverageRating
@@ -303,7 +303,7 @@ reviewRoute.get('/stats/average/:productId',
 // GET /api/review/stats/breakdown/:productId - Get rating breakdown for a product
 reviewRoute.get('/stats/breakdown/:productId', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   param('productId').isMongoId().withMessage('Invalid product ID'),
   validate,
   reviewCtrl.getRatingBreakdown
@@ -312,7 +312,7 @@ reviewRoute.get('/stats/breakdown/:productId',
 // GET /api/review/stats/top-rated/:productId - Get top-rated reviews for a product
 reviewRoute.get('/stats/top-rated/:productId', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   param('productId').isMongoId().withMessage('Invalid product ID'),
   validate,
   reviewValidation.query,
@@ -322,7 +322,7 @@ reviewRoute.get('/stats/top-rated/:productId',
 // GET /api/review/stats/most-helpful/:productId - Get most helpful reviews for a product
 reviewRoute.get('/stats/most-helpful/:productId', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   param('productId').isMongoId().withMessage('Invalid product ID'),
   validate,
   reviewValidation.query,
@@ -332,7 +332,7 @@ reviewRoute.get('/stats/most-helpful/:productId',
 // GET /api/review/most-active - Get most active reviewers
 reviewRoute.get('/most-active', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   reviewValidation.query,
   reviewCtrl.getMostActiveReviewers
 );
@@ -340,7 +340,7 @@ reviewRoute.get('/most-active',
 // GET /api/review/top-helpful - Get top helpful reviews
 reviewRoute.get('/top-helpful', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   reviewValidation.query,
   reviewCtrl.getTopHelpfulReviews
 );
@@ -352,7 +352,7 @@ reviewRoute.get('/top-helpful',
 // GET /api/review/search/query - Search reviews
 reviewRoute.get('/search/query', 
   authMiddleware,
-  authorize('reviews', 'read'),
+
   reviewValidation.query,
   reviewCtrl.searchReviews
 );
@@ -360,7 +360,7 @@ reviewRoute.get('/search/query',
 // POST /api/review/:id/reply - Reply to a review
 reviewRoute.post('/:id/reply', 
   authMiddleware,
-  authorize('reviews', 'update'),
+
   instanceCheckMiddleware,
   reviewValidation.reply,
   reviewCtrl.replyToReview
@@ -398,7 +398,7 @@ reviewRoute.use(routeOrderMiddleware);
 
 reviewRoute.get('/docs/routes', 
   authMiddleware,
-  authorize('reviews', 'view'),
+
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

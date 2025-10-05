@@ -52,7 +52,7 @@ authRoute.post('/social/:provider', authLimiter, authController.initiateSocialLo
 authRoute.post('/social/:provider/callback', authLimiter, authController.handleSocialCallback);
 authRoute.post('/forgot-password', authLimiter, authController.forgotPassword);
 authRoute.post('/reset-password/:token', authLimiter, authController.resetPassword);
-authRoute.post('/verify-user/:id', authMiddleware, authorize('users', 'update'), authController.verifyUser);
+authRoute.post('/verify/:id', authMiddleware, authController.verifyUser);
 
 // ========================================
 // 🔐 AUTHENTICATED ENDPOINTS
@@ -103,7 +103,7 @@ authRoute.post('/devices/trust', authMiddleware, authAccess.requireOTP('trust_de
 authRoute.delete('/devices/remove', authMiddleware, authAccess.requireOTP('remove_device'), authController.removeDevice);
 authRoute.get('/sessions', authMiddleware, authController.getActiveSessions);
 authRoute.post('/sessions/revoke', authMiddleware, authController.revokeSession);
-authRoute.post('/sessions/invalidate-all', authMiddleware, authorize('sessions', 'delete'), authController.invalidateAllSessions);
+authRoute.post('/sessions/invalidate-all', authMiddleware,  authController.invalidateAllSessions);
 authRoute.post('/sessions/revoke-token', authMiddleware, authController.revokeToken);
 
 // ========================================
@@ -124,20 +124,20 @@ authRoute.put('/otp/settings', authMiddleware, authAccess.requireOTP('update_otp
 // ========================================
 authRoute.patch('/profile', authMiddleware, authController.updateProfile);
 authRoute.patch('/profile-picture', authMiddleware, authController.updateProfilePicture);
-authRoute.patch('/email', authMiddleware, authorize('users', 'update'), authController.updateEmail);
-authRoute.patch('/phone', authMiddleware, authorize('users', 'update'), authController.updatePhoneNumber);
-authRoute.post('/social/:provider/link', authMiddleware, authorize('users', 'update'), authController.linkSocialAccount);
-authRoute.post('/social/:provider/link/callback', authMiddleware, authorize('users', 'update'), authController.handleLinkingCallback);
-authRoute.post('/social/:provider/unlink', authMiddleware, authorize('users', 'update'), authController.unlinkSocialAccount);
-authRoute.post('/social/accounts', authMiddleware, authorize('users', 'update'), authController.getLinkedAccounts);
-authRoute.post('/social/:provider/status', authMiddleware, authorize('users', 'update'), authController.checkSocialStatus);
-authRoute.delete('/social/clear/:id', authMiddleware, authorize('users', 'update'), authController.clearAllSocialLinks);
+authRoute.patch('/email', authMiddleware,  authController.updateEmail);
+authRoute.patch('/phone', authMiddleware,  authController.updatePhoneNumber);
+authRoute.post('/social/:provider/link', authMiddleware,  authController.linkSocialAccount);
+authRoute.post('/social/:provider/link/callback', authMiddleware,  authController.handleLinkingCallback);
+authRoute.post('/social/:provider/unlink', authMiddleware,  authController.unlinkSocialAccount);
+authRoute.post('/social/accounts', authMiddleware,  authController.getLinkedAccounts);
+authRoute.post('/social/:provider/status', authMiddleware,  authController.checkSocialStatus);
+authRoute.delete('/social/clear/:id', authMiddleware,  authController.clearAllSocialLinks);
 
 // ========================================
 // 📊 ADMIN ANALYTICS & REPORTS
 // ========================================
-authRoute.get('/admin/otp/analytics', authMiddleware, authorize('users', 'manage'), authController.getOTPAnalytics);
-authRoute.get('/admin/security/report', authMiddleware, authorize('users', 'manage'), authController.getSecurityReport);
+authRoute.get('/admin/otp/analytics', authMiddleware,  authController.getOTPAnalytics);
+authRoute.get('/admin/security/report', authMiddleware,  authController.getSecurityReport);
 
 // ========================================
 // 📝 ROUTE DOCUMENTATION ENDPOINT
@@ -216,9 +216,9 @@ authRoute.get('/docs/routes', authMiddleware, authorize('auth', 'view'), (req, r
 // ========================================
 // 🚫 ERROR HANDLING
 // ========================================
-authRoute.use('*', (req, res) => {
-  res.status(404).json({ success: false, message: 'Endpoint not found', error: 'ENDPOINT_NOT_FOUND' });
-});
+// authRoute.use('*', (req, res) => {
+//   res.status(404).json({ success: false, message: 'Endpoint not found', error: 'ENDPOINT_NOT_FOUND' });
+// });
 
 authRoute.use((err, req, res, next) => {
   console.error('Auth route error:', err);

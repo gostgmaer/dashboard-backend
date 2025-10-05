@@ -82,21 +82,21 @@ const categoryValidation = {
 
 router.post('/',
   authMiddleware,
-  authorize('categories', 'write'),
+
   // categoryValidation.create,
   categoryController.create
 );
 
 router.get('/',
   authMiddleware,
-  authorize('categories', 'read'),
+
   categoryValidation.query,
   categoryController.getAll
 );
 
 router.get('/:id',
   authMiddleware,
-  authorize('categories', 'read'),
+
   instanceCheckMiddleware,
   categoryValidation.id,
   categoryController.getSingle
@@ -104,7 +104,7 @@ router.get('/:id',
 
 router.put('/:id',
   authMiddleware,
-  authorize('categories', 'update'),
+
   instanceCheckMiddleware,
   categoryValidation.update,
   categoryController.update
@@ -112,7 +112,7 @@ router.put('/:id',
 
 router.delete('/:id',
   authMiddleware,
-  authorize('categories', 'update'),
+
   instanceCheckMiddleware,
   categoryValidation.id,
   categoryController.delete
@@ -122,19 +122,19 @@ router.delete('/:id',
 
 router.get('/active',
   authMiddleware,
-  authorize('categories', 'read'),
+
   categoryController.getActiveCategories
 );
 
 router.get('/featured',
   authMiddleware,
-  authorize('categories', 'read'),
+
   categoryController.getFeaturedCategories
 );
 
 router.get('/search',
   authMiddleware,
-  authorize('categories', 'read'),
+
   query('keyword').isString().isLength({ min: 1, max: 100 }).trim().escape(),
   validate,
   categoryController.searchCategories
@@ -142,7 +142,7 @@ router.get('/search',
 
 router.get('/tree',
   authMiddleware,
-  authorize('categories', 'read'),
+
   categoryController.getTree
 );
 
@@ -150,19 +150,19 @@ router.get('/tree',
 
 router.get('/stats',
   authMiddleware,
-  authorize('categories', 'report'),
+
   categoryController.getStats
 );
 
 router.get('/featured-stats',
   authMiddleware,
-  authorize('categories', 'report'),
+
   categoryController.featuredStats
 );
 
 router.get('/aggregate-status',
   authMiddleware,
-  authorize('categories', 'report'),
+
   categoryController.aggregateByStatus
 );
 
@@ -170,7 +170,7 @@ router.get('/aggregate-status',
 
 router.patch('/bulk-status',
   authMiddleware,
-  authorize('categories', 'update'),
+
   bulkOperationLimiter,
   categoryValidation.bulkStatus,
   categoryController.bulkUpdateStatus
@@ -178,21 +178,21 @@ router.patch('/bulk-status',
 
 router.post('/import-bulk',
   authMiddleware,
-  authorize('categories', 'write'),
+
   bulkOperationLimiter,
   categoryController.importBulk
 );
 
 router.patch('/batch-update-display-orders',
   authMiddleware,
-  authorize('categories', 'update'),
+
   bulkOperationLimiter,
   categoryController.batchUpdateDisplayOrders
 );
 
 router.post('/soft-delete-many',
   authMiddleware,
-  authorize('categories', 'update'),
+
   bulkOperationLimiter,
   categoryController.softDeleteMany
 );
@@ -200,8 +200,6 @@ router.post('/soft-delete-many',
 // === Route Documentation Endpoint ===
 
 router.get('/docs/routes',
-  authMiddleware,
-  authorize('categories', 'view'),
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

@@ -235,7 +235,7 @@ const attributeValidation = {
 // POST /api/attributes - Add a new attribute
 router.post('/',
   authMiddleware,
-  authorize('attributes', 'write'),
+
   attributeValidation.addAttribute,
   addAttribute
 );
@@ -243,7 +243,7 @@ router.post('/',
 // POST /api/attributes/bulk - Add multiple attributes
 router.post('/bulk',
   authMiddleware,
-  authorize('attributes', 'write'),
+
   bulkOperationLimiter,
   attributeValidation.addAllAttributes,
   addAllAttributes
@@ -252,7 +252,7 @@ router.post('/bulk',
 // GET /api/attributes - Get all attributes
 router.get('/',
   authMiddleware,
-  authorize('attributes', 'read'),
+
   attributeValidation.query,
   getAllAttributes
 );
@@ -260,7 +260,7 @@ router.get('/',
 // GET /api/attributes/visible - Get visible attributes
 router.get('/visible',
   authMiddleware,
-  authorize('attributes', 'read'),
+
   attributeValidation.query,
   getShowingAttributes
 );
@@ -268,7 +268,7 @@ router.get('/visible',
 // GET /api/attributes/:id - Get attribute by ID
 router.get('/:id',
   authMiddleware,
-  authorize('attributes', 'read'),
+
   instanceCheckMiddleware,
   attributeValidation.getById,
   getAttributeById
@@ -277,7 +277,7 @@ router.get('/:id',
 // PUT /api/attributes/:id - Update attribute
 router.put('/:id',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   instanceCheckMiddleware,
   attributeValidation.updateAttributes,
   updateAttributes
@@ -286,7 +286,7 @@ router.put('/:id',
 // DELETE /api/attributes/:id - Delete attribute
 router.delete('/:id',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   instanceCheckMiddleware,
   attributeValidation.deleteAttribute,
   deleteAttribute
@@ -299,7 +299,7 @@ router.delete('/:id',
 // POST /api/attributes/:id/children - Add child attributes
 router.post('/:id/children',
   authMiddleware,
-  authorize('attributes', 'write'),
+
   instanceCheckMiddleware,
   attributeValidation.addChildAttributes,
   addChildAttributes
@@ -308,7 +308,7 @@ router.post('/:id/children',
 // GET /api/attributes/:id/children/:ids - Get child attribute by ID
 router.get('/:id/children/:ids',
   authMiddleware,
-  authorize('attributes', 'read'),
+
   instanceCheckMiddleware,
   attributeValidation.getChildById,
   getChildAttributeById
@@ -317,7 +317,7 @@ router.get('/:id/children/:ids',
 // PUT /api/attributes/:attributeId/children/:childId - Update child attribute
 router.put('/:attributeId/children/:childId',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   instanceCheckMiddleware,
   attributeValidation.updateChildAttributes,
   updateChildAttributes
@@ -326,7 +326,7 @@ router.put('/:attributeId/children/:childId',
 // PATCH /api/attributes/:attributeId/children/:childId - Delete child attribute
 router.patch('/:attributeId/children/:childId',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   instanceCheckMiddleware,
   attributeValidation.deleteChildAttribute,
   deleteChildAttribute
@@ -339,7 +339,7 @@ router.patch('/:attributeId/children/:childId',
 // PATCH /api/attributes/:id/status - Update attribute visibility
 router.patch('/:id/status',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   instanceCheckMiddleware,
   attributeValidation.updateStatus,
   updateStatus
@@ -348,7 +348,7 @@ router.patch('/:id/status',
 // PATCH /api/attributes/children/:id/status - Update child attribute visibility
 router.patch('/children/:id/status',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   instanceCheckMiddleware,
   attributeValidation.updateChildStatus,
   updateChildStatus
@@ -361,7 +361,7 @@ router.patch('/children/:id/status',
 // PATCH /api/attributes/bulk/update - Update multiple attributes
 router.patch('/bulk/update',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   bulkOperationLimiter,
   attributeValidation.updateManyAttribute,
   updateManyAttribute
@@ -370,7 +370,7 @@ router.patch('/bulk/update',
 // PATCH /api/attributes/bulk/children/update - Update multiple child attributes
 router.patch('/bulk/children/update',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   bulkOperationLimiter,
   attributeValidation.updateManyChildAttribute,
   updateManyChildAttribute
@@ -379,7 +379,7 @@ router.patch('/bulk/children/update',
 // PATCH /api/attributes/bulk/delete - Delete multiple attributes
 router.patch('/bulk/delete',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   bulkOperationLimiter,
   attributeValidation.deleteManyAttribute,
   deleteManyAttribute
@@ -388,7 +388,7 @@ router.patch('/bulk/delete',
 // PATCH /api/attributes/bulk/children/delete - Delete multiple child attributes
 router.patch('/bulk/children/delete',
   authMiddleware,
-  authorize('attributes', 'update'),
+
   bulkOperationLimiter,
   attributeValidation.deleteManyChildAttribute,
   deleteManyChildAttribute
@@ -401,7 +401,7 @@ router.patch('/bulk/children/delete',
 // GET /api/attributes/visible/test - Test visible attributes (likely for debugging)
 router.get('/visible/test',
   authMiddleware,
-  authorize('attributes', 'view'),
+
   attributeValidation.query,
   getShowingAttributesTest
 );
@@ -429,8 +429,7 @@ router.use(routeOrderMiddleware);
 // ========================================
 
 router.get('/docs/routes',
-  authMiddleware,
-  authorize('attributes', 'view'),
+
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({

@@ -191,48 +191,48 @@ router.get('/stats/top-endpoints', async (req, res) => {
 });
 
 // GET /logs/activity/:table/:record_id? - Get activity logs for a table or specific record
-router.get('/activity/:table/:record_id?', async (req, res) => {
-    try {
-        const { table, record_id } = req.params;
-        const { limit = 10, start_date, end_date } = req.query;
+// router.get('/activity/:table/:record_id?', async (req, res) => {
+//     try {
+//         const { table, record_id } = req.params;
+//         const { limit = 10, start_date, end_date } = req.query;
 
-        // Validate table
-        const validTables = Object.keys(tableEndpointMap);
-        if (!validTables.includes(table)) {
-            return res.status(400).json({ error: `Invalid table. Supported tables: ${validTables.join(', ')}` });
-        }
+//         // Validate table
+//         const validTables = Object.keys(tableEndpointMap);
+//         if (!validTables.includes(table)) {
+//             return res.status(400).json({ error: `Invalid table. Supported tables: ${validTables.join(', ')}` });
+//         }
 
-        // Use new static method for table logs
-        let logs;
-        if (record_id) {
-            if (!mongoose.Types.ObjectId.isValid(record_id)) {
-                return res.status(400).json({ error: 'Invalid record_id format' });
-            }
-            logs = await Log.findByUserAndTable(record_id, table, parseInt(limit));
-        } else {
-            logs = await Log.findByTable(table, parseInt(limit));
-        }
+//         // Use new static method for table logs
+//         let logs;
+//         if (record_id) {
+//             if (!mongoose.Types.ObjectId.isValid(record_id)) {
+//                 return res.status(400).json({ error: 'Invalid record_id format' });
+//             }
+//             logs = await Log.findByUserAndTable(record_id, table, parseInt(limit));
+//         } else {
+//             logs = await Log.findByTable(table, parseInt(limit));
+//         }
 
-        // Filter by date range if provided
-        if (start_date && end_date) {
-            logs = logs.filter(log => 
-                new Date(log.timestamp) >= new Date(start_date) && 
-                new Date(log.timestamp) <= new Date(end_date)
-            );
-        }
+//         // Filter by date range if provided
+//         if (start_date && end_date) {
+//             logs = logs.filter(log => 
+//                 new Date(log.timestamp) >= new Date(start_date) && 
+//                 new Date(log.timestamp) <= new Date(end_date)
+//             );
+//         }
 
-        // Add log_message to each log
-        const logsWithMessage = logs.map(log => ({
-            ...log,
-            log_message: new Log(log).toSummary(table, record_id)
-        }));
+//         // Add log_message to each log
+//         const logsWithMessage = logs.map(log => ({
+//             ...log,
+//             log_message: new Log(log).toSummary(table, record_id)
+//         }));
 
-        res.json(logsWithMessage);
-    } catch (err) {
-        console.error('Error fetching activity logs:', err);
-        res.status(500).json({ error: 'Failed to fetch activity logs' });
-    }
-});
+//         res.json(logsWithMessage);
+//     } catch (err) {
+//         console.error('Error fetching activity logs:', err);
+//         res.status(500).json({ error: 'Failed to fetch activity logs' });
+//     }
+// });
 
 // GET /logs/failed - Get failed requests (new route using findFailedRequests)
 router.get('/failed', async (req, res) => {

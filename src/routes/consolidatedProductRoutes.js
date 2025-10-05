@@ -177,7 +177,7 @@ router.get('/:identifier',
 // POST /api/products - Create new product
 router.post('/',
   authMiddleware,
-  authorize('products', 'write'),
+
   // productValidation.create,
   ProductController.createProduct
 );
@@ -185,7 +185,7 @@ router.post('/',
 // PUT /api/products/:id - Update product
 router.put('/:id',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   productValidation.update,
   ProductController.updateProduct
@@ -194,7 +194,7 @@ router.put('/:id',
 // DELETE /api/products/:id - Delete product (soft delete by default)
 router.delete('/:id',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -208,7 +208,7 @@ router.delete('/:id',
 // DELETE /api/products/bulk/delete - Bulk delete products
 router.delete('/bulk/delete',
   authMiddleware,
-  authorize('products', 'update'),
+
   bulkOperationLimiter,
   body('ids').isArray({ min: 1 }).withMessage('Product IDs array is required'),
   body('ids.*').isMongoId().withMessage('Invalid product ID in array'),
@@ -220,7 +220,7 @@ router.delete('/bulk/delete',
 // PUT /api/products/bulk/status - Bulk update status
 router.put('/bulk/status',
   authMiddleware,
-  authorize('products', 'update'),
+
   bulkOperationLimiter,
   productValidation.bulkUpdate,
   ProductController.bulkUpdateStatus
@@ -229,7 +229,7 @@ router.put('/bulk/status',
 // PUT /api/products/bulk/stock - Bulk update stock
 router.put('/bulk/stock',
   authMiddleware,
-  authorize('products', 'update'),
+
   bulkOperationLimiter,
   body('updates').isArray({ min: 1 }).withMessage('Updates array is required'),
   body('updates.*.id').isMongoId().withMessage('Invalid product ID in updates'),
@@ -250,7 +250,7 @@ router.get('/search/:keyword',
 
 // GET /api/products/featured - Get featured products
 router.get('/featured',
-  authorize('products', 'read'),
+
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50').toInt(),
   validate,
   ProductController.getFeaturedProducts
@@ -259,14 +259,14 @@ router.get('/featured',
 // GET /api/products/low-stock - Get low stock products
 router.get('/low-stock',
   authMiddleware,
-  authorize('products', 'read'),
+
   ProductController.getLowStockProducts
 );
 
 // GET /api/products/out-of-stock - Get out of stock products
 router.get('/out-of-stock',
   authMiddleware,
-  authorize('products', 'read'),
+
   ProductController.getOutOfStockProducts
 );
 
@@ -328,7 +328,7 @@ router.get('/discounted',
 
 // GET /api/products/category/:categoryId/rating - Get average rating by category
 router.get('/category/:categoryId/rating',
-  authorize('products', 'report'),
+
   param('categoryId').isMongoId().withMessage('Invalid category ID'),
   validate,
   ProductController.getAverageRatingByCategory
@@ -340,7 +340,7 @@ router.get('/category/:categoryId/rating',
 
 // GET /api/products/:id/images/simplified - Get simplified images
 router.get('/:id/images/simplified',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -359,7 +359,7 @@ router.get('/:id/price/final',
 
 // GET /api/products/:id/stock/status - Get stock status
 router.get('/:id/stock/status',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -369,7 +369,7 @@ router.get('/:id/stock/status',
 // PUT /api/products/:id/stock/mark-out - Mark as out of stock
 router.put('/:id/stock/mark-out',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -379,7 +379,7 @@ router.put('/:id/stock/mark-out',
 // PUT /api/products/:id/views/increment - Increment views
 router.put('/:id/views/increment',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -389,7 +389,7 @@ router.put('/:id/views/increment',
 // PUT /api/products/:id/sold/increment - Increment sold count
 router.put('/:id/sold/increment',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -399,7 +399,7 @@ router.put('/:id/sold/increment',
 // GET /api/products/:id/discount/active - Check if discount is active
 router.get('/:id/discount/active',
   authMiddleware,
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -409,7 +409,7 @@ router.get('/:id/discount/active',
 // GET /api/products/:id/seo - Get SEO data
 router.get('/:id/seo',
   authMiddleware,
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -419,7 +419,7 @@ router.get('/:id/seo',
 // GET /api/products/:id/price/bulk - Get bulk discount price
 router.get('/:id/price/bulk',
   authMiddleware,
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   query('quantity').optional().isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
@@ -430,7 +430,7 @@ router.get('/:id/price/bulk',
 // GET /api/products/:id/purchasable - Check if purchasable
 router.get('/:id/purchasable',
   authMiddleware,
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -440,7 +440,7 @@ router.get('/:id/purchasable',
 // PUT /api/products/:id/stock/reduce - Reduce stock
 router.put('/:id/stock/reduce',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
@@ -451,7 +451,7 @@ router.put('/:id/stock/reduce',
 // PUT /api/products/:id/stock/restock - Restock product
 router.put('/:id/stock/restock',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
@@ -462,7 +462,7 @@ router.put('/:id/stock/restock',
 // PUT /api/products/:id/featured/toggle - Toggle featured status
 router.put('/:id/featured/toggle',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -471,7 +471,7 @@ router.put('/:id/featured/toggle',
 
 // GET /api/products/:id/related - Get related products
 router.get('/:id/related',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   query('limit').optional().isInt({ min: 1, max: 20 }).withMessage('Limit must be between 1 and 20').toInt(),
@@ -481,7 +481,7 @@ router.get('/:id/related',
 
 // GET /api/products/:id/bundle/check - Check if part of bundle
 router.get('/:id/bundle/check',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -490,7 +490,7 @@ router.get('/:id/bundle/check',
 
 // GET /api/products/:id/discount/percent - Get discount percent
 router.get('/:id/discount/percent',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -500,7 +500,7 @@ router.get('/:id/discount/percent',
 // POST /api/products/:id/reviews/add - Add review
 router.post('/:id/reviews/add',
   authMiddleware,
-  authorize('products', 'write'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   body('rating').isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5').toInt(),
@@ -521,7 +521,7 @@ router.put('/:id/promotion/apply',
 
 // GET /api/products/:id/preorder/check - Check pre-order availability
 router.get('/:id/preorder/check',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -530,7 +530,7 @@ router.get('/:id/preorder/check',
 
 // GET /api/products/:id/bundle/price - Get bundle total price
 router.get('/:id/bundle/price',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -539,7 +539,7 @@ router.get('/:id/bundle/price',
 
 // GET /api/products/:id/ratings/statistics - Get rating statistics
 router.get('/:id/ratings/statistics',
-  authorize('products', 'report'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -548,7 +548,7 @@ router.get('/:id/ratings/statistics',
 
 // GET /api/products/:id/stock/virtual-status - Get virtual stock status
 router.get('/:id/stock/virtual-status',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -558,7 +558,7 @@ router.get('/:id/stock/virtual-status',
 // GET /api/products/analytics/schema-report - Get schema report
 router.get('/analytics/schema-report',
   authMiddleware,
-  authorize('products', 'report'),
+
   ProductController.getSchemaReport
 );
 
@@ -572,14 +572,14 @@ router.get('/analytics/database-stats',
 // GET /api/products/analytics/products - Get products with analytics
 router.get('/analytics/products',
   authMiddleware,
-  authorize('products', 'report'),
+
   ProductController.getProductsWithAnalytics
 );
 
 // PUT /api/products/:id/stock/update - Enhanced stock update
 router.put('/:id/stock/update',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   productValidation.stock,
   ProductController.updateStock
@@ -588,7 +588,7 @@ router.put('/:id/stock/update',
 // POST /api/products/archive/old - Archive old products
 router.post('/archive/old',
   authMiddleware,
-  authorize('products', 'update'),
+
   bulkOperationLimiter,
   body('beforeDate').isISO8601().withMessage('Valid before date is required'),
   validate,
@@ -598,7 +598,7 @@ router.post('/archive/old',
 // 1. Favorites
 router.post('/favorites/:id',
   authMiddleware,
-  authorize('products', 'write'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -607,7 +607,7 @@ router.post('/favorites/:id',
 
 router.delete('/favorites/:id',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -616,13 +616,13 @@ router.delete('/favorites/:id',
 
 router.get('/favorites',
   authMiddleware,
-  authorize('products', 'read'),
+
   ProductController.listFavorites
 );
 
 // 2. Recommendations
 router.get('/recommendations/:id',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -632,7 +632,7 @@ router.get('/recommendations/:id',
 // 3. Import/Export
 // router.post('/import',
 //   authMiddleware,
-//   authorize('products', 'write'),
+// 
 //   bulkOperationLimiter,
 //   upload.single('file'),
 //   ProductController.importCSV
@@ -640,7 +640,7 @@ router.get('/recommendations/:id',
 
 router.get('/export',
   authMiddleware,
-  authorize('products', 'report'),
+
   bulkOperationLimiter,
   ProductController.exportCSV
 );
@@ -648,7 +648,7 @@ router.get('/export',
 // 4. Review Moderation
 router.put('/:id/reviews/:reviewId/approve',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   param('reviewId').isMongoId().withMessage('Invalid review ID'),
@@ -658,7 +658,7 @@ router.put('/:id/reviews/:reviewId/approve',
 
 router.delete('/:id/reviews/:reviewId',
   authMiddleware,
-  authorize('products', 'update'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   param('reviewId').isMongoId().withMessage('Invalid review ID'),
@@ -669,13 +669,13 @@ router.delete('/:id/reviews/:reviewId',
 // 5. Inventory Alerts
 router.get('/alerts/low-stock',
   authMiddleware,
-  authorize('products', 'view'),
+
   ProductController.lowStockAlerts
 );
 
 router.post('/alerts/low-stock/email',
   authMiddleware,
-  authorize('products', 'update'),
+
   bulkOperationLimiter,
   ProductController.sendLowStockEmails
 );
@@ -683,7 +683,7 @@ router.post('/alerts/low-stock/email',
 // 6. Bulk Price & Sales
 router.put('/bulk/price-update',
   authMiddleware,
-  authorize('products', 'update'),
+
   bulkOperationLimiter,
   body('updates').isArray({ min: 1 }).withMessage('Updates array is required'),
   body('updates.*.id').isMongoId().withMessage('Invalid product ID in updates'),
@@ -694,7 +694,7 @@ router.put('/bulk/price-update',
 
 router.post('/flash-sale',
   authMiddleware,
-  authorize('products', 'write'),
+
   bulkOperationLimiter,
   body('productIds').isArray({ min: 1 }).withMessage('Product IDs array is required'),
   body('productIds.*').isMongoId().withMessage('Invalid product ID in array'),
@@ -708,20 +708,20 @@ router.post('/flash-sale',
 // 7. Extended Analytics
 router.get('/analytics/sales-metrics',
   authMiddleware,
-  authorize('products', 'report'),
+
   ProductController.salesMetrics
 );
 
 router.get('/analytics/popularity',
   authMiddleware,
-  authorize('products', 'report'),
+
   ProductController.popularity
 );
 
 // 8. Taxonomy (Categories)
 router.post('/taxonomy/category',
   authMiddleware,
-  authorize('products', 'write'),
+
   body('name').notEmpty().withMessage('Category name is required').trim().escape(),
   body('parentId').optional().isMongoId().withMessage('Invalid parent category ID'),
   validate,
@@ -730,7 +730,7 @@ router.post('/taxonomy/category',
 
 router.put('/taxonomy/category/:id',
   authMiddleware,
-  authorize('products', 'update'),
+
   param('id').isMongoId().withMessage('Invalid category ID'),
   body('name').optional().notEmpty().withMessage('Category name cannot be empty').trim().escape(),
   body('parentId').optional().isMongoId().withMessage('Invalid parent category ID'),
@@ -739,7 +739,7 @@ router.put('/taxonomy/category/:id',
 );
 
 router.get('/taxonomy/categories',
-  authorize('products', 'read'),
+
   query('parentId').optional().isMongoId().withMessage('Invalid parent category ID'),
   validate,
   ProductController.listCategories
@@ -747,7 +747,7 @@ router.get('/taxonomy/categories',
 
 // 9. Downloadable Files
 router.get('/:id/downloads',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -755,7 +755,7 @@ router.get('/:id/downloads',
 );
 
 router.get('/:id/downloads/:fileIndex',
-  authorize('products', 'read'),
+
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   param('fileIndex').isInt({ min: 0 }).withMessage('File index must be a non-negative integer').toInt(),
@@ -821,8 +821,7 @@ router.use(routeOrderMiddleware);
 
 // GET /api/products/docs/routes - Get all available routes (dev only)
 router.get('/docs/routes',
-  authMiddleware,
-  authorize('products', 'view'),
+
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({
