@@ -51,9 +51,9 @@ const TransactionLogSchema = new mongoose.Schema({
     userAgent: {
         type: String
     }
-}, {
-    timestamps: true
-});
+},   {   timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true } });
 
 // Indexes for efficient querying
 TransactionLogSchema.index({ orderId: 1, createdAt: -1 });

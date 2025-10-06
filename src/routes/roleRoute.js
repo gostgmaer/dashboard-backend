@@ -63,7 +63,6 @@ router.post(
 router.get(
   '/',
   authMiddleware,
-
   // roleValidation.query,
   roleController.getAll
 );

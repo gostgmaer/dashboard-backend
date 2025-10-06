@@ -88,7 +88,9 @@ const settingSchema = new mongoose.Schema(
     privacyPolicy: { type: String },
     termsOfService: { type: String },
   },
-  { timestamps: true }
+   {   timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true } }
 );
 
 // ===== Helper / Static Methods =====

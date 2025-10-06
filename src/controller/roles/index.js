@@ -34,12 +34,8 @@ const getAll = async (req, res) => {
 
     const rolesWithCounts = await Promise.all(
       roles.map(async (role) => {
-        // Count users by role
         const userCount = await User.countDocuments({ role: role._id });
-        // Count permissions by length of permissions id array
         const permissionsCount = role.permissions ? role.permissions.length : 0;
-
-        // Return role object excluding permissions array
         const roleObj = role.toObject();
         delete roleObj.permissions;
 
@@ -111,7 +107,7 @@ const getSingle = async (req, res) => {
       return res.status(StatusCodes.NOT_FOUND).json({
         statusCode: StatusCodes.NOT_FOUND,
         status: ReasonPhrases.NOT_FOUND,
-        results: null,
+        data: null,
         message: 'Role not found',
       });
     }
@@ -124,7 +120,7 @@ const getSingle = async (req, res) => {
     res.status(StatusCodes.OK).json({
       statusCode: StatusCodes.OK,
       status: ReasonPhrases.OK,
-      results: {
+      data: {
         ...role.toObject(), // full role data from Mongo
         userCount,
       },
