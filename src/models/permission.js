@@ -190,19 +190,19 @@ permissionSchema.statics.getAll = async function (options = {}) {
     // Query data with pagination, sorting, and projection
     const query = this.find(finalFilter).skip(skip).limit(safeLimit).sort(sortOptions).select(projection);
 
-    const data = await query.lean();
+    const result = await query.lean();
     const totalCount = await this.countDocuments(finalFilter);
 
     // Optional caching placeholder:
     // cache.set(cacheKey, { data, totalCount }, cacheTTL);
 
     return {
-      data,
+      result,
       pagination: {
         total: totalCount,
         page: safePage,
         limit: safeLimit,
-        pages: Math.ceil(totalCount / safeLimit),
+        totalPages: Math.ceil(totalCount / safeLimit),
       }
     };
   } catch (error) {

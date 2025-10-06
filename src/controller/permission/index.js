@@ -92,7 +92,7 @@ const getAllPermissions = async (req, res) => {
       search,
     });
 
-    res.status(200).json(data);
+   return standardResponse(res, true, data, 'Permissions retrieved successfully', 200);
   } catch (error) {
     console.error('Error fetching permissions:', error);
     res.status(400).json({ error: error.message || 'Failed to fetch permissions' });

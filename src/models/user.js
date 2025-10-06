@@ -354,7 +354,9 @@ const userSchema = new mongoose.Schema(
     // Misc
     session: [{ type: Object }],
   },
-  { timestamps: true }
+  {   timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true } }
 );
 
 userSchema.virtual('fullName').get(function () {
@@ -390,11 +392,10 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
-
   async cleanupTokensForDevice(tokenData) {
     try {
       const { deviceId } = tokenData;
-      if (!deviceId ) {
+      if (!deviceId) {
         throw new Error('deviceId and browser are required for token cleanup');
       }
 
@@ -405,7 +406,7 @@ userSchema.method({
       const removedTokensByType = {};
 
       // Remove expired tokens and tokens from same device+browser
-      const cleanedTokens = this.authTokens.filter(token => {
+      const cleanedTokens = this.authTokens.filter((token) => {
         // Remove expired tokens
         if (token.expiresAt < now) {
           expiredTokensRemoved++;
@@ -429,17 +430,12 @@ userSchema.method({
 
       // Log security event
       if (expiredTokensRemoved > 0 || duplicateTokensRemoved > 0) {
-        await this.logSecurityEvent(
-          'tokens_cleaned_up',
-          `Cleaned up ${expiredTokensRemoved} expired tokens and ${duplicateTokensRemoved} duplicate tokens for device ${deviceId}`,
-          'low',
-          {
-            deviceId,
-            expiredTokensRemoved,
-            duplicateTokensRemoved,
-            removedTokensByType
-          }
-        );
+        await this.logSecurityEvent('tokens_cleaned_up', `Cleaned up ${expiredTokensRemoved} expired tokens and ${duplicateTokensRemoved} duplicate tokens for device ${deviceId}`, 'low', {
+          deviceId,
+          expiredTokensRemoved,
+          duplicateTokensRemoved,
+          removedTokensByType,
+        });
       }
 
       return {
@@ -449,9 +445,8 @@ userSchema.method({
         expiredTokensRemoved,
         duplicateTokensRemoved,
         removedTokensByType,
-        totalTokensRemoved: expiredTokensRemoved + duplicateTokensRemoved
+        totalTokensRemoved: expiredTokensRemoved + duplicateTokensRemoved,
       };
-
     } catch (error) {
       throw new Error(`Token cleanup failed: ${error.message}`);
     }
@@ -1309,7 +1304,7 @@ userSchema.method({
 
   // Create session for this user
   async createSession(sessionData) {
-    const { sessionId = crypto.randomUUID(), deviceId,browser, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
+    const { sessionId = crypto.randomUUID(), deviceId, browser, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
 
     // Clean expired sessions first
     await this.cleanupExpiredSessions(sessionData);
@@ -1329,7 +1324,7 @@ userSchema.method({
     // Add new session
     const newSession = {
       sessionId,
-      browser:browser.name,
+      browser: browser.name,
       deviceId: deviceId || crypto.randomUUID(),
       createdAt: new Date(),
       lastActivity: new Date(),
@@ -1634,7 +1629,7 @@ userSchema.method({
         browser: deviceInfo.browser.name,
         ipAddress: deviceInfo.ipAddress,
       };
-      await this.cleanupTokensForDevice(deviceInfo)
+      await this.cleanupTokensForDevice(deviceInfo);
       await this.authTokens.push({
         token: accessToken,
         type: 'access',
@@ -1799,7 +1794,7 @@ userSchema.method({
           type: 'totp',
           purpose,
           expiresAt: null,
-          message: 'TOTP verification required'
+          message: 'TOTP verification required',
         };
       } else if (methodToUse === 'email' || methodToUse === 'sms') {
         // Generate and send OTP via the otpService
@@ -2101,48 +2096,46 @@ userSchema.method({
 
       {
         $lookup: {
-          from: "permissions", // name of permissions collection
-          localField: "permissions",
-          foreignField: "_id",
-          as: "permissions",
+          from: 'permissions', // name of permissions collection
+          localField: 'permissions',
+          foreignField: '_id',
+          as: 'permissions',
         },
       },
 
-      { $unwind: "$permissions" },
+      { $unwind: '$permissions' },
 
-      { $match: { "permissions.isActive": true } },
+      { $match: { 'permissions.isActive': true } },
 
       // Extract first word from category
       {
         $addFields: {
           resource: {
-            $arrayElemAt: [{ $split: ["$permissions.category", " "] }, 0],
+            $arrayElemAt: [{ $split: ['$permissions.category', ' '] }, 0],
           },
         },
       },
 
       {
         $group: {
-          _id: "$resource", // group by the first word of category
-          actions: { $addToSet: "$permissions.action" },
-          id: { $first: "$permissions._id" },
+          _id: '$resource', // group by the first word of category
+          actions: { $addToSet: '$permissions.action' },
+          id: { $first: '$permissions._id' },
         },
       },
 
       {
         $project: {
           _id: 0,
-          id: { $toString: "$id" },
-          resource: "$_id", // use the first word as resource
+          id: { $toString: '$id' },
+          resource: '$_id', // use the first word as resource
           actions: 1,
         },
       },
     ]);
 
     return result; // [{ id, resource, actions: [] }, ...]
-  }
-  ,
-
+  },
   // Update last login timestamp
   async updateLastLogin() {
     this.lastLogin = new Date();
@@ -3806,7 +3799,7 @@ userSchema.statics.authenticateSocial = async function (profileData, identifier,
   };
 };
 
-userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) { };
+userSchema.statics.handleSocialLogin = async function (identifier, deviceInfo = {}) {};
 
 /**
  * Verify user credentials with OTP
@@ -4171,82 +4164,56 @@ userSchema.statics.getDashboardStats = async function () {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   // STATUS
-  const [totalUsers, activeUsers, inactiveUsers, verifiedUsers, newsletterSubscribed] = await Promise.all([
-    this.countDocuments({}),
-    this.countDocuments({ status: "active" }),
-    this.countDocuments({ status: "inactive" }),
-    this.countDocuments({ isVerified: true }),
-    this.countDocuments({ "preferences.newsletter": true }),
-  ]);
+  const [totalUsers, activeUsers, inactiveUsers, verifiedUsers, newsletterSubscribed] = await Promise.all([this.countDocuments({}), this.countDocuments({ status: 'active' }), this.countDocuments({ status: 'inactive' }), this.countDocuments({ isVerified: true }), this.countDocuments({ 'preferences.newsletter': true })]);
   const unverifiedUsers = totalUsers - verifiedUsers;
   const newsletterUnsubscribed = totalUsers - newsletterSubscribed;
 
   // NEW USERS
-  const [newUsersToday, newUsersThisWeek, newUsersThisMonth] = await Promise.all([
-    this.countDocuments({ createdAt: { $gte: startOfDay } }),
-    this.countDocuments({ createdAt: { $gte: startOfWeek } }),
-    this.countDocuments({ createdAt: { $gte: startOfMonth } }),
-  ]);
+  const [newUsersToday, newUsersThisWeek, newUsersThisMonth] = await Promise.all([this.countDocuments({ createdAt: { $gte: startOfDay } }), this.countDocuments({ createdAt: { $gte: startOfWeek } }), this.countDocuments({ createdAt: { $gte: startOfMonth } })]);
 
   // USERS WITH/WITHOUT ORDERS
-  const [usersWithOrders, usersWithoutOrders] = await Promise.all([
-    this.countDocuments({ orders: { $exists: true, $not: { $size: 0 } } }),
-    this.countDocuments({ $or: [{ orders: { $size: 0 } }, { orders: { $exists: false } }] })
-  ]);
+  const [usersWithOrders, usersWithoutOrders] = await Promise.all([this.countDocuments({ orders: { $exists: true, $not: { $size: 0 } } }), this.countDocuments({ $or: [{ orders: { $size: 0 } }, { orders: { $exists: false } }] })]);
 
   // ROLE, DEVICE, COUNTRY GROUPING
-  const [
-    usersByRole,
-    usersByDevice,
-    usersByCountry,
-    usersByStatus,
-    usersWithNewsletter,
-    usersByVerification
-  ] = await Promise.all([
-    this.aggregate([{ $group: { _id: "$role", value: { $sum: 1 } } }]),
-    this.aggregate([{ $group: { _id: "$deviceInfo.type", value: { $sum: 1 } } }]),
-    this.aggregate([{ $group: { _id: "$location.country", value: { $sum: 1 } } }]),
-    this.aggregate([{ $group: { _id: "$status", value: { $sum: 1 } } }]),
-    this.aggregate([{ $group: { _id: "$preferences.newsletter", value: { $sum: 1 } } }]),
+  const [usersByRole, usersByDevice, usersByCountry, usersByStatus, usersWithNewsletter, usersByVerification] = await Promise.all([
+    this.aggregate([{ $group: { _id: '$role', value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: '$deviceInfo.type', value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: '$location.country', value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: '$status', value: { $sum: 1 } } }]),
+    this.aggregate([{ $group: { _id: '$preferences.newsletter', value: { $sum: 1 } } }]),
     this.aggregate([
       {
         $group: {
           _id: null,
-          emailVerified: { $sum: { $cond: ["$emailVerified", 1, 0] } },
-          phoneVerified: { $sum: { $cond: ["$phoneVerified", 1, 0] } },
-          twoFactorEnabled: { $sum: { $cond: ["$twoFactorAuth.enabled", 1, 0] } }
-        }
-      }
-    ])
+          emailVerified: { $sum: { $cond: ['$emailVerified', 1, 0] } },
+          phoneVerified: { $sum: { $cond: ['$phoneVerified', 1, 0] } },
+          twoFactorEnabled: { $sum: { $cond: ['$twoFactorAuth.enabled', 1, 0] } },
+        },
+      },
+    ]),
   ]);
 
   // RECENT USERS
-  const recentUsers = await this.find({})
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .select([
-      "_id", "firstName", "lastName", "email", "role", "status", "lastLogin",
-      "createdAt", "location.country", "phoneNumber", "orders", "preferences.newsletter", "deviceInfo.type", "activityLogs", "isVerified"
-    ]).lean();
+  const recentUsers = await this.find({}).sort({ createdAt: -1 }).limit(5).select(['_id', 'firstName', 'lastName', 'email', 'role', 'status', 'lastLogin', 'createdAt', 'location.country', 'phoneNumber', 'orders', 'preferences.newsletter', 'deviceInfo.type', 'activityLogs', 'isVerified']).lean();
 
   // TOP SPENDING USERS (requires orders population fully)
   const topSpendingUsers = await this.aggregate([
     {
       $project: {
-        name: { $concat: ["$firstName", " ", "$lastName"] },
-        totalSpent: { $ifNull: ["$totalSpent", 0] }
-      }
+        name: { $concat: ['$firstName', ' ', '$lastName'] },
+        totalSpent: { $ifNull: ['$totalSpent', 0] },
+      },
     },
     { $sort: { totalSpent: -1 } },
-    { $limit: 3 }
+    { $limit: 3 },
   ]);
 
   // ORDER/VISITOR STATS (replace with Order/Session/Log models if needed)
   const averageOrderValue = 75; // Use Order.aggregate for real calcs
   const totalOrders = 320; // Use Order.countDocuments
-  const averageSessionDuration = "15m 30s"; // Placeholder, compute from session logs
+  const averageSessionDuration = '15m 30s'; // Placeholder, compute from session logs
   const pagesPerSession = 5.2; // Placeholder, compute from activity logs
-  const bounceRate = "18%"; // Placeholder
+  const bounceRate = '18%'; // Placeholder
   const dailyActiveUsers = 1020; // Placeholder
   const weeklyActiveUsers = 1350; // Placeholder
   const monthlyActiveUsers = 1480; // Placeholder
@@ -4255,11 +4222,11 @@ userSchema.statics.getDashboardStats = async function () {
   // NEW/RETURNING USERS (approximate for dashboard, real calc needs session/logs)
   const newVsReturningUsers = {
     newUsers: newUsersThisMonth,
-    returningUsers: totalUsers - newUsersThisMonth
+    returningUsers: totalUsers - newUsersThisMonth,
   };
 
   // USER GROWTH RATE (e.g., new users this month vs last month)
-  const userGrowthRate = "12%"; // Placeholder; compute true percentage
+  const userGrowthRate = '12%'; // Placeholder; compute true percentage
 
   return {
     stats: {
@@ -4285,19 +4252,19 @@ userSchema.statics.getDashboardStats = async function () {
       newVsReturningUsers,
       userGrowthRate,
       averageOrderValue,
-      totalOrders
+      totalOrders,
     },
-    usersByRole: usersByRole.map(r => ({ name: r._id, value: r.value })),
-    usersByDevice: usersByDevice.map(d => ({ name: d._id, value: d.value })),
-    usersByCountry: usersByCountry.map(c => ({ country: c._id, count: c.value })),
-    usersByStatus: usersByStatus.map(s => ({ status: s._id, count: s.value })),
-    usersWithNewsletter: usersWithNewsletter.map(u => ({ status: u._id ? "Subscribed" : "Unsubscribed", count: u.value })),
+    usersByRole: usersByRole.map((r) => ({ name: r._id, value: r.value })),
+    usersByDevice: usersByDevice.map((d) => ({ name: d._id, value: d.value })),
+    usersByCountry: usersByCountry.map((c) => ({ country: c._id, count: c.value })),
+    usersByStatus: usersByStatus.map((s) => ({ status: s._id, count: s.value })),
+    usersWithNewsletter: usersWithNewsletter.map((u) => ({ status: u._id ? 'Subscribed' : 'Unsubscribed', count: u.value })),
     usersByVerification: {
       emailVerified: usersByVerification[0]?.emailVerified || 0,
       phoneVerified: usersByVerification[0]?.phoneVerified || 0,
-      twoFactorEnabled: usersByVerification[0]?.twoFactorEnabled || 0
+      twoFactorEnabled: usersByVerification[0]?.twoFactorEnabled || 0,
     },
-    recentUsers: recentUsers.map(u => ({
+    recentUsers: recentUsers.map((u) => ({
       id: u._id,
       name: `${u.firstName} ${u.lastName}`,
       email: u.email,
@@ -4313,11 +4280,11 @@ userSchema.statics.getDashboardStats = async function () {
       newsletterSubscribed: (u.preferences?.newsletter ? true : false) || false,
       lastLogin: u.lastLogin,
       activityLogs: u.activityLogs,
-      isVerified: u.isVerified
+      isVerified: u.isVerified,
     })),
-    topSpendingUsers
-  }
-}
+    topSpendingUsers,
+  };
+};
 userSchema.statics.getUserStats = async function () {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -4330,99 +4297,46 @@ userSchema.statics.getUserStats = async function () {
   const endOfLastWeek = new Date(startOfThisWeek.getTime() - 1);
 
   // Basic counts: total, active, inactive, deleted, pending, banned, archived, draft
-  const [totalUsers, activeUsers, inactiveUsers, deletedUsers, pendingUsers, bannedUsers, archivedUsers, draftUsers] = await Promise.all([
-    this.countDocuments({}),
-    this.countDocuments({ status: 'active' }),
-    this.countDocuments({ status: 'inactive' }),
-    this.countDocuments({ status: 'deleted' }),
-    this.countDocuments({ status: 'pending' }),
-    this.countDocuments({ status: 'banned' }),
-    this.countDocuments({ status: 'archived' }),
-    this.countDocuments({ status: 'draft' }),
-  ]);
+  const [totalUsers, activeUsers, inactiveUsers, deletedUsers, pendingUsers, bannedUsers, archivedUsers, draftUsers] = await Promise.all([this.countDocuments({}), this.countDocuments({ status: 'active' }), this.countDocuments({ status: 'inactive' }), this.countDocuments({ status: 'deleted' }), this.countDocuments({ status: 'pending' }), this.countDocuments({ status: 'banned' }), this.countDocuments({ status: 'archived' }), this.countDocuments({ status: 'draft' })]);
 
   // Verification counts: email verified, phone verified, 2FA enabled
-  const [emailVerifiedCount, phoneVerifiedCount, twoFactorEnabledCount] = await Promise.all([
-    this.countDocuments({ emailVerified: true }),
-    this.countDocuments({ phoneVerified: true }),
-    this.countDocuments({ 'twoFactorAuth.enabled': true }),
-  ]);
+  const [emailVerifiedCount, phoneVerifiedCount, twoFactorEnabledCount] = await Promise.all([this.countDocuments({ emailVerified: true }), this.countDocuments({ phoneVerified: true }), this.countDocuments({ 'twoFactorAuth.enabled': true })]);
 
   // New users: today, this week, this month
-  const [newUsersToday, newUsersThisWeek, newUsersThisMonth] = await Promise.all([
-    this.countDocuments({ createdAt: { $gte: startOfToday } }),
-    this.countDocuments({ createdAt: { $gte: startOfThisWeek } }),
-    this.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
-  ]);
+  const [newUsersToday, newUsersThisWeek, newUsersThisMonth] = await Promise.all([this.countDocuments({ createdAt: { $gte: startOfToday } }), this.countDocuments({ createdAt: { $gte: startOfThisWeek } }), this.countDocuments({ createdAt: { $gte: startOfThisMonth } })]);
 
   // User growth rate: weekly and monthly (percentage change in new users)
-  const [newUsersLastWeek, newUsersLastMonth] = await Promise.all([
-    this.countDocuments({ createdAt: { $gte: startOfLastWeek, $lte: endOfLastWeek } }),
-    this.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } }),
-  ]);
-  const weeklyGrowthRate = newUsersLastWeek > 0 ? ((newUsersThisWeek - newUsersLastWeek) / newUsersLastWeek) * 100 : (newUsersThisWeek > 0 ? 100 : 0);
-  const monthlyGrowthRate = newUsersLastMonth > 0 ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100 : (newUsersThisMonth > 0 ? 100 : 0);
+  const [newUsersLastWeek, newUsersLastMonth] = await Promise.all([this.countDocuments({ createdAt: { $gte: startOfLastWeek, $lte: endOfLastWeek } }), this.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } })]);
+  const weeklyGrowthRate = newUsersLastWeek > 0 ? ((newUsersThisWeek - newUsersLastWeek) / newUsersLastWeek) * 100 : newUsersThisWeek > 0 ? 100 : 0;
+  const monthlyGrowthRate = newUsersLastMonth > 0 ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100 : newUsersThisMonth > 0 ? 100 : 0;
 
   // Active sessions count (current)
-  const activeSessionsCount = await this.aggregate([
-    { $unwind: '$activeSessions' },
-    { $match: { 'activeSessions.isActive': true, 'activeSessions.expiresAt': { $gt: now } } },
-    { $count: 'total' },
-  ]).then(result => result[0]?.total || 0);
+  const activeSessionsCount = await this.aggregate([{ $unwind: '$activeSessions' }, { $match: { 'activeSessions.isActive': true, 'activeSessions.expiresAt': { $gt: now } } }, { $count: 'total' }]).then((result) => result[0]?.total || 0);
 
   // Average session duration (placeholder; requires historical closed sessions data. Assuming average from active ones for demo)
-  const sessionDurations = await this.aggregate([
-    { $unwind: '$activeSessions' },
-    { $match: { 'activeSessions.isActive': true } },
-    { $project: { duration: { $subtract: ['$activeSessions.lastActivity', '$activeSessions.createdAt'] } } },
-    { $group: { _id: null, avgDuration: { $avg: '$duration' } } },
-  ]).then(result => result[0]?.avgDuration || 0);
+  const sessionDurations = await this.aggregate([{ $unwind: '$activeSessions' }, { $match: { 'activeSessions.isActive': true } }, { $project: { duration: { $subtract: ['$activeSessions.lastActivity', '$activeSessions.createdAt'] } } }, { $group: { _id: null, avgDuration: { $avg: '$duration' } } }]).then((result) => result[0]?.avgDuration || 0);
   const averageSessionDurationMs = sessionDurations; // in ms; convert as needed e.g., to minutes
 
   // Users by role (for chart)
-  const usersByRole = await this.aggregate([
-    { $group: { _id: '$role', count: { $sum: 1 } } },
-    { $lookup: { from: 'roles', localField: '_id', foreignField: '_id', as: 'roleDetails' } },
-    { $unwind: '$roleDetails' },
-    { $project: { name: '$roleDetails.name', value: '$count', _id: 0 } },
-  ]);
+  const usersByRole = await this.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }, { $lookup: { from: 'roles', localField: '_id', foreignField: '_id', as: 'roleDetails' } }, { $unwind: '$roleDetails' }, { $project: { name: '$roleDetails.name', value: '$count', _id: 0 } }]);
 
   // Users by device (unwind knownDevices, group by type; counts users with at least one device of that type)
-  const usersByDevice = await this.aggregate([
-    { $unwind: '$knownDevices' },
-    { $group: { _id: '$knownDevices.type', users: { $addToSet: '$_id' } } },
-    { $project: { name: '$_id', value: { $size: '$users' }, _id: 0 } },
-  ]);
+  const usersByDevice = await this.aggregate([{ $unwind: '$knownDevices' }, { $group: { _id: '$knownDevices.type', users: { $addToSet: '$_id' } } }, { $project: { name: '$_id', value: { $size: '$users' }, _id: 0 } }]);
 
   // Users by country (using getUserCountByCountry static if available, or replicate)
   const usersByCountry = await this.getUserCountByCountry(); // Assuming it's defined as in the schema
 
   // Newsletter subscriptions
-  const [newsletterSubscribed, newsletterUnsubscribed] = await Promise.all([
-    this.countDocuments({ 'preferences.newsletter': true }),
-    this.countDocuments({ 'preferences.newsletter': false }),
-  ]);
+  const [newsletterSubscribed, newsletterUnsubscribed] = await Promise.all([this.countDocuments({ 'preferences.newsletter': true }), this.countDocuments({ 'preferences.newsletter': false })]);
 
   // Recent users (last 5)
-  const recentUsers = await this.find({})
-    .sort({ createdAt: -1 })
-    .limit(5)
-    .select('username email firstName lastName role status createdAt lastLogin')
-    .populate('role', 'name')
-    .lean();
+  const recentUsers = await this.find({}).sort({ createdAt: -1 }).limit(5).select('username email firstName lastName role status createdAt lastLogin').populate('role', 'name').lean();
 
   // More stats: users with orders, without orders (as in provided code)
-  const [usersWithOrders, usersWithoutOrders] = await Promise.all([
-    this.countDocuments({ orders: { $exists: true, $not: { $size: 0 } } }),
-    this.countDocuments({ $or: [{ orders: { $exists: false } }, { orders: { $size: 0 } }] }),
-  ]);
+  const [usersWithOrders, usersWithoutOrders] = await Promise.all([this.countDocuments({ orders: { $exists: true, $not: { $size: 0 } } }), this.countDocuments({ $or: [{ orders: { $exists: false } }, { orders: { $size: 0 } }] })]);
 
   // Active users: daily, weekly, monthly (users with lastLogin in period)
-  const [dailyActiveUsers, weeklyActiveUsers, monthlyActiveUsers] = await Promise.all([
-    this.countDocuments({ lastLogin: { $gte: startOfToday } }),
-    this.countDocuments({ lastLogin: { $gte: startOfThisWeek } }),
-    this.countDocuments({ lastLogin: { $gte: startOfThisMonth } }),
-  ]);
+  const [dailyActiveUsers, weeklyActiveUsers, monthlyActiveUsers] = await Promise.all([this.countDocuments({ lastLogin: { $gte: startOfToday } }), this.countDocuments({ lastLogin: { $gte: startOfThisWeek } }), this.countDocuments({ lastLogin: { $gte: startOfThisMonth } })]);
 
   // Churned users (users inactive for 30 days, but registered before)
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

@@ -170,7 +170,9 @@ const settingSchema = new mongoose.Schema(
       customJSUrl: { type: String, trim: true },
     },
   },
-  { timestamps: true }
+    {   timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true } }
 );
 
 

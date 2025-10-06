@@ -242,6 +242,9 @@ const userActivityLogSchema = new mongoose.Schema(
   {
     timestamps: false, // We're using custom timestamp field
     collection: 'user_activity_logs',
+
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 
