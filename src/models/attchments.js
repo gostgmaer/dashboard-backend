@@ -143,7 +143,7 @@ attachmentSchema.methods.generateSignedUrl = async function (expirySeconds = 360
     case "azure":
       // Implement Azure Blob Storage SAS token generation
       // Example: const { BlobServiceClient } = require('@azure/storage-blob');
-      // const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+      // const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_CONNECTION_STRING);
       // const containerClient = blobServiceClient.getContainerClient(this.bucketName);
       // const blobClient = containerClient.getBlobClient(this.storagePath);
       // signedUrl = await blobClient.generateSasUrl({ expiresOn: new Date(Date.now() + expirySeconds * 1000) });

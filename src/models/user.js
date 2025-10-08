@@ -66,8 +66,8 @@ const userSchema = new mongoose.Schema(
     },
     phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
     profilePicture: {
-      _id: { type: mongoose.Schema.Types.ObjectId, ref: 'Attachment', default: null },
-      fileUrl: { type: String, default: null },
+      id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
+      url: { type: String, default: null },
     },
 
     // ─────────── Verification & Security ───────────
