@@ -23,8 +23,10 @@ const RefundItemSchema = new mongoose.Schema({
   initiatedAt: { type: Date, default: Date.now },
   processedAt: Date
 }, {
-  _id: false, // ✅ set true if standalone
-  timestamps: true
+ 
+  timestamps: true,  
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },
 });
 
 const paymentSchema = new mongoose.Schema({
