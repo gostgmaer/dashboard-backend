@@ -98,7 +98,7 @@ const gcsKeyFile = process.env.GCS_KEY_FILE || '';
 const azureContainer = process.env.AZURE_CONTAINER || '';
 const azureAccount = process.env.AZURE_ACCOUNT || '';
 const azureAccessKey = process.env.AZURE_ACCESS_KEY || '';
-const azurestorage_conn_string = process.env.AZURE_STORAGE_CONNECTION_STRING || '';
+const azurestorage_conn_string = process.env.AZURE_CONNECTION_STRING || '';
 const maxFileSizeMB = parseInt(process.env.MAX_FILE_SIZE_MB) || 10;
 const allowedFileTypes = process.env.ALLOWED_FILE_TYPES ? process.env.ALLOWED_FILE_TYPES.split(',') : [];
 const virusScanEnabled = process.env.VIRUS_SCAN_ENABLED === 'true' || false;

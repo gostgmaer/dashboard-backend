@@ -191,9 +191,8 @@ class UserController {
 
       // Return response
       if (emailResult.success) {
-
-         res.locals.createdUser=registrationResult
-         NotificationMiddleware.onUserCreate(req, res, () => { });
+        res.locals.createdUser = registrationResult;
+        NotificationMiddleware.onUserCreate(req, res, () => {});
         return res.status(200).json({
           success: true,
           message: `Registration successful and welcome email sent${emailResult.usedFallback ? ' via fallback' : ''}`,
@@ -253,10 +252,11 @@ class UserController {
         role: user.role.name,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       });
-      res.locals.createdUser=user
-         NotificationMiddleware.onUserCreate(req, res, () => { });
+      res.locals.createdUser = user;
+          let emaildata = await sendEmail(welcomeEmailTemplate, user);
+      NotificationMiddleware.onUserCreate(req, res, () => {});
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);
@@ -292,7 +292,6 @@ class UserController {
       for (var key in otherFilters) {
         var value = otherFilters[key];
         if (value && value !== '' && value !== 'undefined') {
-
           normalizedOtherFilters[key] = value;
         }
       }
@@ -577,10 +576,10 @@ class UserController {
         role: user.role.name,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       });
-      res.locals.user=user
-         NotificationMiddleware.onUserUpdate(req, res, () => { });
+      res.locals.user = user;
+      NotificationMiddleware.onUserUpdate(req, res, () => {});
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User updated successfully');
     } catch (error) {
       console.error('Failed to update user:', error);
@@ -621,8 +620,8 @@ class UserController {
         await user.deleteAccount();
         result = { _id: id };
       }
-  res.locals.deletedUser=user
-         NotificationMiddleware.onUserDelete(req, res, () => { });
+      res.locals.deletedUser = user;
+      NotificationMiddleware.onUserDelete(req, res, () => {});
       return UserController.standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'User permanently deleted' : 'User deleted successfully');
     } catch (error) {
       console.error('Failed to delete user:', error);
@@ -4138,39 +4137,27 @@ class UserController {
     }
   }
 
-
-
   // Controller to get dashboard stats
   static async getUserStats(req, res, next) {
     try {
-      const stats =   await User.getUserStats();
-      return standardResponse(
-        res,
-        true,
-        stats,
-        'fetched dashboard stats'
-      );
+      const stats = await User.getUserStats();
+      return standardResponse(res, true, stats, 'fetched dashboard stats');
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      return errorResponse(res, 'Error fetching dashboard stats', 500, error.message)
+      return errorResponse(res, 'Error fetching dashboard stats', 500, error.message);
     }
-  };
+  }
 
-    // Controller to get dashboard stats
+  // Controller to get dashboard stats
   static async getDashboardStats(req, res, next) {
     try {
-      const stats =   await User.getDashboardStats();
-      return standardResponse(
-        res,
-        true,
-        stats,
-        'fetched dashboard stats'
-      );
+      const stats = await User.getDashboardStats();
+      return standardResponse(res, true, stats, 'fetched dashboard stats');
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      return errorResponse(res, 'Error fetching dashboard stats', 500, error.message)
+      return errorResponse(res, 'Error fetching dashboard stats', 500, error.message);
     }
-  };
+  }
   static async assignUserRoleById(req, res, next) {
     try {
       const { userId } = req.params;
@@ -4192,9 +4179,9 @@ class UserController {
 
       // Optionally populate role details
       await user.populate('role');
-  res.locals.user=user
-    res.locals.newRole=user.role.name
-         NotificationMiddleware.onRoleAssign(req, res, () => { });
+      res.locals.user = user;
+      res.locals.newRole = user.role.name;
+      NotificationMiddleware.onRoleAssign(req, res, () => {});
       res.status(200).json(
         formatResponse('Role assigned to user successfully', {
           id: user._id,
@@ -4206,10 +4193,6 @@ class UserController {
       next(err);
     }
   }
-
-
-
-
 }
 
 module.exports = UserController;

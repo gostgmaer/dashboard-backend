@@ -35,8 +35,7 @@ const { notificationRoute } = require('./src/routes/notificationRoutes');
 // Import routes
 const resumeRoutes = require('./src/controller/resume/Resume_Routes');
 const templateRoutes = require('./src/controller/resume/Template_Routes');
-
-const { AttachmentUpload } = require('./src/routes/fileUploader');
+const fileRoutes = require('./src/routes/fileRoutes');
 const LoggerService = require("./src/services/logger");
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
@@ -75,6 +74,7 @@ app.use(LoggerService.expressRequestLogger());
 // Assuming your uploads folder is ./uploads relative to your project root
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
+
 app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
 app.use('/api/users', checkRoute("UserRoute", UserRoute));
 app.use('/api/wishlists', checkRoute("WishlistRoute", WishlistRoute));
@@ -94,7 +94,7 @@ app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
 app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
-app.use('/api/files', checkRoute("Attachment Files", AttachmentUpload));
+app.use('/api/files', checkRoute("Attachment Files", fileRoutes));
 // API Routes
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/templates', templateRoutes);
