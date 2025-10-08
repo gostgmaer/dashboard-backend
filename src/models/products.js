@@ -157,13 +157,29 @@ const productSchema = new mongoose.Schema(
     replacementParts: [{ type: String }],
     customAttributes: { type: Map, of: String },
     // variants: [variantSchema] || null,
-    mainImage: { type: String },
-    images: { type: [Object] },
+    mainImage: {
+      id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
+      url: { type: String, default: null },
+      name: { type: String, required: true }, // Original or current filename
+      size: { type: Number }, // File size in bytes
+      type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
+    },
+    images: [
+      {
+        id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
+        url: { type: String, default: null },
+        name: { type: String, required: true }, // Original or current filename
+        size: { type: Number }, // File size in bytes
+        type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
+      },
+    ],
     downloadableFiles: [
       {
-        name: { type: String },
-        url: { type: String },
-        fileSize: { type: String },
+        id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
+        url: { type: String, default: null },
+        name: { type: String, required: true }, // Original or current filename
+        size: { type: Number }, // File size in bytes
+        type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
       },
     ],
     videoLinks: { type: [String] },
@@ -216,9 +232,7 @@ const productSchema = new mongoose.Schema(
     soldCount: { type: Number, default: 0 },
     lastRestocked: { type: Date },
   },
-  { timestamps: true , 
-        toJSON: { virtuals: true },
-        toObject: { virtuals: true },}
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // 🔍 Full-text search
@@ -3372,34 +3386,12 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
   try {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-    const [
-      totalProducts,
-      activeProducts,
-      deletedProducts,
-      draftProducts,
-      publishedProducts,
-      featuredProducts,
-      trendingProducts,
-      newArrivals,
-      bestsellers,
-      productsOnSale,
-      outOfStockCount,
-      lowStockCount,
-      healthyStockCount,
-      autoRestockCount,
-      productsWithSales,
-      productsWithoutSales,
-      productsWithDiscounts,
-      productsWithReviews,
-      ecoFriendlyCount,
-      lowStockProductsCount,
-      thisMonthProducts,
-    ] = await Promise.all([
+    const [totalProducts, activeProducts, deletedProducts, draftProducts, publishedProducts, featuredProducts, trendingProducts, newArrivals, bestsellers, productsOnSale, outOfStockCount, lowStockCount, healthyStockCount, autoRestockCount, productsWithSales, productsWithoutSales, productsWithDiscounts, productsWithReviews, ecoFriendlyCount, lowStockProductsCount, thisMonthProducts] = await Promise.all([
       Product.countDocuments({}), // Total products
-      Product.countDocuments({ status: "active", isDeleted: false }),
+      Product.countDocuments({ status: 'active', isDeleted: false }),
       Product.countDocuments({ isDeleted: true }),
-      Product.countDocuments({ status: "draft" }),
-      Product.countDocuments({ status: "published" }),
+      Product.countDocuments({ status: 'draft' }),
+      Product.countDocuments({ status: 'published' }),
       Product.countDocuments({ isFeatured: true }),
       Product.countDocuments({ trending: true }),
       Product.countDocuments({ newArrival: true }),
@@ -3409,24 +3401,24 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       // Inventory-related counts
       Product.countDocuments({ inventory: 0, isDeleted: false }),
       Product.countDocuments({
-        $expr: { $and: [{ $lt: ["$inventory", "$lowStockThreshold"] }, { $gt: ["$inventory", 0] }] },
+        $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] },
         isDeleted: false,
       }),
-      Product.countDocuments({ $expr: { $gte: ["$inventory", "$lowStockThreshold"] }, isDeleted: false }),
+      Product.countDocuments({ $expr: { $gte: ['$inventory', '$lowStockThreshold'] }, isDeleted: false }),
       Product.countDocuments({ autoRestockEnabled: true }),
 
       // Sales and discount-related counts
       Product.countDocuments({ soldCount: { $gt: 0 }, isDeleted: false }),
       Product.countDocuments({ soldCount: 0, isDeleted: false }),
-      Product.countDocuments({ discountType: { $ne: "none" }, isDeleted: false }),
+      Product.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
 
       // Engagement and attributes
-      Product.countDocuments({ "reviews.totalReviews": { $gt: 0 }, isDeleted: false }),
+      Product.countDocuments({ 'reviews.totalReviews': { $gt: 0 }, isDeleted: false }),
       Product.countDocuments({ ecoFriendly: true, isDeleted: false }),
 
       // Enhanced stats
       Product.countDocuments({
-        $expr: { $and: [{ $lt: ["$inventory", "$lowStockThreshold"] }, { $gt: ["$inventory", 0] }] },
+        $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] },
         isDeleted: false,
       }),
       Product.countDocuments({
@@ -3459,12 +3451,10 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       thisMonthProducts,
     };
   } catch (error) {
-    console.error("Error fetching product dashboard counts:", error);
+    console.error('Error fetching product dashboard counts:', error);
     throw error;
   }
 };
-
-
 
 const Product = mongoose.model('Product', productSchema);
 module.exports = Product;

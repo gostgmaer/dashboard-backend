@@ -17,10 +17,12 @@ const categorySchema = new mongoose.Schema(
     parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
 
     images: [
-      {
-        url: { type: String, },
-        alt: { type: String, default: "" }
-      }
+     { id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
+           url: { type: String, default: null },
+           name: { type: String, required: true }, // Original or current filename
+           size: { type: Number }, // File size in bytes
+           type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
+           }
     ],
     descriptions: { type: String, trim: true, maxlength: 1000 },
     isDeleted: { type: Boolean, default: false },
