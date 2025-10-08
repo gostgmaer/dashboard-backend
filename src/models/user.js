@@ -68,6 +68,9 @@ const userSchema = new mongoose.Schema(
     profilePicture: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
       url: { type: String, default: null },
+      name: { type: String, required: true }, // Original or current filename
+      size: { type: Number }, // File size in bytes
+      type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
     },
 
     // ─────────── Verification & Security ───────────
@@ -354,9 +357,7 @@ const userSchema = new mongoose.Schema(
     // Misc
     session: [{ type: Object }],
   },
-  {   timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true } }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 userSchema.virtual('fullName').get(function () {

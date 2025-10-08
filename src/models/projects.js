@@ -13,11 +13,11 @@ const projectSchema = new Schema(
     resume: { type: Schema.Types.ObjectId, ref: 'Resume' },
 
     image: {
-      url: { type: String },
-      name: { type: String },
-      id: { type: String },
-      type: { type: String },
-      size: { type: Number }
+      id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
+      url: { type: String, default: null },
+      name: { type: String, required: true }, // Original or current filename
+      size: { type: Number }, // File size in bytes
+      type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
     },
 
     client: { type: String, trim: true },
@@ -27,7 +27,7 @@ const projectSchema = new Schema(
     status: {
       type: String,
       enum: ['planned', 'ongoing', 'completed', 'canceled'],
-      default: 'completed'
+      default: 'completed',
     },
     isPublic: { type: Boolean, default: true },
     tags: [{ type: String }],
@@ -45,19 +45,19 @@ const projectSchema = new Schema(
     metadata: { type: Map, of: Schema.Types.Mixed },
 
     awards: [{ type: String }],
-    links: [{
-      title: String,
-      url: String
-    }],
+    links: [
+      {
+        title: String,
+        url: String,
+      },
+    ],
     privacyLevel: {
       type: String,
       enum: ['public', 'private', 'restricted'],
-      default: 'public'
-    }
+      default: 'public',
+    },
   },
-  { timestamps: true, 
-        toJSON: { virtuals: true },
-        toObject: { virtuals: true }, }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
 // Virtuals
@@ -125,7 +125,6 @@ projectSchema.virtual('isOverdue').get(function () {
 });
 // Instance Methods
 
-
 // Add new link to project
 projectSchema.methods.addLink = async function (title, url) {
   this.links = this.links || [];
@@ -136,7 +135,7 @@ projectSchema.methods.addLink = async function (title, url) {
 // Remove link by title
 projectSchema.methods.removeLinkByTitle = async function (title) {
   if (!this.links) return this;
-  this.links = this.links.filter(link => link.title !== title);
+  this.links = this.links.filter((link) => link.title !== title);
   return this.save();
 };
 
@@ -170,7 +169,7 @@ projectSchema.methods.addTag = function (tag) {
 };
 
 projectSchema.methods.removeTag = function (tag) {
-  this.tags = this.tags.filter(t => t !== tag);
+  this.tags = this.tags.filter((t) => t !== tag);
   return this.save();
 };
 
@@ -194,7 +193,7 @@ projectSchema.methods.addDeliverable = async function (deliverable) {
 
 // Remove a deliverable if present
 projectSchema.methods.removeDeliverable = async function (deliverable) {
-  this.deliverables = this.deliverables.filter(d => d !== deliverable);
+  this.deliverables = this.deliverables.filter((d) => d !== deliverable);
   return this.save();
 };
 
@@ -217,7 +216,6 @@ projectSchema.methods.clearMetadata = async function () {
 
 // Static Methods
 
-
 // Find projects with rating above a threshold
 projectSchema.statics.findTopRated = function (minRating = 4, limit = 10) {
   return this.find({ rating: { $gte: minRating } })
@@ -234,10 +232,10 @@ projectSchema.statics.avgRatingGroupByStatus = function () {
       $group: {
         _id: '$status',
         avgRating: { $avg: '$rating' },
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
-    { $sort: { avgRating: -1 } }
+    { $sort: { avgRating: -1 } },
   ]).exec();
 };
 
@@ -248,9 +246,9 @@ projectSchema.statics.countByPrivacyLevel = function (userId) {
     {
       $group: {
         _id: '$privacyLevel',
-        count: { $sum: 1 }
-      }
-    }
+        count: { $sum: 1 },
+      },
+    },
   ]).exec();
 };
 
@@ -259,11 +257,7 @@ projectSchema.statics.findPublicByKeyword = function (keyword, limit = 10) {
   const regex = new RegExp(keyword, 'i');
   return this.find({
     isPublic: true,
-    $or: [
-      { title: regex },
-      { description: regex },
-      { tags: regex }
-    ]
+    $or: [{ title: regex }, { description: regex }, { tags: regex }],
   })
     .limit(limit)
     .lean()
@@ -301,10 +295,10 @@ projectSchema.statics.groupByClient = function () {
       $group: {
         _id: '$client',
         count: { $sum: 1 },
-        projects: { $push: '$$ROOT' }
-      }
+        projects: { $push: '$$ROOT' },
+      },
     },
-    { $sort: { count: -1 } }
+    { $sort: { count: -1 } },
   ]).exec();
 };
 
@@ -324,16 +318,7 @@ projectSchema.statics.findRecentlyUpdated = function (days = 7) {
  * @param {Object} options - pagination, sort, fullText search, etc.
  */
 projectSchema.statics.searchPaginated = async function (filter = {}, options = {}) {
-  const {
-    page = 1,
-    limit = 20,
-    sort = { createdAt: -1 },
-    fullText = '',
-    dateRange = {},
-    technologies,
-    privacyLevel,
-    userId,
-  } = options;
+  const { page = 1, limit = 20, sort = { createdAt: -1 }, fullText = '', dateRange = {}, technologies, privacyLevel, userId } = options;
 
   const skip = (page - 1) * limit;
 
@@ -344,14 +329,7 @@ projectSchema.statics.searchPaginated = async function (filter = {}, options = {
 
   if (fullText) {
     const regex = new RegExp(fullText, 'i');
-    baseFilter.$or = [
-      { title: regex },
-      { description: regex },
-      { client: regex },
-      { role: regex },
-      { responsibilities: regex },
-      { tags: regex },
-    ];
+    baseFilter.$or = [{ title: regex }, { description: regex }, { client: regex }, { role: regex }, { responsibilities: regex }, { tags: regex }];
   }
 
   if (dateRange.startDate) {
@@ -375,12 +353,7 @@ projectSchema.statics.searchPaginated = async function (filter = {}, options = {
   // Get total count for pagination
   const totalCount = await this.countDocuments(baseFilter);
 
-  const projects = await this.find(baseFilter)
-    .sort(sort)
-    .skip(skip)
-    .limit(limit)
-    .lean()
-    .exec();
+  const projects = await this.find(baseFilter).sort(sort).skip(skip).limit(limit).lean().exec();
 
   return {
     totalCount,
@@ -423,7 +396,7 @@ projectSchema.pre('save', async function (next) {
 
   // Normalize tags - all lowercase and trimmed
   if (this.tags && this.tags.length) {
-    this.tags = this.tags.map(tag => tag.trim().toLowerCase());
+    this.tags = this.tags.map((tag) => tag.trim().toLowerCase());
   }
 
   // Validate rating bounds
@@ -437,7 +410,6 @@ projectSchema.pre('save', async function (next) {
 
   next();
 });
-
 
 // Export model
 const Project = mongoose.model('Project', projectSchema);
