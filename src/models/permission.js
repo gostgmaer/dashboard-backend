@@ -28,7 +28,9 @@ const permissionSchema = new mongoose.Schema(
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
   },
-  { timestamps: true }
+  { timestamps: true,  
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true }, }
 );
 
 // ===== Static Methods =====

@@ -43,7 +43,9 @@ const reviewSchema = new mongoose.Schema(
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   },
-  { timestamps: true }
+  {   timestamps: true,
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true }, }
 );
 
 // ✅ Ensure a user can review a product only once

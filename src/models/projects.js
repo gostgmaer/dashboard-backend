@@ -55,7 +55,9 @@ const projectSchema = new Schema(
       default: 'public'
     }
   },
-  { timestamps: true }
+  { timestamps: true, 
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true }, }
 );
 
 // Virtuals

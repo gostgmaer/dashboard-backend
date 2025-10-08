@@ -1,37 +1,16 @@
 const mongoose = require('mongoose');
 
-
 const variantSchema = new mongoose.Schema({
   sku: { type: String },
-  title: { type: String },  // e.g., 'Red, Size M'
+  title: { type: String }, // e.g., 'Red, Size M'
   price: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   images: [{ url: String, alt: String }],
   inventory: { type: Number, default: 0 },
-  attributes: { type: Map, of: String } // e.g., color: 'red', size: 'M'
+  attributes: { type: Map, of: String }, // e.g., color: 'red', size: 'M'
 });
 
-const DEFAULT_SEARCH_FIELDS = [
-  'title',
-  'shortDescription',
-  'tags',
-  'sku',
-  'vendor',
-  'manufacturer',
-  'model',
-  'overview',
-  'metaTitle',
-  'metaDescription',
-  'seo_info.title',
-  'seo_info.description',
-  'descriptions.content',
-  'features',
-  'specifications.color',
-  'customAttributes.material',
-  'categoryName',
-  'brandName'
-];
-
+const DEFAULT_SEARCH_FIELDS = ['title', 'shortDescription', 'tags', 'sku', 'vendor', 'manufacturer', 'model', 'overview', 'metaTitle', 'metaDescription', 'seo_info.title', 'seo_info.description', 'descriptions.content', 'features', 'specifications.color', 'customAttributes.material', 'categoryName', 'brandName'];
 
 const productSchema = new mongoose.Schema(
   {
@@ -52,15 +31,17 @@ const productSchema = new mongoose.Schema(
     size: { type: String },
     ageGroup: { type: String },
     gender: { type: String },
-    stockActivityLog: [{
-      operation: { type: String, enum: ['reduce', 'restore', 'restock', 'auto_restock'] },
-      quantity: { type: Number },
-      previousStock: { type: Number },
-      currentStock: { type: Number },
-      reason: { type: String },
-      timestamp: { type: Date, default: Date.now },
-      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' }
-    }],
+    stockActivityLog: [
+      {
+        operation: { type: String, enum: ['reduce', 'restore', 'restock', 'auto_restock'] },
+        quantity: { type: Number },
+        previousStock: { type: Number },
+        currentStock: { type: Number },
+        reason: { type: String },
+        timestamp: { type: Date, default: Date.now },
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+      },
+    ],
 
     // Enhanced low stock threshold
     lowStockThreshold: { type: Number, min: 0, default: 10 },
@@ -82,17 +63,17 @@ const productSchema = new mongoose.Schema(
     reviews: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }],
       averageRating: { type: Number, min: 0, max: 5 },
-      totalReviews: { type: Number, min: 0 }
+      totalReviews: { type: Number, min: 0 },
     },
     socialMedia: {
       hashtags: { type: [String] },
       instagramHandle: { type: String },
-      twitterHandle: { type: String }
+      twitterHandle: { type: String },
     },
     analytics: {
       views: { type: Number, min: 0, default: 0 },
       clicks: { type: Number, min: 0, default: 0 },
-      conversions: { type: Number, min: 0, default: 0 }
+      conversions: { type: Number, min: 0, default: 0 },
     },
     tags: { type: [String] },
     basePrice: { type: Number, min: 0, required: true },
@@ -124,13 +105,13 @@ const productSchema = new mongoose.Schema(
     dimensions: {
       length: { type: Number, min: 0 },
       width: { type: Number, min: 0 },
-      height: { type: Number, min: 0 }
+      height: { type: Number, min: 0 },
     },
     packageDimensions: {
       length: { type: Number, min: 0 },
       width: { type: Number, min: 0 },
       height: { type: Number, min: 0 },
-      weight: { type: Number, min: 0 }
+      weight: { type: Number, min: 0 },
     },
     shipping: {
       requiresShipping: { type: Boolean, default: true },
@@ -139,7 +120,7 @@ const productSchema = new mongoose.Schema(
       freeShippingThreshold: { type: Number, min: 0 },
       shippingRestrictions: { type: [String] },
       hazardousMaterial: { type: Boolean, default: false },
-      fragile: { type: Boolean, default: false }
+      fragile: { type: Boolean, default: false },
     },
     seo_info: {
       title: { type: String },
@@ -148,7 +129,7 @@ const productSchema = new mongoose.Schema(
       slug: { type: String },
       canonicalUrl: { type: String },
       robotsMeta: { type: String },
-      structuredData: { type: String }
+      structuredData: { type: String },
     },
     visibility: { type: String, enum: ['public', 'private', 'password'] },
     password: { type: String },
@@ -157,7 +138,7 @@ const productSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ['active', 'inactive', 'draft', 'pending', 'archived', 'published']
+      enum: ['active', 'inactive', 'draft', 'pending', 'archived', 'published'],
     },
     isFeatured: { type: Boolean, default: false },
     trending: { type: Boolean, default: false },
@@ -182,8 +163,8 @@ const productSchema = new mongoose.Schema(
       {
         name: { type: String },
         url: { type: String },
-        fileSize: { type: String }
-      }
+        fileSize: { type: String },
+      },
     ],
     videoLinks: { type: [String] },
     threeDModelUrl: { type: String },
@@ -217,8 +198,8 @@ const productSchema = new mongoose.Schema(
     bundleContents: [
       {
         product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-        quantity: { type: Number, default: 1 }
-      }
+        quantity: { type: Number, default: 1 },
+      },
     ],
     purchaseLimit: { type: Number },
     bulkDiscounts: [{ quantity: { type: Number }, discountAmount: { type: Number } }],
@@ -233,13 +214,15 @@ const productSchema = new mongoose.Schema(
     digitalDownloadLink: { type: String },
     views: { type: Number, default: 0 },
     soldCount: { type: Number, default: 0 },
-    lastRestocked: { type: Date }
+    lastRestocked: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true , 
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },}
 );
 
 // 🔍 Full-text search
-productSchema.index({ "$**": "text" });
+productSchema.index({ '$**': 'text' });
 // productSchema.index({ sku: 1 }, { unique: true });
 // productSchema.index({ slug: 1 }, { unique: true });
 productSchema.index({ status: 1 });
@@ -253,13 +236,12 @@ productSchema.virtual('ratingStatistics').get(function () {
     const totalRating = this.reviews.reduce((total, review) => total + (review.rating || 0), 0);
     return {
       totalReviews,
-      averageRating: totalRating / totalReviews
+      averageRating: totalRating / totalReviews,
     };
   } else {
     return { totalReviews: 0, averageRating: 0 };
   }
 });
-
 
 // Enhanced stock status with more detail
 productSchema.virtual('detailedStockStatus').get(function () {
@@ -271,20 +253,20 @@ productSchema.virtual('detailedStockStatus').get(function () {
       status: 'out-of-stock',
       message: 'Out of Stock',
       quantity: 0,
-      canBackorder: this.allowBackorder
+      canBackorder: this.allowBackorder,
     };
   } else if (totalStock <= threshold) {
     return {
       status: 'low-stock',
       message: `Only ${totalStock} left`,
       quantity: totalStock,
-      threshold
+      threshold,
     };
   } else {
     return {
       status: 'in-stock',
       message: 'In Stock',
-      quantity: totalStock
+      quantity: totalStock,
     };
   }
 });
@@ -340,7 +322,7 @@ productSchema.virtual('performanceMetrics').get(function () {
     conversionRate: parseFloat(conversionRate.toFixed(2)),
     revenuePerView: parseFloat(revenuePerView.toFixed(2)),
     totalRevenue: this.soldCount * this.basePrice,
-    averageOrderValue: this.soldCount > 0 ? (this.soldCount * this.basePrice) / this.soldCount : 0
+    averageOrderValue: this.soldCount > 0 ? (this.soldCount * this.basePrice) / this.soldCount : 0,
   };
 });
 
@@ -382,7 +364,7 @@ productSchema.virtual('shippingInfo').get(function () {
     estimatedCost: this.calculateShipping(),
     handlingTime: this.shipping?.handlingTime || 1,
     hazardous: this.shipping?.hazardousMaterial || false,
-    fragile: this.shipping?.fragile || false
+    fragile: this.shipping?.fragile || false,
   };
 });
 
@@ -394,17 +376,11 @@ productSchema.virtual('stockStatus').get(function () {
 });
 productSchema.add({ deletedAt: { type: Date } });
 productSchema.statics.bulkDelete = function (ids) {
-  return this.updateMany(
-    { _id: { $in: ids }, deletedAt: { $exists: false } },
-    { $set: { deletedAt: new Date(), status: 'archived' } }
-  );
+  return this.updateMany({ _id: { $in: ids }, deletedAt: { $exists: false } }, { $set: { deletedAt: new Date(), status: 'archived' } });
 };
-
 
 productSchema.pre('save', async function (next) {
   try {
-
-
     // Generate SKU if not provided
     if (!this.sku) {
       this.sku = await this.generateUniqueSKU();
@@ -426,8 +402,7 @@ productSchema.pre('save', async function (next) {
     }
 
     if (!this.metaDescription && this.shortDescription) {
-      this.metaDescription = this.shortDescription.length > 160 ?
-        this.shortDescription.substring(0, 157) + '...' : this.shortDescription;
+      this.metaDescription = this.shortDescription.length > 160 ? this.shortDescription.substring(0, 157) + '...' : this.shortDescription;
     }
 
     // Auto-set product flags based on data
@@ -449,7 +424,6 @@ productSchema.pre('save', async function (next) {
     next(error);
   }
 });
-
 
 productSchema.pre('save', async function (next) {
   try {
@@ -594,25 +568,21 @@ productSchema.methods.generateUniqueSlug = async function () {
 productSchema.methods.generateAndOptimizeContent = async function () {
   // Auto-generate meta title if not provided
   if (!this.metaTitle && this.title) {
-    this.metaTitle = this.title.length > 60 ?
-      this.title.substring(0, 57) + '...' : this.title;
+    this.metaTitle = this.title.length > 60 ? this.title.substring(0, 57) + '...' : this.title;
   }
 
   // Auto-generate meta description if not provided
   if (!this.metaDescription && this.shortDescription) {
-    this.metaDescription = this.shortDescription.length > 160 ?
-      this.shortDescription.substring(0, 157) + '...' : this.shortDescription;
+    this.metaDescription = this.shortDescription.length > 160 ? this.shortDescription.substring(0, 157) + '...' : this.shortDescription;
   } else if (!this.metaDescription && this.descriptions?.content) {
     const plainText = this.descriptions.content.replace(/<[^>]*>/g, '');
-    this.metaDescription = plainText.length > 160 ?
-      plainText.substring(0, 157) + '...' : plainText;
+    this.metaDescription = plainText.length > 160 ? plainText.substring(0, 157) + '...' : plainText;
   }
 
   // Generate short description from full description if missing
   if (!this.shortDescription && this.descriptions?.content) {
     const plainText = this.descriptions.content.replace(/<[^>]*>/g, '');
-    this.shortDescription = plainText.length > 200 ?
-      plainText.substring(0, 197) + '...' : plainText;
+    this.shortDescription = plainText.length > 200 ? plainText.substring(0, 197) + '...' : plainText;
   }
 };
 
@@ -641,7 +611,7 @@ productSchema.methods.calculateAndUpdatePricing = function () {
 productSchema.methods.calculateAndSetSalePrice = function () {
   if (this.discountType && this.discountType !== 'none' && this.discountValue > 0) {
     if (this.discountType === 'percentage') {
-      this.salePrice = this.basePrice - (this.basePrice * (this.discountValue / 100));
+      this.salePrice = this.basePrice - this.basePrice * (this.discountValue / 100);
     } else if (this.discountType === 'fixed') {
       this.salePrice = Math.max(0, this.basePrice - this.discountValue);
     }
@@ -678,8 +648,7 @@ productSchema.methods.autoSetProductFlags = async function () {
   }
 
   // Auto-set bestseller flag based on sold count relative to age
-  const daysSinceCreated = this.createdAt ?
-    (now - this.createdAt) / (1000 * 60 * 60 * 24) : 0;
+  const daysSinceCreated = this.createdAt ? (now - this.createdAt) / (1000 * 60 * 60 * 24) : 0;
   const dailyAverageSales = daysSinceCreated > 0 ? this.soldCount / daysSinceCreated : 0;
 
   if (dailyAverageSales > 1 && this.soldCount >= 50) {
@@ -713,7 +682,7 @@ productSchema.methods.autoCategorizeBusiness = async function () {
   const ecoKeywords = ['organic', 'eco', 'sustainable', 'bamboo', 'recycled', 'biodegradable'];
   const productText = `${this.title} ${this.shortDescription} ${this.tags?.join(' ')}`.toLowerCase();
 
-  if (ecoKeywords.some(keyword => productText.includes(keyword))) {
+  if (ecoKeywords.some((keyword) => productText.includes(keyword))) {
     this.ecoFriendly = true;
   }
 
@@ -732,7 +701,7 @@ productSchema.methods.autoCategorizeBusiness = async function () {
 
   // Set age restrictions for certain categories
   const restrictedKeywords = ['alcohol', 'tobacco', 'adult', '18+'];
-  if (restrictedKeywords.some(keyword => productText.includes(keyword))) {
+  if (restrictedKeywords.some((keyword) => productText.includes(keyword))) {
     this.ageRestriction = '18+';
   }
 };
@@ -771,7 +740,7 @@ productSchema.methods.validateBusinessRules = async function () {
 
   // Variant validation
   if (this.variants && this.variants.length > 0) {
-    const skus = this.variants.map(v => v.sku).filter(Boolean);
+    const skus = this.variants.map((v) => v.sku).filter(Boolean);
     const duplicateSkus = skus.filter((sku, index) => skus.indexOf(sku) !== index);
     if (duplicateSkus.length > 0) {
       errors.push(`Duplicate variant SKUs found: ${duplicateSkus.join(', ')}`);
@@ -805,10 +774,11 @@ productSchema.methods.updateSearchAndSEOData = function () {
   // Extract keywords from various fields
   const extractKeywords = (text) => {
     if (!text) return;
-    return text.toLowerCase()
+    return text
+      .toLowerCase()
       .split(/\s+/)
-      .filter(word => word.length > 2 && !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'man', 'men', 'put', 'say', 'she', 'too', 'use'].includes(word))
-      .forEach(word => keywords.add(word));
+      .filter((word) => word.length > 2 && !['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'new', 'now', 'old', 'see', 'two', 'who', 'boy', 'did', 'man', 'men', 'put', 'say', 'she', 'too', 'use'].includes(word))
+      .forEach((word) => keywords.add(word));
   };
 
   extractKeywords(this.title);
@@ -821,11 +791,11 @@ productSchema.methods.updateSearchAndSEOData = function () {
   }
 
   if (this.tags) {
-    this.tags.forEach(tag => keywords.add(tag.toLowerCase()));
+    this.tags.forEach((tag) => keywords.add(tag.toLowerCase()));
   }
 
   if (this.features) {
-    this.features.forEach(feature => extractKeywords(feature));
+    this.features.forEach((feature) => extractKeywords(feature));
   }
 
   // Store keywords (limit to top 50)
@@ -857,15 +827,15 @@ productSchema.methods.generateStructuredData = function () {
       availability: this.isAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       seller: {
         '@type': 'Organization',
-        name: process.env.COMPANY_NAME || 'Your Store'
-      }
-    }
+        name: process.env.COMPANY_NAME || 'Your Store',
+      },
+    },
   };
 
   if (this.brand) {
     structuredData.brand = {
       '@type': 'Brand',
-      name: this.brandName || 'Brand'
+      name: this.brandName || 'Brand',
     };
   }
 
@@ -873,7 +843,7 @@ productSchema.methods.generateStructuredData = function () {
     structuredData.aggregateRating = {
       '@type': 'AggregateRating',
       ratingValue: this.reviews.averageRating,
-      reviewCount: this.reviews.totalReviews || 0
+      reviewCount: this.reviews.totalReviews || 0,
     };
   }
 
@@ -895,7 +865,7 @@ productSchema.methods.processImages = async function () {
         return {
           url: img,
           alt: `${this.title} - Image ${index + 1}`,
-          isPrimary: index === 0
+          isPrimary: index === 0,
         };
       } else if (img && typeof img === 'object' && !img.alt) {
         img.alt = `${this.title} - Image ${index + 1}`;
@@ -936,7 +906,7 @@ productSchema.methods.triggerChangeNotifications = async function () {
   } else {
     // Check for important field changes
     const importantFields = ['basePrice', 'inventory', 'status', 'isAvailable'];
-    const modifiedImportantFields = importantFields.filter(field => this.isModified(field));
+    const modifiedImportantFields = importantFields.filter((field) => this.isModified(field));
 
     if (modifiedImportantFields.length > 0) {
       console.log(`Important product changes for ${this.title}:`, modifiedImportantFields);
@@ -950,8 +920,6 @@ productSchema.methods.triggerChangeNotifications = async function () {
     }
   }
 };
-
-
 
 /* 🔹 Instance Methods */
 
@@ -976,7 +944,7 @@ productSchema.methods.generateUniqueSKU = async function () {
 productSchema.methods.calculateAndSetSalePrice = function () {
   if (this.discountType && this.discountType !== 'none' && this.discountValue > 0) {
     if (this.discountType === 'percentage') {
-      this.salePrice = this.basePrice - (this.basePrice * (this.discountValue / 100));
+      this.salePrice = this.basePrice - this.basePrice * (this.discountValue / 100);
     } else if (this.discountType === 'fixed') {
       this.salePrice = Math.max(0, this.basePrice - this.discountValue);
     }
@@ -998,7 +966,8 @@ productSchema.methods.autoSetProductFlags = function () {
   }
 
   // Auto-set bestseller flag based on sold count
-  if (this.soldCount >= 100) { // Configure threshold as needed
+  if (this.soldCount >= 100) {
+    // Configure threshold as needed
     this.bestseller = true;
   }
 
@@ -1010,7 +979,8 @@ productSchema.methods.autoSetProductFlags = function () {
   }
 
   // Auto-set trending flag based on recent views
-  if (this.analytics && this.analytics.views > 1000) { // Configure threshold
+  if (this.analytics && this.analytics.views > 1000) {
+    // Configure threshold
     this.trending = true;
   }
 };
@@ -1026,7 +996,7 @@ productSchema.methods.autoRestock = async function (restockQuantity) {
       quantity: restockQuantity,
       previousStock: this.inventory - restockQuantity,
       currentStock: this.inventory,
-      reason: 'auto_restock_triggered'
+      reason: 'auto_restock_triggered',
     });
 
     console.log(`Auto-restocked product ${this.title} with ${restockQuantity} units`);
@@ -1063,7 +1033,7 @@ productSchema.methods.validateBusinessRules = async function () {
 
   // Variant validation
   if (this.variants && this.variants.length > 0) {
-    const skus = this.variants.map(v => v.sku);
+    const skus = this.variants.map((v) => v.sku);
     const duplicateSkus = skus.filter((sku, index) => skus.indexOf(sku) !== index);
     if (duplicateSkus.length > 0) {
       errors.push(`Duplicate variant SKUs found: ${duplicateSkus.join(', ')}`);
@@ -1082,13 +1052,11 @@ productSchema.methods.updateSearchKeywords = function () {
   // Extract keywords from various fields
   if (this.title) keywords.push(...this.title.toLowerCase().split(/\s+/));
   if (this.shortDescription) keywords.push(...this.shortDescription.toLowerCase().split(/\s+/));
-  if (this.tags) keywords.push(...this.tags.map(tag => tag.toLowerCase()));
-  if (this.features) keywords.push(...this.features.map(f => f.toLowerCase().split(/\s+/)).flat());
+  if (this.tags) keywords.push(...this.tags.map((tag) => tag.toLowerCase()));
+  if (this.features) keywords.push(...this.features.map((f) => f.toLowerCase().split(/\s+/)).flat());
 
   // Remove duplicates and short words
-  const uniqueKeywords = [...new Set(keywords)]
-    .filter(word => word.length > 2)
-    .slice(0, 50); // Limit to 50 keywords
+  const uniqueKeywords = [...new Set(keywords)].filter((word) => word.length > 2).slice(0, 50); // Limit to 50 keywords
 
   // Store in seo_info for search optimization
   if (!this.seo_info.keywords || this.isModified('title') || this.isModified('tags')) {
@@ -1112,28 +1080,23 @@ productSchema.methods.getPriceWithTax = function (quantity = 1, taxRate = null) 
     formatted: {
       subtotal: `$${basePrice.toFixed(2)}`,
       tax: `$${tax.toFixed(2)}`,
-      total: `$${(basePrice + tax).toFixed(2)}`
-    }
+      total: `$${(basePrice + tax).toFixed(2)}`,
+    },
   };
 };
 
 // Comprehensive price breakdown with all possible discounts and fees
 productSchema.methods.getCompletePriceBreakdown = function (quantity = 1, options = {}) {
-  const {
-    discountCode = null,
-    shippingRequired = true,
-    taxRate = null,
-    loyaltyDiscount = 0
-  } = options;
+  const { discountCode = null, shippingRequired = true, taxRate = null, loyaltyDiscount = 0 } = options;
 
   const basePrice = this.basePrice * quantity;
-  const productDiscount = this.isDiscountActive() ? (basePrice * (this.discount / 100)) : 0;
-  const salePrice = this.salePrice ? (this.salePrice * quantity) : null;
+  const productDiscount = this.isDiscountActive() ? basePrice * (this.discount / 100) : 0;
+  const salePrice = this.salePrice ? this.salePrice * quantity : null;
   const finalPrice = this.getFinalPrice(quantity);
 
   // Apply bulk discount
   const bulkDiscountPrice = this.getBulkDiscountPrice ? this.getBulkDiscountPrice(quantity) : finalPrice;
-  const bulkDiscount = finalPrice - (bulkDiscountPrice * quantity);
+  const bulkDiscount = finalPrice - bulkDiscountPrice * quantity;
 
   // Loyalty discount
   const loyaltyDiscountAmount = finalPrice * (loyaltyDiscount / 100);
@@ -1148,31 +1111,31 @@ productSchema.methods.getCompletePriceBreakdown = function (quantity = 1, option
     original: {
       basePrice,
       quantity,
-      unitPrice: this.basePrice
+      unitPrice: this.basePrice,
     },
     discounts: {
       productDiscount,
       bulkDiscount,
       loyaltyDiscount: loyaltyDiscountAmount,
-      totalDiscount: productDiscount + bulkDiscount + loyaltyDiscountAmount
+      totalDiscount: productDiscount + bulkDiscount + loyaltyDiscountAmount,
     },
     pricing: {
       subtotal: subtotalAfterDiscounts,
       tax,
       shipping,
-      total
+      total,
     },
     savings: {
       amount: basePrice - total,
-      percentage: basePrice > 0 ? ((basePrice - total) / basePrice * 100).toFixed(2) : 0
+      percentage: basePrice > 0 ? (((basePrice - total) / basePrice) * 100).toFixed(2) : 0,
     },
     formatted: {
       subtotal: `$${subtotalAfterDiscounts.toFixed(2)}`,
       tax: `$${tax.toFixed(2)}`,
       shipping: shipping > 0 ? `$${shipping.toFixed(2)}` : 'FREE',
       total: `$${total.toFixed(2)}`,
-      savings: `$${(basePrice - total).toFixed(2)}`
-    }
+      savings: `$${(basePrice - total).toFixed(2)}`,
+    },
   };
 };
 
@@ -1181,7 +1144,7 @@ productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 
   const result = {
     productId: this._id,
     requestedQuantity,
-    timestamp: new Date()
+    timestamp: new Date(),
   };
 
   if (!this.trackInventory || this.trackInventory === 'no') {
@@ -1189,7 +1152,7 @@ productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 
       ...result,
       available: true,
       status: 'unlimited',
-      message: 'Stock tracking disabled - unlimited availability'
+      message: 'Stock tracking disabled - unlimited availability',
     };
   }
 
@@ -1203,7 +1166,7 @@ productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 
         ...result,
         available: false,
         status: 'variant_not_found',
-        message: 'Requested variant not found'
+        message: 'Requested variant not found',
       };
     }
     availableStock = variant.inventory || 0;
@@ -1220,7 +1183,7 @@ productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 
       availableStock,
       message: `${availableStock} units available`,
       canFulfillImmediately: true,
-      estimatedShipDate: this.getEstimatedShipDate()
+      estimatedShipDate: this.getEstimatedShipDate(),
     };
   } else if (this.allowBackorder) {
     const backorderQuantity = requestedQuantity - availableStock;
@@ -1233,7 +1196,7 @@ productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 
       message: `${availableStock} in stock, ${backorderQuantity} on backorder`,
       canFulfillImmediately: false,
       estimatedShipDate: this.getBackorderShipDate(),
-      partialFulfillment: availableStock > 0
+      partialFulfillment: availableStock > 0,
     };
   } else {
     return {
@@ -1244,7 +1207,7 @@ productSchema.methods.checkDetailedAvailability = function (requestedQuantity = 
       shortfall: requestedQuantity - availableStock,
       message: `Insufficient stock. Available: ${availableStock}, Requested: ${requestedQuantity}`,
       suggestedQuantity: availableStock,
-      estimatedRestockDate: this.getEstimatedRestockDate()
+      estimatedRestockDate: this.getEstimatedRestockDate(),
     };
   }
 };
@@ -1291,30 +1254,23 @@ productSchema.methods.getEstimatedRestockDate = function () {
 
 // Generate comprehensive product recommendations
 productSchema.methods.getAdvancedRecommendations = async function (options = {}) {
-  const {
-    limit = 8,
-    types = ['related', 'cross_sell', 'up_sell', 'similar'],
-    userContext = null
-  } = options;
+  const { limit = 8, types = ['related', 'cross_sell', 'up_sell', 'similar'], userContext = null } = options;
 
   const recommendations = {};
 
   // Related products (same category/brand)
   if (types.includes('related')) {
-    recommendations.related = await this.constructor.find({
-      $and: [
-        { _id: { $ne: this._id } },
-        { status: 'active' },
-        { isAvailable: true },
-        {
-          $or: [
-            { categories: { $in: this.categories } },
-            { brand: this.brand },
-            { tags: { $in: this.tags || [] } }
-          ]
-        }
-      ]
-    })
+    recommendations.related = await this.constructor
+      .find({
+        $and: [
+          { _id: { $ne: this._id } },
+          { status: 'active' },
+          { isAvailable: true },
+          {
+            $or: [{ categories: { $in: this.categories } }, { brand: this.brand }, { tags: { $in: this.tags || [] } }],
+          },
+        ],
+      })
       .sort({ soldCount: -1, reviews: -1 })
       .limit(Math.ceil(limit / types.length))
       .select('title basePrice salePrice mainImage slug soldCount reviews averageRating');
@@ -1322,24 +1278,20 @@ productSchema.methods.getAdvancedRecommendations = async function (options = {})
 
   // Cross-sell products (accessories, complementary items)
   if (types.includes('cross_sell')) {
-    recommendations.crossSell = await this.constructor.find({
-      _id: { $in: this.crossSells || [] }
-    })
+    recommendations.crossSell = await this.constructor
+      .find({
+        _id: { $in: this.crossSells || [] },
+      })
       .populate('reviews')
       .limit(Math.ceil(limit / types.length));
   }
 
   // Up-sell products (higher price, similar category)
   if (types.includes('up_sell')) {
-    recommendations.upSell = await this.constructor.find({
-      $and: [
-        { _id: { $ne: this._id } },
-        { categories: { $in: this.categories } },
-        { basePrice: { $gt: this.basePrice } },
-        { status: 'active' },
-        { isAvailable: true }
-      ]
-    })
+    recommendations.upSell = await this.constructor
+      .find({
+        $and: [{ _id: { $ne: this._id } }, { categories: { $in: this.categories } }, { basePrice: { $gt: this.basePrice } }, { status: 'active' }, { isAvailable: true }],
+      })
       .sort({ basePrice: 1 })
       .limit(Math.ceil(limit / types.length));
   }
@@ -1347,11 +1299,7 @@ productSchema.methods.getAdvancedRecommendations = async function (options = {})
   // Similar products (ML-based or attribute matching)
   if (types.includes('similar')) {
     const similarityQuery = {
-      $and: [
-        { _id: { $ne: this._id } },
-        { status: 'active' },
-        { isAvailable: true }
-      ]
+      $and: [{ _id: { $ne: this._id } }, { status: 'active' }, { isAvailable: true }],
     };
 
     // Add similarity criteria
@@ -1359,8 +1307,7 @@ productSchema.methods.getAdvancedRecommendations = async function (options = {})
     if (this.material) similarityQuery.$and.push({ material: this.material });
     if (this.style) similarityQuery.$and.push({ style: this.style });
 
-    recommendations.similar = await this.constructor.find(similarityQuery)
-      .limit(Math.ceil(limit / types.length));
+    recommendations.similar = await this.constructor.find(similarityQuery).limit(Math.ceil(limit / types.length));
   }
 
   // Personalized recommendations based on user context
@@ -1374,14 +1321,7 @@ productSchema.methods.getAdvancedRecommendations = async function (options = {})
 
 // Clone product with advanced options
 productSchema.methods.cloneProductAdvanced = async function (options = {}) {
-  const {
-    newTitle = null,
-    priceAdjustment = 0,
-    categoryOverride = null,
-    includeInventory = false,
-    includeReviews = false,
-    customFields = {}
-  } = options;
+  const { newTitle = null, priceAdjustment = 0, categoryOverride = null, includeInventory = false, includeReviews = false, customFields = {} } = options;
 
   const clonedData = this.toObject();
 
@@ -1401,7 +1341,7 @@ productSchema.methods.cloneProductAdvanced = async function (options = {}) {
   if (!includeInventory) {
     clonedData.inventory = 0;
     if (clonedData.variants) {
-      clonedData.variants.forEach(variant => {
+      clonedData.variants.forEach((variant) => {
         variant.inventory = 0;
       });
     }
@@ -1412,7 +1352,7 @@ productSchema.methods.cloneProductAdvanced = async function (options = {}) {
     clonedData.reviews = {
       type: [],
       averageRating: 0,
-      totalReviews: 0
+      totalReviews: 0,
     };
   }
 
@@ -1438,10 +1378,10 @@ productSchema.methods.cloneProductAdvanced = async function (options = {}) {
 
   // Clone variants with new SKUs
   if (clonedData.variants && clonedData.variants.length > 0) {
-    clonedData.variants = clonedData.variants.map(variant => ({
+    clonedData.variants = clonedData.variants.map((variant) => ({
       ...variant,
       sku: `${variant.sku}-CLONE-${Date.now()}`,
-      inventory: includeInventory ? variant.inventory : 0
+      inventory: includeInventory ? variant.inventory : 0,
     }));
   }
 
@@ -1461,8 +1401,8 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
     condition: 'new',
     brand: this.brandName,
     sku: this.sku,
-    images: this.images?.map(img => img.url || img).filter(Boolean) || [],
-    categories: this.categoryName
+    images: this.images?.map((img) => img.url || img).filter(Boolean) || [],
+    categories: this.categoryName,
   };
 
   switch (platform.toLowerCase()) {
@@ -1476,11 +1416,13 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
         custom_label_0: this.isFeatured ? 'featured' : 'regular',
         custom_label_1: this.newArrival ? 'new' : 'existing',
         shipping_weight: this.getProductWeight(),
-        shipping: [{
-          country: 'US',
-          service: 'Standard',
-          price: `${this.calculateShipping()} USD`
-        }]
+        shipping: [
+          {
+            country: 'US',
+            service: 'Standard',
+            price: `${this.calculateShipping()} USD`,
+          },
+        ],
       };
 
     case 'facebook':
@@ -1489,8 +1431,7 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
         product_catalog_id: process.env.FB_CATALOG_ID,
         inventory: this.inventory,
         sale_price: this.salePrice ? `${this.salePrice} ${baseData.currency}` : undefined,
-        sale_price_effective_date: this.discountStartDate && this.discountEndDate ?
-          `${this.discountStartDate.toISOString()}/${this.discountEndDate.toISOString()}` : undefined
+        sale_price_effective_date: this.discountStartDate && this.discountEndDate ? `${this.discountStartDate.toISOString()}/${this.discountEndDate.toISOString()}` : undefined,
       };
 
     case 'amazon':
@@ -1505,7 +1446,7 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
         bullet_point1: this.features?.[0],
         bullet_point2: this.features?.[1],
         bullet_point3: this.features?.[2],
-        generic_keywords: this.tags?.join(', ')
+        generic_keywords: this.tags?.join(', '),
       };
 
     case 'shopify':
@@ -1516,17 +1457,19 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
         product_type: this.productType,
         tags: this.tags?.join(', '),
         published: this.status === 'active',
-        variants: this.variants?.map(v => ({
+        variants: this.variants?.map((v) => ({
           sku: v.sku,
           price: v.price,
           inventory_quantity: v.inventory,
-          weight: this.weight
-        })) || [{
-          sku: this.sku,
-          price: this.basePrice,
-          inventory_quantity: this.inventory,
-          weight: this.weight
-        }]
+          weight: this.weight,
+        })) || [
+          {
+            sku: this.sku,
+            price: this.basePrice,
+            inventory_quantity: this.inventory,
+            weight: this.weight,
+          },
+        ],
       };
 
     default:
@@ -1542,15 +1485,13 @@ productSchema.methods.getAnalyticsReport = function (dateRange = {}) {
   const end = endDate ? new Date(endDate) : now;
 
   // Filter analytics data by date range if available
-  const relevantAnalytics = this.detailedAnalytics?.filter(
-    interaction => new Date(interaction.timestamp) >= start && new Date(interaction.timestamp) <= end
-  ) || [];
+  const relevantAnalytics = this.detailedAnalytics?.filter((interaction) => new Date(interaction.timestamp) >= start && new Date(interaction.timestamp) <= end) || [];
 
   const report = {
     period: {
       start: start.toISOString().split('T')[0],
       end: end.toISOString().split('T')[0],
-      days: Math.ceil((end - start) / (1000 * 60 * 60 * 24))
+      days: Math.ceil((end - start) / (1000 * 60 * 60 * 24)),
     },
     interactions: relevantAnalytics.reduce((acc, interaction) => {
       acc[interaction.type] = (acc[interaction.type] || 0) + 1;
@@ -1560,18 +1501,18 @@ productSchema.methods.getAnalyticsReport = function (dateRange = {}) {
       views: this.views || 0,
       sold: this.soldCount || 0,
       revenue: (this.soldCount || 0) * (this.basePrice || 0),
-      conversionRate: this.views > 0 ? ((this.soldCount / this.views) * 100).toFixed(2) : 0
+      conversionRate: this.views > 0 ? ((this.soldCount / this.views) * 100).toFixed(2) : 0,
     },
     inventory: {
       current: this.inventory || 0,
       turnoverRate: this.inventory > 0 ? (this.soldCount / this.inventory).toFixed(2) : 'N/A',
-      daysOfInventory: this.soldCount > 0 ? Math.ceil((this.inventory || 0) / (this.soldCount / 90)) : 'N/A'
+      daysOfInventory: this.soldCount > 0 ? Math.ceil((this.inventory || 0) / (this.soldCount / 90)) : 'N/A',
     },
     pricing: {
       currentPrice: this.getFinalPrice(),
       averageOrderValue: this.soldCount > 0 ? (this.soldCount * this.basePrice) / this.soldCount : this.basePrice,
-      profitMargin: this.costPrice ? (((this.basePrice - this.costPrice) / this.basePrice) * 100).toFixed(2) : 'N/A'
-    }
+      profitMargin: this.costPrice ? (((this.basePrice - this.costPrice) / this.basePrice) * 100).toFixed(2) : 'N/A',
+    },
   };
 
   return report;
@@ -1580,8 +1521,8 @@ productSchema.methods.getAnalyticsReport = function (dateRange = {}) {
 // Get price breakdown
 productSchema.methods.getPriceBreakdown = function (quantity = 1) {
   const basePrice = this.basePrice * quantity;
-  const discount = this.isDiscountActive() ? (basePrice * (this.discount / 100)) : 0;
-  const salePrice = this.salePrice ? (this.salePrice * quantity) : null;
+  const discount = this.isDiscountActive() ? basePrice * (this.discount / 100) : 0;
+  const salePrice = this.salePrice ? this.salePrice * quantity : null;
   const finalPrice = this.getFinalPrice(quantity);
   const tax = this.getTaxAmount() * quantity;
   const shipping = this.calculateShipping();
@@ -1593,7 +1534,7 @@ productSchema.methods.getPriceBreakdown = function (quantity = 1) {
     finalPrice,
     tax,
     shipping,
-    total: finalPrice + tax + shipping
+    total: finalPrice + tax + shipping,
   };
 };
 
@@ -1622,12 +1563,12 @@ productSchema.methods.checkStockAvailability = function (requestedQuantity, vari
       available: true,
       backorder: true,
       availableStock,
-      backorderQuantity: requestedQuantity - availableStock
+      backorderQuantity: requestedQuantity - availableStock,
     };
   } else {
     return {
       available: false,
-      message: `Insufficient stock. Available: ${availableStock}, Requested: ${requestedQuantity}`
+      message: `Insufficient stock. Available: ${availableStock}, Requested: ${requestedQuantity}`,
     };
   }
 };
@@ -1635,20 +1576,17 @@ productSchema.methods.checkStockAvailability = function (requestedQuantity, vari
 // Generate product recommendations
 productSchema.methods.getRecommendations = async function (limit = 5) {
   // Get related products by category and tags
-  const relatedProducts = await this.constructor.find({
-    $and: [
-      { _id: { $ne: this._id } },
-      { status: 'active' },
-      { isAvailable: true },
-      {
-        $or: [
-          { categories: { $in: this.categories } },
-          { tags: { $in: this.tags || [] } },
-          { brand: this.brand }
-        ]
-      }
-    ]
-  })
+  const relatedProducts = await this.constructor
+    .find({
+      $and: [
+        { _id: { $ne: this._id } },
+        { status: 'active' },
+        { isAvailable: true },
+        {
+          $or: [{ categories: { $in: this.categories } }, { tags: { $in: this.tags || [] } }, { brand: this.brand }],
+        },
+      ],
+    })
     .sort({ soldCount: -1, views: -1 })
     .limit(limit)
     .select('title basePrice salePrice mainImage slug soldCount reviews');
@@ -1668,7 +1606,7 @@ productSchema.methods.exportForFeed = function (format = 'google') {
     price: `${this.getFinalPrice()} ${process.env.CURRENCY || 'USD'}`,
     brand: this.brandName,
     condition: 'new',
-    gtin: this.productUPCEAN
+    gtin: this.productUPCEAN,
   };
 
   if (format === 'google') {
@@ -1676,7 +1614,7 @@ productSchema.methods.exportForFeed = function (format = 'google') {
       ...baseData,
       google_product_category: this.categoryName,
       product_type: this.productType,
-      custom_label_0: this.isFeatured ? 'featured' : 'regular'
+      custom_label_0: this.isFeatured ? 'featured' : 'regular',
     };
   }
 
@@ -1684,7 +1622,7 @@ productSchema.methods.exportForFeed = function (format = 'google') {
     return {
       ...baseData,
       product_catalog_id: process.env.FB_CATALOG_ID,
-      category: this.categoryName
+      category: this.categoryName,
     };
   }
 
@@ -1712,9 +1650,9 @@ productSchema.methods.cloneProduct = async function (overrides = {}) {
 
   // Clone variants with new SKUs
   if (clonedData.variants && clonedData.variants.length > 0) {
-    clonedData.variants = clonedData.variants.map(variant => ({
+    clonedData.variants = clonedData.variants.map((variant) => ({
       ...variant,
-      sku: `${variant.sku}-CLONE-${Date.now()}`
+      sku: `${variant.sku}-CLONE-${Date.now()}`,
     }));
   }
 
@@ -1751,7 +1689,7 @@ productSchema.methods.updateStockOnOrder = async function (quantity, operation =
       quantity,
       previousStock: originalStock,
       currentStock: this.inventory,
-      reason: operation === 'reduce' ? 'order_placed' : 'order_cancelled'
+      reason: operation === 'reduce' ? 'order_placed' : 'order_cancelled',
     });
 
     await this.save();
@@ -1760,7 +1698,7 @@ productSchema.methods.updateStockOnOrder = async function (quantity, operation =
       success: true,
       previousStock: originalStock,
       currentStock: this.inventory,
-      operation
+      operation,
     };
   } catch (error) {
     throw new Error(`Stock update failed: ${error.message}`);
@@ -1794,7 +1732,7 @@ productSchema.methods.updateVariantStock = async function (variantId, quantity, 
     variantId,
     previousStock: originalStock,
     currentStock: variant.inventory,
-    totalProductStock: this.inventory
+    totalProductStock: this.inventory,
   };
 };
 
@@ -1845,7 +1783,7 @@ productSchema.methods.logStockActivity = async function (activity) {
   this.stockActivityLog.push({
     ...activity,
     timestamp: new Date(),
-    productId: this._id
+    productId: this._id,
   });
 
   // Keep only last 100 entries to prevent document bloat
@@ -1884,7 +1822,6 @@ productSchema.methods.triggerLowStockAlert = async function () {
   // eventEmitter.emit('lowStock', { product: this });
 };
 
-
 productSchema.methods.applyDiscountCode = async function (discountCode, quantity = 1) {
   try {
     // This assumes you have a DiscountCode model
@@ -1893,7 +1830,7 @@ productSchema.methods.applyDiscountCode = async function (discountCode, quantity
       code: discountCode,
       isActive: true,
       startDate: { $lte: new Date() },
-      endDate: { $gte: new Date() }
+      endDate: { $gte: new Date() },
     });
 
     if (!discount) {
@@ -1921,7 +1858,7 @@ productSchema.methods.applyDiscountCode = async function (discountCode, quantity
       discountAmount,
       finalPrice,
       discountType: discount.type,
-      discountCode: discountCode
+      discountCode: discountCode,
     };
   } catch (error) {
     return { success: false, message: error.message };
@@ -1937,10 +1874,8 @@ productSchema.methods.isDiscountApplicable = function (discount) {
 
   // Check category-specific discounts
   if (discount.applicableCategories && discount.applicableCategories.length > 0) {
-    const productCategories = this.categories.map(cat => cat.toString());
-    return discount.applicableCategories.some(cat =>
-      productCategories.includes(cat.toString())
-    );
+    const productCategories = this.categories.map((cat) => cat.toString());
+    return discount.applicableCategories.some((cat) => productCategories.includes(cat.toString()));
   }
 
   // Check brand-specific discounts
@@ -1950,7 +1885,7 @@ productSchema.methods.isDiscountApplicable = function (discount) {
 
   // Check tag-based discounts
   if (discount.applicableTags && discount.applicableTags.length > 0) {
-    return this.tags.some(tag => discount.applicableTags.includes(tag));
+    return this.tags.some((tag) => discount.applicableTags.includes(tag));
   }
 
   // Check minimum purchase amount
@@ -1964,8 +1899,8 @@ productSchema.methods.isDiscountApplicable = function (discount) {
   }
 
   if (discount.excludedCategories && discount.excludedCategories.length > 0) {
-    const productCategories = this.categories.map(cat => cat.toString());
-    if (discount.excludedCategories.some(cat => productCategories.includes(cat.toString()))) {
+    const productCategories = this.categories.map((cat) => cat.toString());
+    if (discount.excludedCategories.some((cat) => productCategories.includes(cat.toString()))) {
       return false;
     }
   }
@@ -2013,10 +1948,12 @@ productSchema.methods.updateAverageRating = async function () {
   return this;
 };
 
-
 productSchema.methods.generateSlug = function () {
   if (!this.slug && this.title) {
-    this.slug = this.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    this.slug = this.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
   }
   return this.slug;
 };
@@ -2033,7 +1970,7 @@ productSchema.methods.getVariantsStock = function () {
 };
 
 productSchema.methods.checkCompatibility = function (otherProductId) {
-  return this.accessories && this.accessories.includes(otherProductId) || this.replacementParts && this.replacementParts.includes(otherProductId);
+  return (this.accessories && this.accessories.includes(otherProductId)) || (this.replacementParts && this.replacementParts.includes(otherProductId));
 };
 
 productSchema.methods.archive = async function () {
@@ -2066,7 +2003,7 @@ productSchema.methods.validatePurchaseQuantity = function (quantity) {
 };
 
 productSchema.methods.getImagesByType = function (type) {
-  return Array.isArray(this.images) ? this.images.filter(img => img.type === type) : [];
+  return Array.isArray(this.images) ? this.images.filter((img) => img.type === type) : [];
 };
 
 productSchema.methods.isEligibleForDiscount = function () {
@@ -2090,7 +2027,7 @@ productSchema.methods.updateAnalytics = function (field, increment = 1) {
 };
 
 productSchema.methods.getAvailableVariants = function () {
-  return Array.isArray(this.variants) ? this.variants.filter(v => v.inventory > 0) : [];
+  return Array.isArray(this.variants) ? this.variants.filter((v) => v.inventory > 0) : [];
 };
 
 productSchema.methods.isExpired = function () {
@@ -2124,7 +2061,7 @@ productSchema.methods.getBestApplicableDiscount = async function (availableDisco
         bestDiscount = {
           ...discount,
           savingsAmount,
-          finalPrice: basePrice - savingsAmount
+          finalPrice: basePrice - savingsAmount,
         };
       }
     }
@@ -2143,7 +2080,7 @@ productSchema.methods.applyAutomaticDiscounts = async function () {
     automaticDiscounts.push({
       type: 'clearance',
       reason: 'Old inventory clearance',
-      discountPercentage: 20
+      discountPercentage: 20,
     });
   }
 
@@ -2152,7 +2089,7 @@ productSchema.methods.applyAutomaticDiscounts = async function () {
     automaticDiscounts.push({
       type: 'low_stock',
       reason: 'Low stock urgency',
-      discountPercentage: 15
+      discountPercentage: 15,
     });
   }
 
@@ -2162,7 +2099,7 @@ productSchema.methods.applyAutomaticDiscounts = async function () {
     automaticDiscounts.push({
       type: 'slow_moving',
       reason: 'Slow-moving inventory',
-      discountPercentage: 25
+      discountPercentage: 25,
     });
   }
 
@@ -2210,13 +2147,7 @@ productSchema.methods.incrementSold = function (quantity = 1) {
 // Check if discount is active
 productSchema.methods.isDiscountActive = function () {
   const now = new Date();
-  return (
-    this.discount &&
-    this.discountStartDate &&
-    this.discountEndDate &&
-    now >= this.discountStartDate &&
-    now <= this.discountEndDate
-  );
+  return this.discount && this.discountStartDate && this.discountEndDate && now >= this.discountStartDate && now <= this.discountEndDate;
 };
 
 // Get SEO data
@@ -2224,7 +2155,7 @@ productSchema.methods.getSEOData = function () {
   return {
     title: this.metaTitle || this.title,
     description: this.metaDescription || this.shortDescription,
-    tags: this.tags
+    tags: this.tags,
   };
 };
 /* =========================
@@ -2234,9 +2165,7 @@ productSchema.methods.getSEOData = function () {
 // Apply bulk discount based on quantity
 productSchema.methods.getBulkDiscountPrice = function (quantity) {
   if (!this.bulkDiscounts || this.bulkDiscounts.length === 0) return this.calculateFinalPrice();
-  const applicable = this.bulkDiscounts
-    .filter(d => quantity >= d.quantity)
-    .sort((a, b) => b.quantity - a.quantity)[0];
+  const applicable = this.bulkDiscounts.filter((d) => quantity >= d.quantity).sort((a, b) => b.quantity - a.quantity)[0];
   if (applicable) {
     return this.price - applicable.discountAmount;
   }
@@ -2321,7 +2250,7 @@ productSchema.methods.isPreOrderAvailable = function () {
 productSchema.methods.getBundleTotalPrice = async function () {
   if (!this.isPartOfBundle()) return this.calculateFinalPrice();
   const products = await Product.find({
-    _id: { $in: this.bundleContents.map(c => c.product) }
+    _id: { $in: this.bundleContents.map((c) => c.product) },
   });
   return products.reduce((total, p, i) => {
     const qty = this.bundleContents[i].quantity;
@@ -2337,9 +2266,7 @@ productSchema.methods.getFinalPrice = function (quantity = 1) {
     finalPrice = Math.min(finalPrice, this.salePrice);
   }
   if (this.bulkDiscounts && this.bulkDiscounts.length > 0) {
-    const applicable = this.bulkDiscounts
-      .filter(d => quantity >= d.quantity)
-      .sort((a, b) => b.quantity - a.quantity)[0];
+    const applicable = this.bulkDiscounts.filter((d) => quantity >= d.quantity).sort((a, b) => b.quantity - a.quantity)[0];
     if (applicable) {
       finalPrice = this.price - applicable.discountAmount;
     }
@@ -2370,7 +2297,7 @@ productSchema.methods.trackInteraction = async function (type, metadata = {}) {
   const interaction = {
     type, // 'view', 'click', 'add_to_cart', 'purchase', 'share'
     timestamp: new Date(),
-    metadata
+    metadata,
   };
 
   // Update counters
@@ -2405,9 +2332,7 @@ productSchema.methods.trackInteraction = async function (type, metadata = {}) {
 // Get analytics summary
 productSchema.methods.getAnalyticsSummary = function (days = 30) {
   const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const recentInteractions = this.detailedAnalytics?.filter(
-    interaction => new Date(interaction.timestamp) >= cutoffDate
-  ) || [];
+  const recentInteractions = this.detailedAnalytics?.filter((interaction) => new Date(interaction.timestamp) >= cutoffDate) || [];
 
   const summary = recentInteractions.reduce((acc, interaction) => {
     acc[interaction.type] = (acc[interaction.type] || 0) + 1;
@@ -2418,7 +2343,7 @@ productSchema.methods.getAnalyticsSummary = function (days = 30) {
     period: `${days} days`,
     interactions: summary,
     conversionRate: summary.view ? (summary.purchase / summary.view) * 100 : 0,
-    totalInteractions: recentInteractions.length
+    totalInteractions: recentInteractions.length,
   };
 };
 
@@ -2431,7 +2356,7 @@ productSchema.statics.applyBrandDiscount = async function (brandId, discountData
   const products = await this.find({
     brand: brandId,
     isDeleted: false,
-    status: 'active'
+    status: 'active',
   });
 
   const results = [];
@@ -2447,9 +2372,9 @@ productSchema.statics.applyBrandDiscount = async function (brandId, discountData
 
   return {
     totalProcessed: products.length,
-    successful: results.filter(r => r.success).length,
-    failed: results.filter(r => !r.success).length,
-    results
+    successful: results.filter((r) => r.success).length,
+    failed: results.filter((r) => !r.success).length,
+    results,
   };
 };
 // Remove expired discounts
@@ -2458,18 +2383,15 @@ productSchema.statics.removeExpiredDiscounts = async function () {
   return await this.updateMany(
     {
       discountEndDate: { $lt: now },
-      $or: [
-        { discount: { $gt: 0 } },
-        { salePrice: { $exists: true, $ne: null } }
-      ]
+      $or: [{ discount: { $gt: 0 } }, { salePrice: { $exists: true, $ne: null } }],
     },
     {
       $unset: {
-        discount: "",
-        salePrice: "",
-        discountStartDate: "",
-        discountEndDate: ""
-      }
+        discount: '',
+        salePrice: '',
+        discountStartDate: '',
+        discountEndDate: '',
+      },
     }
   );
 };
@@ -2481,11 +2403,7 @@ productSchema.statics.batchStatusUpdate = async function (productIds, status, up
   try {
     const updateObj = { status, updatedAt: new Date(), ...updateData };
 
-    const result = await this.updateMany(
-      { _id: { $in: productIds } },
-      { $set: updateObj },
-      { session }
-    );
+    const result = await this.updateMany({ _id: { $in: productIds } }, { $set: updateObj }, { session });
 
     await session.commitTransaction();
     return result;
@@ -2498,13 +2416,7 @@ productSchema.statics.batchStatusUpdate = async function (productIds, status, up
 };
 // Advanced search with AI-like features
 productSchema.statics.intelligentSearch = async function (query, options = {}) {
-  const {
-    page = 1,
-    limit = 20,
-    sortBy = 'relevance',
-    filters = {},
-    userContext = {}
-  } = options;
+  const { page = 1, limit = 20, sortBy = 'relevance', filters = {}, userContext = {} } = options;
 
   // Build search pipeline
   const pipeline = [];
@@ -2514,15 +2426,15 @@ productSchema.statics.intelligentSearch = async function (query, options = {}) {
     pipeline.push({
       $match: {
         $text: { $search: query },
-        ...filters
-      }
+        ...filters,
+      },
     });
 
     // Add relevance score
     pipeline.push({
       $addFields: {
-        relevanceScore: { $meta: 'textScore' }
-      }
+        relevanceScore: { $meta: 'textScore' },
+      },
     });
   }
 
@@ -2534,10 +2446,10 @@ productSchema.statics.intelligentSearch = async function (query, options = {}) {
           $cond: {
             if: { $in: ['$categories', userContext.preferredCategories || []] },
             then: { $add: ['$relevanceScore', 2] },
-            else: '$relevanceScore'
-          }
-        }
-      }
+            else: '$relevanceScore',
+          },
+        },
+      },
     });
   }
 
@@ -2567,10 +2479,7 @@ productSchema.statics.intelligentSearch = async function (query, options = {}) {
   pipeline.push({ $sort: sortStage });
 
   // Pagination
-  pipeline.push(
-    { $skip: (page - 1) * limit },
-    { $limit: limit }
-  );
+  pipeline.push({ $skip: (page - 1) * limit }, { $limit: limit });
 
   const results = await this.aggregate(pipeline);
   const total = await this.countDocuments({ $text: { $search: query }, ...filters });
@@ -2581,8 +2490,8 @@ productSchema.statics.intelligentSearch = async function (query, options = {}) {
       page,
       limit,
       total,
-      pages: Math.ceil(total / limit)
-    }
+      pages: Math.ceil(total / limit),
+    },
   };
 };
 // Search products by keyword
@@ -2595,7 +2504,7 @@ productSchema.statics.getFeaturedProducts = function (limit = 10) {
 };
 // Get low stock products
 productSchema.statics.getLowStockProducts = function () {
-  return this.find({ $expr: { $lte: ["$currentStockLevel", "$lowStockLevel"] } });
+  return this.find({ $expr: { $lte: ['$currentStockLevel', '$lowStockLevel'] } });
 };
 // Get out of stock products
 productSchema.statics.getOutOfStockProducts = function () {
@@ -2622,28 +2531,19 @@ productSchema.statics.getMostViewed = function (limit = 10) {
   return this.find({}).sort({ views: -1 }).limit(limit);
 };
 // Paginated product list with filters
-productSchema.statics.getPaginatedProducts = async function ({
-  page = 1,
-  limit = 10,
-  filters = {},
-  populateOptions,
-  sort = { createdAt: -1 }
-}) {
+productSchema.statics.getPaginatedProducts = async function ({ page = 1, limit = 10, filters = {}, populateOptions, sort = { createdAt: -1 } }) {
   const skip = (page - 1) * limit;
   const query = { ...filters, deletedAt: { $exists: false } }; // Added deletedAt filter
-  const [results, total] = await Promise.all([
-    this.find(query).sort(sort).skip(skip).limit(limit).populate(populateOptions),
-    this.countDocuments(query)
-  ]);
+  const [results, total] = await Promise.all([this.find(query).sort(sort).skip(skip).limit(limit).populate(populateOptions), this.countDocuments(query)]);
   return { results, total, page, pages: Math.ceil(total / limit) };
 };
 // Update stock in bulk
 productSchema.statics.bulkUpdateStock = function (updates) {
-  const bulkOps = updates.map(u => ({
+  const bulkOps = updates.map((u) => ({
     updateOne: {
       filter: { _id: u.id },
-      update: { $set: { stock: u.stock, currentStockLevel: u.stock } }
-    }
+      update: { $set: { stock: u.stock, currentStockLevel: u.stock } },
+    },
   }));
   return this.bulkWrite(bulkOps);
 };
@@ -2653,7 +2553,7 @@ productSchema.statics.getActiveDiscountProducts = function () {
   return this.find({
     discount: { $gt: 0 },
     discountStartDate: { $lte: now },
-    discountEndDate: { $gte: now }
+    discountEndDate: { $gte: now },
   });
 };
 productSchema.statics.getProductsByTag = function (tags, limit = 20) {
@@ -2662,23 +2562,22 @@ productSchema.statics.getProductsByTag = function (tags, limit = 20) {
 productSchema.statics.getNewArrivals = function (days = 30, limit = 10) {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return this.find({ createdAt: { $gte: date }, status: 'active' }).sort({ createdAt: -1 }).limit(limit);
+  return this.find({ createdAt: { $gte: date }, status: 'active' })
+    .sort({ createdAt: -1 })
+    .limit(limit);
 };
 productSchema.statics.getProductsByPriceRange = function (minPrice, maxPrice, limit = 20) {
   return this.find({
     price: { $gte: minPrice, $lte: maxPrice },
-    status: 'active'
+    status: 'active',
   }).limit(limit);
 };
 productSchema.statics.archiveOldProducts = function (beforeDate) {
-  return this.updateMany(
-    { createdAt: { $lt: beforeDate }, status: { $ne: 'archived' } },
-    { $set: { status: 'archived' } }
-  );
+  return this.updateMany({ createdAt: { $lt: beforeDate }, status: { $ne: 'archived' } }, { $set: { status: 'archived' } });
 };
 productSchema.statics.getAverageRatingByCategory = async function (categoryId) {
   const products = await this.find({ categories: categoryId }).populate('reviews');
-  const ratings = products.map(p => p.ratingStatistics.averageRating).filter(r => r > 0);
+  const ratings = products.map((p) => p.ratingStatistics.averageRating).filter((r) => r > 0);
   return ratings.length > 0 ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length : 0;
 };
 // Apply category-wide discount
@@ -2703,18 +2602,15 @@ productSchema.statics.removeExpiredDiscounts = async function () {
   return await this.updateMany(
     {
       discountEndDate: { $lt: now },
-      $or: [
-        { discount: { $gt: 0 } },
-        { salePrice: { $exists: true, $ne: null } }
-      ]
+      $or: [{ discount: { $gt: 0 } }, { salePrice: { $exists: true, $ne: null } }],
     },
     {
       $unset: {
-        discount: "",
-        salePrice: "",
-        discountStartDate: "",
-        discountEndDate: ""
-      }
+        discount: '',
+        salePrice: '',
+        discountStartDate: '',
+        discountEndDate: '',
+      },
     }
   );
 };
@@ -2727,15 +2623,15 @@ productSchema.statics.generateSchemaReport = function () {
     enum: field.enumValues || null,
     ref: field.options.ref || null,
     min: field.options.min || null,
-    unique: field.options.unique || false
+    unique: field.options.unique || false,
   }));
 
   const instanceMethods = Object.keys(this.schema.methods);
   const staticMethods = Object.keys(this.schema.statics);
   const virtuals = Object.keys(this.schema.virtuals);
-  const indexes = this.schema.indexes().map(index => ({
+  const indexes = this.schema.indexes().map((index) => ({
     fields: Object.keys(index[0]),
-    options: index[1]
+    options: index[1],
   }));
 
   return {
@@ -2752,11 +2648,11 @@ productSchema.statics.generateSchemaReport = function () {
     indexes,
     timestamps: this.schema.options.timestamps || false,
     middleware: {
-      preSave: !!this.schema.pre('save')
-    }
+      preSave: !!this.schema.pre('save'),
+    },
   };
 };
-productSchema.statics.advancedFilter = async function (queryParams = {}) {
+(productSchema.statics.advancedFilter = async function (queryParams = {}) {
   try {
     const params = this._validateAndSanitizeParams(queryParams);
     const pipeline = this._buildAdvancedPipeline(params);
@@ -2771,39 +2667,13 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
   } catch (error) {
     throw new Error(`Advanced filtering failed: ${error.message}`);
   }
-},
-  productSchema.statics.generateDatabaseStatistics = async function () {
-    const [
-      totalProducts,
-      statusCounts,
-      productTypeCounts,
-      availabilityCounts,
-      priceStats,
-      stockStats,
-      discountStats,
-      reviewStats,
-      categoryStats,
-      tagStats,
-      bundleStats,
-      featuredStats,
-      ecoFriendlyStats,
-      giftCardStats,
-      preOrderStats,
-      subscriptionStats
-    ] = await Promise.all([
+}),
+  (productSchema.statics.generateDatabaseStatistics = async function () {
+    const [totalProducts, statusCounts, productTypeCounts, availabilityCounts, priceStats, stockStats, discountStats, reviewStats, categoryStats, tagStats, bundleStats, featuredStats, ecoFriendlyStats, giftCardStats, preOrderStats, subscriptionStats] = await Promise.all([
       this.countDocuments({ deletedAt: { $exists: false } }),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        { $group: { _id: '$status', count: { $sum: 1 } } }
-      ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        { $group: { _id: '$productType', count: { $sum: 1 } } }
-      ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        { $group: { _id: '$availability', count: { $sum: 1 } } }
-      ]),
+      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$productType', count: { $sum: 1 } } }]),
+      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$availability', count: { $sum: 1 } } }]),
       this.aggregate([
         { $match: { deletedAt: { $exists: false } } },
         {
@@ -2812,9 +2682,9 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
             avgPrice: { $avg: '$price' },
             minPrice: { $min: '$price' },
             maxPrice: { $max: '$price' },
-            totalPrice: { $sum: '$price' }
-          }
-        }
+            totalPrice: { $sum: '$price' },
+          },
+        },
       ]),
       this.aggregate([
         { $match: { deletedAt: { $exists: false }, trackInventory: 'yes' } },
@@ -2826,9 +2696,9 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
             minStock: { $min: '$stock' },
             maxStock: { $max: '$stock' },
             lowStockCount: { $sum: { $cond: [{ $lte: ['$currentStockLevel', '$lowStockLevel'] }, 1, 0] } },
-            outOfStockCount: { $sum: { $cond: [{ $eq: ['$isAvailable', false] }, 1, 0] } }
-          }
-        }
+            outOfStockCount: { $sum: { $cond: [{ $eq: ['$isAvailable', false] }, 1, 0] } },
+          },
+        },
       ]),
       this.aggregate([
         { $match: { deletedAt: { $exists: false }, discount: { $gt: 0 }, discountStartDate: { $lte: new Date() }, discountEndDate: { $gte: new Date() } } },
@@ -2838,9 +2708,9 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
             discountedProducts: { $sum: 1 },
             avgDiscount: { $avg: '$discount' },
             maxDiscount: { $max: '$discount' },
-            totalDiscountedValue: { $sum: { $multiply: ['$price', '$discount', 0.01] } }
-          }
-        }
+            totalDiscountedValue: { $sum: { $multiply: ['$price', '$discount', 0.01] } },
+          },
+        },
       ]),
       this.aggregate([
         { $match: { deletedAt: { $exists: false } } },
@@ -2849,28 +2719,18 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
           $group: {
             _id: null,
             totalReviews: { $sum: { $size: '$reviewsData' } },
-            avgRating: { $avg: { $avg: '$reviewsData.rating' } }
-          }
-        }
+            avgRating: { $avg: { $avg: '$reviewsData.rating' } },
+          },
+        },
       ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        { $unwind: '$categories' },
-        { $group: { _id: '$categories', count: { $sum: 1 } } },
-        { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'categoryData' } },
-        { $project: { _id: 0, categoryId: '$_id', categoryName: { $arrayElemAt: ['$categoryData.name', 0] }, count: 1 } }
-      ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        { $unwind: '$tags' },
-        { $group: { _id: '$tags', count: { $sum: 1 } } }
-      ]),
+      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $unwind: '$categories' }, { $group: { _id: '$categories', count: { $sum: 1 } } }, { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'categoryData' } }, { $project: { _id: 0, categoryId: '$_id', categoryName: { $arrayElemAt: ['$categoryData.name', 0] }, count: 1 } }]),
+      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $unwind: '$tags' }, { $group: { _id: '$tags', count: { $sum: 1 } } }]),
       this.countDocuments({ productBundle: true, deletedAt: { $exists: false } }),
       this.countDocuments({ isFeatured: true, deletedAt: { $exists: false } }),
       this.countDocuments({ ecoFriendly: true, deletedAt: { $exists: false } }),
       this.countDocuments({ isGiftCard: true, deletedAt: { $exists: false } }),
       this.countDocuments({ preOrder: true, deletedAt: { $exists: false } }),
-      this.countDocuments({ isSubscription: true, deletedAt: { $exists: false } })
+      this.countDocuments({ isSubscription: true, deletedAt: { $exists: false } }),
     ]);
 
     return {
@@ -2878,30 +2738,38 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
       statusDistribution: statusCounts.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
       productTypeDistribution: productTypeCounts.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
       availabilityDistribution: availabilityCounts.reduce((acc, a) => ({ ...acc, [a._id]: a.count }), {}),
-      priceStatistics: priceStats[0] ? {
-        averagePrice: priceStats[0].avgPrice,
-        minPrice: priceStats[0].minPrice,
-        maxPrice: priceStats[0].maxPrice,
-        totalPrice: priceStats[0].totalPrice
-      } : { averagePrice: 0, minPrice: 0, maxPrice: 0, totalPrice: 0 },
-      stockStatistics: stockStats[0] ? {
-        totalStock: stockStats[0].totalStock,
-        averageStock: stockStats[0].avgStock,
-        minStock: stockStats[0].minStock,
-        maxStock: stockStats[0].maxStock,
-        lowStockCount: stockStats[0].lowStockCount,
-        outOfStockCount: stockStats[0].outOfStockCount
-      } : { totalStock: 0, averageStock: 0, minStock: 0, maxStock: 0, lowStockCount: 0, outOfStockCount: 0 },
-      discountStatistics: discountStats[0] ? {
-        discountedProducts: discountStats[0].discountedProducts,
-        averageDiscount: discountStats[0].avgDiscount,
-        maxDiscount: discountStats[0].maxDiscount,
-        totalDiscountedValue: discountStats[0].totalDiscountedValue
-      } : { discountedProducts: 0, averageDiscount: 0, maxDiscount: 0, totalDiscountedValue: 0 },
-      reviewStatistics: reviewStats[0] ? {
-        totalReviews: reviewStats[0].totalReviews,
-        averageRating: reviewStats[0].avgRating || 0
-      } : { totalReviews: 0, averageRating: 0 },
+      priceStatistics: priceStats[0]
+        ? {
+            averagePrice: priceStats[0].avgPrice,
+            minPrice: priceStats[0].minPrice,
+            maxPrice: priceStats[0].maxPrice,
+            totalPrice: priceStats[0].totalPrice,
+          }
+        : { averagePrice: 0, minPrice: 0, maxPrice: 0, totalPrice: 0 },
+      stockStatistics: stockStats[0]
+        ? {
+            totalStock: stockStats[0].totalStock,
+            averageStock: stockStats[0].avgStock,
+            minStock: stockStats[0].minStock,
+            maxStock: stockStats[0].maxStock,
+            lowStockCount: stockStats[0].lowStockCount,
+            outOfStockCount: stockStats[0].outOfStockCount,
+          }
+        : { totalStock: 0, averageStock: 0, minStock: 0, maxStock: 0, lowStockCount: 0, outOfStockCount: 0 },
+      discountStatistics: discountStats[0]
+        ? {
+            discountedProducts: discountStats[0].discountedProducts,
+            averageDiscount: discountStats[0].avgDiscount,
+            maxDiscount: discountStats[0].maxDiscount,
+            totalDiscountedValue: discountStats[0].totalDiscountedValue,
+          }
+        : { discountedProducts: 0, averageDiscount: 0, maxDiscount: 0, totalDiscountedValue: 0 },
+      reviewStatistics: reviewStats[0]
+        ? {
+            totalReviews: reviewStats[0].totalReviews,
+            averageRating: reviewStats[0].avgRating || 0,
+          }
+        : { totalReviews: 0, averageRating: 0 },
       categoryDistribution: categoryStats,
       tagDistribution: tagStats.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
       bundleStatistics: { bundleProducts: bundleStats },
@@ -2909,9 +2777,9 @@ productSchema.statics.advancedFilter = async function (queryParams = {}) {
       ecoFriendlyStatistics: { ecoFriendlyProducts: ecoFriendlyStats },
       giftCardStatistics: { giftCardProducts: giftCardStats },
       preOrderStatistics: { preOrderProducts: preOrderStats },
-      subscriptionStatistics: { subscriptionProducts: subscriptionStats }
+      subscriptionStatistics: { subscriptionProducts: subscriptionStats },
     };
-  };
+  });
 
 productSchema.static._validateAndSanitizeParams = async function (params) {
   const {
@@ -2940,7 +2808,7 @@ productSchema.static._validateAndSanitizeParams = async function (params) {
     // Performance options
     lean = true,
     explain = false,
-    timeout = 30000
+    timeout = 30000,
   } = params;
 
   // Validate and sanitize pagination
@@ -2948,14 +2816,7 @@ productSchema.static._validateAndSanitizeParams = async function (params) {
   const validatedLimit = Math.max(1, Math.min(parseInt(limit) || 20, 1000));
 
   // Validate sort fields
-  const allowedSortFields = [
-    'title', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice',
-    'createdAt', 'updatedAt', 'publishDate', 'lastRestocked',
-    'soldCount', 'views', 'total_view', 'inventory',
-    'reviews.averageRating', 'reviews.totalReviews',
-    'analytics.views', 'analytics.clicks', 'analytics.conversions',
-    'discountValue', 'loyaltyPoints'
-  ];
+  const allowedSortFields = ['title', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice', 'createdAt', 'updatedAt', 'publishDate', 'lastRestocked', 'soldCount', 'views', 'total_view', 'inventory', 'reviews.averageRating', 'reviews.totalReviews', 'analytics.views', 'analytics.clicks', 'analytics.conversions', 'discountValue', 'loyaltyPoints'];
 
   const validatedSort = this._parseSort(sort, allowedSortFields);
 
@@ -2984,9 +2845,9 @@ productSchema.static._validateAndSanitizeParams = async function (params) {
     includeStats: Boolean(includeStats),
     lean: Boolean(lean),
     explain: Boolean(explain),
-    timeout: Math.min(parseInt(timeout) || 30000, 60000)
+    timeout: Math.min(parseInt(timeout) || 30000, 60000),
   };
-}
+};
 productSchema.static._parseSort = async function (sortParam, allowedFields) {
   if (!sortParam) return { createdAt: -1 };
 
@@ -3012,10 +2873,8 @@ productSchema.static._parseSort = async function (sortParam, allowedFields) {
   }
 
   return Object.keys(sortObj).length > 0 ? sortObj : { createdAt: -1 };
-}
+};
 productSchema.static._validateSearchFields = async function (fields) {
-
-
   // const allowedSearchFields = [
   //   'title', 'shortDescription', 'descriptions', 'tags', 'sku',
   //   'brand', 'manufacturer', 'model', 'features', 'overview',
@@ -3029,10 +2888,10 @@ productSchema.static._validateSearchFields = async function (fields) {
 
   const fieldArray = Array.isArray(fields) ? fields : fields.split(',');
   return fieldArray
-    .map(f => f.trim())
-    .filter(f => DEFAULT_SEARCH_FIELDS.includes(f))
+    .map((f) => f.trim())
+    .filter((f) => DEFAULT_SEARCH_FIELDS.includes(f))
     .slice(0, 10); // Limit to 10 search fields
-}
+};
 productSchema.static._validateFilters = async function (filters, includeInactive) {
   if (!filters || typeof filters !== 'object') return {};
 
@@ -3047,21 +2906,22 @@ productSchema.static._validateFilters = async function (filters, includeInactive
   // Filter validation map
   const filterValidators = {
     // Basic text fields
-    status: (val) => ['active', 'inactive', 'draft', 'pending', 'archived', 'published'].includes(val) ? val : null,
-    productType: (val) => ['physical', 'digital', 'service'].includes(val) ? val : null,
-    visibility: (val) => ['public', 'private', 'password'].includes(val) ? val : null,
-    availability: (val) => typeof val === 'string' ? val : null,
+    status: (val) => (['active', 'inactive', 'draft', 'pending', 'archived', 'published'].includes(val) ? val : null),
+    productType: (val) => (['physical', 'digital', 'service'].includes(val) ? val : null),
+    visibility: (val) => (['public', 'private', 'password'].includes(val) ? val : null),
+    availability: (val) => (typeof val === 'string' ? val : null),
 
     // ObjectId references
-    category: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
-    brand: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
-    created_by: (val) => mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null,
+    category: (val) => (mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null),
+    brand: (val) => (mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null),
+    created_by: (val) => (mongoose.isValidObjectId(val) ? new mongoose.Types.ObjectId(val) : null),
 
     // Categories array
     categories: (val) => {
       const ids = Array.isArray(val) ? val : [val];
-      const validIds = ids.filter(id => mongoose.isValidObjectId(id))
-        .map(id => new mongoose.Types.ObjectId(id))
+      const validIds = ids
+        .filter((id) => mongoose.isValidObjectId(id))
+        .map((id) => new mongoose.Types.ObjectId(id))
         .slice(0, 50);
       return validIds.length ? { $in: validIds } : null;
     },
@@ -3075,24 +2935,24 @@ productSchema.static._validateFilters = async function (filters, includeInactive
     discountValue: (val) => this._parseRange(val),
 
     // Boolean filters
-    isFeatured: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    trending: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    newArrival: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    bestseller: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    onSale: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    isAvailable: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    ecoFriendly: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    limitedEdition: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    preOrder: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    backorder: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    discontinued: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    isGiftCard: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    productBundle: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    giftWrappingAvailable: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    isSubscription: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    virtualProduct: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    virtualTryOnEnabled: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
-    augmentedRealityEnabled: (val) => typeof val === 'boolean' ? val : (val === 'true' ? true : (val === 'false' ? false : null)),
+    isFeatured: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    trending: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    newArrival: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    bestseller: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    onSale: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    isAvailable: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    ecoFriendly: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    limitedEdition: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    preOrder: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    backorder: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    discontinued: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    isGiftCard: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    productBundle: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    giftWrappingAvailable: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    isSubscription: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    virtualProduct: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    virtualTryOnEnabled: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
+    augmentedRealityEnabled: (val) => (typeof val === 'boolean' ? val : val === 'true' ? true : val === 'false' ? false : null),
 
     // Numeric range filters
     inventory: (val) => this._parseRange(val),
@@ -3133,18 +2993,18 @@ productSchema.static._validateFilters = async function (filters, includeInactive
     },
 
     // String filters with exact/partial matching
-    vendor: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
-    manufacturer: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
-    model: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
-    material: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
-    color: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
-    size: (val) => typeof val === 'string' ? new RegExp(val.trim(), 'i') : null,
-    ageGroup: (val) => typeof val === 'string' ? val.trim() : null,
-    gender: (val) => typeof val === 'string' ? val.trim() : null,
-    season: (val) => typeof val === 'string' ? val.trim() : null,
-    occasion: (val) => typeof val === 'string' ? val.trim() : null,
-    style: (val) => typeof val === 'string' ? val.trim() : null,
-    pattern: (val) => typeof val === 'string' ? val.trim() : null,
+    vendor: (val) => (typeof val === 'string' ? new RegExp(val.trim(), 'i') : null),
+    manufacturer: (val) => (typeof val === 'string' ? new RegExp(val.trim(), 'i') : null),
+    model: (val) => (typeof val === 'string' ? new RegExp(val.trim(), 'i') : null),
+    material: (val) => (typeof val === 'string' ? new RegExp(val.trim(), 'i') : null),
+    color: (val) => (typeof val === 'string' ? new RegExp(val.trim(), 'i') : null),
+    size: (val) => (typeof val === 'string' ? new RegExp(val.trim(), 'i') : null),
+    ageGroup: (val) => (typeof val === 'string' ? val.trim() : null),
+    gender: (val) => (typeof val === 'string' ? val.trim() : null),
+    season: (val) => (typeof val === 'string' ? val.trim() : null),
+    occasion: (val) => (typeof val === 'string' ? val.trim() : null),
+    style: (val) => (typeof val === 'string' ? val.trim() : null),
+    pattern: (val) => (typeof val === 'string' ? val.trim() : null),
 
     // Date filters
     createdAt: (val) => this._parseDateRange(val),
@@ -3178,7 +3038,7 @@ productSchema.static._validateFilters = async function (filters, includeInactive
         }
       }
       return Object.keys(specFilters).length ? specFilters : null;
-    }
+    },
   };
 
   // Apply filters
@@ -3196,7 +3056,7 @@ productSchema.static._validateFilters = async function (filters, includeInactive
   }
 
   return validatedFilters;
-}
+};
 productSchema.static._parseRange = async function (value, min = 0, max = Number.MAX_SAFE_INTEGER) {
   if (!value) return null;
 
@@ -3214,7 +3074,7 @@ productSchema.static._parseRange = async function (value, min = 0, max = Number.
   }
 
   return Object.keys(range).length > 0 ? range : null;
-}
+};
 productSchema.static._parseDateRange = async function (value) {
   if (!value) return null;
 
@@ -3236,18 +3096,11 @@ productSchema.static._parseDateRange = async function (value) {
   }
 
   return Object.keys(range).length > 0 ? range : null;
-}
+};
 productSchema.static._validateProjection = async function (projection) {
   if (!projection) return null;
 
-  const allowedFields = [
-    '_id', 'title', 'sku', 'productType', 'category', 'subcategory',
-    'vendor', 'manufacturer', 'model', 'shortDescription', 'material',
-    'color', 'size', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice',
-    'discount', 'discountType', 'discountValue', 'inventory', 'mainImage',
-    'images', 'status', 'isAvailable', 'isFeatured', 'trending', 'newArrival',
-    'bestseller', 'onSale', 'reviews', 'tags', 'brand', 'createdAt', 'updatedAt'
-  ];
+  const allowedFields = ['_id', 'title', 'sku', 'productType', 'category', 'subcategory', 'vendor', 'manufacturer', 'model', 'shortDescription', 'material', 'color', 'size', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice', 'discount', 'discountType', 'discountValue', 'inventory', 'mainImage', 'images', 'status', 'isAvailable', 'isFeatured', 'trending', 'newArrival', 'bestseller', 'onSale', 'reviews', 'tags', 'brand', 'createdAt', 'updatedAt'];
 
   const projectionObj = {};
   const fields = typeof projection === 'string' ? projection.split(',') : [];
@@ -3260,13 +3113,9 @@ productSchema.static._validateProjection = async function (projection) {
   }
 
   return Object.keys(projectionObj).length > 0 ? projectionObj : null;
-}
+};
 productSchema.static._buildAdvancedPipeline = async function (params) {
-
-  const {
-    page, limit, sort, search, searchFields, searchMode, filters,
-    facets, aggregations, projection, includeStats, explain
-  } = params;
+  const { page, limit, sort, search, searchFields, searchMode, filters, facets, aggregations, projection, includeStats, explain } = params;
 
   const pipeline = [];
 
@@ -3292,18 +3141,18 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
         localField: 'category',
         foreignField: '_id',
         as: 'categoryInfo',
-        pipeline: [{ $project: { name: 1, slug: 1, image: 1 } }]
-      }
+        pipeline: [{ $project: { name: 1, slug: 1, image: 1 } }],
+      },
     },
-    // Brand lookup  
+    // Brand lookup
     {
       $lookup: {
         from: 'brands',
         localField: 'brand',
         foreignField: '_id',
         as: 'brandInfo',
-        pipeline: [{ $project: { name: 1, logo: 1, slug: 1 } }]
-      }
+        pipeline: [{ $project: { name: 1, logo: 1, slug: 1 } }],
+      },
     }
   );
 
@@ -3314,27 +3163,24 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
         $cond: {
           if: { $and: [{ $ne: ['$salePrice', null] }, { $gt: ['$salePrice', 0] }] },
           then: '$salePrice',
-          else: '$basePrice'
-        }
+          else: '$basePrice',
+        },
       },
       hasDiscount: {
         $cond: {
           if: { $and: [{ $ne: ['$salePrice', null] }, { $lt: ['$salePrice', '$basePrice'] }] },
           then: true,
-          else: false
-        }
+          else: false,
+        },
       },
       discountPercentage: {
         $cond: {
           if: { $and: [{ $ne: ['$salePrice', null] }, { $lt: ['$salePrice', '$basePrice'] }] },
           then: {
-            $round: [
-              { $multiply: [{ $divide: [{ $subtract: ['$basePrice', '$salePrice'] }, '$basePrice'] }, 100] },
-              2
-            ]
+            $round: [{ $multiply: [{ $divide: [{ $subtract: ['$basePrice', '$salePrice'] }, '$basePrice'] }, 100] }, 2],
           },
-          else: 0
-        }
+          else: 0,
+        },
       },
       stockStatus: {
         $cond: {
@@ -3344,28 +3190,23 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
             $cond: {
               if: { $lte: ['$inventory', '$lowStockThreshold'] },
               then: 'low-stock',
-              else: 'in-stock'
-            }
-          }
-        }
+              else: 'in-stock',
+            },
+          },
+        },
       },
       categoryName: { $arrayElemAt: ['$categoryInfo.name', 0] },
-      brandName: { $arrayElemAt: ['$brandInfo.name', 0] }
-    }
+      brandName: { $arrayElemAt: ['$brandInfo.name', 0] },
+    },
   });
 
   // 5. Faceted aggregation using $facet
   const facetStages = {
     // Main data with pagination
-    data: [
-      ...(projection ? [{ $project: projection }] : []),
-      { $sort: sort },
-      { $skip: (page - 1) * limit },
-      { $limit: limit }
-    ],
+    data: [...(projection ? [{ $project: projection }] : []), { $sort: sort }, { $skip: (page - 1) * limit }, { $limit: limit }],
 
     // Total count
-    totalCount: [{ $count: 'count' }]
+    totalCount: [{ $count: 'count' }],
   };
 
   // Add facets if requested
@@ -3381,11 +3222,11 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
                 then: {
                   _id: '$category',
                   name: { $arrayElemAt: ['$categoryInfo.name', 0] },
-                  count: 1
+                  count: 1,
                 },
-                else: '$$REMOVE'
-              }
-            }
+                else: '$$REMOVE',
+              },
+            },
           },
           brands: {
             $addToSet: {
@@ -3394,27 +3235,27 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
                 then: {
                   _id: '$brand',
                   name: { $arrayElemAt: ['$brandInfo.name', 0] },
-                  count: 1
+                  count: 1,
                 },
-                else: '$$REMOVE'
-              }
-            }
+                else: '$$REMOVE',
+              },
+            },
           },
           priceRange: {
             $push: {
               min: { $min: '$basePrice' },
               max: { $max: '$basePrice' },
-              avg: { $avg: '$basePrice' }
-            }
+              avg: { $avg: '$basePrice' },
+            },
           },
           productTypes: { $addToSet: '$productType' },
           avgRating: { $avg: '$reviews.averageRating' },
           totalProducts: { $sum: 1 },
           inStock: { $sum: { $cond: [{ $gt: ['$inventory', 0] }, 1, 0] } },
           onSale: { $sum: { $cond: ['$onSale', 1, 0] } },
-          featured: { $sum: { $cond: ['$isFeatured', 1, 0] } }
-        }
-      }
+          featured: { $sum: { $cond: ['$isFeatured', 1, 0] } },
+        },
+      },
     ];
   }
 
@@ -3434,11 +3275,11 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
             $cond: {
               if: { $gt: ['$views', 0] },
               then: { $divide: ['$soldCount', '$views'] },
-              else: 0
-            }
-          }
-        }
-      }
+              else: 0,
+            },
+          },
+        },
+      },
     ];
   }
 
@@ -3450,20 +3291,20 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
           _id: '$status',
           count: { $sum: 1 },
           avgPrice: { $avg: '$basePrice' },
-          totalInventory: { $sum: '$inventory' }
-        }
-      }
+          totalInventory: { $sum: '$inventory' },
+        },
+      },
     ];
   }
 
   pipeline.push({ $facet: facetStages });
 
   return pipeline;
-}
+};
 productSchema.static._buildSearchStage = async function (search, searchFields, searchMode) {
   const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
-  const searchConditions = searchFields.map(field => {
+  const searchConditions = searchFields.map((field) => {
     if (field === 'descriptions') {
       return { 'descriptions.content': searchRegex };
     } else if (field.includes('.')) {
@@ -3476,24 +3317,24 @@ productSchema.static._buildSearchStage = async function (search, searchFields, s
   if (searchMode === 'exact') {
     return {
       $match: {
-        $or: searchFields.map(field => ({ [field]: search }))
-      }
+        $or: searchFields.map((field) => ({ [field]: search })),
+      },
     };
   } else if (searchMode === 'fuzzy') {
     return {
       $match: {
-        $or: searchConditions
-      }
+        $or: searchConditions,
+      },
     };
   } else {
     // Default partial matching
     return {
       $match: {
-        $or: searchConditions
-      }
+        $or: searchConditions,
+      },
     };
   }
-}
+};
 productSchema.statics._formatFilterResults = async function (result, params) {
   const data = result?.data || [];
   const totalCount = result?.totalCount?.[0]?.count || 0;
@@ -3516,22 +3357,22 @@ productSchema.statics._formatFilterResults = async function (result, params) {
       hasNextPage,
       hasPrevPage,
       nextPage: hasNextPage ? params.page + 1 : null,
-      prevPage: hasPrevPage ? params.page - 1 : null
+      prevPage: hasPrevPage ? params.page - 1 : null,
     },
     filters: params.filters,
     sort: params.sort,
     search: params.search,
     ...(facets && { facets }),
     ...(aggregations && { aggregations }),
-    ...(stats && { stats })
+    ...(stats && { stats }),
   };
-}
+};
 
 productSchema.statics.getCompleteProductDashboardStatistics = async function () {
   try {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
     const [
-      // Basic Counts & Flags
       totalProducts,
       activeProducts,
       deletedProducts,
@@ -3542,198 +3383,52 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       newArrivals,
       bestsellers,
       productsOnSale,
-
-      // Inventory Stats
-      inventoryValue,
-      inventoryUnits,
       outOfStockCount,
       lowStockCount,
       healthyStockCount,
       autoRestockCount,
-      avgInventory,
-      inventoryByLocation,
-
-      // Sales & Revenue Stats
-      totalRevenue,
-      totalUnitsSold,
-      avgSellingPrice,
       productsWithSales,
       productsWithoutSales,
-      topRevenueProducts,
-      revenueByCategory,
-      revenueByBrand,
-
-      // Pricing Stats
-      avgBasePrice,
-      highestPricedProduct,
-      lowestPricedProduct,
-      priceDistribution,
       productsWithDiscounts,
-      avgDiscountValue,
-      profitMarginAnalysis,
-
-      // Engagement Stats
-      totalViews,
-      avgViews,
-      mostViewedProducts,
       productsWithReviews,
-      totalReviews,
-      avgRating,
-      conversionRate,
-      ratingDistribution,
-
-      // Attribute Statistics
-      productsByType,
-      productsByGender,
-      productsByAgeGroup,
-      productsBySeason,
-      productsByColor,
-      productsBySize,
       ecoFriendlyCount,
-
-      // Enhanced Top Products & Distributions
-      topProductByCategory,
-      topProductByBrand,
-      stockDistribution,
-      topSellingProducts,
-      topDiscountedProducts,
-      topDiscountedProductsCount,
-      recentlyAddedProducts,
       lowStockProductsCount,
-      topRatedProducts,
-      mostViewedProductsEnhanced,
-      thisMonthProducts
-
+      thisMonthProducts,
     ] = await Promise.all([
-
-      // Counts and flags
-      Product.countDocuments({}),
-      Product.countDocuments({ status: 'active', isDeleted: false }),
+      Product.countDocuments({}), // Total products
+      Product.countDocuments({ status: "active", isDeleted: false }),
       Product.countDocuments({ isDeleted: true }),
-      Product.countDocuments({ status: 'draft' }),
-      Product.countDocuments({ status: 'published' }),
+      Product.countDocuments({ status: "draft" }),
+      Product.countDocuments({ status: "published" }),
       Product.countDocuments({ isFeatured: true }),
       Product.countDocuments({ trending: true }),
       Product.countDocuments({ newArrival: true }),
       Product.countDocuments({ bestseller: true }),
       Product.countDocuments({ onSale: true }),
 
-      // Inventory aggregations
-      Product.aggregate([{ $group: { _id: null, total: { $sum: { $multiply: ['$basePrice', '$inventory'] } } } }]),
-      Product.aggregate([{ $group: { _id: null, total: { $sum: '$inventory' } } }]),
+      // Inventory-related counts
       Product.countDocuments({ inventory: 0, isDeleted: false }),
-      Product.countDocuments({ $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] }, isDeleted: false }),
-      Product.countDocuments({ $expr: { $gte: ['$inventory', '$lowStockThreshold'] }, isDeleted: false }),
+      Product.countDocuments({
+        $expr: { $and: [{ $lt: ["$inventory", "$lowStockThreshold"] }, { $gt: ["$inventory", 0] }] },
+        isDeleted: false,
+      }),
+      Product.countDocuments({ $expr: { $gte: ["$inventory", "$lowStockThreshold"] }, isDeleted: false }),
       Product.countDocuments({ autoRestockEnabled: true }),
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$inventory' } } }]),
-      Product.aggregate([{ $match: { stockLocation: { $ne: null }, isDeleted: false } }, { $group: { _id: '$stockLocation', count: { $sum: 1 } } }]),
 
-      // Sales & revenue
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: { $multiply: ['$basePrice', '$soldCount'] } } } }]),
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$soldCount' } } }]),
-      Product.aggregate([{ $match: { soldCount: { $gt: 0 }, isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$basePrice' } } }]),
+      // Sales and discount-related counts
       Product.countDocuments({ soldCount: { $gt: 0 }, isDeleted: false }),
       Product.countDocuments({ soldCount: 0, isDeleted: false }),
-      Product.aggregate([
-        { $match: { isDeleted: false } },
-        { $addFields: { revenue: { $multiply: ['$basePrice', '$soldCount'] } } },
-        { $sort: { revenue: -1 } },
-        { $limit: 10 },
-        { $project: { title: 1, mainImage: 1 } }
-      ]),
-      Product.aggregate([
-        { $match: { isDeleted: false } },
-        { $lookup: { from: 'categories', localField: 'category', foreignField: '_id', as: 'categoryData' } },
-        { $unwind: '$categoryData' },
-        { $group: { _id: '$categoryData.name', count: { $sum: 1 } } }
-      ]),
-      Product.aggregate([
-        { $match: { isDeleted: false } },
-        { $lookup: { from: 'brands', localField: 'brand', foreignField: '_id', as: 'brandData' } },
-        { $unwind: '$brandData' },
-        { $group: { _id: '$brandData.name', count: { $sum: 1 } } }
-      ]),
+      Product.countDocuments({ discountType: { $ne: "none" }, isDeleted: false }),
 
-      // Pricing stats
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$basePrice' } } }]),
-      Product.findOne({ isDeleted: false }).sort({ basePrice: -1 }).select('title _id mainImage'),
-      Product.findOne({ isDeleted: false }).sort({ basePrice: 1 }).select('title _id mainImage'),
-      Product.aggregate([{ $match: { isDeleted: false } }, { $bucket: { groupBy: '$basePrice', boundaries: [0, 50, 100, 250, 500, 1000, 5000], default: '5000+', output: { count: { $sum: 1 } } } }]),
-      Product.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
-      Product.aggregate([{ $match: { discountType: { $ne: 'none' }, isDeleted: false } }, { $group: { _id: null, avgDiscount: { $avg: '$discountValue' } } }]),
-      Product.aggregate([{ $match: { costPrice: { $gt: 0 }, basePrice: { $gt: 0 }, isDeleted: false } }, { $addFields: { profitMargin: { $multiply: [{ $divide: [{ $subtract: ['$basePrice', '$costPrice'] }, '$basePrice'] }, 100] } } }, { $group: { _id: null, avgMargin: { $avg: '$profitMargin' }, minMargin: { $min: '$profitMargin' }, maxMargin: { $max: '$profitMargin' }, productsWithMargin: { $sum: 1 } } }]),
-
-      // Engagement stats
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$views' } } }]),
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$views' } } }]),
-      Product.find({ isDeleted: false }).sort({ views: -1 }).limit(10).select('title _id mainImage'),
-      Product.countDocuments({ 'reviews.totalReviews': { $gt: 0 }, isDeleted: false }),
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: null, total: { $sum: '$reviews.totalReviews' } } }]),
-      Product.aggregate([{ $match: { 'reviews.averageRating': { $exists: true }, isDeleted: false } }, { $group: { _id: null, avg: { $avg: '$reviews.averageRating' } } }]),
-      Product.aggregate([{ $match: { views: { $gt: 0 }, isDeleted: false } }, { $group: { _id: null, avgConversion: { $avg: { $divide: ['$soldCount', '$views'] } } } }]),
-      Product.aggregate([{ $match: { 'reviews.averageRating': { $exists: true }, isDeleted: false } }, { $bucket: { groupBy: '$reviews.averageRating', boundaries: [0, 1, 2, 3, 4, 5], default: 'Unrated', output: { count: { $sum: 1 } } } }]),
-
-      // Attribute stats
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$productType', count: { $sum: 1 } } }]),
-      Product.aggregate([{ $match: { gender: { $ne: null }, isDeleted: false } }, { $group: { _id: '$gender', count: { $sum: 1 } } }]),
-      Product.aggregate([{ $match: { ageGroup: { $ne: null }, isDeleted: false } }, { $group: { _id: '$ageGroup', count: { $sum: 1 } } }]),
-      Product.aggregate([{ $match: { season: { $ne: null }, isDeleted: false } }, { $group: { _id: '$season', count: { $sum: 1 } } }]),
-      Product.aggregate([{ $match: { color: { $ne: null }, isDeleted: false } }, { $group: { _id: '$color', count: { $sum: 1 } } }]),
-      Product.aggregate([{ $match: { size: { $ne: null }, isDeleted: false } }, { $group: { _id: '$size', count: { $sum: 1 } } }]),
+      // Engagement and attributes
+      Product.countDocuments({ "reviews.totalReviews": { $gt: 0 }, isDeleted: false }),
       Product.countDocuments({ ecoFriendly: true, isDeleted: false }),
 
-      // Enhanced top products & counts
-      Product.aggregate([
-        { $match: { isDeleted: false } },
-        {
-          $lookup: {
-            from: 'categories',
-            localField: 'category',
-            foreignField: '_id',
-            as: 'categoryData'
-          }
-        },
-        { $unwind: '$categoryData' },
-        { $addFields: { revenue: { $multiply: ['$basePrice', '$soldCount'] } } },
-        { $sort: { revenue: -1 } },
-        {
-          $group: {
-            _id: '$categoryData.name',
-            product: { $first: { title: '$title', _id: '$_id', mainImage: '$mainImage' } }
-          }
-        }
-      ]),
-      Product.aggregate([
-        { $match: { isDeleted: false } },
-        {
-          $lookup: {
-            from: 'brands',
-            localField: 'brand',
-            foreignField: '_id',
-            as: 'brandData'
-          }
-        },
-        { $unwind: '$brandData' },
-        { $addFields: { revenue: { $multiply: ['$basePrice', '$soldCount'] } } },
-        { $sort: { revenue: -1 } },
-        {
-          $group: {
-            _id: '$brandData.name',
-            product: { $first: { title: '$title', _id: '$_id', mainImage: '$mainImage' } }
-          }
-        }
-      ]),
-      Product.aggregate([{ $match: { isDeleted: false } }, { $group: { _id: '$stockLocation', count: { $sum: 1 } } }]),
-      Product.find({ isDeleted: false }).sort({ soldCount: -1 }).limit(10).select('title _id mainImage'),
-      Product.find({ discountType: { $ne: 'none' }, isDeleted: false }).sort({ discountValue: -1 }).limit(10).select('title _id mainImage'),
-      Product.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
-      Product.find({ isDeleted: false }).sort({ createdAt: -1 }).limit(10).select('title _id mainImage'),
+      // Enhanced stats
       Product.countDocuments({
-        $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] },
-        isDeleted: false
+        $expr: { $and: [{ $lt: ["$inventory", "$lowStockThreshold"] }, { $gt: ["$inventory", 0] }] },
+        isDeleted: false,
       }),
-      Product.find({ 'reviews.averageRating': { $exists: true }, isDeleted: false }).sort({ 'reviews.averageRating': -1 }).limit(10).select('title _id mainImage'),
-      Product.find({ isDeleted: false }).sort({ views: -1 }).limit(10).select('title _id mainImage'),
       Product.countDocuments({
         createdAt: { $gte: startOfMonth },
         isDeleted: false,
@@ -3751,61 +3446,24 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       newArrivals,
       bestsellers,
       productsOnSale,
-      totalInventoryValue: inventoryValue[0]?.total || 0,
-      totalInventoryUnits: inventoryUnits[0]?.total || 0,
       outOfStockCount,
       lowStockCount,
       healthyStockCount,
       autoRestockCount,
-      avgInventoryPerProduct: avgInventory[0]?.avg || 0,
-      inventoryByLocation,
-      totalRevenue: totalRevenue[0]?.total || 0,
-      totalUnitsSold: totalUnitsSold[0]?.total || 0,
-      avgSellingPrice: avgSellingPrice[0]?.avg || 0,
       productsWithSales,
       productsWithoutSales,
-      topRevenueProducts,
-      revenueByCategory,
-      revenueByBrand,
-      avgBasePrice: avgBasePrice[0]?.avg || 0,
-      highestPricedProduct,
-      lowestPricedProduct,
-      priceDistribution,
       productsWithDiscounts,
-      avgDiscountValue: avgDiscountValue[0]?.avgDiscount || 0,
-      profitMarginAnalysis: profitMarginAnalysis[0] || {},
-      totalProductViews: totalViews[0]?.total || 0,
-      avgViewsPerProduct: avgViews[0]?.avg || 0,
-      mostViewedProducts,
       productsWithReviews,
-      totalReviews: totalReviews[0]?.total || 0,
-      avgRating: avgRating[0]?.avg || 0,
-      conversionRate: conversionRate[0]?.avgConversion || 0,
-      ratingDistribution,
-      productsByType,
-      productsByGender,
-      productsByAgeGroup,
-      productsBySeason,
-      productsByColor,
-      productsBySize,
-      ecoFriendlyProducts: ecoFriendlyCount,
-      topProductByCategory,
-      topProductByBrand,
-      stockDistribution,
-      topSellingProducts,
-      topDiscountedProducts,
-      topDiscountedProductsCount,
-      recentlyAddedProducts,
+      ecoFriendlyCount,
       lowStockProductsCount,
-      topRatedProducts,
-      mostViewedProductsEnhanced,
-      thisMonthProducts
+      thisMonthProducts,
     };
   } catch (error) {
-    console.error('Error fetching complete product dashboard statistics:', error);
+    console.error("Error fetching product dashboard counts:", error);
     throw error;
   }
-}
+};
+
 
 
 const Product = mongoose.model('Product', productSchema);

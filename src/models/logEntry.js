@@ -52,7 +52,9 @@ const activityLogSchema = new mongoose.Schema(
     sensitive: { type: Boolean, default: false },                   // mark if action involves PII
     retentionPolicy: { type: String, enum: ["30d", "90d", "1y", "forever"], default: "1y" },
   },
-  { timestamps: true }
+  {   timestamps: true,
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true }, }
 );
 /**
  * 🛠 Instance Methods

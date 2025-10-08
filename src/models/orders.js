@@ -42,7 +42,9 @@ const CartItemSchema = new mongoose.Schema(
       trim: true,
     }, // Warranty details for the item
   },
-  { _id: false }
+  {  timestamps: true,
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true }, }
 );
 
 // Order Schema with comprehensive fields and validations
