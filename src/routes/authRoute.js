@@ -25,7 +25,7 @@ const { requireOTPVerification } = require('../middleware/otpMiddleware');
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { success: false, message: 'Too many requests, please try again later', error: 'AUTH_RATE_LIMIT_EXCEEDED' }
+  message: { success: false, message: 'Too many requests, please try again later', error: 'AUTH_RATE_LIMIT_EXCEEDED' },
 });
 // Rate limiting for OTP endpoints
 const otpRateLimit = rateLimit({
@@ -34,7 +34,7 @@ const otpRateLimit = rateLimit({
   message: {
     success: false,
     message: 'Too many OTP requests, please try again later.',
-    error: 'RATE_LIMIT_EXCEEDED'
+    error: 'RATE_LIMIT_EXCEEDED',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -91,7 +91,6 @@ authRoute.post('/mfa/verify', authMiddleware, authController.verifyOTP);
 authRoute.post('/mfa/verify-login-otp', authMiddleware, authController.verifyOTPAndLogin);
 authRoute.post('/mfa/disable', authMiddleware, requireOTPVerification('sensitive_op'), authController.disableOTP);
 
-
 // ========================================
 // 📱 DEVICE & SESSION MANAGEMENT
 // ========================================
@@ -103,7 +102,7 @@ authRoute.post('/devices/trust', authMiddleware, authAccess.requireOTP('trust_de
 authRoute.delete('/devices/remove', authMiddleware, authAccess.requireOTP('remove_device'), authController.removeDevice);
 authRoute.get('/sessions', authMiddleware, authController.getActiveSessions);
 authRoute.post('/sessions/revoke', authMiddleware, authController.revokeSession);
-authRoute.post('/sessions/invalidate-all', authMiddleware,  authController.invalidateAllSessions);
+authRoute.post('/sessions/invalidate-all', authMiddleware, authController.invalidateAllSessions);
 authRoute.post('/sessions/revoke-token', authMiddleware, authController.revokeToken);
 
 // ========================================
@@ -124,91 +123,41 @@ authRoute.put('/otp/settings', authMiddleware, authAccess.requireOTP('update_otp
 // ========================================
 authRoute.patch('/profile', authMiddleware, authController.updateProfile);
 authRoute.patch('/profile-picture', authMiddleware, authController.updateProfilePicture);
-authRoute.patch('/email', authMiddleware,  authController.updateEmail);
-authRoute.patch('/phone', authMiddleware,  authController.updatePhoneNumber);
-authRoute.post('/social/:provider/link', authMiddleware,  authController.linkSocialAccount);
-authRoute.post('/social/:provider/link/callback', authMiddleware,  authController.handleLinkingCallback);
-authRoute.post('/social/:provider/unlink', authMiddleware,  authController.unlinkSocialAccount);
-authRoute.post('/social/accounts', authMiddleware,  authController.getLinkedAccounts);
-authRoute.post('/social/:provider/status', authMiddleware,  authController.checkSocialStatus);
-authRoute.delete('/social/clear/:id', authMiddleware,  authController.clearAllSocialLinks);
+authRoute.patch('/email', authMiddleware, authController.updateEmail);
+authRoute.patch('/phone', authMiddleware, authController.updatePhoneNumber);
+authRoute.post('/social/:provider/link', authMiddleware, authController.linkSocialAccount);
+authRoute.post('/social/:provider/link/callback', authMiddleware, authController.handleLinkingCallback);
+authRoute.post('/social/:provider/unlink', authMiddleware, authController.unlinkSocialAccount);
+authRoute.get('/social/accounts', authMiddleware, authController.getLinkedAccounts);
+authRoute.post('/social/:provider/status', authMiddleware, authController.checkSocialStatus);
+authRoute.delete('/social/clear/:id', authMiddleware, authController.clearAllSocialLinks);
+authRoute.get('/trusted-devices', authMiddleware, authController.getTrustedDevices);
+authRoute.get('/security-logs', authMiddleware, authController.getSecurityLogs);
+authRoute.get('/login-history', authMiddleware, authController.getLoginHistory);
+authRoute.get('/active-sessions', authMiddleware, authController.getActiveSessions);
+authRoute.get('/known-devices', authMiddleware, authController.getKnownDevices);
 
 // ========================================
 // 📊 ADMIN ANALYTICS & REPORTS
 // ========================================
-authRoute.get('/admin/otp/analytics', authMiddleware,  authController.getOTPAnalytics);
-authRoute.get('/admin/security/report', authMiddleware,  authController.getSecurityReport);
+authRoute.get('/admin/otp/analytics', authMiddleware, authController.getOTPAnalytics);
+authRoute.get('/admin/security/report', authMiddleware, authController.getSecurityReport);
 
 // ========================================
 // 📝 ROUTE DOCUMENTATION ENDPOINT
 // ========================================
 authRoute.get('/docs/routes', authMiddleware, authorize('auth', 'view'), (req, res) => {
   const routes = {
-    public: [
-      'POST   /auth/register',
-      'POST   /auth/login',
-      'POST   /auth/verify-otp',
-      'POST   /auth/resend-otp',
-      'POST   /auth/forgot-password',
-      'POST   /auth/reset-password/:token',
-      'POST   /auth/verify-user/:id'
-    ],
-    authenticated: [
-      'POST   /auth/logout',
-      'GET   /auth/permissions',
-      'POST   /auth/logout-all',
-      'POST   /auth/refresh-token',
-      'POST   /auth/change-password'
-    ],
-    emailVerification: [
-      'POST   /auth/send-email-verification',
-      'POST   /auth/verify-email',
-      'POST   /auth/confirm-email'
-    ],
-    mfa: [
-      'POST   /auth/totp/setup',
-      'POST   /auth/totp/verify-setup',
-      'POST   /auth/totp/disable',
-      'POST   /auth/totp/backup-codes',
-      'POST   /auth/mfa/enable',
-      'POST   /auth/mfa/confirm',
-      'POST   /auth/mfa/verify',
-      'get   /auth/mfa/status',
-      'POST   /auth/mfa/toggle'
-    ],
-    sessions: [
-      'GET    /auth/devices',
-      'POST   /auth/devices/trust',
-      'DELETE /auth/devices/remove',
-      'GET    /auth/sessions',
-      'POST   /auth/sessions/revoke',
-      'POST   /auth/sessions/invalidate-all',
-      'POST   /auth/sessions/revoke-token'
-    ],
-    security: [
-      'GET    /auth/security/events',
-      'GET    /auth/security/login-history',
-      'GET    /auth/security/summary'
-    ],
-    otpSettings: [
-      'GET    /auth/otp/settings',
-      'PUT    /auth/otp/settings'
-    ],
-    profile: [
-      'PUT    /auth/profile/:id',
-      'PUT    /auth/profile-picture/:id',
-      'PUT    /auth/email/:id',
-      'PUT    /auth/phone/:id'
-    ],
-    social: [
-      'POST   /auth/social/link/:id',
-      'POST   /auth/social/unlink/:id',
-      'DELETE /auth/social/clear/:id'
-    ],
-    admin: [
-      'GET    /auth/admin/otp/analytics',
-      'GET    /auth/admin/security/report'
-    ]
+    public: ['POST   /auth/register', 'POST   /auth/login', 'POST   /auth/verify-otp', 'POST   /auth/resend-otp', 'POST   /auth/forgot-password', 'POST   /auth/reset-password/:token', 'POST   /auth/verify-user/:id'],
+    authenticated: ['POST   /auth/logout', 'GET   /auth/permissions', 'POST   /auth/logout-all', 'POST   /auth/refresh-token', 'POST   /auth/change-password'],
+    emailVerification: ['POST   /auth/send-email-verification', 'POST   /auth/verify-email', 'POST   /auth/confirm-email'],
+    mfa: ['POST   /auth/totp/setup', 'POST   /auth/totp/verify-setup', 'POST   /auth/totp/disable', 'POST   /auth/totp/backup-codes', 'POST   /auth/mfa/enable', 'POST   /auth/mfa/confirm', 'POST   /auth/mfa/verify', 'get   /auth/mfa/status', 'POST   /auth/mfa/toggle'],
+    sessions: ['GET    /auth/devices', 'POST   /auth/devices/trust', 'DELETE /auth/devices/remove', 'GET    /auth/sessions', 'POST   /auth/sessions/revoke', 'POST   /auth/sessions/invalidate-all', 'POST   /auth/sessions/revoke-token'],
+    security: ['GET    /auth/security/events', 'GET    /auth/security/login-history', 'GET    /auth/security/summary'],
+    otpSettings: ['GET    /auth/otp/settings', 'PUT    /auth/otp/settings'],
+    profile: ['PUT    /auth/profile/:id', 'PUT    /auth/profile-picture/:id', 'PUT    /auth/email/:id', 'PUT    /auth/phone/:id'],
+    social: ['POST   /auth/social/link/:id', 'POST   /auth/social/unlink/:id', 'DELETE /auth/social/clear/:id'],
+    admin: ['GET    /auth/admin/otp/analytics', 'GET    /auth/admin/security/report'],
   };
   res.json({ success: true, data: routes, message: 'Auth API routes documentation' });
 });
@@ -225,7 +174,7 @@ authRoute.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    error: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 });
 
