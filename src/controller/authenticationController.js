@@ -190,7 +190,7 @@ class authController {
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-      await NotificationMiddleware.onUserCreate(req, res, () => { });
+      await NotificationMiddleware.onUserCreate(req, res, () => {});
 
       return standardResponse(
         res,
@@ -503,20 +503,18 @@ class authController {
       );
     } catch (error) {
       console.error('Login error:', error);
-      NotificationMiddleware.onLoginFailed(req, res, () => { });
+      NotificationMiddleware.onLoginFailed(req, res, () => {});
       return errorResponse(res, error.message, 500, error.message);
     }
   }
   static async socialLogin(req, res) {
     try {
-
-      const { identifier, profileData, deviceTrust = false, provider, providerId, email, name, profile, } = req.body;
+      const { identifier, profileData, deviceTrust = false, provider, providerId, email, name, profile } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
       if (!provider || !providerId || !email || !name) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
-
       }
-    const { user, isNewUser } = await verifyAndLinkUser({ provider, providerId, email, name, profile });
+      const { user, isNewUser } = await verifyAndLinkUser({ provider, providerId, email, name, profile });
 
       // Authenticate user
       const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
@@ -553,7 +551,7 @@ class authController {
         },
         'Login successful'
       );
-      NotificationMiddleware.onLoginSuccess(req, res, () => { });
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
     } catch (error) {
       await ActivityHelper.logAuth(req, 'login attempt', 'error', {
         error: error.message,
@@ -625,7 +623,7 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-      NotificationMiddleware.onLoginSuccess(req, res, () => { });
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -658,7 +656,7 @@ class authController {
     try {
       const { tempToken, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-    } catch (error) { }
+    } catch (error) {}
   }
   /**
    * MFA verification - Step 2
@@ -922,7 +920,7 @@ class authController {
 
       const result = await user.changePassword(currentPassword, newPassword);
       await user.logSecurityEvent('password_changed', 'Password changed successfully', 'medium', deviceInfo);
-      NotificationMiddleware.onPasswordChange(req, res, () => { });
+      NotificationMiddleware.onPasswordChange(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -1136,7 +1134,7 @@ class authController {
       await user.revokeAllTokens('password_reset');
       await user.save();
       await user.logSecurityEvent('password_reset_completed', 'Password reset completed', 'high', deviceInfo);
-      NotificationMiddleware.onPasswordReset(req, res, () => { });
+      NotificationMiddleware.onPasswordReset(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -1320,7 +1318,7 @@ class authController {
 
       if (result) {
         await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
-        NotificationMiddleware.onEmailVerified(req, res, () => { });
+        NotificationMiddleware.onEmailVerified(req, res, () => {});
         return standardResponse(
           res,
           true,
@@ -1669,7 +1667,7 @@ class authController {
     try {
       await req.user.updateProfile(req.body);
       res.locals.changes = req.body;
-      NotificationMiddleware.onUserUpdate(req, res, () => { });
+      NotificationMiddleware.onUserUpdate(req, res, () => {});
       return standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
@@ -1688,10 +1686,9 @@ class authController {
         return errorResponse(res, 'Image URL is required', 400);
       }
 
-      const profilePicture = await req.user.updateProfilePicture(url);
-       NotificationMiddleware.onUserUpdate(req, res, () => { });
+      const profilePicture = await req.user.updateProfilePicture(req.body);
+      NotificationMiddleware.onUserUpdate(req, res, () => {});
       return standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
-     
     } catch (error) {
       console.error('Update profile picture error:', error);
       return errorResponse(res, 'Failed to update profile picture', 500, error.message);
@@ -2635,7 +2632,7 @@ class authController {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
       });
-  NotificationMiddleware.onTwoFactorEnabled(req, res, () => { });
+      NotificationMiddleware.onTwoFactorEnabled(req, res, () => {});
       return res.status(200).json({
         success: true,
         message: result.message,
@@ -2892,7 +2889,7 @@ class authController {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
       });
-  NotificationMiddleware.onTwoFactorDisabled(req, res, () => { });
+      NotificationMiddleware.onTwoFactorDisabled(req, res, () => {});
       return res.status(200).json({
         success: true,
         message: 'OTP has been disabled for your account',
@@ -2951,10 +2948,9 @@ class authController {
     }
   }
 
-
   /**
-    * Initialize social login (redirect to provider)
-    */
+   * Initialize social login (redirect to provider)
+   */
   static async initiateSocialLogin(req, res, next) {
     const { provider } = req.params;
     const validProviders = ['google', 'facebook', 'twitter', 'github'];
@@ -2962,7 +2958,7 @@ class authController {
     if (!validProviders.includes(provider)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid social provider'
+        message: 'Invalid social provider',
       });
     }
 
@@ -2971,12 +2967,12 @@ class authController {
       userAgent: req.get('User-Agent'),
       ipAddress: req.ip,
       deviceId: crypto.randomBytes(16).toString('hex'),
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     // Initiate passport authentication
     passport.authenticate(provider, {
-      scope: getScopeForProvider(provider)
+      scope: getScopeForProvider(provider),
     })(req, res, next);
   }
 
@@ -3001,7 +2997,7 @@ class authController {
         const deviceInfo = req.session.deviceInfo || {
           userAgent: req.get('User-Agent'),
           ipAddress: req.ip,
-          deviceId: crypto.randomBytes(16).toString('hex')
+          deviceId: crypto.randomBytes(16).toString('hex'),
         };
 
         // Authenticate or create user
@@ -3014,13 +3010,9 @@ class authController {
         delete req.session.deviceInfo;
 
         // Redirect with tokens
-        const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?` +
-          `token=${tokens.accessToken}&` +
-          `refresh=${tokens.refreshToken}&` +
-          `new_user=${isNewUser}`;
+        const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?` + `token=${tokens.accessToken}&` + `refresh=${tokens.refreshToken}&` + `new_user=${isNewUser}`;
 
         res.redirect(redirectUrl);
-
       } catch (error) {
         console.error('Social callback error:', error);
         res.redirect(`${process.env.CLIENT_URL}/login?error=processing_failed`);
@@ -3039,7 +3031,7 @@ class authController {
       if (!user) {
         return res.status(401).json({
           success: false,
-          message: 'User not authenticated'
+          message: 'User not authenticated',
         });
       }
 
@@ -3049,14 +3041,13 @@ class authController {
 
       // Initiate OAuth flow
       passport.authenticate(provider, {
-        scope: getScopeForProvider(provider)
+        scope: getScopeForProvider(provider),
       })(req, res);
-
     } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Failed to initiate social account linking',
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -3084,19 +3075,13 @@ class authController {
         }
 
         // Link the social account
-        await user.linkSocialAccount(
-          socialData.provider,
-          socialData.providerId,
-          socialData.email,
-          true
-        );
+        await user.linkSocialAccount(socialData.provider, socialData.providerId, socialData.email, true);
 
         // Clear session
         delete req.session.linkingUserId;
         delete req.session.isLinking;
 
         res.redirect(`${process.env.CLIENT_URL}/profile?link_success=${provider}`);
-
       } catch (error) {
         console.error('Social linking error:', error);
         res.redirect(`${process.env.CLIENT_URL}/profile?link_error=processing_failed`);
@@ -3120,14 +3105,13 @@ class authController {
         unlinkedAccount: {
           provider: unlinkedAccount.provider,
           email: unlinkedAccount.email,
-          connectedAt: unlinkedAccount.connectedAt
-        }
+          connectedAt: unlinkedAccount.connectedAt,
+        },
       });
-
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: error.message
+        message: error.message,
       });
     }
   }
@@ -3143,14 +3127,13 @@ class authController {
       res.json({
         success: true,
         linkedAccounts,
-        availableProviders: ['google', 'facebook', 'twitter', 'github']
+        availableProviders: ['google', 'facebook', 'twitter', 'github'],
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch linked accounts',
-        error: error.message
+        error: error.message,
       });
     }
   }
@@ -3169,32 +3152,89 @@ class authController {
       res.json({
         success: true,
         hasProvider,
-        accountInfo: socialAccount ? {
-          provider: socialAccount.provider,
-          email: socialAccount.email,
-          verified: socialAccount.verified,
-          connectedAt: socialAccount.connectedAt
-        } : null
+        accountInfo: socialAccount
+          ? {
+              provider: socialAccount.provider,
+              email: socialAccount.email,
+              verified: socialAccount.verified,
+              connectedAt: socialAccount.connectedAt,
+            }
+          : null,
       });
-
     } catch (error) {
       res.status(500).json({
         success: false,
         message: 'Failed to check social status',
-        error: error.message
+        error: error.message,
       });
+    }
+  }
+
+  // Get user's paginated trusted devices
+  static async getTrustedDevices(req, res) {
+    try {
+      const options = req.query;
+      const result = await req.user.getPaginatedTrustedDevices(options);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // Get user's paginated security logs
+  static async getSecurityLogs(req, res) {
+    try {
+      const options = req.query;
+      const result = await req.user.getPaginatedSecurityLogs(options);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // Get user's paginated login history
+  static async getLoginHistory(req, res) {
+    try {
+      const options = req.query;
+      const result = await req.user.getPaginatedLoginHistory(options);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // Get user's paginated active sessions
+  static async getActiveSessions(req, res) {
+    try {
+      const options = req.query;
+      const result = await req.user.getPaginatedActiveSessions(options);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  // Get user's paginated known devices
+  static async getKnownDevices(req, res) {
+    try {
+      const options = req.query;
+      const result = await req.user.getPaginatedKnownDevices(options);
+      res.status(200).json({ success: true, data: result });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
     }
   }
 }
 /**
  * Get OAuth scopes for each provider
  */
+
 function getScopeForProvider(provider) {
   const scopes = {
     google: ['profile', 'email'],
     facebook: ['email', 'public_profile'],
     twitter: ['tweet.read', 'users.read'],
-    github: ['user:email', 'read:user']
+    github: ['user:email', 'read:user'],
   };
   return scopes[provider] || [];
 }

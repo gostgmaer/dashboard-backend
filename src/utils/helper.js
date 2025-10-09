@@ -548,6 +548,40 @@ function buildFilters(query) {
 
   return filters;
 }
+function paginateSortSearch(items, { page = 1, limit = 10, sortBy = 'timestamp', sortDir = 'desc', search = '', searchFields = [] }) {
+  let filteredItems = items;
+  
+  // Search filter by checking if search term found in any searchFields (case-insensitive)
+  if (search && searchFields.length) {
+    const searchLower = search.toLowerCase();
+    filteredItems = filteredItems.filter(item =>
+      searchFields.some(field => item[field] && String(item[field]).toLowerCase().includes(searchLower))
+    );
+  }
+
+  // Sort items
+  filteredItems.sort((a, b) => {
+    const aVal = a[sortBy];
+    const bVal = b[sortBy];
+    if (aVal == null) return 1;
+    if (bVal == null) return -1;
+    if (sortDir === 'asc') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    else return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+  });
+  
+  // Paginate results
+  const total = filteredItems.length;
+  const start = (page - 1) * limit;
+  const paginatedItems = filteredItems.slice(start, start + limit);
+
+  return {
+    total,
+    page,
+    limit,
+    pages: Math.ceil(total / limit),
+    items: paginatedItems
+  };
+}
 
 
 function formatRelativeDuration(dateInput) {
@@ -592,5 +626,5 @@ module.exports = {
   agGridFilterToMongoQuery,
   sendResponse,
   sendError,
-  formatRelativeDuration,buildFilters
+  formatRelativeDuration,buildFilters,paginateSortSearch
 };

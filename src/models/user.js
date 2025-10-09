@@ -11,6 +11,7 @@ const Order = require('./orders');
 const Role = require('./role');
 const { jwtSecret } = require('../config/setting');
 const otpService = require('../services/otpService');
+const { paginateSortSearch } = require('../utils/helper');
 const SALT_ROUNDS = 10;
 
 // Environment variables with enhanced defaults
@@ -68,7 +69,7 @@ const userSchema = new mongoose.Schema(
     profilePicture: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
       url: { type: String, default: null },
-      name: { type: String, }, // Original or current filename
+      name: { type: String }, // Original or current filename
       size: { type: Number }, // File size in bytes
       type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
     },
@@ -393,6 +394,49 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
+  async getPaginatedTrustedDevices(options = {}) {
+    const filteredDevices = this.knownDevices.filter((device) => device.isActive && device.isTrusted);
+    return paginateSortSearch(filteredDevices, {
+      ...options,
+      sortBy: options.sortBy || 'lastSeen',
+      searchFields: ['name', 'type', 'os', 'browser', 'location.country', 'location.city'],
+    });
+  },
+
+  async getPaginatedSecurityLogs(options = {}) {
+    return paginateSortSearch(this.loginHistory, {
+      ...options,
+      sortBy: options.sortBy || 'loginTime',
+      searchFields: ['ipAddress', 'userAgent', 'device', 'browser', 'os', 'location.country', 'location.city'],
+    });
+  },
+
+  async getPaginatedLoginHistory(options = {}) {
+    return paginateSortSearch(this.securityEvents, {
+      ...options,
+      sortBy: options.sortBy || 'timestamp',
+      searchFields: ['event', 'description', 'ipAddress', 'userAgent'],
+    });
+  },
+
+  async getPaginatedActiveSessions(options = {}) {
+    const now = new Date();
+    const activeSessions = this.activeSessions.filter((session) => session.isActive && session.expiresAt > now);
+    return paginateSortSearch(activeSessions, {
+      ...options,
+      sortBy: options.sortBy || 'lastActivity',
+      searchFields: ['ipAddress', 'userAgent', 'browser', 'os'],
+    });
+  },
+  async getPaginatedKnownDevices(options = {}) {
+    const activeDevices = this.knownDevices.filter((device) => device.isActive);
+    return paginateSortSearch(activeDevices, {
+      ...options,
+      sortBy: options.sortBy || 'lastSeen',
+      searchFields: ['name', 'type', 'os', 'browser', 'location.country', 'location.city'],
+    });
+  },
+
   async cleanupTokensForDevice(tokenData) {
     try {
       const { deviceId } = tokenData;
@@ -2774,8 +2818,8 @@ userSchema.method({
     Object.assign(this, updates);
     return await this.save();
   },
-  async updateProfilePicture(url) {
-    this.profilePicture = url;
+  async updateProfilePicture(body) {
+    this.profilePicture = body;
     await this.save();
     return this.profilePicture;
   },
@@ -4036,7 +4080,7 @@ userSchema.statics.getSessionStatistics = async function () {
 };
 
 userSchema.statics.fetchUserSettings = async function (userId) {
-  const selectedKeys = ['otpSettings', 'lastLogin', 'currentOTP', 'twoFactorAuth', 'loginSecurity', 'socialMedia', 'preferences', 'username', 'interests', 'email', 'firstName', 'lastName', 'dateOfBirth', 'gender', 'phoneNumber', 'profilePicture', 'session', 'status', 'isVerified', 'subscriptionStatus', 'subscriptionType', 'paymentMethods', 'updatedAt', 'emailVerified', 'phoneVerified', 'twoFactorEnabled', 'loginHistory', 'securityEvents', 'activeSessions', 'knownDevices', 'socialAccounts', 'lastLoginAttempt', 'referralCode', 'role', 'updated_by', 'loyaltyPoints'];
+  const selectedKeys = ['otpSettings', 'createdAt', 'lastLogin', 'currentOTP', 'twoFactorAuth', 'loginSecurity', 'socialMedia', 'preferences', 'username', 'interests', 'email', 'firstName', 'lastName', 'dateOfBirth', 'gender', 'phoneNumber', 'profilePicture', 'session', 'status', 'isVerified', 'subscriptionStatus', 'subscriptionType', 'paymentMethods', 'updatedAt', 'emailVerified', 'phoneVerified', 'twoFactorEnabled', 'loginHistory', 'securityEvents', 'activeSessions', 'knownDevices', 'socialAccounts', 'lastLoginAttempt', 'referralCode', 'role', 'updated_by', 'loyaltyPoints'];
 
   // Predefine the population fields
   const populationFields = [
