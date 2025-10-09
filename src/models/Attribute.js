@@ -29,7 +29,7 @@ const attributeSchema = new mongoose.Schema(
         },
         image:  { id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
                    url: { type: String, default: null },
-                   name: { type: String, required: true }, // Original or current filename
+                   name: { type: String }, // Original or current filename
                    size: { type: Number }, // File size in bytes
                    type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
                    },
