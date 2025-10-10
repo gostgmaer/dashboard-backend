@@ -59,9 +59,9 @@ authRoute.post('/verify/:id', authMiddleware, authController.verifyUser);
 // ========================================
 authRoute.post('/logout', authMiddleware, authController.logout);
 authRoute.get('/permissions', authMiddleware, authController.getUserPermissionsController);
-authRoute.post('/logout-all', authMiddleware, authAccess.requireOTP('logout_all'), authController.logoutAll);
+authRoute.post('/logout-all', authMiddleware,  authController.logoutAll);
 authRoute.post('/refresh-token', authController.refreshToken);
-authRoute.post('/change-password', authMiddleware, authAccess.requireOTP('change_password'), authController.changePassword);
+authRoute.post('/change-password', authMiddleware, authController.changePassword);
 
 // ========================================
 // 📧 EMAIL VERIFICATION
@@ -134,7 +134,7 @@ authRoute.delete('/social/clear/:id', authMiddleware, authController.clearAllSoc
 authRoute.get('/trusted-devices', authMiddleware, authController.getTrustedDevices);
 authRoute.get('/security-logs', authMiddleware, authController.getSecurityLogs);
 authRoute.get('/login-history', authMiddleware, authController.getLoginHistory);
-authRoute.get('/active-sessions', authMiddleware, authController.getActiveSessions);
+authRoute.get('/active-sessions', authMiddleware, authController.getAllActiveSessions);
 authRoute.get('/known-devices', authMiddleware, authController.getKnownDevices);
 
 // ========================================

@@ -396,7 +396,7 @@ const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppi
 userSchema.method({
   async getPaginatedTrustedDevices(options = {}) {
     const filteredDevices = this.knownDevices.filter((device) => device.isActive && device.isTrusted);
-    return paginateSortSearch(filteredDevices, {
+      return paginateSortSearch(filteredDevices, {
       ...options,
       sortBy: options.sortBy || 'lastSeen',
       searchFields: ['name', 'type', 'os', 'browser', 'location.country', 'location.city'],
