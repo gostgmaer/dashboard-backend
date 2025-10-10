@@ -2,15 +2,15 @@ const express = require('express');
 const addressRoute = express.Router();
 const addressController = require('../controller/addresses/address');
 const { body, query, param, validationResult } = require('express-validator');
-const {authMiddleware} = require('../middleware/auth'); // Uncommented
-const authorize = require('../middleware/authorize');// Assuming authorize is exported from auth middleware
+const { authMiddleware } = require('../middleware/auth'); // Uncommented
+const authorize = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting'); // Assumed from userRoutes.js
 const Address = require('../models/address');
 
 /**
  * 🚀 ADDRESS ROUTES
- * 
+ *
  * Features:
  * ✅ CRUD operations for addresses
  * ✅ Authentication and authorization via authMiddleware and authorize
@@ -31,7 +31,7 @@ const Address = require('../models/address');
 const bulkOperationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 requests per window
-  message: { success: false, message: 'Too many requests, please try again later' }
+  message: { success: false, message: 'Too many requests, please try again later' },
 });
 
 /**
@@ -41,24 +41,25 @@ const bulkOperationLimiter = rateLimit({
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const addressId = req.params.id || req.params.addressId1;
-    if (addressId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
+    if (addressId && !req.user.isSuperadmin) {
+      // Superadmin bypass in authorize
 
       const address = await Address.findById(addressId);
       if (!address) {
         return res.status(404).json({ success: false, message: 'Address not found' });
       }
-      if (address.userId.toString() !== req.user.id) { // Restrict to own addresses
-        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s address' });
+      if (address.userId.toString() !== req.user.id) {
+        // Restrict to own addresses
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot access another user's address" });
       }
     }
     if (req.params.addressId2 && !req.user.isSuperadmin) {
-
       const address = await Address.findById(req.params.addressId2);
       if (!address) {
         return res.status(404).json({ success: false, message: 'Second address not found' });
       }
       if (address.userId.toString() !== req.user.id) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s address' });
+        return res.status(403).json({ success: false, message: "Forbidden: Cannot access another user's address" });
       }
     }
     next();
@@ -84,124 +85,43 @@ const validate = (req, res, next) => {
 // ========================================
 
 const addressValidation = {
-  create: [
-    body('addressLine1').notEmpty().withMessage('Street is required').trim().escape(),
-    body('city').notEmpty().withMessage('City is required').trim().escape(),
-    body('country').notEmpty().withMessage('Country is required').trim().escape(),
-    body('postalCode').notEmpty().withMessage('ZIP code is required').trim().escape(),
-    validate
-  ],
+  create: [body('addressLine1').notEmpty().withMessage('Street is required').trim().escape(), body('city').notEmpty().withMessage('City is required').trim().escape(), body('country').notEmpty().withMessage('Country is required').trim().escape(), body('postalCode').notEmpty().withMessage('ZIP code is required').trim().escape(), validate],
 
-  update: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    body('addressLine1').optional().notEmpty().withMessage('Street cannot be empty').trim().escape(),
-    body('city').optional().notEmpty().withMessage('City cannot be empty').trim().escape(),
-    body('country').optional().notEmpty().withMessage('Country cannot be empty').trim().escape(),
-    body('postalCode').optional().notEmpty().withMessage('ZIP code cannot be empty').trim().escape(),
-    validate
-  ],
+  update: [param('id').isMongoId().withMessage('Invalid address ID'), body('addressLine1').optional().notEmpty().withMessage('Street cannot be empty').trim().escape(), body('city').optional().notEmpty().withMessage('City cannot be empty').trim().escape(), body('country').optional().notEmpty().withMessage('Country cannot be empty').trim().escape(), body('postalCode').optional().notEmpty().withMessage('ZIP code cannot be empty').trim().escape(), validate],
 
-  partialUpdate: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    body().isObject().withMessage('Body must be an object'),
-    validate
-  ],
+  partialUpdate: [param('id').isMongoId().withMessage('Invalid address ID'), body().isObject().withMessage('Body must be an object'), validate],
 
-  setDefault: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    validate
-  ],
+  setDefault: [param('id').isMongoId().withMessage('Invalid address ID'), validate],
 
-  archive: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    validate
-  ],
+  archive: [param('id').isMongoId().withMessage('Invalid address ID'), validate],
 
-  restore: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    validate
-  ],
+  restore: [param('id').isMongoId().withMessage('Invalid address ID'), validate],
 
-  clone: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    validate
-  ],
+  clone: [param('id').isMongoId().withMessage('Invalid address ID'), validate],
 
-  compare: [
-    param('addressId1').isMongoId().withMessage('Invalid first address ID'),
-    param('addressId2').isMongoId().withMessage('Invalid second address ID'),
-    validate
-  ],
+  compare: [param('addressId1').isMongoId().withMessage('Invalid first address ID'), param('addressId2').isMongoId().withMessage('Invalid second address ID'), validate],
 
-  delete: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    validate
-  ],
+  delete: [param('id').isMongoId().withMessage('Invalid address ID'), validate],
 
-  bulkStatus: [
-    body('ids').isArray({ min: 1 }).withMessage('Address IDs array is required'),
-    body('ids.*').isMongoId().withMessage('Invalid address ID in array'),
-    body('status').isIn(['active', 'inactive', 'archived']).withMessage('Invalid status'),
-    validate
-  ],
+  bulkStatus: [body('ids').isArray({ min: 1 }).withMessage('Address IDs array is required'), body('ids.*').isMongoId().withMessage('Invalid address ID in array'), body('status').isIn(['active', 'inactive', 'archived']).withMessage('Invalid status'), validate],
 
-  search: [
-    query('keyword').optional().notEmpty().withMessage('Search keyword is required').trim().escape(),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
-    validate
-  ],
+  search: [query('keyword').optional().notEmpty().withMessage('Search keyword is required').trim().escape(), query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(), validate],
 
-  nearby: [
-    query('latitude').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude is required'),
-    query('longitude').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude is required'),
-    query('radius').optional().isFloat({ min: 0 }).withMessage('Radius must be a positive number').toFloat(),
-    validate
-  ],
+  nearby: [query('latitude').isFloat({ min: -90, max: 90 }).withMessage('Valid latitude is required'), query('longitude').isFloat({ min: -180, max: 180 }).withMessage('Valid longitude is required'), query('radius').optional().isFloat({ min: 0 }).withMessage('Radius must be a positive number').toFloat(), validate],
 
-  addTag: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    body('tag').notEmpty().withMessage('Tag is required').trim().escape(),
-    validate
-  ],
+  addTag: [param('id').isMongoId().withMessage('Invalid address ID'), body('tag').notEmpty().withMessage('Tag is required').trim().escape(), validate],
 
-  removeTag: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    body('tag').notEmpty().withMessage('Tag is required').trim().escape(),
-    validate
-  ],
+  removeTag: [param('id').isMongoId().withMessage('Invalid address ID'), body('tag').notEmpty().withMessage('Tag is required').trim().escape(), validate],
 
-  bulkAddTag: [
-    body('ids').isArray({ min: 1 }).withMessage('Address IDs array is required'),
-    body('ids.*').isMongoId().withMessage('Invalid address ID in array'),
-    body('tag').notEmpty().withMessage('Tag is required').trim().escape(),
-    validate
-  ],
+  bulkAddTag: [body('ids').isArray({ min: 1 }).withMessage('Address IDs array is required'), body('ids.*').isMongoId().withMessage('Invalid address ID in array'), body('tag').notEmpty().withMessage('Tag is required').trim().escape(), validate],
 
-  merge: [
-    param('id').isMongoId().withMessage('Invalid address ID'),
-    body('sourceAddressId').isMongoId().withMessage('Valid source address ID is required'),
-    validate
-  ],
+  merge: [param('id').isMongoId().withMessage('Invalid address ID'), body('sourceAddressId').isMongoId().withMessage('Valid source address ID is required'), validate],
 
-  byTag: [
-    query('tag').notEmpty().withMessage('Tag is required').trim().escape(),
-    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(),
-    validate
-  ],
+  byTag: [query('tag').notEmpty().withMessage('Tag is required').trim().escape(), query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100').toInt(), validate],
 
-  batchCreate: [
-    body('addresses').isArray({ min: 1 }).withMessage('Addresses array is required'),
-    body('addresses.*.addressLine1').notEmpty().withMessage('Street is required').trim().escape(),
-    body('addresses.*.city').notEmpty().withMessage('City is required').trim().escape(),
-    body('addresses.*.country').notEmpty().withMessage('Country is required').trim().escape(),
-    body('addresses.*.postalCode').notEmpty().withMessage('ZIP code is required').trim().escape(),
-    validate
-  ],
+  batchCreate: [body('addresses').isArray({ min: 1 }).withMessage('Addresses array is required'), body('addresses.*.addressLine1').notEmpty().withMessage('Street is required').trim().escape(), body('addresses.*.city').notEmpty().withMessage('City is required').trim().escape(), body('addresses.*.country').notEmpty().withMessage('Country is required').trim().escape(), body('addresses.*.postalCode').notEmpty().withMessage('ZIP code is required').trim().escape(), validate],
 
-  export: [
-    query('format').optional().isIn(['csv', 'json']).withMessage('Invalid format'),
-    validate
-  ]
+  export: [query('format').optional().isIn(['csv', 'json']).withMessage('Invalid format'), validate],
 };
 
 // ========================================
@@ -209,7 +129,8 @@ const addressValidation = {
 // ========================================
 
 // POST /addresses - Create a new address
-addressRoute.post('/',
+addressRoute.post(
+  '/',
   authMiddleware,
 
   addressValidation.create,
@@ -217,11 +138,9 @@ addressRoute.post('/',
 );
 
 // GET /addresses/:id - Get address by ID
-addressRoute.get('/user',
-  authMiddleware,
-  addressController.getAddressUserId
-);
-addressRoute.get('/:id',
+addressRoute.get('/user', authMiddleware, addressController.getAddressUserId);
+addressRoute.get(
+  '/:id',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -230,7 +149,8 @@ addressRoute.get('/:id',
 );
 
 // PUT /addresses/:id - Update address (full update)
-addressRoute.put('/:id',
+addressRoute.put(
+  '/:id',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -240,9 +160,9 @@ addressRoute.put('/:id',
 
 // PUT /addresses/:id - Update address (full update)
 
-
 // PATCH /addresses/:id - Partial update address
-addressRoute.patch('/:id',
+addressRoute.patch(
+  '/:id',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -251,7 +171,8 @@ addressRoute.patch('/:id',
 );
 
 // PATCH /addresses/:id/set-default - Set address as default
-addressRoute.patch('/:id/set-default',
+addressRoute.patch(
+  '/:id/set-default',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -260,7 +181,8 @@ addressRoute.patch('/:id/set-default',
 );
 
 // DELETE /addresses/:id - Soft delete address
-addressRoute.delete('/:id',
+addressRoute.delete(
+  '/:id',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -269,7 +191,8 @@ addressRoute.delete('/:id',
 );
 
 // PATCH /addresses/:id/archive - Archive address
-addressRoute.patch('/:id/archive',
+addressRoute.patch(
+  '/:id/archive',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -278,7 +201,8 @@ addressRoute.patch('/:id/archive',
 );
 
 // PATCH /addresses/:id/restore - Restore address
-addressRoute.patch('/:id/restore',
+addressRoute.patch(
+  '/:id/restore',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -287,7 +211,8 @@ addressRoute.patch('/:id/restore',
 );
 
 // POST /addresses/:id/clone - Clone address
-addressRoute.post('/:id/clone',
+addressRoute.post(
+  '/:id/clone',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -296,7 +221,8 @@ addressRoute.post('/:id/clone',
 );
 
 // GET /addresses/:addressId1/compare/:addressId2 - Compare two addresses
-addressRoute.get('/:addressId1/compare/:addressId2',
+addressRoute.get(
+  '/:addressId1/compare/:addressId2',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -305,21 +231,24 @@ addressRoute.get('/:addressId1/compare/:addressId2',
 );
 
 // GET /addresses/default - Get default address
-addressRoute.get('/default',
+addressRoute.get(
+  '/default',
   authMiddleware,
 
   addressController.getDefaultAddress
 );
 
 // GET /addresses - Get all user addresses
-addressRoute.get('/',
+addressRoute.get(
+  '/',
   authMiddleware,
 
   addressController.getUserAddresses
 );
 
 // DELETE /addresses - Remove all user addresses
-addressRoute.delete('/',
+addressRoute.delete(
+  '/',
   authMiddleware,
 
   bulkOperationLimiter,
@@ -327,7 +256,8 @@ addressRoute.delete('/',
 );
 
 // GET /addresses/nearby - Find nearby addresses
-addressRoute.get('/nearby',
+addressRoute.get(
+  '/nearby',
   authMiddleware,
 
   addressValidation.nearby,
@@ -335,7 +265,8 @@ addressRoute.get('/nearby',
 );
 
 // PATCH /addresses/:id/status - Update address status
-addressRoute.patch('/:id/status',
+addressRoute.patch(
+  '/:id/status',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -344,7 +275,8 @@ addressRoute.patch('/:id/status',
 );
 
 // PATCH /addresses/bulk/status - Bulk update address status
-addressRoute.patch('/bulk/status',
+addressRoute.patch(
+  '/bulk/status',
   authMiddleware,
 
   bulkOperationLimiter,
@@ -353,7 +285,8 @@ addressRoute.patch('/bulk/status',
 );
 
 // GET /addresses/:id/history - Get address history
-addressRoute.get('/:id/history',
+addressRoute.get(
+  '/:id/history',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -362,7 +295,8 @@ addressRoute.get('/:id/history',
 );
 
 // GET /addresses/search - Search addresses
-addressRoute.get('/search',
+addressRoute.get(
+  '/search',
   authMiddleware,
 
   addressValidation.search,
@@ -370,7 +304,8 @@ addressRoute.get('/search',
 );
 
 // POST /addresses/batch - Batch create addresses
-addressRoute.post('/batch',
+addressRoute.post(
+  '/batch',
   authMiddleware,
 
   bulkOperationLimiter,
@@ -379,21 +314,24 @@ addressRoute.post('/batch',
 );
 
 // GET /addresses/duplicates - Find duplicate addresses
-addressRoute.get('/duplicates',
+addressRoute.get(
+  '/duplicates',
   authMiddleware,
 
   addressController.findDuplicateAddresses
 );
 
 // GET /addresses/status/count - Get address count by status
-addressRoute.get('/status/count',
+addressRoute.get(
+  '/status/count',
   authMiddleware,
 
   addressController.getAddressCountByStatus
 );
 
 // PATCH /addresses/:id/add-tag - Add tag to address
-addressRoute.patch('/:id/add-tag',
+addressRoute.patch(
+  '/:id/add-tag',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -402,7 +340,8 @@ addressRoute.patch('/:id/add-tag',
 );
 
 // PATCH /addresses/:id/remove-tag - Remove tag from address
-addressRoute.patch('/:id/remove-tag',
+addressRoute.patch(
+  '/:id/remove-tag',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -411,7 +350,8 @@ addressRoute.patch('/:id/remove-tag',
 );
 
 // PATCH /addresses/bulk/add-tag - Add tag to multiple addresses
-addressRoute.patch('/bulk/add-tag',
+addressRoute.patch(
+  '/bulk/add-tag',
   authMiddleware,
 
   bulkOperationLimiter,
@@ -420,7 +360,8 @@ addressRoute.patch('/bulk/add-tag',
 );
 
 // PATCH /addresses/:id/merge - Merge addresses
-addressRoute.patch('/:id/merge',
+addressRoute.patch(
+  '/:id/merge',
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -429,7 +370,8 @@ addressRoute.patch('/:id/merge',
 );
 
 // GET /addresses/export - Export user addresses
-addressRoute.get('/export',
+addressRoute.get(
+  '/export',
   authMiddleware,
 
   bulkOperationLimiter,
@@ -438,7 +380,8 @@ addressRoute.get('/export',
 );
 
 // GET /addresses/by-tag - Get addresses by tag
-addressRoute.get('/by-tag',
+addressRoute.get(
+  '/by-tag',
   authMiddleware,
 
   addressValidation.byTag,
@@ -450,66 +393,33 @@ addressRoute.get('/by-tag',
 // ========================================
 
 // GET /addresses/docs/routes - Get all available routes (dev only)
-addressRoute.get('/docs/routes',
+addressRoute.get(
+  '/docs/routes',
 
   (req, res) => {
     if (enviroment !== 'development') {
       return res.status(404).json({
         success: false,
-        message: 'Route documentation only available in development mode'
+        message: 'Route documentation only available in development mode',
       });
     }
 
     const routes = {
-      crud: [
-        'POST   /addresses                             - Create a new address (write)',
-        'GET    /addresses/:id                         - Get address by ID (read, instance check)',
-        'PUT    /addresses/:id                         - Update address (full update) (update, instance check)',
-        'PATCH  /addresses/:id                         - Partial update address (update, instance check)',
-        'DELETE /addresses/:id                         - Soft delete address (update, instance check)',
-        'GET    /addresses                             - Get all user addresses (read)',
-        'DELETE /addresses                             - Remove all user addresses (update, rate-limited)'
-      ],
-      management: [
-        'PATCH  /addresses/:id/set-default             - Set address as default (update, instance check)',
-        'PATCH  /addresses/:id/archive                 - Archive address (update, instance check)',
-        'PATCH  /addresses/:id/restore                 - Restore address (update, instance check)',
-        'POST   /addresses/:id/clone                   - Clone address (write, instance check)',
-        'PATCH  /addresses/:id/status                  - Update address status (update, instance check)',
-        'PATCH  /addresses/bulk/status                 - Bulk update address status (update, rate-limited)',
-        'PATCH  /addresses/:id/add-tag                 - Add tag to address (update, instance check)',
-        'PATCH  /addresses/:id/remove-tag              - Remove tag from address (update, instance check)',
-        'PATCH  /addresses/bulk/add-tag                - Add tag to multiple addresses (update, rate-limited)',
-        'PATCH  /addresses/:id/merge                   - Merge addresses (update, instance check)'
-      ],
-      retrieval: [
-        'GET    /addresses/default                     - Get default address (read)',
-        'GET    /addresses/nearby                      - Find nearby addresses (read)',
-        'GET    /addresses/search                      - Search addresses (read)',
-        'GET    /addresses/by-tag                      - Get addresses by tag (read)',
-        'GET    /addresses/duplicates                  - Find duplicate addresses (read)',
-        'GET    /addresses/:id/history                 - Get address history (view, instance check)',
-        'GET    /addresses/:addressId1/compare/:addressId2 - Compare two addresses (view, instance check)',
-        'GET    /addresses/status/count                - Get address count by status (view)'
-      ],
-      batch: [
-        'POST   /addresses/batch                       - Batch create addresses (write, rate-limited)'
-      ],
-      export: [
-        'GET    /addresses/export                      - Export user addresses (view, rate-limited)'
-      ],
-      documentation: [
-        'GET    /addresses/docs/routes                 - Get API route documentation (view, dev-only)'
-      ]
+      crud: ['POST   /addresses                             - Create a new address (write)', 'GET    /addresses/:id                         - Get address by ID (read, instance check)', 'PUT    /addresses/:id                         - Update address (full update) (update, instance check)', 'PATCH  /addresses/:id                         - Partial update address (update, instance check)', 'DELETE /addresses/:id                         - Soft delete address (update, instance check)', 'GET    /addresses                             - Get all user addresses (read)', 'DELETE /addresses                             - Remove all user addresses (update, rate-limited)'],
+      management: ['PATCH  /addresses/:id/set-default             - Set address as default (update, instance check)', 'PATCH  /addresses/:id/archive                 - Archive address (update, instance check)', 'PATCH  /addresses/:id/restore                 - Restore address (update, instance check)', 'POST   /addresses/:id/clone                   - Clone address (write, instance check)', 'PATCH  /addresses/:id/status                  - Update address status (update, instance check)', 'PATCH  /addresses/bulk/status                 - Bulk update address status (update, rate-limited)', 'PATCH  /addresses/:id/add-tag                 - Add tag to address (update, instance check)', 'PATCH  /addresses/:id/remove-tag              - Remove tag from address (update, instance check)', 'PATCH  /addresses/bulk/add-tag                - Add tag to multiple addresses (update, rate-limited)', 'PATCH  /addresses/:id/merge                   - Merge addresses (update, instance check)'],
+      retrieval: ['GET    /addresses/default                     - Get default address (read)', 'GET    /addresses/nearby                      - Find nearby addresses (read)', 'GET    /addresses/search                      - Search addresses (read)', 'GET    /addresses/by-tag                      - Get addresses by tag (read)', 'GET    /addresses/duplicates                  - Find duplicate addresses (read)', 'GET    /addresses/:id/history                 - Get address history (view, instance check)', 'GET    /addresses/:addressId1/compare/:addressId2 - Compare two addresses (view, instance check)', 'GET    /addresses/status/count                - Get address count by status (view)'],
+      batch: ['POST   /addresses/batch                       - Batch create addresses (write, rate-limited)'],
+      export: ['GET    /addresses/export                      - Export user addresses (view, rate-limited)'],
+      documentation: ['GET    /addresses/docs/routes                 - Get API route documentation (view, dev-only)'],
     };
 
     res.status(200).json({
       success: true,
       data: {
         totalRoutes: Object.values(routes).flat().length,
-        categories: routes
+        categories: routes,
       },
-      message: 'Address API routes documentation'
+      message: 'Address API routes documentation',
     });
   }
 );

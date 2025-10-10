@@ -3204,7 +3204,7 @@ class authController {
   }
 
   // Get user's paginated active sessions
-  static async getActiveSessions(req, res) {
+  static async getAllActiveSessions(req, res) {
     try {
       const options = req.query;
       const result = await req.user.getPaginatedActiveSessions(options);
