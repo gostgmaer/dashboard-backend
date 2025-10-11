@@ -1,5 +1,4 @@
 const Permission = require('./permission');
-const User = require('./user');
 const mongoose = require('mongoose');
 
 // 🔹 Predefined role names
@@ -54,6 +53,25 @@ const roleSchema = new mongoose.Schema(
 //
 
 // Add a permission
+
+roleSchema.pre('save', async function (next) {
+  if (this.permissions && this.permissions.length > 0) {
+
+    // Fetch only active + non-deleted permissions
+    const activePermissions = await Permission.find({
+      _id: { $in: this.permissions },
+      isActive: true,
+      isDeleted: false,
+    }).select('_id');
+    
+    // Replace with only valid IDs
+    this.permissions = activePermissions.map(p => p._id);
+  }
+
+  next();
+});
+
+
 roleSchema.methods.addPermission = async function (permissionId) {
   if (!this.permissions.includes(permissionId)) {
     this.permissions.push(permissionId);

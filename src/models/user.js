@@ -59,6 +59,7 @@ const userSchema = new mongoose.Schema(
     firstName: { type: String, trim: true },
     lastName: { type: String, trim: true },
     dateOfBirth: { type: Date, default: null },
+    isActive: { type: Boolean, default: true },
     gender: {
       type: String,
       enum: ['male', 'female', 'other', 'prefer_not_to_say'],
@@ -396,7 +397,7 @@ const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppi
 userSchema.method({
   async getPaginatedTrustedDevices(options = {}) {
     const filteredDevices = this.knownDevices.filter((device) => device.isActive && device.isTrusted);
-      return paginateSortSearch(filteredDevices, {
+    return paginateSortSearch(filteredDevices, {
       ...options,
       sortBy: options.sortBy || 'lastSeen',
       searchFields: ['name', 'type', 'os', 'browser', 'location.country', 'location.city'],
@@ -993,7 +994,7 @@ userSchema.method({
           throw new Error(`${method.toUpperCase()} 2FA setup was not initiated`);
         }
 
-        if (this.otpSettings?.enabled) {
+        if (this.otpSettings?.enabled && this.otpSettings?.preferredMethod === method) {
           throw new Error(`${method.toUpperCase()} 2FA is already enabled`);
         }
 
@@ -1003,6 +1004,7 @@ userSchema.method({
         if (isValidOTP) {
           // Enable 2FA
           this.otpSettings.enabled = true;
+          this.otpSettings.preferredMethod = method;
           this.currentOTP.verified = true;
 
           // Clear the setup OTP session
@@ -1901,7 +1903,16 @@ userSchema.method({
   },
 
   async getMyProfile() {
-    await this.populate(['role']);
+    await this.populate({
+      path: 'role',
+      populate: {
+        
+        path: 'permissions', // populate the permissions inside role
+        match: { isActive: true, isDeleted: false },
+        select: 'category resource action key', // only include what’s needed
+      },
+    });
+
     return {
       id: this._id,
       fullName: this.fullName,
@@ -1910,12 +1921,23 @@ userSchema.method({
       dateOfBirth: this.dateOfBirth,
       gender: this.gender,
       phoneNumber: this.phoneNumber,
-      image: this.profilePicture,
+      image: this.profilePicture.url,
       role: this.role ? this.role.name : null,
+      roleId: this.role?._id || null,
       loyaltyPoints: this.loyaltyPoints,
       isVerified: this.isVerified,
       preferences: this.preferences,
       accountStatus: this.status,
+
+      // Add permissions from role (flattened)
+      permissions: this.role?.permissions?.length
+        ? this.role.permissions.map((perm) => ({
+            id: perm._id,
+            name: perm.name,
+            code: perm.code,
+            description: perm.description || null,
+          }))
+        : [],
     };
   },
 
@@ -4330,6 +4352,17 @@ userSchema.statics.getDashboardStats = async function () {
     topSpendingUsers,
   };
 };
+
+//Static method to find user with role and permissions populated
+userSchema.statics.findByIdWithPermissions = function (userId) {
+  return this.findById(userId).populate({
+    path: 'role',
+    populate: {
+      path: 'permissions',
+      model: 'Permission',
+    },
+  });
+};
 userSchema.statics.getUserStats = async function () {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -4396,6 +4429,7 @@ userSchema.statics.getUserStats = async function () {
     newUsers: newUsersThisMonth,
     returningUsers: monthlyActiveUsers - newUsersThisMonth,
   };
+  const totalActiveRole = await Role.countDocuments({ isActive: true });
 
   // Placeholders or additional (e.g., from Order model if needed)
   // const totalOrders = await Order.countDocuments();
@@ -4433,6 +4467,7 @@ userSchema.statics.getUserStats = async function () {
     monthlyActiveUsers,
     churnedUsers30Days,
     newVsReturningUsers,
+    totalActiveRole,
     // Add more as needed, e.g., totalOrders, averageOrderValue, etc.
   };
 };

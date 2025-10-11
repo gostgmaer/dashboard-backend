@@ -18,6 +18,12 @@ const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTem
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
 const { jwtSecret } = require('../config/setting');
 const ActivityHelper = require('../utils/activityHelpers');
+const passport = require('passport');
+const socialAccountControllers = require('./social-account-controllers');
+const { isSupportedProvider } = require('../services/socialProvider');
+
+
+
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -465,7 +471,7 @@ class authController {
               id: user._id,
               email: user.email,
               username: user.username,
-              image: user.profilePicture,
+              image: user.profilePicture.url,
               fullName: user.fullName,
             },
           },
@@ -492,7 +498,7 @@ class authController {
           user: {
             id: user._id,
             email: user.email,
-            image: user.profilePicture,
+            image: user.profilePicture.url,
             username: user.username,
             fullName: user.fullName,
             role: user.role?.name,
@@ -559,6 +565,137 @@ class authController {
       return errorResponse(res, error.message, 500, error.message);
     }
   }
+
+static async socialMediaLogin(req, res) {
+  try {
+    const { provider, accessToken, code, email, identityToken } = req.body;
+    if (!isSupportedProvider(provider)) {
+      return res.status(400).json({ success: false, message: 'Invalid social provider.' });
+    }
+
+    let profile;
+    switch (provider) {
+      case 'google':
+        profile = await socialAccountControllers.validateGoogleToken(accessToken || code);
+        break;
+      case 'facebook':
+        profile = await socialAccountControllers.validateFacebookToken(accessToken);
+        break;
+      case 'twitter':
+        profile = await socialAccountControllers.validateTwitterToken(accessToken, code);
+        break;
+      case 'github':
+        profile = await socialAccountControllers.validateGithubToken(accessToken || code);
+        break;
+      case 'apple':
+        profile = await socialAccountControllers.validateAppleToken(identityToken);
+        break;
+      case 'linkedin':
+        profile = await socialAccountControllers.validateLinkedInToken(accessToken);
+        break;
+      case 'microsoft':
+        profile = await socialAccountControllers.validateMicrosoftToken(accessToken);
+        break;
+      case 'discord':
+        profile = await socialAccountControllers.validateDiscordToken(accessToken);
+        break;
+      default:
+        return res.status(400).json({ success: false, message: 'Unsupported provider.' });
+    }
+
+    if (!profile || !(profile.id || profile.sub)) {
+      return res.status(400).json({ success: false, message: 'Failed to retrieve social profile.' });
+    }
+
+    const providerId = profile.id || profile.sub;
+    const providerEmail = profile.email || email;
+
+    // Try to find existing user by linked social account
+    let user = await User.findOne({
+      socialAccounts: {
+        $elemMatch: { provider, providerId }
+      }
+    });
+
+    let isNewUser = false;
+    if (!user) {
+      // Try finding user by email if provided (to link with existing account)
+      if (providerEmail) {
+        user = await User.findOne({ email: providerEmail.toLowerCase() });
+      }
+      if (!user) {
+        // Create new user account
+        user = new User({
+          email: providerEmail || '',
+          socialAccounts: [{
+            provider,
+            providerId,
+            email: providerEmail,
+            verified: true,
+            connectedAt: new Date()
+          }],
+          username: profile.name || profile.email || '',
+          status: 'active'
+        });
+        isNewUser = true;
+        await user.save();
+      } else {
+        // Link new social account to existing user
+        user.socialAccounts.push({
+          provider,
+          providerId,
+          email: providerEmail,
+          verified: true,
+          connectedAt: new Date()
+        });
+        await user.save();
+      }
+    }
+
+    // Generate JWT or session tokens as per your auth mechanism
+    const deviceInfo = DeviceDetector.detectDevice(req);
+    const tokens = await user.generateTokens(deviceInfo);
+
+    // Log security event
+    await user.logSecurityEvent(
+      isNewUser ? 'social_registration' : 'social_login',
+      `${isNewUser ? 'New user registered' : 'User logged in'} via ${provider}`,
+      'low',
+      { ...deviceInfo, provider, isNewUser }
+    );
+  
+    res.status(200).json({
+      success: true,
+      message: `${isNewUser ? 'Account created and logged in' : 'Logged in'} successfully via ${provider}`,
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          socialAccounts: user.socialAccounts,
+          status: user.status
+        },
+        tokens: {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: tokens.accessTokenExpiresAt
+        },
+        isNewUser,
+        provider
+      }
+    });
+
+  } catch (error) {
+    logger.error('Social login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Social login failed',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed'
+    });
+  }
+}
+
+
   /**
    * VERIFY OTP and complete login
    */
@@ -3035,9 +3172,13 @@ class authController {
         });
       }
 
+      req.session = {
+        linkingUserId:user._id.toString(),
+        isLinking: true,
+      }
       // Store user ID in session for linking after OAuth
-      req.session.linkingUserId = user._id.toString();
-      req.session.isLinking = true;
+      // req.session.linkingUserId = user._id.toString();
+      // req.session.isLinking = true;
 
       // Initiate OAuth flow
       passport.authenticate(provider, {

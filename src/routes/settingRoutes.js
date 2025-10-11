@@ -222,7 +222,6 @@ settingRoute.patch('/:siteKey/branding/field',
 // PATCH /api/setting/:siteKey/seo - Update SEO settings
 settingRoute.patch('/:siteKey/seo',
   authMiddleware,
-
   instanceCheckMiddleware,
   settingsValidation.sectionUpdate,
   body('metaTitle').optional().isString().isLength({ max: 60 }).withMessage('Meta title cannot exceed 60 characters').trim().escape(),
