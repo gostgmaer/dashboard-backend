@@ -122,31 +122,31 @@ class ProductController {
       }
 
       // Set created/updated by
-      if (req.user) {
-        productData.created_by = req.user.id;
-        productData.updated_by = req.user.id;
-      }
+      // if (req.user) {
+      //   productData.created_by = req.user.id;
+      //   productData.updated_by = req.user.id;
+      // }
 
       // Auto-calculate fields
       if (productData.basePrice && productData.discount) {
         productData.salePrice = productData.basePrice - (productData.basePrice * productData.discount) / 100;
       }
-
+      productData.currentStockLevel = productData.inventory || 0;
       // Set inventory tracking
-      if (productData.inventory !== undefined) {
-        productData.currentStockLevel = productData.inventory;
-      }
+      // if (productData.inventory !== undefined) {
+
+      // }
 
       const product = new Product(productData);
       await product.save();
-      await ActivityHelper.logCRUD(req, 'product', 'create', {
-        id: product._id,
-        name: product.name,
-        category: product.category,
-        price: product.price,
-      });
-         res.locals.product = product
-      await NotificationMiddleware.onUserCreate(req, res, () => { });
+      // await ActivityHelper.logCRUD(req, 'product', 'create', {
+      //   id: product._id,
+      //   name: product.title,
+      //   category: product.category,
+      //   price: product.basePrice,
+      // });
+      res.locals.createdProduct = product;
+      await NotificationMiddleware.onProductCreated(req, res, () => {});
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product created successfully', 201);
     } catch (error) {
       console.error('Create product error:', error);
@@ -160,8 +160,6 @@ class ProductController {
    */
   static async getProducts(req, res) {
     try {
-
-
       let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
 
       page = Number(page);
@@ -226,9 +224,9 @@ class ProductController {
         .sort(sortObj)
         .skip((page - 1) * limit)
         .limit(limit)
-        .select('title brand category basePrice status _id slug sku createdAt inventory isFeatured bestSeller') // ✅ Only required fields
+         .select('title brand category basePrice status _id slug sku createdAt inventory isFeatured bestSeller finalPrice stockStatus discountPercent isLowStock discountType discount discountValue  salePrice ') // ✅ Only required fields
         .populate({ path: 'brand', select: 'name' })
-        .populate({ path: 'category', select: 'name' })
+        .populate({ path: 'category', select: 'title' })
         .lean(); // ✅ Fast, returns plain JS objects
 
       const products = await query.exec();
@@ -416,8 +414,8 @@ class ProductController {
         category: product.category,
         price: product.price,
       });
-        res.locals.product = product
-      await NotificationMiddleware.onProductUpdated(req, res, () => { });
+      res.locals.product = product;
+      await NotificationMiddleware.onProductUpdated(req, res, () => {});
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product updated successfully');
     } catch (error) {
       console.error('Failed to update product:', error);
@@ -461,7 +459,7 @@ class ProductController {
         result = { _id: id };
       }
 
-        res.locals.product = result
+      res.locals.product = result;
       // Using manual logging with detailed info
       await ActivityHelper.logCRUD(req, 'product', 'Update', {
         id: product._id,
@@ -469,7 +467,7 @@ class ProductController {
         category: product.category,
         price: product.price,
       });
-      await NotificationMiddleware.onProductDeleted(req, res, () => { });
+      await NotificationMiddleware.onProductDeleted(req, res, () => {});
       return standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'Product permanently deleted' : 'Product deleted successfully');
     } catch (error) {
       console.error('Failed to delete product:', error);
@@ -544,8 +542,8 @@ class ProductController {
       }
 
       const result = await Product.bulkUpdateStatus(validIds, status);
-      res.locals.product = result
-      await NotificationMiddleware.onProductBackInStock(req, res, () => { });
+      res.locals.product = result;
+      await NotificationMiddleware.onProductBackInStock(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -995,8 +993,8 @@ class ProductController {
 
       product.markAsOutOfStock();
       await product.save();
-   res.locals.product = product
-       NotificationMiddleware.onProductOutOfStock(req, res, () => { });
+      res.locals.product = product;
+      NotificationMiddleware.onProductOutOfStock(req, res, () => {});
       return standardResponse(res, true, ProductController.enrichProduct(product), 'Product marked as out of stock');
     } catch (error) {
       console.error('Failed to mark as out of stock:', error);
@@ -1232,8 +1230,8 @@ class ProductController {
       }
 
       await product.restock(quantity);
-  res.locals.product = product
-       NotificationMiddleware.onProductBackInStock(req, res, () => { });
+      res.locals.product = product;
+      NotificationMiddleware.onProductBackInStock(req, res, () => {});
       return standardResponse(res, true, ProductController.enrichProduct(product), `Product restocked with ${quantity} units successfully`);
     } catch (error) {
       console.error('Failed to restock product:', error);
@@ -1652,8 +1650,8 @@ class ProductController {
         { path: 'categories', select: 'name slug' },
         { path: 'brand', select: 'name logo' },
       ]);
- res.locals.product = updatedProduct
-       NotificationMiddleware.onProductOutOfStockDual(req, res, () => { });
+      res.locals.product = updatedProduct;
+      NotificationMiddleware.onProductOutOfStockDual(req, res, () => {});
       return standardResponse(res, true, ProductController.enrichProduct(updatedProduct), `Stock updated successfully. New stock: ${newStock}`);
     } catch (error) {
       console.error('Update stock error:', error);

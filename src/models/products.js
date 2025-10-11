@@ -77,6 +77,7 @@ const productSchema = new mongoose.Schema(
     },
     tags: { type: [String] },
     basePrice: { type: Number, min: 0, required: true },
+    finalPrice: { type: Number, min: 0 },
     comparePrice: { type: Number, min: 0 },
     costPrice: { type: Number, min: 0 },
     wholesalePrice: { type: Number, min: 0 },
@@ -160,7 +161,7 @@ const productSchema = new mongoose.Schema(
     mainImage: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
       url: { type: String, default: null },
-      name: { type: String, }, // Original or current filename
+      name: { type: String }, // Original or current filename
       size: { type: Number }, // File size in bytes
       type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
     },
@@ -168,7 +169,7 @@ const productSchema = new mongoose.Schema(
       {
         id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
         url: { type: String, default: null },
-        name: { type: String,  }, // Original or current filename
+        name: { type: String }, // Original or current filename
         size: { type: Number }, // File size in bytes
         type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
       },
@@ -177,7 +178,7 @@ const productSchema = new mongoose.Schema(
       {
         id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
         url: { type: String, default: null },
-        name: { type: String, }, // Original or current filename
+        name: { type: String }, // Original or current filename
         size: { type: Number }, // File size in bytes
         type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
       },
@@ -244,6 +245,56 @@ productSchema.index({ categories: 1 });
 productSchema.index({ isFeatured: 1, status: 1 });
 
 // 🔹 Virtual rating stats
+
+productSchema.pre('save', function (next) {
+  try {
+    const product = this;
+
+    // Start with the base price
+    let finalPrice = product.basePrice || 0;
+
+    // Apply discount if defined
+    if (product.discountType && product.discountValue) {
+      switch (product.discountType) {
+        case 'percentage':
+          finalPrice -= (finalPrice * product.discountValue) / 100;
+          break;
+        case 'fixed':
+          finalPrice -= product.discountValue;
+          break;
+        case 'none':
+        default:
+          break;
+      }
+    }
+
+    // Ensure discount does not go below 0
+    finalPrice = Math.max(finalPrice, 0);
+
+    // Set salePrice and retailPrice
+    if (product.comparePrice && product.comparePrice > finalPrice) {
+      product.salePrice = finalPrice;
+      product.retailPrice = product.comparePrice;
+    } else {
+      product.salePrice = finalPrice;
+      product.retailPrice = finalPrice;
+    }
+
+    // Optionally calculate loyalty points
+    if (product.loyaltyPoints == null) {
+      product.loyaltyPoints = Math.floor(finalPrice / 10); // Example: 1 point per 10 currency units
+    }
+
+    // Update finalPrice
+    product.finalPrice = finalPrice;
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+
 productSchema.virtual('ratingStatistics').get(function () {
   if (this.reviews && this.reviews.length > 0) {
     const totalReviews = this.reviews.length;

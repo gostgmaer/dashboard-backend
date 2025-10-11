@@ -73,8 +73,8 @@
   const discountValidation = {
     rule: [
       body('name').isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters').trim().escape(),
-      body('type').isIn(['percentage', 'fixed', 'buy_x_get_y']).withMessage('Type must be percentage, fixed, or buy_x_get_y'),
-      body('value').isFloat({ min: 0 }).withMessage('Value must be a non-negative number').toFloat(),
+      body('discountType').isIn(['percentage', 'fixed', 'buy_x_get_y']).withMessage('Type must be percentage, fixed, or buy_x_get_y'),
+      body('discountValue').isFloat({ min: 0 }).withMessage('Value must be a non-negative number').toFloat(),
       body('conditions').isObject().withMessage('Conditions must be an object'),
       body('conditions.minPurchase').optional().isFloat({ min: 0 }).withMessage('Minimum purchase must be a non-negative number').toFloat(),
       body('conditions.products').optional().isArray().withMessage('Products must be an array'),
@@ -147,7 +147,6 @@
   // POST /api/discount/rules - Create or update a discount rule
   discountRoute.post('/rules',
     authMiddleware,
-
     operationLimiter,
     discountValidation.rule,
     ctrl.upsertDiscountRule
@@ -163,6 +162,15 @@
     ctrl.upsertDiscountRule
   );
 
+   discountRoute.post('/rules/:ruleId/apply',
+    authMiddleware,
+    ctrl.applyDiscountRule
+  );
+
+   discountRoute.post('/rules/:ruleId/remove',
+    authMiddleware,
+    ctrl.removeDiscountRule
+  );
   // GET /api/discount/rules - List discount rules
   discountRoute.get('/rules',
     authMiddleware,
