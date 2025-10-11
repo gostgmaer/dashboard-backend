@@ -1,38 +1,58 @@
-const mongoose = require("mongoose");
-const ACTIONS = {
-  READ: 'read',
-  WRITE: 'write',
-  MODIFY: 'modify',
-  DELETE: 'delete',
-  MANAGE: 'full'
-};
-
+const mongoose = require('mongoose');
 
 const allowedFilterFields = ['name', 'action', 'category', 'isActive']; // whitelist filterable fields
 const allowedSortFields = ['name', 'category', 'createdAt', 'updatedAt', 'action'];
 const defaultExcludeFields = ['__v', 'created_by', 'updated_by', 'isDeleted']; // fields to exclude by default
-
 const permissionSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true, trim: true },
     description: { type: String, trim: true },
-    category: { type: String, trim: true },
+    category: {
+      type: String,
+      required: [true, 'Permission category is required'],
+      enum: ['cart', 'wishlist', 'checkout', 'users', 'products', 'orders', 'inventory', 'reports', 'settings', 'system', 'content', 'analytics', 'finance', 'support', 'roles', 'permissions', 'address', 'attributes', 'category', 'brand', 'coupon', 'notifications', 'activitylogs', 'review', 'projects', 'tasks', 'resume', 'transactions', 'integrations', 'audit', 'compliance', 'localization', 'translation', 'billing', 'subscription', 'license', 'tax', 'shipment', 'warehouse', 'inventory_transfer', 'ticketing', 'escalation', 'message', 'announcement', 'banner', 'settings_advanced', 'environment', 'deployment', 'webhook', 'api_key', 'external_service', 'email_template', 'sms_template', 'dashboard', 'schedule', 'calendar', 'event', 'milestone', 'feedback', 'SLA', 'contract', 'document', 'attachment', 'onboarding', 'offboarding', 'maintenance', 'sync', 'import_export', 'backup', 'restore', 'migration', 'template', 'theme', 'branding', 'affiliate', 'referral', 'campaign', 'marketing', 'promotion', 'lead', 'crm', 'segment', 'workflow', 'automation', 'report_schedule', 'datalake', 'datamart', 'analytics_dashboard', 'visualization', 'retention', 'user_group', 'delegation', 'access_token', 'oauth', 'notification_channel', 'payment_gateway', 'payout', 'settlement', 'dispute', 'reconciliation', 'compliance_report', 'legal', 'consent', 'privacy', 'risk', 'fraud', 'monitoring', 'log', 'healthcheck', 'performance', 'quota', 'limit', 'threshold', 'policy', 'guideline', 'escalation_policy', 'knowledge_base', 'helpdesk', 'tutorial', 'faq', 'training', 'certification', 'award', 'badge', 'achievement', 'gamification', 'scoring', 'objective', 'kpi', 'roadmap', 'requirement', 'version', 'release', 'changelog'],
+    },
     isDefault: { type: Boolean, default: false },
+    key: {
+      type: String,
+      required: [true, 'Permission key is required'],
+      unique: true,
+      trim: true,
+      lowercase: true,
+      match: [/^[a-z]+:[a-z_]+$/, 'Permission key must follow format: action:resource (e.g., create:product)'],
+    },
+    resource: {
+      type: String,
+      required: [true, 'Resource is required'],
+      trim: true,
+      lowercase: true,
+    },
+
     isActive: { type: Boolean, default: true },
     isDeleted: { type: Boolean, default: false },
     action: {
       type: String,
-      enum: Object.values(ACTIONS),
-      required: true
+      required: [true, 'Action is required'],
+      enum: ['create','write', 'read', 'update', 'delete', 'view', 'manage', 'approve', 'reject', 'publish', 'archive', 'export', 'import'],
     },
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
-  { timestamps: true,  
-        toJSON: { virtuals: true },
-        toObject: { virtuals: true }, }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
+permissionSchema.pre('save', function (next) {
+  if (!this.key && this.action && this.resource) {
+    this.key = `${this.action}:${this.resource}`;
+  }
+  next();
+});
+permissionSchema.pre('validate', function (next) {
+  if (!this.key && this.action && this.resource) {
+    this.key = `${this.action.trim().toLowerCase()}:${this.resource.trim().toLowerCase()}`;
+  }
+  next();
+});
 // ===== Static Methods =====
 
 // Get all active permissions
@@ -42,7 +62,7 @@ permissionSchema.statics.getActivePermissions = function () {
 
 // Search permissions by keyword
 permissionSchema.statics.searchPermissions = function (keyword) {
-  return this.find({ name: { $regex: keyword, $options: "i" } });
+  return this.find({ name: { $regex: keyword, $options: 'i' } });
 };
 
 // Bulk create permissions
@@ -104,7 +124,7 @@ permissionSchema.methods.toAPIResponse = function () {
     category: this.category,
     isActive: this.isActive,
     createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    updatedAt: this.updatedAt,
   };
 };
 
@@ -128,10 +148,7 @@ permissionSchema.statics.getAll = async function (options = {}) {
 
   // Start with base filter excluding soft deleted documents
   const baseFilter = {
-    $or: [
-      { isDeleted: isDeleted },
-      { isDeleted: { $exists: false } }
-    ]
+    $or: [{ isDeleted: isDeleted }, { isDeleted: { $exists: false } }],
   };
 
   // Build final filter by including only allowed fields and values
@@ -148,7 +165,7 @@ permissionSchema.statics.getAll = async function (options = {}) {
     finalFilter.$or = [
       { name: regex },
       // { category: regex },
-      { action: regex }
+      { action: regex },
     ];
   }
 
@@ -156,8 +173,8 @@ permissionSchema.statics.getAll = async function (options = {}) {
   let sortOptions = {};
   if (typeof sort === 'string') {
     // comma separated "field:direction"
-    sort.split(',').forEach(fieldStr => {
-      const [field, dir] = fieldStr.split(':').map(s => s.trim());
+    sort.split(',').forEach((fieldStr) => {
+      const [field, dir] = fieldStr.split(':').map((s) => s.trim());
       if (allowedSortFields.includes(field)) {
         sortOptions[field] = dir === 'asc' ? 1 : -1;
       }
@@ -176,8 +193,8 @@ permissionSchema.statics.getAll = async function (options = {}) {
   // Select fields with exclusion of default fields, override if specified by client
   let projection = {};
   if (selectFields) {
-    let fieldsArray = Array.isArray(selectFields) ? selectFields : selectFields.split(',').map(f => f.trim());
-    fieldsArray = fieldsArray.filter(f => !defaultExcludeFields.includes(f));
+    let fieldsArray = Array.isArray(selectFields) ? selectFields : selectFields.split(',').map((f) => f.trim());
+    fieldsArray = fieldsArray.filter((f) => !defaultExcludeFields.includes(f));
     for (const field of fieldsArray) {
       projection[field] = 1;
     }
@@ -205,7 +222,7 @@ permissionSchema.statics.getAll = async function (options = {}) {
         page: safePage,
         limit: safeLimit,
         totalPages: Math.ceil(totalCount / safeLimit),
-      }
+      },
     };
   } catch (error) {
     // Enhance error to give clearer message based on error type
@@ -215,7 +232,6 @@ permissionSchema.statics.getAll = async function (options = {}) {
     throw new Error(`Failed to get permissions: ${error.message}`);
   }
 };
-
 
 // Get permissions by category
 permissionSchema.statics.getByCategory = function (category) {
@@ -248,7 +264,7 @@ permissionSchema.statics.existsByName = async function (name) {
 };
 
 // Create permission if it doesn't exist
-permissionSchema.statics.createIfNotExists = async function (name, description = "", category = "") {
+permissionSchema.statics.createIfNotExists = async function (name, description = '', category = '') {
   const existing = await this.findOne({ name: name.trim().toLowerCase() });
   if (existing) return existing;
   return this.create({ name: name.trim().toLowerCase(), description, category });
@@ -257,78 +273,72 @@ permissionSchema.statics.createIfNotExists = async function (name, description =
 // Get all permissions grouped by category
 permissionSchema.statics.getGroupedByCategory = async function () {
   return await this.aggregate([
-    { $match: { isActive: true } },
+    { $match: { isActive: true, isDeleted: false, action: { $in: ['read', 'write', 'update', 'export', 'delete', 'manage'] } } },
     { $sort: { category: 1, name: 1 } },
     {
       $group: {
-        _id: { $ifNull: ["$category", "Uncategorized"] },
-        action: { $push: { id: "$_id", action: "$action", name: "$name" } }
-      }
+        _id: { $ifNull: ['$category', 'Uncategorized'] },
+        action: { $push: { id: '$_id', action: '$action', name: '$name' } },
+      },
     },
     {
       $project: {
         _id: 0,
-        category: "$_id",
-        action: 1
-      }
+        category: '$_id',
+        action: 1,
+      },
     },
     {
-      $sort: { category: 1 }
-    }
+      $sort: { category: 1 },
+    },
   ]);
 };
-
 
 permissionSchema.statics.getStatistics = async function () {
   return this.aggregate([
     {
       $group: {
         _id: {
-          category: "$category",
-          action: "$action",
-          isActive: "$isActive"
+          category: '$category',
+          action: '$action',
+          isActive: '$isActive',
         },
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
     {
       $group: {
-        _id: "$_id.category",
+        _id: '$_id.category',
         actions: {
           $push: {
-            action: "$_id.action",
-            isActive: "$_id.isActive",
-            count: "$count"
-          }
+            action: '$_id.action',
+            isActive: '$_id.isActive',
+            count: '$count',
+          },
         },
-        totalCount: { $sum: "$count" }
-      }
+        totalCount: { $sum: '$count' },
+      },
     },
     {
       $project: {
-        category: "$_id",
+        category: '$_id',
         actions: 1,
         totalCount: 1,
-        _id: 0
-      }
+        _id: 0,
+      },
     },
     {
-      $sort: { category: 1 }
-    }
+      $sort: { category: 1 },
+    },
   ]);
 };
-
 
 // Search by partial match in name or description
 permissionSchema.statics.search = function (keyword) {
   return this.find({
-    $or: [
-      { name: { $regex: keyword, $options: "i" } },
-      { description: { $regex: keyword, $options: "i" } }
-    ]
+    $or: [{ name: { $regex: keyword, $options: 'i' } }, { description: { $regex: keyword, $options: 'i' } }],
   });
 };
-
 
 permissionSchema.statics.createPermission = async function (data) {
   if (!data.name || !data.action) {
@@ -349,7 +359,6 @@ permissionSchema.statics.createPermission = async function (data) {
   return permission.save();
 };
 
-
 permissionSchema.statics.updatePermissionById = async function (permissionId, data) {
   if (!permissionId) {
     throw new Error('Permission ID is required');
@@ -360,7 +369,7 @@ permissionSchema.statics.updatePermissionById = async function (permissionId, da
 
   const updatedPayload = {
     ...data,
-    name: `${data.name}:${data.action}`
+    name: `${data.name}:${data.action}`,
   };
 
   // Check if name is unique for other documents
@@ -372,23 +381,23 @@ permissionSchema.statics.updatePermissionById = async function (permissionId, da
   return this.findByIdAndUpdate(permissionId, updatedPayload, { new: true });
 };
 
-
 permissionSchema.statics.getPermissionsGroupedByCategoryAndAction = async function () {
   const permissions = await this.find({ isActive: true, category: { $exists: true, $ne: '' } })
-    .select('name action category isActive')  // isActive of permission
+    .select('name action category isActive') // isActive of permission
     .lean();
 
   // Group by category, collect action info under each category
   const grouped = permissions.reduce((acc, perm) => {
     const cat = perm.category || 'Uncategorized';
-    if (!acc[cat]) acc[cat] = {
-      actions: [],
-      isActive: true,  // Since this permission is active, category considered active
-    };
+    if (!acc[cat])
+      acc[cat] = {
+        actions: [],
+        isActive: true, // Since this permission is active, category considered active
+      };
     acc[cat].actions.push({
       id: perm._id,
       name: perm.name,
-      action: perm.action
+      action: perm.action,
     });
     return acc;
   }, {});
@@ -398,12 +407,11 @@ permissionSchema.statics.getPermissionsGroupedByCategoryAndAction = async functi
     .filter(([_, val]) => val.isActive) // keep only if active category
     .map(([category, val]) => ({
       category,
-      action: val.actions
+      action: val.actions,
     }));
 
   return { permissions: result };
 };
 
-
-const Permission = mongoose.model("Permission", permissionSchema);
+const Permission = mongoose.model('Permission', permissionSchema);
 module.exports = Permission;
