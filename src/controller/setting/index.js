@@ -20,7 +20,7 @@ exports.createSettings = async (req, res) => {
 exports.getSettingsBySite = async (req, res) => {
   try {
     const { siteKey } = req.params;
-    const settings = await Setting.findOne({ siteKey });
+    const settings = await Setting.findOne({ siteKey }).select('-_id -id -isDeleted -siteKey');
     if (!settings) {
       return errorResponse(res, `No settings found for ${siteKey}`, 404);
     }
