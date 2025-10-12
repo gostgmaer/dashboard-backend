@@ -80,11 +80,11 @@ const validate = (req, res, next) => {
 // ========================================
 
 const userValidation = {
-  create: [body('email').isEmail().withMessage('Valid email is required').trim().normalizeEmail(), body('username').notEmpty().withMessage('Username is required').trim().escape(), body('firstName').notEmpty().withMessage('First name is required').trim().escape(), body('lastName').notEmpty().withMessage('Last name is required').trim().escape(), validate],
+  create: [body('email').isEmail().withMessage('Valid email is required').trim(), body('username').notEmpty().withMessage('Username is required').trim().escape(), body('firstName').notEmpty().withMessage('First name is required').trim().escape(), body('lastName').notEmpty().withMessage('Last name is required').trim().escape(), validate],
 
-  update: [param('id').isMongoId().withMessage('Invalid user ID'), body('email').optional().isEmail().withMessage('Valid email is required').trim().normalizeEmail(), body('username').optional().notEmpty().withMessage('Username cannot be empty').trim().escape(), body('firstName').optional().notEmpty().withMessage('First name cannot be empty').trim().escape(), body('lastName').optional().notEmpty().withMessage('Last name cannot be empty').trim().escape(), body('status').optional().isIn(['active', 'inactive', 'suspended', 'pending']).withMessage('Invalid status'), validate],
+  update: [param('id').isMongoId().withMessage('Invalid user ID'), body('email').optional().isEmail().withMessage('Valid email is required').trim(), body('username').optional().notEmpty().withMessage('Username cannot be empty').trim().escape(), body('firstName').optional().notEmpty().withMessage('First name cannot be empty').trim().escape(), body('lastName').optional().notEmpty().withMessage('Last name cannot be empty').trim().escape(), body('status').optional().isIn(['active', 'inactive', 'suspended', 'pending']).withMessage('Invalid status'), validate],
 
-  auth: [body('email').isEmail().withMessage('Valid email is required').trim().normalizeEmail(), body('password').notEmpty().withMessage('Password is required'), validate],
+  auth: [body('email').isEmail().withMessage('Valid email is required').trim(), body('password').notEmpty().withMessage('Password is required'), validate],
 
   password: [
     param('id').isMongoId().withMessage('Invalid user ID'),

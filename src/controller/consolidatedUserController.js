@@ -14,6 +14,7 @@ const { checkPasswordStrength } = require('../utils/security');
 const { buildFilters, formatRelativeDuration } = require('../utils/helper');
 const ActivityHelper = require('../utils/activityHelpers');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
+const DeviceDetector = require('../services/deviceDetector');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
  *
@@ -213,6 +214,7 @@ class UserController {
   }
   static async createUser(req, res) {
     try {
+      const deviceInfo = DeviceDetector.detectDevice(req);
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return UserController.errorResponse(res, 'Validation failed', 400, errors.array());
@@ -226,7 +228,6 @@ class UserController {
       }
 
       // Set created by
-    
 
       // Create user instance
       const user = new User(userData);
@@ -235,7 +236,7 @@ class UserController {
       if (userData.password) {
         await user.setPassword(userData.password);
       }
-
+      await user.sendEmailVerification(deviceInfo);
       await user.save();
 
       // Populate the created user
@@ -252,14 +253,14 @@ class UserController {
         lastName: user.lastName,
       });
       res.locals.createdUser = user;
-      let emaildata = await sendEmail(welcomeEmailTemplate, user);
+      await sendEmail(welcomeEmailTemplate, user);
       NotificationMiddleware.onUserCreate(req, res, () => {});
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);
       if (error.code === 11000) {
-        const field = Object.keys(error.keyPattern)[0];
-        return UserController.errorResponse(res, `${field} already exists`, 400, 'Duplicate key error');
+        // const field = Object?.keys(error?.keyPattern)[0];
+        return UserController.errorResponse(res, error.message, 400, 'Duplicate key error');
       }
       return UserController.errorResponse(res, 'Failed to create user', 500, error.message);
     }
