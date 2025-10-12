@@ -51,7 +51,7 @@ const userSchema = new mongoose.Schema(
     // ─────────── Identity & Authentication ───────────
     username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 30 },
     socialID: { type: String, default: null },
-    email: { type: String, required: true, unique: true, lowercase: true },
+    email: { type: String, required: true, unique: true },
     hash_password: { type: String, required: false },
     role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
 

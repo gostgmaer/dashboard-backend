@@ -1,4 +1,4 @@
-const { appUrl, applicaionName } = require("../config/setting");
+const { frontendUrl, applicaionName, host, confirmPath } = require("../config/setting");
 
 
 /**
@@ -82,7 +82,7 @@ const welcomeEmailTemplate = (data) => {
             <p>Thank you for joining our application! We're thrilled to have you on board.</p>
             <p>Your registered email is: <strong>${email}</strong></p>
             <p>Start exploring our features by clicking the button below:</p>
-            <a href="${appUrl}" class="button">Get Started</a>
+            <a href="${host}/${confirmPath}?token=${data.emailVerificationTokens[0].token}" class="button">Get Started</a>
             <p>If you have any questions, feel free to reach out to our support team.</p>
           </div>
           <div class="footer">
