@@ -226,10 +226,7 @@ class UserController {
       }
 
       // Set created by
-      if (req.user) {
-        userData.created_by = req.user.id;
-        userData.updated_by = req.user.id;
-      }
+    
 
       // Create user instance
       const user = new User(userData);
@@ -255,7 +252,7 @@ class UserController {
         lastName: user.lastName,
       });
       res.locals.createdUser = user;
-          let emaildata = await sendEmail(welcomeEmailTemplate, user);
+      let emaildata = await sendEmail(welcomeEmailTemplate, user);
       NotificationMiddleware.onUserCreate(req, res, () => {});
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
