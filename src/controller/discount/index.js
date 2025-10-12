@@ -248,7 +248,7 @@ exports.removeDiscountRule = async (req, res) => {
     // 🗂️ Mark AppliedDiscounts as inactive
     await AppliedDiscount.updateMany({ ruleId, isActive: true }, { $set: { isActive: false, removedAt: new Date() } });
 
-    await DiscountRule.findByIdAndUpdate(ruleId, { isActive: false, in_use: false }, { new: true, runValidators: true });
+    await DiscountRule.findByIdAndUpdate(ruleId, {  in_use: false }, { new: true, runValidators: true });
 
     return res.json({
       success: true,
