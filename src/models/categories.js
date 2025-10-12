@@ -217,7 +217,7 @@ categorySchema.methods.updateDisplayOrder = async function (newOrder) {
 
 // Get all active categories
 categorySchema.statics.getActiveCategories = function () {
-  return this.find({ status: 'active', visibility: true }).sort({ displayOrder: 1, title: 1 });
+  return this.find({ status: 'active', visibility: true }).sort({ displayOrder: 1, title: 1 }).select('title slug');
 };
 
 // Get featured categories

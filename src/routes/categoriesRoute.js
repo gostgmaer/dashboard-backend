@@ -6,6 +6,7 @@ const {authMiddleware} = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
+const Category = require('../models/categories');
 
 const bulkOperationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -23,7 +24,7 @@ const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const categoryId = req.params.id;
     if (categoryId && !req.user.isSuperadmin) {
-      const Category = require('../models/categories');
+    
       const category = await Category.findById(categoryId);
       if (!category) return res.status(404).json({ success: false, message: 'Category not found' });
       if (category.created_by.toString() !== req.user.id) {
@@ -87,6 +88,11 @@ router.post('/',
   categoryController.create
 );
 
+router.get('/active',
+  authMiddleware,
+
+  categoryController.getActiveCategories
+);
 router.get('/',
   authMiddleware,
 
@@ -120,11 +126,7 @@ router.delete('/:id',
 
 // === Filtering & Search ===
 
-router.get('/active',
-  authMiddleware,
 
-  categoryController.getActiveCategories
-);
 
 router.get('/featured',
   authMiddleware,
