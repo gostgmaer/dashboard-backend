@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const DiscountRule = require('../../models/DiscountRule');
+const AppliedDiscount = require('../../models/AppliedDiscount');
 const PromoCode = require('../../models/Coupon');
 const { priceWithRules, applyPromoCode, applyDiscountsAtCheckout } = require('../../services/discount');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
@@ -144,51 +145,75 @@ exports.checkoutWithDiscounts = async () => {
 exports.applyDiscountRule = async (req, res) => {
   try {
     const ruleId = req.params.ruleId;
-
     const rule = await DiscountRule.findById(ruleId);
     if (!rule || !rule.isActive) throw new Error('Rule not found or inactive');
 
-    // Build the product query
-    const query = {
-      $or: [
-        { category: { $in: rule.categoryIds || [] } }, // single ObjectId
-        { tags: { $in: rule.tags || [] } }, // array field
-        { brand: { $in: rule.brandIds || [] } }, // single value
-      ],
-    };
+    // 🔍 Build the product query dynamically based on what’s defined in the rule
+    const orConditions = [];
+    if (rule.productIds?.length) orConditions.push({ _id: { $in: rule.productIds } });
+    if (rule.categoryIds?.length) orConditions.push({ category: { $in: rule.categoryIds } });
+    if (rule.brandIds?.length) orConditions.push({ brand: { $in: rule.brandIds } });
+    if (rule.tags?.length) orConditions.push({ tags: { $in: rule.tags } });
 
-    // MongoDB aggregation expression for discount
+    if (!orConditions.length) throw new Error('No applicable targets found in this rule');
+
+    const query = { $or: orConditions };
+
+    // 🧮 MongoDB aggregation update for discount calculation
     let update = {};
     if (rule.discountType === 'percentage') {
-      update = {
-        $set: {
-          finalPrice: {
-            $max: [{ $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }] }, 0],
+      update = [
+        {
+          $set: {
+            finalPrice: {
+              $max: [{ $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }] }, 0],
+            },
+            salePrice: {
+              $max: [{ $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }] }, 0],
+            },
+            discountType: rule.discountType,
+            discountValue: rule.discountValue,
+            discount: { $multiply: ['$basePrice', rule.discountValue / 100] },
           },
-          salePrice: {
-            $max: [{ $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }] }, 0],
-          },
-          discountType: rule.discountType,
-          discountValue: rule.discountValue,
-          discount: { $multiply: ['$basePrice', rule.discountValue / 100] },
         },
-      };
+      ];
     } else if (rule.discountType === 'fixed') {
-      update = {
-        $set: {
-          finalPrice: { $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0] },
-          salePrice: { $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0] },
-          discountType: rule.discountType,
-          discountValue: rule.discountValue,
-          discount: rule.discountValue,
+      update = [
+        {
+          $set: {
+            finalPrice: { $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0] },
+            salePrice: { $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0] },
+            discountType: rule.discountType,
+            discountValue: rule.discountValue,
+            discount: rule.discountValue,
+          },
         },
-      };
+      ];
+    } else {
+      throw new Error('Invalid discount type');
     }
 
-    // Use updateMany with aggregation pipeline (MongoDB >= 4.2)
-    const result = await Product.updateMany(query, [update]);
-    return res.json({ success: true, modifiedCount: result.modifiedCount });
-    // return result.modifiedCount;
+    // ⚙️ Fetch affected products (for tracking)
+    const affectedProducts = await Product.find(query, '_id');
+    if (!affectedProducts.length) return res.json({ success: false, message: 'No matching products found' });
+
+    // 🧾 Apply the update
+    const result = await Product.updateMany(query, update);
+
+    // 🗂️ Track which products got this rule applied
+    const appliedRecords = affectedProducts.map((p) => ({
+      ruleId: rule._id,
+      productId: p._id,
+    }));
+
+    await AppliedDiscount.insertMany(appliedRecords);
+    await DiscountRule.findByIdAndUpdate(ruleId, { in_use: true });
+
+    return res.json({
+      success: true,
+      message: `Discount rule applied successfully to ${affectedProducts.length} products`,
+      modifiedCount: result.modifiedCount,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: error.message });
@@ -198,21 +223,17 @@ exports.applyDiscountRule = async (req, res) => {
 exports.removeDiscountRule = async (req, res) => {
   try {
     const ruleId = req.params.ruleId;
-
     const rule = await DiscountRule.findById(ruleId);
     if (!rule) throw new Error('Rule not found');
 
-    const query = {
-      $or: [
-        { category: { $in: rule.categoryIds || [] } }, // single ObjectId
-        { tags: { $in: rule.tags || [] } }, // array field
-        { brand: { $in: rule.brandIds || [] } }, // single value
-      ],
-      discountType: rule.discountType,
-      discountValue: rule.discountValue,
-    };
+    // 🔍 Find all product IDs where this rule was applied
+    const applied = await AppliedDiscount.find({ ruleId, isActive: true });
+    const productIds = applied.map((a) => a.productId);
 
-    const result = await Product.updateMany(query, [
+    if (!productIds.length) return res.json({ success: false, message: 'No active products found for this rule' });
+
+    // ♻️ Reset product prices to base
+    const result = await Product.updateMany({ _id: { $in: productIds } }, [
       {
         $set: {
           finalPrice: '$basePrice',
@@ -223,12 +244,16 @@ exports.removeDiscountRule = async (req, res) => {
         },
       },
     ]);
- await DiscountRule.findByIdAndUpdate(
-  ruleId,
-  { isActive: false },
-  { new: true, runValidators: true }
-);
-    return res.json({ success: true, modifiedCount: result.modifiedCount });
+
+    // 🗂️ Mark AppliedDiscounts as inactive
+    await AppliedDiscount.updateMany({ ruleId, isActive: true }, { $set: { isActive: false, removedAt: new Date() } });
+
+    await DiscountRule.findByIdAndUpdate(ruleId, { isActive: false, in_use: false }, { new: true, runValidators: true });
+
+    return res.json({
+      success: true,
+      message: `Removed discount rule from ${result.modifiedCount} products`,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: error.message });

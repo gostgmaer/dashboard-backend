@@ -1261,6 +1261,7 @@ static async socialMediaLogin(req, res) {
       res.locals.user = user;
       await user.setPassword(newPassword);
       user.resetToken = null;
+      user.isVerified = true;
       user.resetTokenExpiration = null;
       user.passwordReset = {
         token: null,

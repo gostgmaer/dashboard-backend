@@ -32,6 +32,7 @@ const discountRuleSchema = new mongoose.Schema(
     priority: { type: Number, default: 100 }, // lower number = higher priority
     exclusive: { type: Boolean, default: false }, // if true, stop further stacking after this rule
     isActive: { type: Boolean, default: false },
+    in_use: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
