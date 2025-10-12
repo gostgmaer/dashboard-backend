@@ -75,6 +75,15 @@ router.get(
   roleController.getRoleStatistics
 );
 
+// GET /api/role/active - Get all active roles
+router.get(
+  '/active',
+  authMiddleware,
+
+  // roleValidation.query,
+  roleController.getActiveRole
+);
+
 // GET /api/role/:id - Get a single role by ID
 router.get(
   '/:id',
@@ -115,14 +124,6 @@ router.delete(
 // 🔍 ROLE MANAGEMENT
 // ========================================
 
-// GET /api/role/active - Get all active roles
-router.get(
-  '/active',
-  authMiddleware,
-
-  roleValidation.query,
-  roleController.getActiveRole
-);
 
 // POST /api/role/default - Set a default role
 router.post(
