@@ -4,6 +4,7 @@ const discountRuleSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     description: { type: String },
+    in_use: { type: Boolean, default: false },
 
     // Strategy
     discountType: { type: String, enum: ['percentage', 'fixed'], required: true },
@@ -24,11 +25,13 @@ const discountRuleSchema = new mongoose.Schema(
     // Scheduling
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     // Engine controls
     priority: { type: Number, default: 100 }, // lower number = higher priority
     exclusive: { type: Boolean, default: false }, // if true, stop further stacking after this rule
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

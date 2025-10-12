@@ -19,15 +19,55 @@ exports.upsertDiscountRule = async (req, res) => {
 };
 
 // List active discount rules (with filters)
+// List discount rules with pagination and filters
 exports.listDiscountRules = async (req, res) => {
   try {
-    const { activeOnly = 'true' } = req.query;
+    const { page = 1, limit = 10, activeOnly = 'false', search = '' } = req.query;
+
     const query = {};
+
+    // Filter for active rules if requested
     if (activeOnly === 'true') query.isActive = true;
-    const rules = await DiscountRule.find(query).sort({ priority: 1, startDate: -1 });
-    res.json(rules);
+
+    // Optional search (e.g., by name or description)
+    if (search) {
+      query.$or = [{ name: { $regex: search, $options: 'i' } }, { description: { $regex: search, $options: 'i' } }];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Count total matching records
+    const total = await DiscountRule.countDocuments(query);
+
+    // Fetch rules with pagination
+    const result = await DiscountRule.find(query).sort({ priority: 1, startDate: -1 }).skip(skip).limit(parseInt(limit));
+
+    // Pagination details
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      data: {
+        result,
+        pagination: {
+          page: parseInt(page),
+          totalPages,
+          total,
+          hasNext: parseInt(page) < totalPages,
+          hasPrev: parseInt(page) > 1,
+          limit: parseInt(limit),
+        },
+      },
+      message: `Retrieved ${total} discount rules`,
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Error fetching discount rules:', err);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: err.message || 'Server error while fetching discount rules',
+    });
   }
 };
 
@@ -163,21 +203,31 @@ exports.removeDiscountRule = async (req, res) => {
     if (!rule) throw new Error('Rule not found');
 
     const query = {
-      $or: [{ categories: { $in: rule.categories || [] } }, { tags: { $in: rule.tags || [] } }, { brand: { $in: rule.brands || [] } }],
+      $or: [
+        { category: { $in: rule.categoryIds || [] } }, // single ObjectId
+        { tags: { $in: rule.tags || [] } }, // array field
+        { brand: { $in: rule.brandIds || [] } }, // single value
+      ],
       discountType: rule.discountType,
       discountValue: rule.discountValue,
     };
 
-    const result = await Product.updateMany(query, {
-      $set: {
-        finalPrice: '$basePrice',
-        salePrice: '$basePrice',
-        discountType: 'none',
-        discountValue: 0,
-        discount: 0,
+    const result = await Product.updateMany(query, [
+      {
+        $set: {
+          finalPrice: '$basePrice',
+          salePrice: '$basePrice',
+          discountType: 'none',
+          discountValue: 0,
+          discount: 0,
+        },
       },
-    });
-
+    ]);
+ await DiscountRule.findByIdAndUpdate(
+  ruleId,
+  { isActive: false },
+  { new: true, runValidators: true }
+);
     return res.json({ success: true, modifiedCount: result.modifiedCount });
   } catch (error) {
     console.error(error);
