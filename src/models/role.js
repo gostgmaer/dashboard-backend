@@ -119,7 +119,7 @@ roleSchema.methods.toAPIResponse = function () {
 
 // Get all active roles
 roleSchema.statics.getActiveRoles = function () {
-  return this.find({ isActive: true }).sort({ name: 1 });
+  return this.find({ isActive: true }).sort({ name: 1 }).select('name isActive');
 };
 
 // Get role with permissions populated
