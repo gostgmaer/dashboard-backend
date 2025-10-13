@@ -384,7 +384,7 @@ roleSchema.statics.getCompleteRoleStatistics = async function () {
     const defaultRoles = await this.countDocuments({ isDefault: true });
 
     // Get all roles with populated permissions
-    const allRoles = await this.find({ isDeleted: false }).populate('permissions').populate('created_by', 'name email').populate('updated_by', 'name email');
+    const allRoles = await this.find({ isDeleted: false }).populate('permissions')
 
     const userCountMap = {};
     // Total users in system
@@ -460,8 +460,7 @@ roleSchema.statics.getCompleteRoleStatistics = async function () {
         categoriesCount: Object.keys(permissionsByRoleCategory).length,
         createdAt: role.createdAt,
         updatedAt: role.updatedAt,
-        created_by: role.created_by,
-        updated_by: role.updated_by,
+
         isInUse: userCount > 0,
       };
     });
@@ -517,20 +516,20 @@ roleSchema.statics.getCompleteRoleStatistics = async function () {
           : null,
         leastUsedRole: leastUsedRole
           ? {
-              name: leastUsedRole[leastUsedRole.length - 1].name,
-              userCount: leastUsedRole[leastUsedRole.length - 1].userCount,
+              name: leastUsedRole.name,
+              userCount: leastUsedRole.userCount,
             }
           : null,
         roleWithMostPermissions: roleWithMostPermissions
           ? {
-              name: roleWithMostPermissions.name,
+              name: roleWithMostPermissions?.name,
               permissionCount: roleWithMostPermissions.permissionCount,
             }
           : null,
         roleWithLeastPermissions: roleWithLeastPermissions
           ? {
-              name: roleWithLeastPermissions[leastUsedRole.length - 1].name,
-              permissionCount: roleWithLeastPermissions[leastUsedRole.length - 1].permissionCount,
+              name: roleWithLeastPermissions.name,
+              permissionCount: roleWithLeastPermissions.permissionCount,
             }
           : null,
       },

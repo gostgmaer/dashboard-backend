@@ -75,16 +75,9 @@
       body('name').isString().withMessage('Name must be a string').isLength({ min: 1, max: 100 }).withMessage('Name must be between 1 and 100 characters').trim().escape(),
       body('discountType').isIn(['percentage', 'fixed', 'buy_x_get_y']).withMessage('Type must be percentage, fixed, or buy_x_get_y'),
       body('discountValue').isFloat({ min: 0 }).withMessage('Value must be a non-negative number').toFloat(),
-      body('conditions').isObject().withMessage('Conditions must be an object'),
-      body('conditions.minPurchase').optional().isFloat({ min: 0 }).withMessage('Minimum purchase must be a non-negative number').toFloat(),
-      body('conditions.products').optional().isArray().withMessage('Products must be an array'),
-      body('conditions.products.*').optional().isMongoId().withMessage('Invalid product ID in conditions'),
-      body('conditions.categories').optional().isArray().withMessage('Categories must be an array'),
-      body('conditions.categories.*').optional().isMongoId().withMessage('Invalid category ID in conditions'),
       body('startDate').isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
       body('endDate').isISO8601().withMessage('End date must be a valid ISO 8601 date'),
       body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
-      body('userId').isMongoId().withMessage('Valid user ID is required'),
       validate
     ],
 

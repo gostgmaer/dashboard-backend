@@ -1262,6 +1262,7 @@ static async socialMediaLogin(req, res) {
       await user.setPassword(newPassword);
       user.resetToken = null;
       user.isVerified = true;
+      user.status = "active";
       user.resetTokenExpiration = null;
       user.passwordReset = {
         token: null,
@@ -1272,7 +1273,7 @@ static async socialMediaLogin(req, res) {
       await user.revokeAllTokens('password_reset');
       await user.save();
       await user.logSecurityEvent('password_reset_completed', 'Password reset completed', 'high', deviceInfo);
-      NotificationMiddleware.onPasswordReset(req, res, () => {});
+      NotificationMiddleware.onPasswordResetDual(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -1437,6 +1438,7 @@ static async socialMediaLogin(req, res) {
 
         if (isValid) {
           user.emailVerified = true;
+            user.emailVerified = true;
           await user.save();
           await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
 

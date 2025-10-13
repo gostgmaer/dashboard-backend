@@ -245,16 +245,16 @@ class UserController {
         { path: 'created_by', select: 'name email' },
       ]);
       // Using manual logging with detailed info
-      await ActivityHelper.logCRUD(req, 'User', 'create', {
-        id: user._id,
-        role: user.role.name,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      });
+      // await ActivityHelper.logCRUD(req, 'User', 'create', {
+      //   id: user._id,
+      //   role: user.role.name,
+      //   email: user.email,
+      //   firstName: user.firstName,
+      //   lastName: user.lastName,
+      // });
       res.locals.createdUser = user;
-      await sendEmail(welcomeEmailTemplate, user);
-      NotificationMiddleware.onUserCreate(req, res, () => {});
+      // await sendEmail(welcomeEmailTemplate, user);
+      // NotificationMiddleware.onUserCreate(req, res, () => {});
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);

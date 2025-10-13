@@ -161,6 +161,9 @@ router.get('/all',
   productValidation.query,
   ProductController.getAdvanceProductSearch
 );
+
+router.get('/active-data', ProductController.getActiveDealStatics);
+
 // GET /api/products/database-stats - Get database statistics
 router.get('/database-stats',
   // authMiddleware,
