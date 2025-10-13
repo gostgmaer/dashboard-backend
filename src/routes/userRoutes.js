@@ -125,7 +125,7 @@ const userValidation = {
 // POST /api/users - Create new user
 router.post(
   '/',
-  authMiddleware,
+  // authMiddleware,
 
   userValidation.create,
   UserController.createUser

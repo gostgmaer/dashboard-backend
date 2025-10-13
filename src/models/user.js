@@ -50,7 +50,6 @@ const userSchema = new mongoose.Schema(
   {
     // ─────────── Identity & Authentication ───────────
     username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 30 },
-    socialID: { type: String, default: null },
     email: { type: String, required: true, unique: true },
     hash_password: { type: String, required: false },
     role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
@@ -264,7 +263,7 @@ const userSchema = new mongoose.Schema(
     // Device Management
     knownDevices: [
       {
-        deviceId: { type: String, required: true, unique: true },
+        deviceId: { type: String, required: true,  },
         name: { type: String, default: null },
         type: { type: String, default: null },
         os: { type: String, default: null },
@@ -2533,7 +2532,7 @@ userSchema.method({
     this.emailVerified = true;
     this.isVerified = true;
     this.emailVerificationTokens = [];
-    this.status = this.isVerified ? 'active' : 'pending';
+    this.status = 'active'
 
     await this.save();
     return true;
@@ -2649,7 +2648,7 @@ userSchema.method({
         isActive: true,
         fingerprint: deviceInfo.fingerprint || null,
       };
-      console.log(device);
+      // console.log(device);
 
       this.knownDevices.push(device);
 
