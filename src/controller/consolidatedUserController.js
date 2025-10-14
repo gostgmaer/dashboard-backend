@@ -245,16 +245,16 @@ class UserController {
         { path: 'created_by', select: 'name email' },
       ]);
       // Using manual logging with detailed info
-      // await ActivityHelper.logCRUD(req, 'User', 'create', {
-      //   id: user._id,
-      //   role: user.role.name,
-      //   email: user.email,
-      //   firstName: user.firstName,
-      //   lastName: user.lastName,
-      // });
+      await ActivityHelper.logCRUD(req, 'User', 'create', {
+        id: user._id,
+        role: user.role.name,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      });
       res.locals.createdUser = user;
-      // await sendEmail(welcomeEmailTemplate, user);
-      // NotificationMiddleware.onUserCreate(req, res, () => {});
+      await sendEmail(welcomeEmailTemplate, user);
+      NotificationMiddleware.onUserCreate(req, res, () => {});
       return UserController.standardResponse(res, true, UserController.enrichUser(user), 'User created successfully', 201);
     } catch (error) {
       console.error('Create user error:', error);
@@ -471,6 +471,13 @@ class UserController {
         profileCompleteness: u.profileCompleteness,
         accountAge: Math.floor((Date.now() - new Date(u.createdAt)) / (1000 * 60 * 60 * 24)),
       };
+      await ActivityHelper.logCRUD(req, 'User', 'viewed', {
+        id: data._id,
+        role: data.rolename,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      });
       return UserController.standardResponse(res, true, UserController.enrichUser(data), 'User created successfully', 200);
     } catch (error) {
       return UserController.errorResponse(res, 'Failed to Fetch user', 500, error.message);

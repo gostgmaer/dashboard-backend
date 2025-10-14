@@ -36,8 +36,9 @@ const { notificationRoute } = require('./src/routes/notificationRoutes');
 const resumeRoutes = require('./src/controller/resume/Resume_Routes');
 const templateRoutes = require('./src/controller/resume/Template_Routes');
 const fileRoutes = require('./src/routes/fileRoutes');
-const LoggerService = require("./src/services/logger");
+const LoggerService = require('./src/services/logger');
 const { componentsRoutes } = require('./src/routes/component');
+const DeviceDetector = require('./src/services/deviceDetector');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -45,15 +46,15 @@ const { componentsRoutes } = require('./src/routes/component');
 const app = express();
 
 // Middleware
-app.use(helmet());                 // Security headers
-app.use(cors());                   // Enable CORS
-app.use(morgan('dev'));            // HTTP request logging
-app.use(express.json());           // Parse JSON body
+app.use(helmet()); // Security headers
+app.use(cors()); // Enable CORS
+app.use(morgan('dev')); // HTTP request logging
+app.use(express.json()); // Parse JSON body
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded body
-app.use(cookieParser());           // Cookie parsing
+app.use(cookieParser()); // Cookie parsing
 
 function checkRoute(name, route) {
-  if (!route || typeof route !== "function") {
+  if (!route || typeof route !== 'function') {
     console.error(`❌ Route "${name}" is NOT a valid router. Got:`, route);
   } else {
     // console.log(`✅ Route "${name}" loaded successfully.`);
@@ -62,51 +63,57 @@ function checkRoute(name, route) {
 }
 
 app.use((req, res, next) => {
-  res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
-  res.setHeader('Critical-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+  const hints = 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Full-Version, Sec-CH-UA-Full-Version-List, Viewport-Width, Width, Device-Memory, RTT, Downlink, ECT, Save-Data';
+  const deviceInfo = DeviceDetector.detectDevice(req);
+  res.set({
+    'Accept-CH': hints,
+    'Critical-CH': hints,
+    Vary: 'User-Agent, Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform',
+  });
+  req.deviceInfo = deviceInfo;
   next();
 });
 
 verifyEmailConnection().then((result) => console.log(result));
 notificationService.socketService = socketService;
 
-// app.use(LoggerService.expressRequestLogger());
+app.use(LoggerService.expressRequestLogger());
 
 // Assuming your uploads folder is ./uploads relative to your project root
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
-app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
-app.use('/api/users', checkRoute("UserRoute", UserRoute));
-app.use('/api/wishlists', checkRoute("WishlistRoute", WishlistRoute));
-app.use('/api/categories', checkRoute("categoryRoute", categoryRoute));
-app.use('/api/setting', checkRoute("settingRoute", settingRoute));
-app.use('/api/reviews', checkRoute("reviewRoute", reviewRoute));
-app.use('/api/order', checkRoute("orderRoutes", orderRoutes));
-app.use('/api/permission', checkRoute("permissionRoute", permissionRoute));
-app.use('/api/roles', checkRoute("RoleRoutes", roleRoute));
-app.use('/api/carts', checkRoute("cartRoutes", cartRoutes));
-app.use('/api/brands', checkRoute("BrandRoute", BrandRoute));
-app.use('/api/auth', checkRoute("authRoute", authRoute));
-app.use('/api/attributes', checkRoute("attributeRouter", attributeRouter));
-app.use('/api/attachments', checkRoute("attachmentRoutes", attachmentRoutes));
-app.use('/api/addresses', checkRoute("addressRoute", addressRoute));
-app.use('/api/discounts', checkRoute("discountRoute", discountRoute));
-app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
-app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
-app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
-app.use('/api/files', checkRoute("Attachment Files", fileRoutes));
-app.use('/api/components', checkRoute("components", componentsRoutes));
+app.use('/api/notifications', checkRoute('notificationRoute', notificationRoute));
+app.use('/api/products', checkRoute('ProductRoute', ProductRoute));
+app.use('/api/users', checkRoute('UserRoute', UserRoute));
+app.use('/api/wishlists', checkRoute('WishlistRoute', WishlistRoute));
+app.use('/api/categories', checkRoute('categoryRoute', categoryRoute));
+app.use('/api/setting', checkRoute('settingRoute', settingRoute));
+app.use('/api/reviews', checkRoute('reviewRoute', reviewRoute));
+app.use('/api/order', checkRoute('orderRoutes', orderRoutes));
+app.use('/api/permission', checkRoute('permissionRoute', permissionRoute));
+app.use('/api/roles', checkRoute('RoleRoutes', roleRoute));
+app.use('/api/carts', checkRoute('cartRoutes', cartRoutes));
+app.use('/api/brands', checkRoute('BrandRoute', BrandRoute));
+app.use('/api/auth', checkRoute('authRoute', authRoute));
+app.use('/api/attributes', checkRoute('attributeRouter', attributeRouter));
+app.use('/api/attachments', checkRoute('attachmentRoutes', attachmentRoutes));
+app.use('/api/addresses', checkRoute('addressRoute', addressRoute));
+app.use('/api/discounts', checkRoute('discountRoute', discountRoute));
+app.use('/api/coupons', checkRoute('couponRouter', couponRouter));
+app.use('/api/contacts', checkRoute('contactsRoute', contactsRoute));
+app.use('/api/logs', checkRoute('Activity Logs', logRoutes));
+app.use('/api/files', checkRoute('Attachment Files', fileRoutes));
+app.use('/api/components', checkRoute('components', componentsRoutes));
 // API Routes
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/templates', templateRoutes);
 
 // Mount other feature routes here...
-app.get("/", (req, res) => {
-  res.send("APP is working!", JSON.stringify(req));
+app.get('/', (req, res) => {
+  res.send('APP is working!', JSON.stringify(req));
 });
 
-app.get("/api", (req, res) => {
-  res.send("api is working!", JSON.stringify(req));
+app.get('/api', (req, res) => {
+  res.send('api is working!', JSON.stringify(req));
 });
 // Healthcheck endpoint
 app.get('/health', (req, res) => {
