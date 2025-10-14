@@ -70,12 +70,11 @@ app.use((req, res, next) => {
 verifyEmailConnection().then((result) => console.log(result));
 notificationService.socketService = socketService;
 
-app.use(LoggerService.expressRequestLogger());
+// app.use(LoggerService.expressRequestLogger());
 
 // Assuming your uploads folder is ./uploads relative to your project root
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/notifications', checkRoute("notificationRoute", notificationRoute));
-
 app.use('/api/products', checkRoute("ProductRoute", ProductRoute));
 app.use('/api/users', checkRoute("UserRoute", UserRoute));
 app.use('/api/wishlists', checkRoute("WishlistRoute", WishlistRoute));

@@ -9,15 +9,13 @@ const { EventEmitter } = require('events');
 require('dotenv').config();
 
 const options = {
-
   // Connection pool
   maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 20, // increase pool size
-  minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 2,  // ensure warm connections
+  minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 2, // ensure warm connections
   maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000, // close idle sockets
 
   // Timeouts
-  serverSelectionTimeoutMS:
-    parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 5000,
+  serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 5000,
   socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 45000,
   connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000,
 
@@ -29,14 +27,14 @@ const options = {
   retryReads: true,
 
   // Compression (helps reduce network traffic for large workloads)
-  compressors: ["zlib"],
+  compressors: ['zlib'],
 
   // Read preference
-  readPreference: "primaryPreferred",
+  readPreference: 'primaryPreferred',
 
   // Write concern
   writeConcern: {
-    w: "majority",
+    w: 'majority',
     j: true,
     wtimeout: 10000,
   },
@@ -48,12 +46,11 @@ const options = {
 
   // Monitoring
   heartbeatFrequencyMS: parseInt(process.env.DB_HEARTBEAT) || 10000,
-  serverMonitoringMode: "auto",
+  serverMonitoringMode: 'auto',
 
   // Index build behavior
-  autoIndex: enviroment === "development", // disable in production for performance
+  autoIndex: enviroment === 'development', // disable in production for performance
   autoCreate: true,
-
 };
 
 const connectDB = async () => {
@@ -85,7 +82,7 @@ const connectDB = async () => {
     process.on('SIGINT', gracefulExit);
     process.on('SIGTERM', gracefulExit);
 
-    await mongoose.connect(dbUrl,{});
+    await mongoose.connect(dbUrl, {});
   } catch (error) {
     console.error('🚨 MongoDB connection error:', error);
     process.exit(1);
