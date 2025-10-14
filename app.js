@@ -37,6 +37,7 @@ const resumeRoutes = require('./src/controller/resume/Resume_Routes');
 const templateRoutes = require('./src/controller/resume/Template_Routes');
 const fileRoutes = require('./src/routes/fileRoutes');
 const LoggerService = require("./src/services/logger");
+const { componentsRoutes } = require('./src/routes/component');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -95,6 +96,7 @@ app.use('/api/coupons', checkRoute("couponRouter", couponRouter));
 app.use('/api/contacts', checkRoute("contactsRoute", contactsRoute));
 app.use('/api/logs', checkRoute("Activity Logs", logRoutes));
 app.use('/api/files', checkRoute("Attachment Files", fileRoutes));
+app.use('/api/components', checkRoute("components", componentsRoutes));
 // API Routes
 app.use('/api/resumes', resumeRoutes);
 app.use('/api/templates', templateRoutes);

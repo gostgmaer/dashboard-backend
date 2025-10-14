@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+const Brand = require('./brands');
+const Category = require('./categories');
+
 
 const variantSchema = new mongoose.Schema({
   sku: { type: String },
@@ -3432,12 +3435,35 @@ productSchema.statics._formatFilterResults = async function (result, params) {
     ...(stats && { stats }),
   };
 };
-
 productSchema.statics.getCompleteProductDashboardStatistics = async function () {
   try {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
-    const [totalProducts, activeProducts, deletedProducts, draftProducts, publishedProducts, featuredProducts, trendingProducts, newArrivals, bestsellers, productsOnSale, outOfStockCount, lowStockCount, healthyStockCount, autoRestockCount, productsWithSales, productsWithoutSales, productsWithDiscounts, productsWithReviews, ecoFriendlyCount, lowStockProductsCount, thisMonthProducts] = await Promise.all([
+    const [
+      totalProducts,
+      activeProducts,
+      deletedProducts,
+      draftProducts,
+      publishedProducts,
+      featuredProducts,
+      trendingProducts,
+      newArrivals,
+      bestsellers,
+      productsOnSale,
+      outOfStockCount,
+      lowStockCount,
+      healthyStockCount,
+      autoRestockCount,
+      productsWithSales,
+      productsWithoutSales,
+      productsWithDiscounts,
+      productsWithReviews,
+      ecoFriendlyCount,
+      lowStockProductsCount,
+      thisMonthProducts,
+      totalBrands,      // New
+      totalCategories   // New
+    ] = await Promise.all([
       Product.countDocuments({}), // Total products
       Product.countDocuments({ status: 'active', isDeleted: false }),
       Product.countDocuments({ isDeleted: true }),
@@ -3476,6 +3502,10 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
         createdAt: { $gte: startOfMonth },
         isDeleted: false,
       }),
+
+      // New additions
+      Brand.countDocuments({}),      // Total brands
+      Category.countDocuments({})    // Total categories
     ]);
 
     return {
@@ -3500,12 +3530,15 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       ecoFriendlyCount,
       lowStockProductsCount,
       thisMonthProducts,
+      totalBrands,       // New
+      totalCategories    // New
     };
   } catch (error) {
     console.error('Error fetching product dashboard counts:', error);
     throw error;
   }
 };
+
 
 const Product = mongoose.model('Product', productSchema);
 module.exports = Product;
