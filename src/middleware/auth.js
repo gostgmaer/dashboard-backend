@@ -1,21 +1,23 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const { jwtSecret } = require('../config/setting');
-const { createError } = require('./errorHandler');
+const { errorResponse } = require('../utils/apiUtils');
+const DeviceDetector = require('../services/deviceDetector');
 
 const authMiddleware = async (req, res, next) => {
   try {
+    const deviceInfo = DeviceDetector.detectDevice(req);
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return next(createError(401, 'Access denied. No token provided'));
+      return next(errorResponse(res, 'Access denied. No token provided', 401));
     }
 
     // Extract token
     const token = authHeader.replace('Bearer ', '') || req.cookies?.token;
 
     if (!token) {
-      return next(createError(401, 'Access denied. Invalid token format'));
+      return next(errorResponse(res, 'cess denied. Invalid token format', 401));
     }
 
     // Verify token
@@ -24,11 +26,11 @@ const authMiddleware = async (req, res, next) => {
       decoded = jwt.verify(token, jwtSecret);
     } catch (jwtError) {
       if (jwtError.name === 'TokenExpiredError') {
-        return next(createError(401, 'Access denied. Token expired'));
+        return next(errorResponse(res, 'Access denied. Token expired', 401));
       } else if (jwtError.name === 'JsonWebTokenError') {
-        return next(createError(401, 'Access denied. Invalid token'));
+        return next(errorResponse(res, 'Access denied. Invalid token', 401));
       } else {
-        return next(createError(401, 'Access denied. Token verification failed'));
+        return next(errorResponse(res, 'Access denied. Token verification failed', 401));
       }
     }
 
@@ -36,23 +38,24 @@ const authMiddleware = async (req, res, next) => {
     const user = await User.findByIdWithPermissions(decoded.userId);
 
     if (!user) {
-      return next(createError(401, 'Access denied. User not found'));
+      return next(errorResponse(res, 'Access denied. User not found', 401));
     }
 
     if (!user.isActive) {
-      return next(createError(401, 'Access denied. Account inactive'));
+      return next(errorResponse(res, 'Access denied. Account inactive', 401));
     }
 
     // Attach user data to request object
-    req.user = user ;
+    req.user = user;
     req.body.created_by = user._id;
     req.body.updated_by = user._id;
+    req.deviceInfo = deviceInfo;
     res.locals.user = user;
 
     next();
   } catch (error) {
     console.error('Token verification error:', error);
-    next(createError(500, 'Internal server error during authentication'));
+    return next(errorResponse(res, 'Internal server error during authentication', 500));
   }
 };
 
@@ -62,8 +65,9 @@ const authMiddleware = async (req, res, next) => {
  */
 const optionalAuth = async (req, res, next) => {
   try {
+    const deviceInfo = DeviceDetector.detectDevice(req);
     const authHeader = req.headers.authorization;
-
+    req.deviceInfo = deviceInfo;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next(); // Continue without authentication
     }

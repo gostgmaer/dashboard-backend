@@ -125,7 +125,7 @@ const userValidation = {
 // POST /api/users - Create new user
 router.post(
   '/',
-  // authMiddleware,
+  authMiddleware,
 
   userValidation.create,
   UserController.createUser
@@ -653,8 +653,8 @@ router.put(
   UserController.reactivateAccount
 );
 
-router.patch('/:userId/activate', authMiddleware,  UserController.activateUser);
-router.patch('/:userId/deactivate', authMiddleware,  UserController.deactivateUser);
+router.patch('/:userId/activate', authMiddleware, UserController.activateUser);
+router.patch('/:userId/deactivate', authMiddleware, UserController.deactivateUser);
 
 // PUT /api/users/:id/lock - Lock account
 router.put(
