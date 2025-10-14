@@ -5121,7 +5121,7 @@ class NotificationMiddleware {
   static async onDataBackupCompleted(req, res, next) {
     try {
       const backup = res.locals.backup;
-        const admins = await User.aggregate([
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5244,7 +5244,7 @@ class NotificationMiddleware {
   static async onServerRestarted(req, res, next) {
     try {
       const restartInfo = res.locals.restartInfo;
-       const admins = await User.aggregate([
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5394,8 +5394,8 @@ class NotificationMiddleware {
   static async onNewOrderPlaced(req, res, next) {
     try {
       const order = res.locals.order;
-     
-          const admins = await User.aggregate([
+
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5411,7 +5411,7 @@ class NotificationMiddleware {
         },
         {
           $match: {
-            'role_info.name': { $in: ['super_admin', 'admin','sales_manager'] }, // ✅ Match both roles
+            'role_info.name': { $in: ['super_admin', 'admin', 'sales_manager'] }, // ✅ Match both roles
           },
         },
         {
@@ -5457,8 +5457,8 @@ class NotificationMiddleware {
   static async onHighValueOrder(req, res, next) {
     try {
       const order = res.locals.order;
-     
-          const admins = await User.aggregate([
+
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5474,7 +5474,7 @@ class NotificationMiddleware {
         },
         {
           $match: {
-            'role_info.name': { $in: ['super_admin', 'admin','sales_manager'] }, // ✅ Match both roles
+            'role_info.name': { $in: ['super_admin', 'admin', 'sales_manager'] }, // ✅ Match both roles
           },
         },
         {
@@ -5590,8 +5590,8 @@ class NotificationMiddleware {
   static async onProductDisabled(req, res, next) {
     try {
       const product = res.locals.product;
-    
-          const admins = await User.aggregate([
+
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5607,7 +5607,7 @@ class NotificationMiddleware {
         },
         {
           $match: {
-            'role_info.name': { $in: ['super_admin', 'admin','product_manager'] }, // ✅ Match both roles
+            'role_info.name': { $in: ['super_admin', 'admin', 'product_manager'] }, // ✅ Match both roles
           },
         },
         {
@@ -5652,7 +5652,7 @@ class NotificationMiddleware {
   static async onNewUserRegistered(req, res, next) {
     try {
       const user = res.locals.registeredUser;
-       const admins = await User.aggregate([
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5749,7 +5749,7 @@ class NotificationMiddleware {
   static async onPaymentDisputeAlert(req, res, next) {
     try {
       const dispute = res.locals.dispute;
-        const admins = await User.aggregate([
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5765,7 +5765,7 @@ class NotificationMiddleware {
         },
         {
           $match: {
-            'role_info.name': { $in: ['super_admin', 'admin','finance_manager'] }, // ✅ Match both roles
+            'role_info.name': { $in: ['super_admin', 'admin', 'finance_manager'] }, // ✅ Match both roles
           },
         },
         {
@@ -5811,7 +5811,7 @@ class NotificationMiddleware {
   static async onReturnRequestNotification(req, res, next) {
     try {
       const returnRequest = res.locals.returnRequest;
-       const admins = await User.aggregate([
+      const admins = await User.aggregate([
         {
           $lookup: {
             from: 'roles',
@@ -5827,7 +5827,7 @@ class NotificationMiddleware {
         },
         {
           $match: {
-            'role_info.name': { $in: ['super_admin', 'admin','customer_service'] }, // ✅ Match both roles
+            'role_info.name': { $in: ['super_admin', 'admin', 'customer_service'] }, // ✅ Match both roles
           },
         },
         {
@@ -5889,7 +5889,7 @@ class NotificationMiddleware {
         },
         {
           $match: {
-            'role_info.name': { $in: ['super_admin', 'admin','finance_manager'] }, // ✅ Match both roles
+            'role_info.name': { $in: ['super_admin', 'admin', 'finance_manager'] }, // ✅ Match both roles
           },
         },
         {
@@ -7977,7 +7977,35 @@ class NotificationMiddleware {
       });
 
       // Admin notification
-      const admins = await User.find({ role: { $in: ['admin', 'security_manager'] } });
+      const admins = await User.aggregate([
+        {
+          $lookup: {
+            from: 'roles',
+            localField: 'role',
+            foreignField: '_id',
+            as: 'role_info',
+          },
+        },
+        {
+          $unwind: {
+            path: '$role_info',
+          },
+        },
+        {
+          $match: {
+            'role_info.name': { $in: ['super_admin', 'admin', 'security_manager'] }, // ✅ Match both roles
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            email: 1, // optional – include if you need it
+            role: '$role_info.name',
+          },
+        },
+      ]);
+
       for (const admin of admins) {
         await notificationService.create({
           recipient: admin._id,
@@ -8015,7 +8043,35 @@ class NotificationMiddleware {
       });
 
       // Admin notification
-      const admins = await User.find({ role: { $in: ['admin', 'finance_manager'] } });
+      const admins = await User.aggregate([
+        {
+          $lookup: {
+            from: 'roles',
+            localField: 'role',
+            foreignField: '_id',
+            as: 'role_info',
+          },
+        },
+        {
+          $unwind: {
+            path: '$role_info',
+          },
+        },
+        {
+          $match: {
+            'role_info.name': { $in: ['super_admin', 'admin', 'finance_manager'] }, // ✅ Match both roles
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            email: 1, // optional – include if you need it
+            role: '$role_info.name',
+          },
+        },
+      ]);
+
       for (const admin of admins) {
         await notificationService.create({
           recipient: admin._id,
@@ -8052,7 +8108,35 @@ class NotificationMiddleware {
       });
 
       // Admin notification
-      const admins = await User.find({ role: { $in: ['admin', 'finance_manager'] } });
+      const admins = await User.aggregate([
+        {
+          $lookup: {
+            from: 'roles',
+            localField: 'role',
+            foreignField: '_id',
+            as: 'role_info',
+          },
+        },
+        {
+          $unwind: {
+            path: '$role_info',
+          },
+        },
+        {
+          $match: {
+            'role_info.name': { $in: ['super_admin', 'admin', 'finance_manager'] }, // ✅ Match both roles
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            email: 1, // optional – include if you need it
+            role: '$role_info.name',
+          },
+        },
+      ]);
+
       for (const admin of admins) {
         await notificationService.create({
           recipient: admin._id,
@@ -8090,7 +8174,35 @@ class NotificationMiddleware {
       });
 
       // Admin notification
-      const admins = await User.find({ role: { $in: ['admin', 'security_manager'] } });
+
+      const admins = await User.aggregate([
+        {
+          $lookup: {
+            from: 'roles',
+            localField: 'role',
+            foreignField: '_id',
+            as: 'role_info',
+          },
+        },
+        {
+          $unwind: {
+            path: '$role_info',
+          },
+        },
+        {
+          $match: {
+            'role_info.name': { $in: ['super_admin', 'admin', 'security_manager'] }, // ✅ Match both roles
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            name: 1,
+            email: 1, // optional – include if you need it
+            role: '$role_info.name',
+          },
+        },
+      ]);
       for (const admin of admins) {
         await notificationService.create({
           recipient: admin._id,
