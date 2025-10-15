@@ -22,9 +22,6 @@ const passport = require('passport');
 const socialAccountControllers = require('./social-account-controllers');
 const { isSupportedProvider } = require('../services/socialProvider');
 
-
-
-
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
  * 
@@ -566,135 +563,130 @@ class authController {
     }
   }
 
-static async socialMediaLogin(req, res) {
-  try {
-    const { provider, accessToken, code, email, identityToken } = req.body;
-    if (!isSupportedProvider(provider)) {
-      return res.status(400).json({ success: false, message: 'Invalid social provider.' });
-    }
-
-    let profile;
-    switch (provider) {
-      case 'google':
-        profile = await socialAccountControllers.validateGoogleToken(accessToken || code);
-        break;
-      case 'facebook':
-        profile = await socialAccountControllers.validateFacebookToken(accessToken);
-        break;
-      case 'twitter':
-        profile = await socialAccountControllers.validateTwitterToken(accessToken, code);
-        break;
-      case 'github':
-        profile = await socialAccountControllers.validateGithubToken(accessToken || code);
-        break;
-      case 'apple':
-        profile = await socialAccountControllers.validateAppleToken(identityToken);
-        break;
-      case 'linkedin':
-        profile = await socialAccountControllers.validateLinkedInToken(accessToken);
-        break;
-      case 'microsoft':
-        profile = await socialAccountControllers.validateMicrosoftToken(accessToken);
-        break;
-      case 'discord':
-        profile = await socialAccountControllers.validateDiscordToken(accessToken);
-        break;
-      default:
-        return res.status(400).json({ success: false, message: 'Unsupported provider.' });
-    }
-
-    if (!profile || !(profile.id || profile.sub)) {
-      return res.status(400).json({ success: false, message: 'Failed to retrieve social profile.' });
-    }
-
-    const providerId = profile.id || profile.sub;
-    const providerEmail = profile.email || email;
-
-    // Try to find existing user by linked social account
-    let user = await User.findOne({
-      socialAccounts: {
-        $elemMatch: { provider, providerId }
+  static async socialMediaLogin(req, res) {
+    try {
+      const { provider, accessToken, code, email, identityToken } = req.body;
+      if (!isSupportedProvider(provider)) {
+        return res.status(400).json({ success: false, message: 'Invalid social provider.' });
       }
-    });
 
-    let isNewUser = false;
-    if (!user) {
-      // Try finding user by email if provided (to link with existing account)
-      if (providerEmail) {
-        user = await User.findOne({ email: providerEmail.toLowerCase() });
+      let profile;
+      switch (provider) {
+        case 'google':
+          profile = await socialAccountControllers.validateGoogleToken(accessToken || code);
+          break;
+        case 'facebook':
+          profile = await socialAccountControllers.validateFacebookToken(accessToken);
+          break;
+        case 'twitter':
+          profile = await socialAccountControllers.validateTwitterToken(accessToken, code);
+          break;
+        case 'github':
+          profile = await socialAccountControllers.validateGithubToken(accessToken || code);
+          break;
+        case 'apple':
+          profile = await socialAccountControllers.validateAppleToken(identityToken);
+          break;
+        case 'linkedin':
+          profile = await socialAccountControllers.validateLinkedInToken(accessToken);
+          break;
+        case 'microsoft':
+          profile = await socialAccountControllers.validateMicrosoftToken(accessToken);
+          break;
+        case 'discord':
+          profile = await socialAccountControllers.validateDiscordToken(accessToken);
+          break;
+        default:
+          return res.status(400).json({ success: false, message: 'Unsupported provider.' });
       }
+
+      if (!profile || !(profile.id || profile.sub)) {
+        return res.status(400).json({ success: false, message: 'Failed to retrieve social profile.' });
+      }
+
+      const providerId = profile.id || profile.sub;
+      const providerEmail = profile.email || email;
+
+      // Try to find existing user by linked social account
+      let user = await User.findOne({
+        socialAccounts: {
+          $elemMatch: { provider, providerId },
+        },
+      });
+
+      let isNewUser = false;
       if (!user) {
-        // Create new user account
-        user = new User({
-          email: providerEmail || '',
-          socialAccounts: [{
+        // Try finding user by email if provided (to link with existing account)
+        if (providerEmail) {
+          user = await User.findOne({ email: providerEmail.toLowerCase() });
+        }
+        if (!user) {
+          // Create new user account
+          user = new User({
+            email: providerEmail || '',
+            socialAccounts: [
+              {
+                provider,
+                providerId,
+                email: providerEmail,
+                verified: true,
+                connectedAt: new Date(),
+              },
+            ],
+            username: profile.name || profile.email || '',
+            status: 'active',
+          });
+          isNewUser = true;
+          await user.save();
+        } else {
+          // Link new social account to existing user
+          user.socialAccounts.push({
             provider,
             providerId,
             email: providerEmail,
             verified: true,
-            connectedAt: new Date()
-          }],
-          username: profile.name || profile.email || '',
-          status: 'active'
-        });
-        isNewUser = true;
-        await user.save();
-      } else {
-        // Link new social account to existing user
-        user.socialAccounts.push({
+            connectedAt: new Date(),
+          });
+          await user.save();
+        }
+      }
+
+      // Generate JWT or session tokens as per your auth mechanism
+      const deviceInfo = DeviceDetector.detectDevice(req);
+      const tokens = await user.generateTokens(deviceInfo);
+
+      // Log security event
+      await user.logSecurityEvent(isNewUser ? 'social_registration' : 'social_login', `${isNewUser ? 'New user registered' : 'User logged in'} via ${provider}`, 'low', { ...deviceInfo, provider, isNewUser });
+
+      res.status(200).json({
+        success: true,
+        message: `${isNewUser ? 'Account created and logged in' : 'Logged in'} successfully via ${provider}`,
+        data: {
+          user: {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            socialAccounts: user.socialAccounts,
+            status: user.status,
+          },
+          tokens: {
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresAt: tokens.accessTokenExpiresAt,
+          },
+          isNewUser,
           provider,
-          providerId,
-          email: providerEmail,
-          verified: true,
-          connectedAt: new Date()
-        });
-        await user.save();
-      }
+        },
+      });
+    } catch (error) {
+      logger.error('Social login error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Social login failed',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed',
+      });
     }
-
-    // Generate JWT or session tokens as per your auth mechanism
-    const deviceInfo = DeviceDetector.detectDevice(req);
-    const tokens = await user.generateTokens(deviceInfo);
-
-    // Log security event
-    await user.logSecurityEvent(
-      isNewUser ? 'social_registration' : 'social_login',
-      `${isNewUser ? 'New user registered' : 'User logged in'} via ${provider}`,
-      'low',
-      { ...deviceInfo, provider, isNewUser }
-    );
-  
-    res.status(200).json({
-      success: true,
-      message: `${isNewUser ? 'Account created and logged in' : 'Logged in'} successfully via ${provider}`,
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          socialAccounts: user.socialAccounts,
-          status: user.status
-        },
-        tokens: {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresAt: tokens.accessTokenExpiresAt
-        },
-        isNewUser,
-        provider
-      }
-    });
-
-  } catch (error) {
-    logger.error('Social login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Social login failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed'
-    });
   }
-}
-
 
   /**
    * VERIFY OTP and complete login
@@ -1262,7 +1254,7 @@ static async socialMediaLogin(req, res) {
       await user.setPassword(newPassword);
       user.resetToken = null;
       user.isVerified = true;
-      user.status = "active";
+      user.status = 'active';
       user.resetTokenExpiration = null;
       user.passwordReset = {
         token: null,
@@ -1438,7 +1430,7 @@ static async socialMediaLogin(req, res) {
 
         if (isValid) {
           user.emailVerified = true;
-            user.emailVerified = true;
+          user.emailVerified = true;
           await user.save();
           await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
 
@@ -1542,27 +1534,32 @@ static async socialMediaLogin(req, res) {
       const user = req.user;
       const now = new Date();
 
-      const activeSessions = user.tokens
-        .filter((token) => !token.isRevoked && token.expiresAt > now)
-        .map((token) => ({
-          tokenId: token._id,
-          deviceId: token.deviceId,
-          ipAddress: token.ipAddress,
-          createdAt: token.createdAt,
-          expiresAt: token.expiresAt,
-          isCurrent: token.token === req.token,
+      // Filter only valid (non-expired & active) sessions
+      const activeSessions = (user.activeSessions || [])
+        .filter((session) => session.isActive && session.expiresAt > now)
+        .map((session) => ({
+          sessionId: session.sessionId,
+          deviceId: session.deviceId,
+          browser: session.browser || 'Unknown',
+          ipAddress: session.ipAddress || 'Unknown',
+          userAgent: session.userAgent || 'Unknown',
+          createdAt: session.createdAt,
+          lastActivity: session.lastActivity,
+          expiresAt: session.expiresAt,
+          isCurrent: session.sessionId === req.sessionId, // Mark current session
         }));
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: {
-          activeSessions,
+          items: activeSessions,
           totalSessions: activeSessions.length,
-          maxSessions: user.concurrentSessionLimit,
+          maxSessions: user.concurrentSessionLimit || null,
         },
       });
     } catch (error) {
-      res.status(500).json({
+      console.error('Error fetching active sessions:', error);
+      return res.status(500).json({
         success: false,
         message: 'Failed to retrieve active sessions',
       });
@@ -3176,9 +3173,9 @@ static async socialMediaLogin(req, res) {
       }
 
       req.session = {
-        linkingUserId:user._id.toString(),
+        linkingUserId: user._id.toString(),
         isLinking: true,
-      }
+      };
       // Store user ID in session for linking after OAuth
       // req.session.linkingUserId = user._id.toString();
       // req.session.isLinking = true;
