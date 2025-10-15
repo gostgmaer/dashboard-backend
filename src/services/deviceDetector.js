@@ -36,9 +36,9 @@ class DeviceDetector {
     }
 
     // Log if key hints are missing
-    if (platform.toLowerCase() === 'windows' && !platformVersion) {
-      console.warn('Missing Sec-CH-UA-Platform-Version header; OS detection may default to Windows 10. Ensure server sends Accept-CH header.');
-    }
+    // if (platform.toLowerCase() === 'windows' && !platformVersion) {
+    //   console.warn('Missing Sec-CH-UA-Platform-Version header; OS detection may default to Windows 10. Ensure server sends Accept-CH header.');
+    // }
     const deviceInfo = {
       // Basic identifiers
       userAgent,
