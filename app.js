@@ -62,15 +62,11 @@ function checkRoute(name, route) {
   return route;
 }
 
+
 app.use((req, res, next) => {
-  const hints = 'Sec-CH-UA, Sec Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Full-Version, Sec-CH-UA-Full-Version-List, Viewport-Width, Width, Device-Memory, RTT, Downlink, ECT, Save-Data';
-  const deviceInfo = DeviceDetector.detectDevice(req);
-  res.set({
-    'Accept-CH': hints,
-    'Critical-CH': hints,
-    Vary: 'User-Agent, Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform',
-  });
-  req.deviceInfo = deviceInfo;
+  res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+  res.setHeader('Critical-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+  req.deviceInfo = DeviceDetector.detectDevice(req);
   next();
 });
 
