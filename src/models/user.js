@@ -174,6 +174,7 @@ const userSchema = new mongoose.Schema(
       {
         sessionId: { type: String, required: true },
         deviceId: { type: String, required: true },
+        deviceInfo: { type: mongoose.Schema.Types.Mixed, default: {} },
         borwser: { type: String },
         createdAt: { type: Date, default: Date.now },
         lastActivity: { type: Date, default: Date.now },
@@ -263,7 +264,7 @@ const userSchema = new mongoose.Schema(
     // Device Management
     knownDevices: [
       {
-        deviceId: { type: String, required: true,  },
+        deviceId: { type: String, required: true },
         name: { type: String, default: null },
         type: { type: String, default: null },
         os: { type: String, default: null },
@@ -1371,6 +1372,7 @@ userSchema.method({
     const newSession = {
       sessionId,
       browser: browser.name,
+      deviceInfo: sessionData,
       deviceId: deviceId || crypto.randomUUID(),
       createdAt: new Date(),
       lastActivity: new Date(),
@@ -1905,7 +1907,6 @@ userSchema.method({
     await this.populate({
       path: 'role',
       populate: {
-        
         path: 'permissions', // populate the permissions inside role
         match: { isActive: true, isDeleted: false },
         select: 'category resource action key', // only include what’s needed
@@ -2532,7 +2533,7 @@ userSchema.method({
     this.emailVerified = true;
     this.isVerified = true;
     this.emailVerificationTokens = [];
-    this.status = 'active'
+    this.status = 'active';
 
     await this.save();
     return true;
