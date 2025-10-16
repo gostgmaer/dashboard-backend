@@ -1,4 +1,3 @@
-
 // controllers/resumeController.js
 const Resume = require('./model');
 const Template = require('./Template');
@@ -18,7 +17,7 @@ exports.createResume = catchAsync(async (req, res, next) => {
 
   const resumeData = {
     ...req.body,
-    userId: req.user._id
+    userId: req.user._id,
   };
 
   // Sanitize input data
@@ -26,9 +25,7 @@ exports.createResume = catchAsync(async (req, res, next) => {
 
   // Generate slug if personal info is provided
   if (resumeData.personalInfo?.firstName && resumeData.personalInfo?.lastName) {
-    resumeData.slug = generateSlug(
-      `${resumeData.personalInfo.firstName}-${resumeData.personalInfo.lastName}-${resumeData.title}`
-    );
+    resumeData.slug = generateSlug(`${resumeData.personalInfo.firstName}-${resumeData.personalInfo.lastName}-${resumeData.title}`);
   }
 
   const resume = await Resume.create(resumeData);
@@ -39,16 +36,7 @@ exports.createResume = catchAsync(async (req, res, next) => {
 
 // Get all resumes for a user
 exports.getResumes = catchAsync(async (req, res, next) => {
-  const {
-    page = 1,
-    limit = 20,
-    status,
-    visibility,
-    search,
-    sortBy = 'updatedAt',
-    sortOrder = 'desc',
-    tags
-  } = req.query;
+  const { page = 1, limit = 20, status, visibility, search, sortBy = 'updatedAt', sortOrder = 'desc', tags } = req.query;
 
   const skip = (page - 1) * limit;
   const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
@@ -64,7 +52,7 @@ exports.getResumes = catchAsync(async (req, res, next) => {
       tags: tags ? tags.split(',') : undefined,
       sort,
       skip: parseInt(skip),
-      limit: parseInt(limit)
+      limit: parseInt(limit),
     };
 
     resumes = await Resume.searchResumes(req.user._id, search, searchOptions);
@@ -82,12 +70,7 @@ exports.getResumes = catchAsync(async (req, res, next) => {
     if (visibility) query.visibility = visibility;
     if (tags) query.tags = { $in: tags.split(',') };
 
-    resumes = await Resume.find(query)
-      .populate('templateId', 'name previewUrl category')
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    resumes = await Resume.find(query).populate('templateId', 'name previewUrl category').sort(sort).skip(skip).limit(parseInt(limit)).lean();
 
     total = await Resume.countDocuments(query);
   }
@@ -97,27 +80,18 @@ exports.getResumes = catchAsync(async (req, res, next) => {
     totalPages: Math.ceil(total / limit),
     totalItems: total,
     hasNext: page * limit < total,
-    hasPrev: page > 1
+    hasPrev: page > 1,
   };
 
   sendResponse(res, 200, 'Resumes retrieved successfully', {
     resumes,
-    pagination
+    pagination,
   });
 });
 
 // Search resumes with advanced filters
 exports.searchResumes = catchAsync(async (req, res, next) => {
-  const {
-    q: searchQuery,
-    page = 1,
-    limit = 20,
-    status,
-    tags,
-    dateFrom,
-    dateTo,
-    sortBy = 'relevance'
-  } = req.query;
+  const { q: searchQuery, page = 1, limit = 20, status, tags, dateFrom, dateTo, sortBy = 'relevance' } = req.query;
 
   if (!searchQuery) {
     return next(new AppError('Search query is required', 400));
@@ -128,7 +102,7 @@ exports.searchResumes = catchAsync(async (req, res, next) => {
     status,
     tags: tags ? tags.split(',') : undefined,
     skip: parseInt(skip),
-    limit: parseInt(limit)
+    limit: parseInt(limit),
   };
 
   // Add date filtering if provided
@@ -151,7 +125,7 @@ exports.searchResumes = catchAsync(async (req, res, next) => {
   sendResponse(res, 200, 'Search completed successfully', {
     resumes,
     searchQuery,
-    filters: { status, tags, dateFrom, dateTo }
+    filters: { status, tags, dateFrom, dateTo },
   });
 });
 
@@ -165,7 +139,7 @@ exports.getResume = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   }).populate('templateId', 'name previewUrl category supportedFormats');
 
   if (!resume) {
@@ -195,7 +169,7 @@ exports.updateResume = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -204,12 +178,10 @@ exports.updateResume = catchAsync(async (req, res, next) => {
 
   // Create version before updating if significant changes
   const significantFields = ['personalInfo', 'experience', 'education', 'skills'];
-  const hasSignificantChanges = significantFields.some(field => 
-    updateData[field] && JSON.stringify(updateData[field]) !== JSON.stringify(resume[field])
-  );
+  const hasSignificantChanges = significantFields.some((field) => updateData[field] && JSON.stringify(updateData[field]) !== JSON.stringify(resume[field]));
 
   if (hasSignificantChanges) {
-    await resume.createVersion('Updated via API');
+    // await resume.createVersion('Updated via API');
   }
 
   // Sanitize update data
@@ -235,7 +207,7 @@ exports.deleteResume = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOneAndDelete({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -261,7 +233,7 @@ exports.updateSection = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -269,8 +241,7 @@ exports.updateSection = catchAsync(async (req, res, next) => {
   }
 
   // Validate section type
-  const validSections = ['personalInfo', 'experience', 'education', 'projects', 'skills', 
-                        'certifications', 'awards', 'volunteer', 'languages', 'customSections'];
+  const validSections = ['personalInfo', 'experience', 'education', 'projects', 'skills', 'certifications', 'awards', 'volunteer', 'languages', 'customSections'];
 
   if (!validSections.includes(sectionType)) {
     return next(new AppError('Invalid section type', 400));
@@ -319,7 +290,7 @@ exports.deleteSection = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -331,9 +302,7 @@ exports.deleteSection = catchAsync(async (req, res, next) => {
 
   // Handle section deletion
   if (Array.isArray(resume[sectionType])) {
-    resume[sectionType] = resume[sectionType].filter(item => 
-      item._id.toString() !== sectionId
-    );
+    resume[sectionType] = resume[sectionType].filter((item) => item._id.toString() !== sectionId);
   } else {
     return next(new AppError('Cannot delete from non-array section', 400));
   }
@@ -352,7 +321,7 @@ exports.applyTemplate = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -362,7 +331,7 @@ exports.applyTemplate = catchAsync(async (req, res, next) => {
   const template = await Template.findOne({
     _id: templateId,
     status: 'active',
-    $or: [{ isPublic: true }, { createdBy: req.user._id }]
+    $or: [{ isPublic: true }, { createdBy: req.user._id }],
   });
 
   if (!template) {
@@ -401,7 +370,7 @@ exports.duplicateResume = catchAsync(async (req, res, next) => {
 
   const originalResume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!originalResume) {
@@ -465,7 +434,7 @@ exports.importResume = catchAsync(async (req, res, next) => {
     resumeData.importSource = {
       type: source,
       originalData,
-      importedAt: new Date()
+      importedAt: new Date(),
     };
 
     const resume = await Resume.create(resumeData);
@@ -488,26 +457,22 @@ exports.getResumeStats = catchAsync(async (req, res, next) => {
         _id: null,
         totalResumes: { $sum: 1 },
         activeResumes: {
-          $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+          $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] },
         },
         draftResumes: {
-          $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] }
+          $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] },
         },
         publicResumes: {
-          $sum: { $cond: [{ $eq: ['$visibility', 'public'] }, 1, 0] }
+          $sum: { $cond: [{ $eq: ['$visibility', 'public'] }, 1, 0] },
         },
         totalViews: { $sum: '$viewCount' },
         totalDownloads: { $sum: '$downloadCount' },
-        averageViews: { $avg: '$viewCount' }
-      }
-    }
+        averageViews: { $avg: '$viewCount' },
+      },
+    },
   ]);
 
-  const recentActivity = await Resume.find({ userId })
-    .sort({ updatedAt: -1 })
-    .limit(5)
-    .select('title updatedAt status')
-    .lean();
+  const recentActivity = await Resume.find({ userId }).sort({ updatedAt: -1 }).limit(5).select('title updatedAt status').lean();
 
   const result = {
     ...(stats[0] || {
@@ -517,9 +482,9 @@ exports.getResumeStats = catchAsync(async (req, res, next) => {
       publicResumes: 0,
       totalViews: 0,
       totalDownloads: 0,
-      averageViews: 0
+      averageViews: 0,
     }),
-    recentActivity
+    recentActivity,
   };
 
   delete result._id;
@@ -538,7 +503,7 @@ exports.getVersions = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   }).select('versions currentVersion title');
 
   if (!resume) {
@@ -546,9 +511,7 @@ exports.getVersions = catchAsync(async (req, res, next) => {
   }
 
   const skip = (page - 1) * limit;
-  const versions = resume.versions
-    .sort((a, b) => b.versionNumber - a.versionNumber)
-    .slice(skip, skip + limit);
+  const versions = resume.versions.sort((a, b) => b.versionNumber - a.versionNumber).slice(skip, skip + limit);
 
   const total = resume.versions.length;
   const pagination = {
@@ -556,13 +519,13 @@ exports.getVersions = catchAsync(async (req, res, next) => {
     totalPages: Math.ceil(total / limit),
     totalItems: total,
     hasNext: page * limit < total,
-    hasPrev: page > 1
+    hasPrev: page > 1,
   };
 
   sendResponse(res, 200, 'Resume versions retrieved successfully', {
     currentVersion: resume.currentVersion,
     versions,
-    pagination
+    pagination,
   });
 });
 
@@ -576,7 +539,7 @@ exports.rollbackVersion = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -604,7 +567,7 @@ exports.createVersion = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -615,7 +578,7 @@ exports.createVersion = catchAsync(async (req, res, next) => {
 
   sendResponse(res, 200, 'Version created successfully', {
     currentVersion: resume.currentVersion,
-    totalVersions: resume.versions.length
+    totalVersions: resume.versions.length,
   });
 });
 
@@ -634,7 +597,7 @@ exports.updateVisibility = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -657,7 +620,7 @@ exports.updateVisibility = catchAsync(async (req, res, next) => {
   sendResponse(res, 200, 'Visibility updated successfully', {
     visibility: resume.visibility,
     shareToken: resume.shareToken,
-    shareSettings: resume.shareSettings
+    shareSettings: resume.shareSettings,
   });
 });
 
@@ -671,7 +634,7 @@ exports.generateShareLink = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    userId: req.user._id
+    userId: req.user._id,
   });
 
   if (!resume) {
@@ -685,7 +648,7 @@ exports.generateShareLink = catchAsync(async (req, res, next) => {
   sendResponse(res, 200, 'Share link generated successfully', {
     shareUrl,
     shareToken: resume.shareToken,
-    expiresAt: resume.shareSettings?.expiresAt
+    expiresAt: resume.shareSettings?.expiresAt,
   });
 });
 
@@ -699,10 +662,7 @@ exports.getSharedResume = catchAsync(async (req, res, next) => {
 
   const resume = await Resume.findOne({
     _id: id,
-    $or: [
-      { visibility: 'public' },
-      { visibility: 'link-only', shareToken: token }
-    ]
+    $or: [{ visibility: 'public' }, { visibility: 'link-only', shareToken: token }],
   }).populate('templateId', 'name previewUrl category');
 
   if (!resume) {
@@ -748,24 +708,26 @@ function processLinkedInData(linkedinData) {
       firstName: linkedinData.firstName,
       lastName: linkedinData.lastName,
       email: linkedinData.emailAddress,
-      linkedin: linkedinData.publicProfileUrl
+      linkedin: linkedinData.publicProfileUrl,
     },
     summary: linkedinData.summary,
-    experience: linkedinData.positions?.values?.map(pos => ({
-      company: pos.company?.name,
-      position: pos.title,
-      startDate: new Date(pos.startDate?.year, pos.startDate?.month - 1),
-      endDate: pos.endDate ? new Date(pos.endDate.year, pos.endDate.month - 1) : null,
-      isCurrent: !pos.endDate,
-      description: pos.summary
-    })) || [],
-    education: linkedinData.educations?.values?.map(edu => ({
-      institution: edu.schoolName,
-      degree: edu.degree,
-      fieldOfStudy: edu.fieldOfStudy,
-      startDate: new Date(edu.startDate?.year, 0),
-      endDate: new Date(edu.endDate?.year, 11)
-    })) || []
+    experience:
+      linkedinData.positions?.values?.map((pos) => ({
+        company: pos.company?.name,
+        position: pos.title,
+        startDate: new Date(pos.startDate?.year, pos.startDate?.month - 1),
+        endDate: pos.endDate ? new Date(pos.endDate.year, pos.endDate.month - 1) : null,
+        isCurrent: !pos.endDate,
+        description: pos.summary,
+      })) || [],
+    education:
+      linkedinData.educations?.values?.map((edu) => ({
+        institution: edu.schoolName,
+        degree: edu.degree,
+        fieldOfStudy: edu.fieldOfStudy,
+        startDate: new Date(edu.startDate?.year, 0),
+        endDate: new Date(edu.endDate?.year, 11),
+      })) || [],
   };
 }
 
@@ -782,24 +744,26 @@ function mapImportedData(data, source) {
           email: data.basics.email,
           phone: data.basics.phone,
           website: data.basics.website,
-          address: data.basics.location
+          address: data.basics.location,
         },
         summary: data.basics.summary,
-        experience: data.work?.map(work => ({
-          company: work.company,
-          position: work.position,
-          startDate: new Date(work.startDate),
-          endDate: work.endDate ? new Date(work.endDate) : null,
-          description: work.summary,
-          achievements: work.highlights || []
-        })) || [],
-        education: data.education?.map(edu => ({
-          institution: edu.institution,
-          degree: edu.studyType,
-          fieldOfStudy: edu.area,
-          startDate: new Date(edu.startDate),
-          endDate: new Date(edu.endDate)
-        })) || []
+        experience:
+          data.work?.map((work) => ({
+            company: work.company,
+            position: work.position,
+            startDate: new Date(work.startDate),
+            endDate: work.endDate ? new Date(work.endDate) : null,
+            description: work.summary,
+            achievements: work.highlights || [],
+          })) || [],
+        education:
+          data.education?.map((edu) => ({
+            institution: edu.institution,
+            degree: edu.studyType,
+            fieldOfStudy: edu.area,
+            startDate: new Date(edu.startDate),
+            endDate: new Date(edu.endDate),
+          })) || [],
       };
     }
 
