@@ -155,7 +155,7 @@ const ResumeVersionSchema = new Schema(
       },
     ],
     // createdAt: { type: Date, default: Date.now },
-    created_by: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    created_by: { type: Schema.Types.ObjectId, ref: 'User' },
     changeDescription: String,
   },
   { _id: false }

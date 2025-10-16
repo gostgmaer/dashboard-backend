@@ -1,4 +1,3 @@
-
 // routes/resumes.js
 const express = require('express');
 const router = express.Router();
@@ -22,7 +21,7 @@ router.get('/', resumeController.getResumes);
 router.get('/search', resumeController.searchResumes);
 router.get('/stats', resumeController.getResumeStats);
 router.get('/:id', resumeController.getResume);
-router.put('/:id', validateResume, resumeController.updateResume);
+router.put('/:id', resumeController.updateResume);
 router.delete('/:id', resumeController.deleteResume);
 
 // 🔹 Resume Sections Management

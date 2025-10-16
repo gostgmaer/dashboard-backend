@@ -62,7 +62,6 @@ function checkRoute(name, route) {
   return route;
 }
 
-
 app.use((req, res, next) => {
   res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
   res.setHeader('Critical-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
@@ -99,9 +98,11 @@ app.use('/api/contacts', checkRoute('contactsRoute', contactsRoute));
 app.use('/api/logs', checkRoute('Activity Logs', logRoutes));
 app.use('/api/files', checkRoute('Attachment Files', fileRoutes));
 app.use('/api/components', checkRoute('components', componentsRoutes));
+app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));
+app.use('/api/templates', checkRoute('components', templateRoutes));
 // API Routes
-app.use('/api/resumes', resumeRoutes);
-app.use('/api/templates', templateRoutes);
+// app.use('/api/resumes', resumeRoutes);
+// app.use('/api/templates', templateRoutes);
 
 // Mount other feature routes here...
 app.get('/', (req, res) => {
