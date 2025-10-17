@@ -541,7 +541,7 @@ class authController {
           user: {
             id: u._id,
             email: u.email,
-            image: u.profilePicture.image,
+            image: u.profilePicture.url,
             username: u.username,
             fullName: u.fullName,
             role: u.role?.name,
