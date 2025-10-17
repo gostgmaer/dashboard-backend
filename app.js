@@ -39,6 +39,7 @@ const fileRoutes = require('./src/routes/fileRoutes');
 const LoggerService = require('./src/services/logger');
 const { componentsRoutes } = require('./src/routes/component');
 const DeviceDetector = require('./src/services/deviceDetector');
+const { userActivityroute } = require('./src/routes/activity');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -96,6 +97,7 @@ app.use('/api/discounts', checkRoute('discountRoute', discountRoute));
 app.use('/api/coupons', checkRoute('couponRouter', couponRouter));
 app.use('/api/contacts', checkRoute('contactsRoute', contactsRoute));
 app.use('/api/logs', checkRoute('Activity Logs', logRoutes));
+app.use('/api/activity-logs', checkRoute('Activity Logs', userActivityroute));
 app.use('/api/files', checkRoute('Attachment Files', fileRoutes));
 app.use('/api/components', checkRoute('components', componentsRoutes));
 app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));

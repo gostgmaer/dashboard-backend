@@ -1,6 +1,6 @@
 // utils/activityHelpers.js
 const activityLogService = require('../services/activityLogService');
-
+const UserActivityLog = require('../models/UserActivityLog');
 /**
  * Helper function for manual activity logging in controllers
  */
@@ -160,14 +160,7 @@ class ActivityHelper {
    * Bulk log multiple activities (for batch operations)
    */
   static async logBatch(req, activities) {
-    const promises = activities.map(activity => 
-      this.logActivity(
-        req,
-        activity.action,
-        activity.additionalData,
-        activity.options
-      )
-    );
+    const promises = activities.map((activity) => this.logActivity(req, activity.action, activity.additionalData, activity.options));
 
     await Promise.allSettled(promises);
   }
@@ -176,14 +169,9 @@ class ActivityHelper {
    * Get user's recent activities
    */
   static async getUserActivities(userId, options = {}) {
-    const {
-      limit = 50,
-      days = 30,
-      category = null,
-      priority = null,
-    } = options;
+    const { limit = 50, page = 1, days = 30, category = null, priority = null, query = {} } = options;
 
-    const query = { userId };
+    query.userId = userId;
 
     if (days) {
       const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -198,18 +186,44 @@ class ActivityHelper {
       query.priority = priority;
     }
 
-    const UserActivityLog = require('../models/UserActivityLog');
-    return await UserActivityLog.find(query)
-      .sort({ timestamp: -1 })
-      .limit(limit)
-      .populate('userId', 'username email');
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [logs, total] = await Promise.all([UserActivityLog.find(query).sort({ timestamp: -1 }).skip(skip).limit(parseInt(limit)).lean(), UserActivityLog.countDocuments(query)]);
+
+    // Generate summaries for logs
+    const logsWithSummary = logs.map((log) => {
+      const action = log.action || 'performed action';
+      const entity = log.additionalData?.entity || 'entity';
+      const userEmail = log.additionalData?.entityData?.email || '';
+      const routeSegment = log.route ? log.route.split('/')[2] : '';
+      const statusCode = log.statusCode || '';
+
+      let summary = `${action} on ${entity}`;
+      if (userEmail) summary += ` for user ${userEmail}`;
+      if (routeSegment) summary += ` via ${routeSegment} route`;
+      summary += ` (status ${statusCode})`;
+      return { ...log, summary };
+    });
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      logs: logsWithSummary,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages,
+        hasPrevPage: page > 1,
+        hasNextPage: page < totalPages,
+      },
+    };
   }
 
   /**
    * Get activity analytics
    */
   static async getAnalytics(userId = null, days = 30) {
-    const UserActivityLog = require('../models/UserActivityLog');
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     const matchStage = { timestamp: { $gte: startDate } };
@@ -222,34 +236,34 @@ class ActivityHelper {
       {
         $group: {
           _id: {
-            date: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
-            category: "$category",
-            method: "$method"
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+            category: '$category',
+            method: '$method',
           },
           count: { $sum: 1 },
-          avgResponseTime: { $avg: "$responseTime" },
+          avgResponseTime: { $avg: '$responseTime' },
           errors: {
-            $sum: { $cond: [{ $gte: ["$statusCode", 400] }, 1, 0] }
-          }
-        }
+            $sum: { $cond: [{ $gte: ['$statusCode', 400] }, 1, 0] },
+          },
+        },
       },
       {
         $group: {
-          _id: "$_id.date",
+          _id: '$_id.date',
           categories: {
             $push: {
-              category: "$_id.category",
-              method: "$_id.method",
-              count: "$count",
-              avgResponseTime: "$avgResponseTime",
-              errors: "$errors"
-            }
+              category: '$_id.category',
+              method: '$_id.method',
+              count: '$count',
+              avgResponseTime: '$avgResponseTime',
+              errors: '$errors',
+            },
           },
-          totalRequests: { $sum: "$count" },
-          totalErrors: { $sum: "$errors" }
-        }
+          totalRequests: { $sum: '$count' },
+          totalErrors: { $sum: '$errors' },
+        },
       },
-      { $sort: { _id: -1 } }
+      { $sort: { _id: -1 } },
     ];
 
     return await UserActivityLog.aggregate(pipeline);
