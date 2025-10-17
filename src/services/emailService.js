@@ -77,234 +77,227 @@ class EmailService {
   // }
 
   // Create default email templates
-//   createDefaultTemplates(templatesDir) {
-//     const templates = {
-//       notification: `
-// <!DOCTYPE html>
-// <html>
-// <head>
-//     <meta charset="utf-8">
-//     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-//     <title>{{title}}</title>
-//     <style>
-//         body {
-//             font-family: Arial, sans-serif;
-//             line-height: 1.6;
-//             color: #333;
-//             max-width: 600px;
-//             margin: 0 auto;
-//             padding: 20px;
-//         }
-//         .header {
-//             background-color: #f8f9fa;
-//             padding: 20px;
-//             text-align: center;
-//             border-radius: 8px 8px 0 0;
-//         }
-//         .content {
-//             background-color: #ffffff;
-//             padding: 30px;
-//             border-left: 1px solid #e9ecef;
-//             border-right: 1px solid #e9ecef;
-//         }
-//         .footer {
-//             background-color: #f8f9fa;
-//             padding: 20px;
-//             text-align: center;
-//             font-size: 12px;
-//             color: #6c757d;
-//             border-radius: 0 0 8px 8px;
-//             border-top: 1px solid #e9ecef;
-//         }
-//         .button {
-//             display: inline-block;
-//             padding: 12px 24px;
-//             background-color: #007bff;
-//             color: white;
-//             text-decoration: none;
-//             border-radius: 5px;
-//             margin: 15px 0;
-//         }
-//         .priority-high {
-//             border-left: 4px solid #dc3545;
-//         }
-//         .priority-urgent {
-//             border-left: 4px solid #fd7e14;
-//         }
-//     </style>
-// </head>
-// <body>
-//     <div class="email-container">
-//         <div class="header">
-//             <h1>{{appName}}</h1>
-//         </div>
-        
-//         <div class="content {{#if priorityClass}}{{priorityClass}}{{/if}}">
-//             <h2>{{title}}</h2>
-//             <p>{{message}}</p>
-            
-//             {{#if actionUrl}}
-//             <div style="text-align: center; margin: 25px 0;">
-//                 <a href="{{actionUrl}}" class="button">View Details</a>
-//             </div>
-//             {{/if}}
-            
-//             {{#if additionalInfo}}
-//             <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-//                 <strong>Additional Information:</strong>
-//                 <ul>
-//                 {{#each additionalInfo}}
-//                     <li>{{this}}</li>
-//                 {{/each}}
-//                 </ul>
-//             </div>
-//             {{/if}}
-//         </div>
-        
-//         <div class="footer">
-//             <p>This email was sent from {{appName}}. If you no longer wish to receive these notifications, you can update your preferences in your account settings.</p>
-//             <p>&copy; {{year}} {{appName}}. All rights reserved.</p>
-//         </div>
-//     </div>
-// </body>
-// </html>`,
+  //   createDefaultTemplates(templatesDir) {
+  //     const templates = {
+  //       notification: `
+  // <!DOCTYPE html>
+  // <html>
+  // <head>
+  //     <meta charset="utf-8">
+  //     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  //     <title>{{title}}</title>
+  //     <style>
+  //         body {
+  //             font-family: Arial, sans-serif;
+  //             line-height: 1.6;
+  //             color: #333;
+  //             max-width: 600px;
+  //             margin: 0 auto;
+  //             padding: 20px;
+  //         }
+  //         .header {
+  //             background-color: #f8f9fa;
+  //             padding: 20px;
+  //             text-align: center;
+  //             border-radius: 8px 8px 0 0;
+  //         }
+  //         .content {
+  //             background-color: #ffffff;
+  //             padding: 30px;
+  //             border-left: 1px solid #e9ecef;
+  //             border-right: 1px solid #e9ecef;
+  //         }
+  //         .footer {
+  //             background-color: #f8f9fa;
+  //             padding: 20px;
+  //             text-align: center;
+  //             font-size: 12px;
+  //             color: #6c757d;
+  //             border-radius: 0 0 8px 8px;
+  //             border-top: 1px solid #e9ecef;
+  //         }
+  //         .button {
+  //             display: inline-block;
+  //             padding: 12px 24px;
+  //             background-color: #007bff;
+  //             color: white;
+  //             text-decoration: none;
+  //             border-radius: 5px;
+  //             margin: 15px 0;
+  //         }
+  //         .priority-high {
+  //             border-left: 4px solid #dc3545;
+  //         }
+  //         .priority-urgent {
+  //             border-left: 4px solid #fd7e14;
+  //         }
+  //     </style>
+  // </head>
+  // <body>
+  //     <div class="email-container">
+  //         <div class="header">
+  //             <h1>{{appName}}</h1>
+  //         </div>
 
-//       welcome: `
-// <!DOCTYPE html>
-// <html>
-// <head>
-//     <meta charset="utf-8">
-//     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-//     <title>Welcome to {{appName}}</title>
-//     <style>
-//         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-//         .welcome-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0; }
-//         .content { background-color: #ffffff; padding: 30px; border: 1px solid #e9ecef; }
-//         .button { display: inline-block; padding: 15px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-//         .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 8px 8px; }
-//     </style>
-// </head>
-// <body>
-//     <div class="welcome-header">
-//         <h1>Welcome to {{appName}}! 🎉</h1>
-//         <p>Your account has been successfully created</p>
-//     </div>
-    
-//     <div class="content">
-//         <p>Hi {{username}},</p>
-//         <p>Thank you for joining {{appName}}! We're excited to have you as part of our community.</p>
-        
-//         <p>Here are some things you can do to get started:</p>
-//         <ul>
-//             <li>Complete your profile setup</li>
-//             <li>Explore our features</li>
-//             <li>Connect with other users</li>
-//         </ul>
-        
-//         <div style="text-align: center;">
-//             <a href="{{dashboardUrl}}" class="button">Get Started</a>
-//         </div>
-        
-//         <p>If you have any questions, feel free to reach out to our support team.</p>
-//         <p>Best regards,<br>The {{appName}} Team</p>
-//     </div>
-    
-//     <div class="footer">
-//         <p>&copy; {{year}} {{appName}}. All rights reserved.</p>
-//     </div>
-// </body>
-// </html>`,
+  //         <div class="content {{#if priorityClass}}{{priorityClass}}{{/if}}">
+  //             <h2>{{title}}</h2>
+  //             <p>{{message}}</p>
 
-//       'order-confirmation': `
-// <!DOCTYPE html>
-// <html>
-// <head>
-//     <meta charset="utf-8">
-//     <title>Order Confirmation - {{orderNumber}}</title>
-//     <style>
-//         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-//         .order-header { background-color: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-//         .content { background-color: #ffffff; padding: 30px; border: 1px solid #e9ecef; }
-//         .order-details { background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }
-//         .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-//         .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-//         .items-table th { background-color: #f8f9fa; }
-//         .total { font-size: 18px; font-weight: bold; color: #28a745; }
-//     </style>
-// </head>
-// <body>
-//     <div class="order-header">
-//         <h1>Order Confirmed! ✅</h1>
-//         <p>Order #{{orderNumber}}</p>
-//     </div>
-    
-//     <div class="content">
-//         <p>Hi {{customerName}},</p>
-//         <p>Thank you for your order! We've received it and are processing it now.</p>
-        
-//         <div class="order-details">
-//             <h3>Order Details</h3>
-//             <p><strong>Order Number:</strong> {{orderNumber}}</p>
-//             <p><strong>Order Date:</strong> {{orderDate}}</p>
-//             <p><strong>Estimated Delivery:</strong> {{estimatedDelivery}}</p>
-//         </div>
-        
-//         {{#if items}}
-//         <table class="items-table">
-//             <thead>
-//                 <tr>
-//                     <th>Item</th>
-//                     <th>Quantity</th>
-//                     <th>Price</th>
-//                     <th>Total</th>
-//                 </tr>
-//             </thead>
-//             <tbody>
-//                 {{#each items}}
-//                 <tr>
-//                     <td>{{name}}</td>
-//                     <td>{{quantity}}</td>
-//                     <td>${{ price }}</td>
-//                     <td>${{ total }}</td>
-//                 </tr>
-//                 {{/each}}
-//             </tbody>
-//         </table>
-//         {{/if}}
-        
-//         <div style="text-align: right; margin-top: 20px;">
-//             <p class="total">Total: ${{ totalAmount }}</p>
-//         </div>
-        
-//         <p>We'll send you another email when your order ships with tracking information.</p>
-        
-//         <div style="text-align: center; margin: 25px 0;">
-//             <a href="{{trackingUrl}}" class="button">Track Your Order</a>
-//         </div>
-//     </div>
-// </body>
-// </html>`,
-//     };
+  //             {{#if actionUrl}}
+  //             <div style="text-align: center; margin: 25px 0;">
+  //                 <a href="{{actionUrl}}" class="button">View Details</a>
+  //             </div>
+  //             {{/if}}
 
-//     // Write templates to files
-//     Object.entries(templates).forEach(([name, content]) => {
-//       const filePath = path.join(templatesDir, `${name}.hbs`);
-//       fs.writeFileSync(filePath, content);
-//     });
+  //             {{#if additionalInfo}}
+  //             <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+  //                 <strong>Additional Information:</strong>
+  //                 <ul>
+  //                 {{#each additionalInfo}}
+  //                     <li>{{this}}</li>
+  //                 {{/each}}
+  //                 </ul>
+  //             </div>
+  //             {{/if}}
+  //         </div>
 
-//     console.log('Created default email templates');
-//   }
+  //         <div class="footer">
+  //             <p>This email was sent from {{appName}}. If you no longer wish to receive these notifications, you can update your preferences in your account settings.</p>
+  //             <p>&copy; {{year}} {{appName}}. All rights reserved.</p>
+  //         </div>
+  //     </div>
+  // </body>
+  // </html>`,
+
+  //       welcome: `
+  // <!DOCTYPE html>
+  // <html>
+  // <head>
+  //     <meta charset="utf-8">
+  //     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  //     <title>Welcome to {{appName}}</title>
+  //     <style>
+  //         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+  //         .welcome-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; border-radius: 8px 8px 0 0; }
+  //         .content { background-color: #ffffff; padding: 30px; border: 1px solid #e9ecef; }
+  //         .button { display: inline-block; padding: 15px 30px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+  //         .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 8px 8px; }
+  //     </style>
+  // </head>
+  // <body>
+  //     <div class="welcome-header">
+  //         <h1>Welcome to {{appName}}! 🎉</h1>
+  //         <p>Your account has been successfully created</p>
+  //     </div>
+
+  //     <div class="content">
+  //         <p>Hi {{username}},</p>
+  //         <p>Thank you for joining {{appName}}! We're excited to have you as part of our community.</p>
+
+  //         <p>Here are some things you can do to get started:</p>
+  //         <ul>
+  //             <li>Complete your profile setup</li>
+  //             <li>Explore our features</li>
+  //             <li>Connect with other users</li>
+  //         </ul>
+
+  //         <div style="text-align: center;">
+  //             <a href="{{dashboardUrl}}" class="button">Get Started</a>
+  //         </div>
+
+  //         <p>If you have any questions, feel free to reach out to our support team.</p>
+  //         <p>Best regards,<br>The {{appName}} Team</p>
+  //     </div>
+
+  //     <div class="footer">
+  //         <p>&copy; {{year}} {{appName}}. All rights reserved.</p>
+  //     </div>
+  // </body>
+  // </html>`,
+
+  //       'order-confirmation': `
+  // <!DOCTYPE html>
+  // <html>
+  // <head>
+  //     <meta charset="utf-8">
+  //     <title>Order Confirmation - {{orderNumber}}</title>
+  //     <style>
+  //         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+  //         .order-header { background-color: #28a745; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+  //         .content { background-color: #ffffff; padding: 30px; border: 1px solid #e9ecef; }
+  //         .order-details { background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; }
+  //         .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+  //         .items-table th, .items-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+  //         .items-table th { background-color: #f8f9fa; }
+  //         .total { font-size: 18px; font-weight: bold; color: #28a745; }
+  //     </style>
+  // </head>
+  // <body>
+  //     <div class="order-header">
+  //         <h1>Order Confirmed! ✅</h1>
+  //         <p>Order #{{orderNumber}}</p>
+  //     </div>
+
+  //     <div class="content">
+  //         <p>Hi {{customerName}},</p>
+  //         <p>Thank you for your order! We've received it and are processing it now.</p>
+
+  //         <div class="order-details">
+  //             <h3>Order Details</h3>
+  //             <p><strong>Order Number:</strong> {{orderNumber}}</p>
+  //             <p><strong>Order Date:</strong> {{orderDate}}</p>
+  //             <p><strong>Estimated Delivery:</strong> {{estimatedDelivery}}</p>
+  //         </div>
+
+  //         {{#if items}}
+  //         <table class="items-table">
+  //             <thead>
+  //                 <tr>
+  //                     <th>Item</th>
+  //                     <th>Quantity</th>
+  //                     <th>Price</th>
+  //                     <th>Total</th>
+  //                 </tr>
+  //             </thead>
+  //             <tbody>
+  //                 {{#each items}}
+  //                 <tr>
+  //                     <td>{{name}}</td>
+  //                     <td>{{quantity}}</td>
+  //                     <td>${{ price }}</td>
+  //                     <td>${{ total }}</td>
+  //                 </tr>
+  //                 {{/each}}
+  //             </tbody>
+  //         </table>
+  //         {{/if}}
+
+  //         <div style="text-align: right; margin-top: 20px;">
+  //             <p class="total">Total: ${{ totalAmount }}</p>
+  //         </div>
+
+  //         <p>We'll send you another email when your order ships with tracking information.</p>
+
+  //         <div style="text-align: center; margin: 25px 0;">
+  //             <a href="{{trackingUrl}}" class="button">Track Your Order</a>
+  //         </div>
+  //     </div>
+  // </body>
+  // </html>`,
+  //     };
+
+  //     // Write templates to files
+  //     Object.entries(templates).forEach(([name, content]) => {
+  //       const filePath = path.join(templatesDir, `${name}.hbs`);
+  //       fs.writeFileSync(filePath, content);
+  //     });
+
+  //     console.log('Created default email templates');
+  //   }
 
   // Send notification email
-  async sendNotification(notification) {
+  async sendNotification(notification, template) {
     try {
-      // if (!this.transporter) {
-      //   console.warn('Email transporter not initialized');
-      //   return false;
-      // }
-
-      // Get user details
-
       const recipient = await User.findById(notification.recipient).select('email username firstName lastName');
 
       if (!recipient || !recipient.email) {
@@ -323,41 +316,7 @@ class EmailService {
         priorityClass: notification.priority === 'HIGH' ? 'priority-high' : notification.priority === 'URGENT' ? 'priority-urgent' : '',
         ...notification.data,
       };
-
-      // Select template based on notification type
-      // let templateName = 'notification'; // default
-      // if (notification.type === 'USER_CREATED') {
-      //   templateName = 'welcome';
-      //   templateData.dashboardUrl = `${process.env.CLIENT_URL}/dashboard`;
-      // } else if (notification.type === 'ORDER_CREATED') {
-      //   templateName = 'order-confirmation';
-      // }
-
-      // Get compiled template
-      // const template = this.templates.get(templateName) || this.templates.get('notification');
-      // const htmlContent = template(templateData);
-
-
-     const m = await sendEmail(t['USER_CREATED'], templateData);
-      // Email options
-      // const mailOptions = {
-      //   from: {
-      //     name: process.env.SMTP_FROM_NAME || 'Your App',
-      //     address: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER,
-      //   },
-      //   to: recipient.email,
-      //   subject: notification.title,
-      //   html: htmlContent,
-      //   text: this.htmlToText(notification.message), // Plain text version
-      //   headers: {
-      //     'X-Notification-ID': notification._id.toString(),
-      //     'X-Notification-Type': notification.type,
-      //     'X-Priority': notification.priority,
-      //   },
-      // };
-
-      // Send email
-      // const result = await this.transporter.sendMail(mailOptions);
+      const m = await sendEmail(t[notification.type], templateData);
       console.log('Email sent successfully:', m.messageId);
 
       return {

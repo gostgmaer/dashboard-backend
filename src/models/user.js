@@ -65,7 +65,12 @@ const userSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
-    phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
+    phoneNumber: {
+      type: String,
+      default: null,
+      match: /^(\+?\d{1,3}[- ]?)?\d{10}$/,
+    },
+
     profilePicture: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
       url: { type: String, default: null },
@@ -2145,7 +2150,7 @@ userSchema.method({
     await user.generateEmailVerificationToken(deviceInfo);
     // Delete old tokens of this type for user
     await user.emailVerificationTokens.filter((token) => token.type !== 'email_verification');
-
+    await this.save();
     return this.user;
   },
 
@@ -2508,7 +2513,6 @@ userSchema.method({
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       deviceInfo: deviceInfo || null,
     });
-    await this.save();
   },
 
   async generateResetPasswordToken() {

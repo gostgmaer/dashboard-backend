@@ -137,9 +137,9 @@ class authController {
     }
 
     try {
-      const { email, username, password, confirmPassword, ...otherData } = req.body;
+      let { email, username, password, confirmPassword, ...otherData } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-
+      username = username || email.split('@')[0];
       // Validation
       if (!email || !username || !password) {
         return errorResponse(res, 'Email, username, and password are required', 400);
@@ -184,13 +184,6 @@ class authController {
 
       // Send welcome email
       let emaildata = await sendEmail(welcomeEmailTemplate, user);
-      // await NotificationService.create({
-      //   recipient: user._id,
-      //   type: 'USER_CREATED',
-      //   channels: ['IN_APP', 'EMAIL'] // choose channels
-      //   // other notification data
-      // });
-
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
       await NotificationMiddleware.onUserCreate(req, res, () => {});
@@ -488,6 +481,7 @@ class authController {
         loginMethod: 'password',
         tokenGenerated: true,
       });
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -679,7 +673,6 @@ class authController {
         },
       });
     } catch (error) {
-      logger.error('Social login error:', error);
       res.status(500).json({
         success: false,
         message: 'Social login failed',

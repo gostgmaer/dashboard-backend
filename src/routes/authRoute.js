@@ -59,7 +59,7 @@ authRoute.post('/verify/:id', authMiddleware, authController.verifyUser);
 // ========================================
 authRoute.post('/logout', authMiddleware, authController.logout);
 authRoute.get('/permissions', authMiddleware, authController.getUserPermissionsController);
-authRoute.post('/logout-all', authMiddleware,  authController.logoutAll);
+authRoute.post('/logout-all', authMiddleware, authController.logoutAll);
 authRoute.post('/refresh-token', authController.refreshToken);
 authRoute.post('/change-password', authMiddleware, authController.changePassword);
 
