@@ -1,24 +1,23 @@
-const Brand = require("../../models/brands");
-const createError = require("http-errors");
-const logger = require("winston"); // Assuming a logging library is configured
-const { cacheClient } = require("../../config/cache"); // Assuming Redis client configuration
+const Brand = require('../../models/brands');
+const createError = require('http-errors');
+// Assuming a logging library is configured
+const { cacheClient } = require('../../config/cache'); // Assuming Redis client configuration
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // Helper function to handle async errors
-const asyncHandler = (fn) => (req, res, next) =>
-  Promise.resolve(fn(req, res, next)).catch(next);
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // Create a new brand
 const createBrand = asyncHandler(async (req, res) => {
   const brandData = {
-    ...req.body
+    ...req.body,
   };
   const brand = new Brand(brandData);
   await brand.save();
-  
+
   // Cache the brand
   // if (cacheClient) await Brand.cacheBrandData(brand._id, cacheClient);
-  
-  logger.info(`Brand created: ${brand._id} by user ${req.user?._id}`);
+
+  //logger.info(`Brand created: ${brand._id} by user ${req.user?._id}`);
   res.status(201).json({ success: true, data: brand });
 });
 
@@ -26,59 +25,59 @@ const createBrand = asyncHandler(async (req, res) => {
 const getBrand = asyncHandler(async (req, res) => {
   const identifier = req.params.idOrSlug;
   let brand;
-  
+
   // Check cache first
   if (cacheClient) {
     const cached = await cacheClient.get(`brand:${identifier}`);
     if (cached) {
-      logger.info(`Cache hit for brand: ${identifier}`);
+      //logger.info(`Cache hit for brand: ${identifier}`);
       return res.json({ success: true, data: JSON.parse(cached) });
     }
   }
-  
+
   // Try finding by ID or slug
   brand = await Brand.findOne({
     $or: [{ _id: identifier }, { slug: identifier }],
-  }).populate("created_by updated_by", "name email");
-  
-  if (!brand) throw createError(404, "Brand not found");
-  
+  }).populate('created_by updated_by', 'name email');
+
+  if (!brand) throw createError(404, 'Brand not found');
+
   // Cache the result
   // if (cacheClient) await Brand.cacheBrandData(brand._id, cacheClient);
-  
+
   res.json({ success: true, data: brand });
 });
 
 // Update a brand
 const updateBrand = asyncHandler(async (req, res) => {
   const brand = await Brand.findById(req.params.id);
-  if (!brand) throw createError(404, "Brand not found");
-  
+  if (!brand) throw createError(404, 'Brand not found');
+
   Object.assign(brand, {
     ...req.body,
     updated_by: req.user?._id,
   });
   await brand.save();
-  
+
   // Invalidate cache
   if (cacheClient) await Brand.invalidateCache(brand._id, cacheClient);
-  
-  logger.info(`Brand updated: ${brand._id} by user ${req.user?._id}`);
+
+  //logger.info(`Brand updated: ${brand._id} by user ${req.user?._id}`);
   res.json({ success: true, data: brand });
 });
 
 // Delete a brand (hard delete)
 const deleteBrand = asyncHandler(async (req, res) => {
   const brand = await Brand.findById(req.params.id);
-  if (!brand) throw createError(404, "Brand not found");
-  
+  if (!brand) throw createError(404, 'Brand not found');
+
   await brand.deleteOne();
-  
+
   // Invalidate cache
   if (cacheClient) await Brand.invalidateCache(brand._id, cacheClient);
-  
-  logger.info(`Brand deleted: ${brand._id} by user ${req.user?._id}`);
-  res.json({ success: true, message: "Brand deleted successfully" });
+
+  //logger.info(`Brand deleted: ${brand._id} by user ${req.user?._id}`);
+  res.json({ success: true, message: 'Brand deleted successfully' });
 });
 
 // Get all active brands
@@ -96,7 +95,7 @@ const getFeaturedBrands = asyncHandler(async (req, res) => {
 // Search brands by keyword
 const searchBrands = asyncHandler(async (req, res) => {
   const { keyword } = req.query;
-  if (!keyword) throw createError(400, "Keyword is required");
+  if (!keyword) throw createError(400, 'Keyword is required');
   const brands = await Brand.searchBrands(keyword);
   res.json({ success: true, data: brands });
 });
@@ -111,7 +110,7 @@ const getTopRatedBrands = asyncHandler(async (req, res) => {
 // Get brands by country
 const getBrandsByCountry = asyncHandler(async (req, res) => {
   const { country } = req.params;
-  if (!country) throw createError(400, "Country is required");
+  if (!country) throw createError(400, 'Country is required');
   const brands = await Brand.getBrandsByCountry(country);
   res.json({ success: true, data: brands });
 });
@@ -119,7 +118,7 @@ const getBrandsByCountry = asyncHandler(async (req, res) => {
 // Get brands by year range
 const getBrandsByYearRange = asyncHandler(async (req, res) => {
   const { startYear, endYear } = req.query;
-  if (!startYear || !endYear) throw createError(400, "Start and end years are required");
+  if (!startYear || !endYear) throw createError(400, 'Start and end years are required');
   const brands = await Brand.getBrandsByYearRange(parseInt(startYear), parseInt(endYear));
   res.json({ success: true, data: brands });
 });
@@ -138,8 +137,8 @@ const getPaginatedBrands = asyncHandler(async (req, res) => {
     limit: parseInt(limit) || 10,
     status,
     search,
-    sortBy: sortBy || "name",
-    sortOrder: sortOrder === "desc" ? -1 : 1,
+    sortBy: sortBy || 'name',
+    sortOrder: sortOrder === 'desc' ? -1 : 1,
   });
   res.json({ success: true, data: result });
 });
@@ -148,176 +147,176 @@ const getPaginatedBrands = asyncHandler(async (req, res) => {
 const bulkUpdateStatus = asyncHandler(async (req, res) => {
   const { ids, status } = req.body;
   if (!ids || !Array.isArray(ids) || !status) {
-    throw createError(400, "IDs and status are required");
+    throw createError(400, 'IDs and status are required');
   }
   await Brand.bulkUpdateStatus(ids, status);
-  
+
   // Invalidate cache for updated brands
   if (cacheClient) {
     for (const id of ids) {
       await Brand.invalidateCache(id, cacheClient);
     }
   }
-  
-  logger.info(`Bulk status update for brands: ${ids.join(", ")} to ${status}`);
-  res.json({ success: true, message: "Brand statuses updated successfully" });
+
+  //logger.info(`Bulk status update for brands: ${ids.join(", ")} to ${status}`);
+  res.json({ success: true, message: 'Brand statuses updated successfully' });
 });
 
 // Bulk feature/unfeature brands
 const bulkFeatureToggle = asyncHandler(async (req, res) => {
   const { ids, isFeatured } = req.body;
   if (!ids || !Array.isArray(ids) || isFeatured === undefined) {
-    throw createError(400, "IDs and isFeatured are required");
+    throw createError(400, 'IDs and isFeatured are required');
   }
   await Brand.bulkFeatureToggle(ids, isFeatured);
-  
+
   // Invalidate cache for updated brands
   if (cacheClient) {
     for (const id of ids) {
       await Brand.invalidateCache(id, cacheClient);
     }
   }
-  
-  logger.info(`Bulk feature toggle for brands: ${ids.join(", ")} to ${isFeatured}`);
-  res.json({ success: true, message: "Brand feature status updated successfully" });
+
+  //logger.info(`Bulk feature toggle for brands: ${ids.join(", ")} to ${isFeatured}`);
+  res.json({ success: true, message: 'Brand feature status updated successfully' });
 });
 
 // Soft delete brands
 const softDeleteBrands = asyncHandler(async (req, res) => {
   const { ids } = req.body;
-  if (!ids || !Array.isArray(ids)) throw createError(400, "IDs are required");
+  if (!ids || !Array.isArray(ids)) throw createError(400, 'IDs are required');
   await Brand.softDeleteBrands(ids);
-  
+
   // Invalidate cache for soft-deleted brands
   if (cacheClient) {
     for (const id of ids) {
       await Brand.invalidateCache(id, cacheClient);
     }
   }
-  
-  logger.info(`Soft deleted brands: ${ids.join(", ")}`);
-  res.json({ success: true, message: "Brands soft deleted successfully" });
+
+  //logger.info(`Soft deleted brands: ${ids.join(", ")}`);
+  res.json({ success: true, message: 'Brands soft deleted successfully' });
 });
 
 // Restore soft-deleted brands
 const restoreBrands = asyncHandler(async (req, res) => {
   const { ids } = req.body;
-  if (!ids || !Array.isArray(ids)) throw createError(400, "IDs are required");
+  if (!ids || !Array.isArray(ids)) throw createError(400, 'IDs are required');
   await Brand.restoreBrands(ids);
-  
+
   // Invalidate cache for restored brands
   if (cacheClient) {
     for (const id of ids) {
       await Brand.invalidateCache(id, cacheClient);
     }
   }
-  
-  logger.info(`Restored brands: ${ids.join(", ")}`);
-  res.json({ success: true, message: "Brands restored successfully" });
+
+  //logger.info(`Restored brands: ${ids.join(", ")}`);
+  res.json({ success: true, message: 'Brands restored successfully' });
 });
 
 // Update display order
 const updateDisplayOrder = asyncHandler(async (req, res) => {
   const { orderMap } = req.body;
-  if (!orderMap || typeof orderMap !== "object") {
-    throw createError(400, "Order map is required");
+  if (!orderMap || typeof orderMap !== 'object') {
+    throw createError(400, 'Order map is required');
   }
   await Brand.updateDisplayOrder(orderMap);
-  
+
   // Invalidate cache for updated brands
   if (cacheClient) {
     for (const id of Object.keys(orderMap)) {
       await Brand.invalidateCache(id, cacheClient);
     }
   }
-  
-  logger.info(`Updated display order for brands: ${Object.keys(orderMap).join(", ")}`);
-  res.json({ success: true, message: "Display order updated successfully" });
+
+  //logger.info(`Updated display order for brands: ${Object.keys(orderMap).join(", ")}`);
+  res.json({ success: true, message: 'Display order updated successfully' });
 });
 
 // Refresh product counts
 const refreshProductCounts = asyncHandler(async (req, res) => {
   await Brand.refreshProductCounts();
-  
+
   // Invalidate cache for all brands
   if (cacheClient) {
-    const brands = await Brand.find({}, "_id");
+    const brands = await Brand.find({}, '_id');
     for (const brand of brands) {
       await Brand.invalidateCache(brand._id, cacheClient);
     }
   }
-  
-  logger.info("Refreshed product counts for all brands");
-  res.json({ success: true, message: "Product counts refreshed successfully" });
+
+  //logger.info("Refreshed product counts for all brands");
+  res.json({ success: true, message: 'Product counts refreshed successfully' });
 });
 
 // Add image to a brand
 const addBrandImage = asyncHandler(async (req, res) => {
   const brand = await Brand.findById(req.params.id);
-  if (!brand) throw createError(404, "Brand not found");
-  
+  if (!brand) throw createError(404, 'Brand not found');
+
   const { image } = req.body;
-  if (!image || !image.url) throw createError(400, "Image URL is required");
-  
+  if (!image || !image.url) throw createError(400, 'Image URL is required');
+
   await brand.addImage(image);
-  
+
   // Invalidate cache
   if (cacheClient) await Brand.invalidateCache(brand._id, cacheClient);
-  
-  logger.info(`Added image to brand: ${brand._id}`);
+
+  //logger.info(`Added image to brand: ${brand._id}`);
   res.json({ success: true, data: brand });
 });
 
 // Remove image from a brand
 const removeBrandImage = asyncHandler(async (req, res) => {
   const brand = await Brand.findById(req.params.id);
-  if (!brand) throw createError(404, "Brand not found");
-  
+  if (!brand) throw createError(404, 'Brand not found');
+
   const { url } = req.body;
-  if (!url) throw createError(400, "Image URL is required");
-  
+  if (!url) throw createError(400, 'Image URL is required');
+
   await brand.removeImageByUrl(url);
-  
+
   // Invalidate cache
   if (cacheClient) await Brand.invalidateCache(brand._id, cacheClient);
-  
-  logger.info(`Removed image from brand: ${brand._id}`);
+
+  //logger.info(`Removed image from brand: ${brand._id}`);
   res.json({ success: true, data: brand });
 });
 
 // Update brand contact
 const updateBrandContact = asyncHandler(async (req, res) => {
   const brand = await Brand.findById(req.params.id);
-  if (!brand) throw createError(404, "Brand not found");
-  
+  if (!brand) throw createError(404, 'Brand not found');
+
   const { contact } = req.body;
-  if (!contact) throw createError(400, "Contact data is required");
-  
+  if (!contact) throw createError(400, 'Contact data is required');
+
   await brand.updateContact(contact);
-  
+
   // Invalidate cache
   if (cacheClient) await Brand.invalidateCache(brand._id, cacheClient);
-  
-  logger.info(`Updated contact for brand: ${brand._id}`);
+
+  //logger.info(`Updated contact for brand: ${brand._id}`);
   res.json({ success: true, data: brand });
 });
 
 // Update brand rating
 const updateBrandRating = asyncHandler(async (req, res) => {
   const brand = await Brand.findById(req.params.id);
-  if (!brand) throw createError(404, "Brand not found");
-  
+  if (!brand) throw createError(404, 'Brand not found');
+
   const { rating } = req.body;
   if (rating === undefined || isNaN(rating)) {
-    throw createError(400, "Valid rating is required");
+    throw createError(400, 'Valid rating is required');
   }
-  
+
   await brand.updateRating(parseFloat(rating));
-  
+
   // Invalidate cache
   if (cacheClient) await Brand.invalidateCache(brand._id, cacheClient);
-  
-  logger.info(`Updated rating for brand: ${brand._id}`);
+
+  //logger.info(`Updated rating for brand: ${brand._id}`);
   res.json({ success: true, data: brand });
 });
 

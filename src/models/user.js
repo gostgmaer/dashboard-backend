@@ -65,7 +65,12 @@ const userSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
-    phoneNumber: { type: String, default: null, match: /^[0-9]{10}$/ },
+    phoneNumber: {
+      type: String,
+      default: null,
+      match: /^(\+?\d{1,3}[- ]?)?\d{10}$/,
+    },
+
     profilePicture: {
       id: { type: mongoose.Schema.Types.ObjectId, ref: 'File', default: null },
       url: { type: String, default: null },
@@ -2145,7 +2150,7 @@ userSchema.method({
     await user.generateEmailVerificationToken(deviceInfo);
     // Delete old tokens of this type for user
     await user.emailVerificationTokens.filter((token) => token.type !== 'email_verification');
-
+    await this.save();
     return this.user;
   },
 
@@ -2508,7 +2513,6 @@ userSchema.method({
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       deviceInfo: deviceInfo || null,
     });
-    await this.save();
   },
 
   async generateResetPasswordToken() {
@@ -4470,6 +4474,133 @@ userSchema.statics.getUserStats = async function () {
     totalActiveRole,
     // Add more as needed, e.g., totalOrders, averageOrderValue, etc.
   };
+};
+
+userSchema.statics.verifyAndLinkUser = async function ({ provider, providerId, email, name, profile = {} }) {
+  try {
+    const validProviders = ['google', 'facebook', 'twitter', 'github'];
+    if (!validProviders.includes(provider)) {
+      throw new Error(`Invalid provider. Must be one of ${validProviders.join(', ')}`);
+    }
+
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
+    // Normalize and trim email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Look for a user by social account (provider + providerId)
+    let user = await this.findOne({
+      'socialAccounts.provider': provider,
+      'socialAccounts.providerId': providerId,
+      isDeleted: false,
+      status: { $ne: 'deleted' },
+    }).populate('role');
+    if (user) {
+      // Return existing user with this social account
+      return { user, isNewUser: false };
+    }
+
+    // 2. Look for user by email to link new social account
+    user = await this.findOne({
+      email: normalizedEmail,
+      isDeleted: false,
+      status: { $ne: 'deleted' },
+    }).populate('role');
+
+    if (user) {
+      // Check if social account already linked
+      const alreadyLinked = user.socialAccounts.some((acc) => acc.provider === provider && acc.providerId === providerId);
+      if (!alreadyLinked) {
+        user.socialAccounts.push({
+          provider,
+          providerId,
+          email: normalizedEmail,
+          verified: true,
+          connectedAt: new Date(),
+        });
+
+        // Mark email as verified on social login if not already
+        if (!user.emailVerified) {
+          user.emailVerified = true;
+        }
+        // Mark user as verified and active if needed
+        if (!user.isVerified) user.isVerified = true;
+        if (user.status === 'pending' || !user.status) user.status = 'active';
+
+        await user.save();
+
+        // Log the linking event
+        if (typeof user.logSecurityEvent === 'function') {
+          await user.logSecurityEvent('social-account-linked', `${provider} account linked during social login`, 'medium', { provider, providerId });
+        }
+      }
+      return { user, isNewUser: false };
+    }
+
+    // 3. Create a new user account
+
+    const defaultRole = await Role.findOne({ isDefault: true, isActive: true });
+    if (!defaultRole) {
+      throw new Error('Default role not configured');
+    }
+
+    // Derive first and last names from profile or name string
+    const nameParts = (name || '').split(' ');
+    const firstName = profile.firstName || nameParts[0] || '';
+    const lastName = profile.lastName || nameParts.slice(1).join(' ') || '';
+
+    // Generate unique username based on email prefix
+    const baseUsername = normalizedEmail.split('@')[0];
+    let username = baseUsername;
+    let counter = 1;
+    while (await this.findOne({ username })) {
+      username = `${baseUsername}${Date.now()}${counter}`;
+      counter++;
+    }
+
+    // Compose new user object per your schema fields
+    user = new this({
+      email: normalizedEmail,
+      username,
+      firstName,
+      lastName,
+      profilePicture:
+        profile.profilePicture || profile.picture
+          ? {
+              url: profile.profilePicture || profile.picture,
+              name: 'profile-picture',
+            }
+          : undefined,
+      isVerified: true,
+      emailVerified: true,
+      status: 'active',
+      role: defaultRole._id,
+      socialAccounts: [
+        {
+          provider,
+          providerId,
+          email: normalizedEmail,
+          verified: true,
+          connectedAt: new Date(),
+        },
+      ],
+      referralCode: crypto.randomBytes(4).toString('hex').toUpperCase(),
+    });
+
+    await user.save();
+
+    await user.populate('role');
+
+    if (typeof user.logSecurityEvent === 'function') {
+      await user.logSecurityEvent('account-created', `User account created via ${provider} social login`, 'medium', { provider, providerId });
+    }
+
+    return { user, isNewUser: true };
+  } catch (error) {
+    throw new Error(`Social login verification failed: ${error.message}`);
+  }
 };
 
 const User = mongoose.model('User', userSchema);

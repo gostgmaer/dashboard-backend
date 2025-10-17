@@ -137,9 +137,9 @@ class authController {
     }
 
     try {
-      const { email, username, password, confirmPassword, ...otherData } = req.body;
+      let { email, username, password, confirmPassword, ...otherData } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-
+      username = username || email.split('@')[0];
       // Validation
       if (!email || !username || !password) {
         return errorResponse(res, 'Email, username, and password are required', 400);
@@ -184,13 +184,6 @@ class authController {
 
       // Send welcome email
       let emaildata = await sendEmail(welcomeEmailTemplate, user);
-      // await NotificationService.create({
-      //   recipient: user._id,
-      //   type: 'USER_CREATED',
-      //   channels: ['IN_APP', 'EMAIL'] // choose channels
-      //   // other notification data
-      // });
-
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
       await NotificationMiddleware.onUserCreate(req, res, () => {});
@@ -409,7 +402,12 @@ class authController {
           // Skip OTP for trusted device
           await user.handleSuccessfulLogin(deviceInfo);
           const tokens = await user.generateTokens(deviceInfo);
-
+          await ActivityHelper.logAuth(req, 'login', 'success', {
+            userId: user._id,
+            email: user.email,
+            loginMethod: 'password',
+            tokenGenerated: true,
+          });
           return standardResponse(
             res,
             true,
@@ -488,6 +486,7 @@ class authController {
         loginMethod: 'password',
         tokenGenerated: true,
       });
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -514,13 +513,13 @@ class authController {
     try {
       const { identifier, profileData, deviceTrust = false, provider, providerId, email, name, profile } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-      if (!provider || !providerId || !email || !name) {
+      if (!provider || !providerId) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
       }
-      const { user, isNewUser } = await verifyAndLinkUser({ provider, providerId, email, name, profile });
+      const { user, isNewUser } = await User.verifyAndLinkUser({ provider, providerId, email: identifier, name: profile.name, profile });
 
       // Authenticate user
-      const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
+      const authResult = await User.authenticateSocial({ ...user, provider, providerId }, identifier, deviceInfo);
       let u = authResult.user;
       res.locals.user = u;
       const tokens = await u.generateTokens(deviceInfo);
@@ -531,10 +530,10 @@ class authController {
       await ActivityHelper.logAuth(req, 'login', 'success', {
         userId: u._id,
         email: u.email,
-        loginMethod: 'password',
+        loginMethod: 'Social',
         tokenGenerated: true,
       });
-
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -542,7 +541,7 @@ class authController {
           user: {
             id: u._id,
             email: u.email,
-            image: u.profilePicture,
+            image: u.profilePicture.url,
             username: u.username,
             fullName: u.fullName,
             role: u.role?.name,
@@ -554,7 +553,6 @@ class authController {
         },
         'Login successful'
       );
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
     } catch (error) {
       await ActivityHelper.logAuth(req, 'login attempt', 'error', {
         error: error.message,
@@ -679,7 +677,6 @@ class authController {
         },
       });
     } catch (error) {
-      logger.error('Social login error:', error);
       res.status(500).json({
         success: false,
         message: 'Social login failed',
@@ -1049,6 +1046,12 @@ class authController {
 
       const result = await user.changePassword(currentPassword, newPassword);
       await user.logSecurityEvent('password_changed', 'Password changed successfully', 'medium', deviceInfo);
+      await ActivityHelper.logAuth(req, 'change-password', 'success', {
+        userId: user._id,
+        email: user.email,
+        loginMethod: 'password',
+        tokenGenerated: true,
+      });
       NotificationMiddleware.onPasswordChange(req, res, () => {});
       return standardResponse(
         res,
@@ -1805,6 +1808,13 @@ class authController {
       await req.user.updateProfile(req.body);
       res.locals.changes = req.body;
       NotificationMiddleware.onUserUpdate(req, res, () => {});
+      await ActivityHelper.logCRUD(req, 'User', 'update', {
+        id: req.user._id,
+        role: req.user.role.name,
+        email: req.user.email,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+      });
       return standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
@@ -3265,11 +3275,15 @@ class authController {
       const user = req.user;
       const linkedAccounts = user.getSocialAccounts();
 
-      res.json({
-        success: true,
-        linkedAccounts,
-        availableProviders: ['google', 'facebook', 'twitter', 'github'],
-      });
+      return standardResponse(
+        res,
+        true,
+        {
+          linkedAccounts,
+          availableProviders: ['google', 'facebook', 'twitter', 'github'],
+        },
+        'Security events retrieved successfully'
+      );
     } catch (error) {
       res.status(500).json({
         success: false,

@@ -2,215 +2,74 @@ const { PaymentModel } = require('../models/payment'); // Adjust path as needed
 const { body, query, param } = require('express-validator');
 const { validationResult } = require('express-validator');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
-// const { Logger } = require('../utils/logger');
 const mongoose = require('mongoose');
 const csvWriter = require('csv-writer').createObjectCsvWriter; // For export, install: npm i csv-writer
 const fs = require('fs');
 
-// const logger = new Logger('PaymentsController');
-
 // Validation Functions
-const createPaymentValidator = [
-  body('orderId').isMongoId().withMessage('Invalid order ID'),
-  body('amount').isFloat({ min: 0 }).toFloat().withMessage('Amount must be a positive number'),
-  body('currency').isIn(['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD']).withMessage('Invalid currency'),
-  body('paymentMethod').isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'),
-  body('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'),
-  body('metadata').optional().isObject().withMessage('Metadata must be an object'),
-  body('billingAddress').optional().isObject().withMessage('Billing address must be an object'),
-  body('billingAddress.country').optional().isString().withMessage('Country must be a string'),
-];
+const createPaymentValidator = [body('orderId').isMongoId().withMessage('Invalid order ID'), body('amount').isFloat({ min: 0 }).toFloat().withMessage('Amount must be a positive number'), body('currency').isIn(['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD']).withMessage('Invalid currency'), body('paymentMethod').isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'), body('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'), body('metadata').optional().isObject().withMessage('Metadata must be an object'), body('billingAddress').optional().isObject().withMessage('Billing address must be an object'), body('billingAddress.country').optional().isString().withMessage('Country must be a string')];
 
-const updateStatusValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('status').isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
-  body('note').optional().isString().trim().withMessage('Note must be a string'),
-];
+const updateStatusValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('status').isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'), body('note').optional().isString().trim().withMessage('Note must be a string')];
 
-const addRefundValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('amount').isFloat({ min: 0 }).toFloat().withMessage('Refund amount must be a positive number'),
-  body('reason').optional().isString().trim().withMessage('Reason must be a string'),
-];
+const addRefundValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('amount').isFloat({ min: 0 }).toFloat().withMessage('Refund amount must be a positive number'), body('reason').optional().isString().trim().withMessage('Reason must be a string')];
 
-const getPaymentsValidator = [
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-  query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
-  query('paymentMethod').optional().isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-  query('sortBy').optional().isIn(['createdAt', 'amount', 'status']).withMessage('Invalid sortBy field'),
-  query('sortOrder').optional().isIn(['1', '-1']).toInt().withMessage('SortOrder must be 1 or -1'),
-];
+const getPaymentsValidator = [query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'), query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'), query('paymentMethod').optional().isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'), query('sortBy').optional().isIn(['createdAt', 'amount', 'status']).withMessage('Invalid sortBy field'), query('sortOrder').optional().isIn(['1', '-1']).toInt().withMessage('SortOrder must be 1 or -1')];
 
-const exportPaymentsValidator = [
-  query('format').optional().isIn(['csv', 'json']).withMessage('Format must be csv or json'),
-  query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 1000 }).toInt().withMessage('Limit must be between 1 and 1000'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const exportPaymentsValidator = [query('format').optional().isIn(['csv', 'json']).withMessage('Format must be csv or json'), query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 1000 }).toInt().withMessage('Limit must be between 1 and 1000'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const resolveDisputeValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('disputeId').isString().trim().notEmpty().withMessage('Dispute ID must be a non-empty string'),
-  body('status').isIn(['WON', 'LOST']).withMessage('Dispute status must be WON or LOST'),
-  body('resolvedAt').optional().isISO8601().toDate().withMessage('Invalid resolvedAt format'),
-  body('note').optional().isString().trim().withMessage('Note must be a string'),
-];
+const resolveDisputeValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('disputeId').isString().trim().notEmpty().withMessage('Dispute ID must be a non-empty string'), body('status').isIn(['WON', 'LOST']).withMessage('Dispute status must be WON or LOST'), body('resolvedAt').optional().isISO8601().toDate().withMessage('Invalid resolvedAt format'), body('note').optional().isString().trim().withMessage('Note must be a string')];
 
-const updateDisputeValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('disputeId').isString().trim().notEmpty().withMessage('Dispute ID must be a non-empty string'),
-  body('status').isIn(['OPEN', 'WON', 'LOST', 'PENDING']).withMessage('Invalid dispute status'),
-  body('note').optional().isString().trim().withMessage('Note must be a string'),
-];
+const updateDisputeValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('disputeId').isString().trim().notEmpty().withMessage('Dispute ID must be a non-empty string'), body('status').isIn(['OPEN', 'WON', 'LOST', 'PENDING']).withMessage('Invalid dispute status'), body('note').optional().isString().trim().withMessage('Note must be a string')];
 
-const getRecurringPaymentsValidator = [
-  query('subscriptionId').optional().isMongoId().withMessage('Invalid subscription ID'),
-  query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-];
+const getRecurringPaymentsValidator = [query('subscriptionId').optional().isMongoId().withMessage('Invalid subscription ID'), query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100')];
 
-const calculateRiskScoreValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-];
+const calculateRiskScoreValidator = [param('id').isMongoId().withMessage('Invalid payment ID')];
 
-const getProcessingTimeStatsValidator = [
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getProcessingTimeStatsValidator = [query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getRefundRatesValidator = [
-  query('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getRefundRatesValidator = [query('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getSuccessRateByProviderValidator = [
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getSuccessRateByProviderValidator = [query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getAverageAmountByMethodValidator = [
-  query('paymentMethod').optional().isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getAverageAmountByMethodValidator = [query('paymentMethod').optional().isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getCurrencyBreakdownValidator = [
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getCurrencyBreakdownValidator = [query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getFeeSummaryValidator = [
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-  query('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'),
-];
+const getFeeSummaryValidator = [query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'), query('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider')];
 
-const getDisputeAnalyticsValidator = [
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getDisputeAnalyticsValidator = [query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getTimelineStatsValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
-];
+const getTimelineStatsValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), query('status').optional().isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status')];
 
-const getPaymentsByCurrencyValidator = [
-  query('currency').isIn(['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD']).withMessage('Invalid currency'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-];
+const getPaymentsByCurrencyValidator = [query('currency').isIn(['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD']).withMessage('Invalid currency'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100')];
 
-const getVolumeByPeriodValidator = [
-  query('period').isIn(['day', 'week', 'month']).withMessage('Period must be day, week, or month'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getVolumeByPeriodValidator = [query('period').isIn(['day', 'week', 'month']).withMessage('Period must be day, week, or month'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getTopCustomersValidator = [
-  query('limit').optional().isInt({ min: 1, max: 50 }).toInt().withMessage('Limit must be between 1 and 50'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getTopCustomersValidator = [query('limit').optional().isInt({ min: 1, max: 50 }).toInt().withMessage('Limit must be between 1 and 50'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const simulatePaymentFailureValidator = [
-  body('paymentId').isMongoId().withMessage('Invalid payment ID'),
-  body('reason').optional().isString().trim().withMessage('Reason must be a string'),
-];
+const simulatePaymentFailureValidator = [body('paymentId').isMongoId().withMessage('Invalid payment ID'), body('reason').optional().isString().trim().withMessage('Reason must be a string')];
 
-const getMethodSuccessRatesOverTimeValidator = [
-  query('paymentMethod').optional().isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'),
-  query('granularity').isIn(['daily', 'weekly', 'monthly']).withMessage('Granularity must be daily, weekly, or monthly'),
-  query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'),
-  query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format'),
-];
+const getMethodSuccessRatesOverTimeValidator = [query('paymentMethod').optional().isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'), query('granularity').isIn(['daily', 'weekly', 'monthly']).withMessage('Granularity must be daily, weekly, or monthly'), query('dateFrom').optional().isISO8601().toDate().withMessage('Invalid dateFrom format'), query('dateTo').optional().isISO8601().toDate().withMessage('Invalid dateTo format')];
 
-const getPaymentsByIPValidator = [
-  query('ipAddress').isIP().withMessage('Invalid IP address'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-];
+const getPaymentsByIPValidator = [query('ipAddress').isIP().withMessage('Invalid IP address'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100')];
 
-const bulkProcessRefundsValidator = [
-  body('paymentIds').isArray({ min: 1 }).withMessage('Payment IDs must be a non-empty array'),
-  body('paymentIds.*').isMongoId().withMessage('Each payment ID must be a valid MongoID'),
-  body('amountPercentage').isFloat({ min: 0, max: 100 }).toFloat().withMessage('Amount percentage must be between 0 and 100'),
-  body('reason').optional().isString().trim().withMessage('Reason must be a string'),
-];
+const bulkProcessRefundsValidator = [body('paymentIds').isArray({ min: 1 }).withMessage('Payment IDs must be a non-empty array'), body('paymentIds.*').isMongoId().withMessage('Each payment ID must be a valid MongoID'), body('amountPercentage').isFloat({ min: 0, max: 100 }).toFloat().withMessage('Amount percentage must be between 0 and 100'), body('reason').optional().isString().trim().withMessage('Reason must be a string')];
 
-const addTagValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string'),
-];
+const addTagValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string')];
 
-const removeTagValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string'),
-];
+const removeTagValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string')];
 
-const updateNotesValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('notes').isString().trim().withMessage('Notes must be a string'),
-];
+const updateNotesValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('notes').isString().trim().withMessage('Notes must be a string')];
 
-const addTimelineEntryValidator = [
-  param('id').isMongoId().withMessage('Invalid payment ID'),
-  body('status').isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'),
-  body('note').optional().isString().trim().withMessage('Note must be a string'),
-  body('updated_by').optional().isString().trim().withMessage('updated_by must be a string'),
-  body('additionalData').optional().isObject().withMessage('Additional data must be an object'),
-];
+const addTimelineEntryValidator = [param('id').isMongoId().withMessage('Invalid payment ID'), body('status').isIn(['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED']).withMessage('Invalid status'), body('note').optional().isString().trim().withMessage('Note must be a string'), body('updated_by').optional().isString().trim().withMessage('updated_by must be a string'), body('additionalData').optional().isObject().withMessage('Additional data must be an object')];
 
-const bulkAddTagsValidator = [
-  body('paymentIds').isArray({ min: 1 }).withMessage('Payment IDs must be a non-empty array'),
-  body('paymentIds.*').isMongoId().withMessage('Each payment ID must be a valid MongoID'),
-  body('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string'),
-];
+const bulkAddTagsValidator = [body('paymentIds').isArray({ min: 1 }).withMessage('Payment IDs must be a non-empty array'), body('paymentIds.*').isMongoId().withMessage('Each payment ID must be a valid MongoID'), body('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string')];
 
-const getPaymentsByCountryValidator = [
-  query('country').isString().trim().notEmpty().withMessage('Country must be a non-empty string'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-];
+const getPaymentsByCountryValidator = [query('country').isString().trim().notEmpty().withMessage('Country must be a non-empty string'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100')];
 
-const searchByNotesValidator = [
-  query('notes').isString().trim().notEmpty().withMessage('Notes must be a non-empty string'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-];
+const searchByNotesValidator = [query('notes').isString().trim().notEmpty().withMessage('Notes must be a non-empty string'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100')];
 
-const getPaymentsByTagValidator = [
-  query('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string'),
-  query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100'),
-];
+const getPaymentsByTagValidator = [query('tag').isString().trim().notEmpty().withMessage('Tag must be a non-empty string'), query('page').optional().isInt({ min: 1 }).toInt().withMessage('Page must be a positive integer'), query('limit').optional().isInt({ min: 1, max: 100 }).toInt().withMessage('Limit must be between 1 and 100')];
 
 // Helper function to handle errors
 const handleError = (res, err, defaultMessage = 'Internal server error') => {
@@ -233,13 +92,10 @@ const checkPaymentOwnership = (req, payment) => {
 
 // PaymentController class
 class PaymentController {
-
-
   // Static services for gateway operations (from Artifact B)
   static paypalService = new PaypalService();
   static razorpayService = new RazorpayService();
   static stripeService = new StripeService();
-
 
   // POST /payment/initiate
   static initiatePayment = safeApiCall(async (req, res) => {
@@ -249,7 +105,7 @@ class PaymentController {
     if (!orderId || !gateway || !amount) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: orderId, gateway, amount'
+        message: 'Missing required fields: orderId, gateway, amount',
       });
     }
 
@@ -258,7 +114,7 @@ class PaymentController {
     if (!supportedGateways.includes(gateway)) {
       return res.status(400).json({
         success: false,
-        message: 'Unsupported payment gateway'
+        message: 'Unsupported payment gateway',
       });
     }
 
@@ -267,21 +123,21 @@ class PaymentController {
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: 'Order not found'
+        message: 'Order not found',
       });
     }
 
     // Check if payment already exists for this order
     const existingPayment = await Payment.findOne({
       orderId,
-      status: { $in: ['pending', 'processing', 'completed'] }
+      status: { $in: ['pending', 'processing', 'completed'] },
     });
 
     if (existingPayment) {
       return res.status(409).json({
         success: false,
         message: 'Payment already exists for this order',
-        payment: existingPayment
+        payment: existingPayment,
       });
     }
 
@@ -297,7 +153,7 @@ class PaymentController {
         amount,
         currency: currency || 'INR',
         status: 'pending',
-        method: 'cod'
+        method: 'cod',
       });
 
       await payment.save();
@@ -309,7 +165,7 @@ class PaymentController {
         eventType: 'payment_initiated',
         gateway: 'cod',
         status: 'pending',
-        data: { amount, currency }
+        data: { amount, currency },
       });
 
       return res.json({
@@ -320,8 +176,8 @@ class PaymentController {
           status: payment.status,
           gateway: payment.gateway,
           amount: payment.amount,
-          currency: payment.currency
-        }
+          currency: payment.currency,
+        },
       });
     }
 
@@ -333,7 +189,7 @@ class PaymentController {
       amount,
       currency: currency || (gateway === 'razorpay' ? 'INR' : 'USD'),
       status: 'pending',
-      method: this.determinePaymentMethod(req.body.method)
+      method: this.determinePaymentMethod(req.body.method),
     });
 
     await payment.save();
@@ -347,7 +203,7 @@ class PaymentController {
       returnUrl: returnUrl || `${process.env.FRONTEND_URL}/payment/success`,
       cancelUrl: cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
       description: `Payment for Order #${order.orderNumber || orderId}`,
-      customerEmail: req.user?.email
+      customerEmail: req.user?.email,
     };
 
     let result;
@@ -379,7 +235,7 @@ class PaymentController {
         eventType: 'payment_initiated',
         gateway,
         status: 'processing',
-        data: result.data
+        data: result.data,
       });
 
       return res.json({
@@ -393,8 +249,8 @@ class PaymentController {
           amount,
           currency: payment.currency,
           approvalUrl: result.approvalUrl,
-          clientSecret: result.clientSecret
-        }
+          clientSecret: result.clientSecret,
+        },
       });
     } else {
       // Update payment status to failed
@@ -409,13 +265,13 @@ class PaymentController {
         eventType: 'payment_failed',
         gateway,
         status: 'failed',
-        errorDetails: result.error
+        errorDetails: result.error,
       });
 
       return res.status(400).json({
         success: false,
         message: 'Payment initiation failed',
-        error: result.error
+        error: result.error,
       });
     }
   });
@@ -427,7 +283,7 @@ class PaymentController {
     if (!paymentId) {
       return res.status(400).json({
         success: false,
-        message: 'Payment ID is required'
+        message: 'Payment ID is required',
       });
     }
 
@@ -435,7 +291,7 @@ class PaymentController {
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Payment not found'
+        message: 'Payment not found',
       });
     }
 
@@ -446,14 +302,10 @@ class PaymentController {
         if (!signature) {
           return res.status(400).json({
             success: false,
-            message: 'Signature is required for Razorpay verification'
+            message: 'Signature is required for Razorpay verification',
           });
         }
-        const isValid = this.razorpayService.verifyPaymentSignature(
-          payment.gatewayPaymentId,
-          gatewayPaymentId,
-          signature
-        );
+        const isValid = this.razorpayService.verifyPaymentSignature(payment.gatewayPaymentId, gatewayPaymentId, signature);
         verificationResult = { success: isValid };
         break;
 
@@ -468,7 +320,7 @@ class PaymentController {
       default:
         return res.status(400).json({
           success: false,
-          message: 'Unsupported gateway for verification'
+          message: 'Unsupported gateway for verification',
         });
     }
 
@@ -482,7 +334,7 @@ class PaymentController {
       // Update order status
       await Order.findByIdAndUpdate(payment.orderId, {
         paymentStatus: 'paid',
-        status: 'confirmed'
+        status: 'confirmed',
       });
 
       // Log successful transaction
@@ -492,7 +344,7 @@ class PaymentController {
         eventType: 'payment_completed',
         gateway: payment.gateway,
         status: 'completed',
-        data: verificationResult.data
+        data: verificationResult.data,
       });
 
       return res.json({
@@ -503,8 +355,8 @@ class PaymentController {
           status: payment.status,
           amount: payment.amount,
           gateway: payment.gateway,
-          completedAt: payment.completedAt
-        }
+          completedAt: payment.completedAt,
+        },
       });
     } else {
       // Update payment status to failed
@@ -519,13 +371,13 @@ class PaymentController {
         eventType: 'payment_failed',
         gateway: payment.gateway,
         status: 'failed',
-        errorDetails: verificationResult.error
+        errorDetails: verificationResult.error,
       });
 
       return res.status(400).json({
         success: false,
         message: 'Payment verification failed',
-        error: verificationResult.error
+        error: verificationResult.error,
       });
     }
   });
@@ -537,7 +389,7 @@ class PaymentController {
     if (!paymentId) {
       return res.status(400).json({
         success: false,
-        message: 'Payment ID is required'
+        message: 'Payment ID is required',
       });
     }
 
@@ -545,7 +397,7 @@ class PaymentController {
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Payment not found'
+        message: 'Payment not found',
       });
     }
 
@@ -553,7 +405,7 @@ class PaymentController {
     if (!payment.canRetry) {
       return res.status(400).json({
         success: false,
-        message: 'Payment cannot be retried. Maximum retry limit reached or retry cooldown active.'
+        message: 'Payment cannot be retried. Maximum retry limit reached or retry cooldown active.',
       });
     }
 
@@ -563,7 +415,7 @@ class PaymentController {
     if (retryGateway === 'cod') {
       return res.status(400).json({
         success: false,
-        message: 'COD payments cannot be retried'
+        message: 'COD payments cannot be retried',
       });
     }
 
@@ -590,7 +442,7 @@ class PaymentController {
       returnUrl: `${process.env.FRONTEND_URL}/payment/success`,
       cancelUrl: `${process.env.FRONTEND_URL}/payment/cancel`,
       description: `Retry Payment for Order #${order.orderNumber || payment.orderId}`,
-      customerEmail: req.user?.email
+      customerEmail: req.user?.email,
     };
 
     let result;
@@ -621,7 +473,7 @@ class PaymentController {
         eventType: 'retry_attempted',
         gateway: retryGateway,
         status: 'processing',
-        data: { retryCount: payment.retryCount, ...result.data }
+        data: { retryCount: payment.retryCount, ...result.data },
       });
 
       return res.json({
@@ -634,8 +486,8 @@ class PaymentController {
           retryCount: payment.retryCount,
           status: 'processing',
           approvalUrl: result.approvalUrl,
-          clientSecret: result.clientSecret
-        }
+          clientSecret: result.clientSecret,
+        },
       });
     } else {
       // Update payment status back to failed
@@ -651,14 +503,14 @@ class PaymentController {
         gateway: retryGateway,
         status: 'failed',
         errorDetails: result.error,
-        data: { retryCount: payment.retryCount }
+        data: { retryCount: payment.retryCount },
       });
 
       return res.status(400).json({
         success: false,
         message: 'Payment retry failed',
         error: result.error,
-        retryCount: payment.retryCount
+        retryCount: payment.retryCount,
       });
     }
   });
@@ -670,7 +522,7 @@ class PaymentController {
     if (!paymentId || !amount || !reason) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: paymentId, amount, reason'
+        message: 'Missing required fields: paymentId, amount, reason',
       });
     }
 
@@ -678,7 +530,7 @@ class PaymentController {
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Payment not found'
+        message: 'Payment not found',
       });
     }
 
@@ -687,7 +539,7 @@ class PaymentController {
     if (!refundCheck.canRefund) {
       return res.status(400).json({
         success: false,
-        message: refundCheck.reason
+        message: refundCheck.reason,
       });
     }
 
@@ -695,7 +547,7 @@ class PaymentController {
     const refund = payment.addRefund({
       amount,
       reason,
-      description
+      description,
     });
 
     await payment.save();
@@ -705,7 +557,7 @@ class PaymentController {
       amount,
       currency: payment.currency,
       reason,
-      description
+      description,
     };
 
     let result;
@@ -724,18 +576,13 @@ class PaymentController {
       default:
         return res.status(400).json({
           success: false,
-          message: `Gateway ${payment.gateway} does not support refunds`
+          message: `Gateway ${payment.gateway} does not support refunds`,
         });
     }
 
     if (result.success) {
       // Update refund status
-      payment.updateRefundStatus(
-        refund._id,
-        result.status === 'succeeded' || result.status === 'processed' ? 'completed' : 'processing',
-        result.refundId,
-        result.data
-      );
+      payment.updateRefundStatus(refund._id, result.status === 'succeeded' || result.status === 'processed' ? 'completed' : 'processing', result.refundId, result.data);
 
       await payment.save();
 
@@ -746,7 +593,7 @@ class PaymentController {
         eventType: 'refund_initiated',
         gateway: payment.gateway,
         status: result.status === 'succeeded' || result.status === 'processed' ? 'completed' : 'processing',
-        data: { refundId: refund.refundId, ...result.data }
+        data: { refundId: refund.refundId, ...result.data },
       });
 
       // Get updated refund info
@@ -760,14 +607,14 @@ class PaymentController {
           amount: updatedRefund.amount,
           status: updatedRefund.status,
           gatewayRefundId: updatedRefund.gatewayRefundId,
-          reason: updatedRefund.reason
+          reason: updatedRefund.reason,
         },
         payment: {
           paymentId: payment.paymentId,
           status: payment.status,
           totalRefunded: payment.totalRefunded,
-          refundableAmount: payment.refundableAmount
-        }
+          refundableAmount: payment.refundableAmount,
+        },
       });
     } else {
       // Update refund status to failed
@@ -783,7 +630,7 @@ class PaymentController {
         gateway: payment.gateway,
         status: 'failed',
         errorDetails: result.error,
-        data: { refundId: refund.refundId }
+        data: { refundId: refund.refundId },
       });
 
       return res.status(400).json({
@@ -793,8 +640,8 @@ class PaymentController {
         refund: {
           refundId: refund.refundId,
           status: 'failed',
-          failureReason: result.error
-        }
+          failureReason: result.error,
+        },
       });
     }
   });
@@ -803,14 +650,12 @@ class PaymentController {
   static getPaymentDetails = safeApiCall(async (req, res) => {
     const { paymentId } = req.params;
 
-    const payment = await Payment.findOne({ paymentId })
-      .populate('orderId', 'orderNumber status')
-      .select('+refunds');
+    const payment = await Payment.findOne({ paymentId }).populate('orderId', 'orderNumber status').select('+refunds');
 
     if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Payment not found'
+        message: 'Payment not found',
       });
     }
 
@@ -830,8 +675,8 @@ class PaymentController {
         refundableAmount: payment.refundableAmount,
         refundStatus: payment.refundStatus,
         createdAt: payment.createdAt,
-        updatedAt: payment.updatedAt
-      }
+        updatedAt: payment.updatedAt,
+      },
     });
   });
 
@@ -878,13 +723,13 @@ class PaymentController {
   // Helper: Determine payment method (from Artifact B)
   static determinePaymentMethod(method) {
     const methodMap = {
-      'card': 'credit_card',
-      'credit_card': 'credit_card',
-      'debit_card': 'debit_card',
-      'netbanking': 'net_banking',
-      'wallet': 'wallet',
-      'upi': 'upi',
-      'cod': 'cod',
+      card: 'credit_card',
+      credit_card: 'credit_card',
+      debit_card: 'debit_card',
+      netbanking: 'net_banking',
+      wallet: 'wallet',
+      upi: 'upi',
+      cod: 'cod',
     };
 
     return methodMap[method] || 'credit_card';
@@ -1432,10 +1277,11 @@ class PaymentController {
           ],
         });
 
-        await csv.writeRecords(payments.map(p => ({ ...p, createdAt: p.createdAt.toISOString() })));
+        await csv.writeRecords(payments.map((p) => ({ ...p, createdAt: p.createdAt.toISOString() })));
         res.download(fileName, (err) => {
-          if (err) //logger.error('Export error', err);
-          fs.unlinkSync(fileName);
+          if (err)
+            //logger.error('Export error', err);
+            fs.unlinkSync(fileName);
         });
       }
     } catch (err) {
@@ -1462,7 +1308,7 @@ class PaymentController {
         return res.status(403).json({ error: 'Admin access required' });
       }
 
-      const dispute = payment.disputes.find(d => d.disputeId === disputeId);
+      const dispute = payment.disputes.find((d) => d.disputeId === disputeId);
       if (!dispute) {
         return res.status(404).json({ error: 'Dispute not found' });
       }
@@ -1502,7 +1348,7 @@ class PaymentController {
         return res.status(403).json({ error: 'Admin access required' });
       }
 
-      const dispute = payment.disputes.find(d => d.disputeId === disputeId);
+      const dispute = payment.disputes.find((d) => d.disputeId === disputeId);
       if (!dispute) {
         return res.status(404).json({ error: 'Dispute not found' });
       }
@@ -1552,8 +1398,8 @@ class PaymentController {
           totalPages: Math.ceil(totalCount / parseInt(limit)),
           totalCount,
           hasNextPage: parseInt(page) < Math.ceil(totalCount / parseInt(limit)),
-          hasPrevPage: parseInt(page) > 1
-        }
+          hasPrevPage: parseInt(page) > 1,
+        },
       });
     } catch (err) {
       handleError(res, err, 'Failed to fetch recurring payments');
@@ -1600,7 +1446,7 @@ class PaymentController {
       const { dateFrom, dateTo } = req.query;
       const matchStage = {
         status: 'COMPLETED',
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
 
       if (req.user.role !== 'admin') {
@@ -1613,16 +1459,16 @@ class PaymentController {
           $group: {
             _id: null,
             avgProcessingTime: {
-              $avg: { $subtract: ['$processedAt', '$createdAt'] }
+              $avg: { $subtract: ['$processedAt', '$createdAt'] },
             },
             maxProcessingTime: {
-              $max: { $subtract: ['$processedAt', '$createdAt'] }
+              $max: { $subtract: ['$processedAt', '$createdAt'] },
             },
             minProcessingTime: {
-              $min: { $subtract: ['$processedAt', '$createdAt'] }
+              $min: { $subtract: ['$processedAt', '$createdAt'] },
             },
-            totalPayments: { $sum: 1 }
-          }
+            totalPayments: { $sum: 1 },
+          },
         },
         {
           $project: {
@@ -1630,9 +1476,9 @@ class PaymentController {
             avgProcessingTimeSeconds: { $divide: ['$avgProcessingTime', 1000] },
             maxProcessingTimeMs: '$maxProcessingTime',
             minProcessingTimeMs: '$minProcessingTime',
-            totalPayments: 1
-          }
-        }
+            totalPayments: 1,
+          },
+        },
       ]);
 
       res.json({ success: true, data: stats[0] || { totalPayments: 0 } });
@@ -1650,7 +1496,7 @@ class PaymentController {
 
       const { dateFrom, dateTo, paymentProvider } = req.query;
       const matchStage = {
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
       if (paymentProvider) matchStage.paymentProvider = paymentProvider;
 
@@ -1669,24 +1515,24 @@ class PaymentController {
                 $sum: {
                   $filter: {
                     input: '$refunds',
-                    cond: { $eq: ['$$this.status', 'COMPLETED'] }
-                  }
-                }
-              }
+                    cond: { $eq: ['$$this.status', 'COMPLETED'] },
+                  },
+                },
+              },
             },
             refundedPayments: {
-              $sum: { $cond: [{ $eq: ['$status', 'REFUNDED'] }, 1, 0] }
-            }
-          }
+              $sum: { $cond: [{ $eq: ['$status', 'REFUNDED'] }, 1, 0] },
+            },
+          },
         },
         {
           $project: {
             provider: '$_id',
             refundRate: { $multiply: [{ $divide: ['$refundedPayments', '$totalPayments'] }, 100] },
             avgRefundAmount: { $divide: ['$totalRefundedAmount', { $add: ['$refundedPayments', 1] }] },
-            totalPayments: 1
-          }
-        }
+            totalPayments: 1,
+          },
+        },
       ]);
 
       res.json({ success: true, data: rates });
@@ -1704,7 +1550,7 @@ class PaymentController {
 
       const { dateFrom, dateTo } = req.query;
       const matchStage = {
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
 
       if (req.user.role !== 'admin') {
@@ -1718,18 +1564,18 @@ class PaymentController {
             _id: '$paymentProvider',
             totalPayments: { $sum: 1 },
             successfulPayments: {
-              $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] }
-            }
-          }
+              $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] },
+            },
+          },
         },
         {
           $project: {
             provider: '$_id',
             successRate: { $multiply: [{ $divide: ['$successfulPayments', '$totalPayments'] }, 100] },
             totalPayments: 1,
-            successfulPayments: 1
-          }
-        }
+            successfulPayments: 1,
+          },
+        },
       ]);
 
       res.json({ success: true, data: rates });
@@ -1747,7 +1593,7 @@ class PaymentController {
 
       const { paymentMethod, dateFrom, dateTo } = req.query;
       const matchStage = {
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
       if (paymentMethod) matchStage.paymentMethod = paymentMethod;
 
@@ -1762,9 +1608,9 @@ class PaymentController {
             _id: '$paymentMethod',
             avgAmount: { $avg: '$amount' },
             totalPayments: { $sum: 1 },
-            totalAmount: { $sum: '$amount' }
-          }
-        }
+            totalAmount: { $sum: '$amount' },
+          },
+        },
       ]);
 
       res.json({ success: true, data: avgs });
@@ -1782,7 +1628,7 @@ class PaymentController {
 
       const { dateFrom, dateTo } = req.query;
       const matchStage = {
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
 
       if (req.user.role !== 'admin') {
@@ -1797,18 +1643,18 @@ class PaymentController {
             totalPayments: { $sum: 1 },
             totalAmount: { $sum: '$amount' },
             successfulPayments: {
-              $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] }
-            }
-          }
+              $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] },
+            },
+          },
         },
         {
           $project: {
             currency: '$_id',
             totalPayments: 1,
             totalAmount: 1,
-            successRate: { $multiply: [{ $divide: ['$successfulPayments', '$totalPayments'] }, 100] }
-          }
-        }
+            successRate: { $multiply: [{ $divide: ['$successfulPayments', '$totalPayments'] }, 100] },
+          },
+        },
       ]);
 
       res.json({ success: true, data: breakdown });
@@ -1826,7 +1672,7 @@ class PaymentController {
 
       const { dateFrom, dateTo, paymentProvider } = req.query;
       const matchStage = {
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
       if (paymentProvider) matchStage.paymentProvider = paymentProvider;
 
@@ -1843,8 +1689,8 @@ class PaymentController {
             totalPlatformFees: { $sum: '$fees.platformFee' },
             totalTax: { $sum: '$fees.taxAmount' },
             totalFees: { $sum: '$fees.totalFees' },
-            totalPayments: { $sum: 1 }
-          }
+            totalPayments: { $sum: 1 },
+          },
         },
         {
           $project: {
@@ -1852,9 +1698,9 @@ class PaymentController {
             totalPlatformFees: 1,
             totalTax: 1,
             totalFees: 1,
-            avgFeesPerPayment: { $divide: ['$totalFees', { $add: ['$totalPayments', 1] }] }
-          }
-        }
+            avgFeesPerPayment: { $divide: ['$totalFees', { $add: ['$totalPayments', 1] }] },
+          },
+        },
       ]);
 
       res.json({ success: true, data: summary[0] || {} });
@@ -1872,7 +1718,7 @@ class PaymentController {
 
       const { dateFrom, dateTo } = req.query;
       const matchStage = {
-        'disputes.createdAt': { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        'disputes.createdAt': { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
 
       if (req.user.role !== 'admin') {
@@ -1887,9 +1733,9 @@ class PaymentController {
             _id: '$disputes.status',
             count: { $sum: 1 },
             totalDisputedAmount: { $sum: '$disputes.amount' },
-            resolvedCount: { $sum: { $cond: [{ $ne: ['$disputes.resolvedAt', null] }, 1, 0] } }
-          }
-        }
+            resolvedCount: { $sum: { $cond: [{ $ne: ['$disputes.resolvedAt', null] }, 1, 0] } },
+          },
+        },
       ]);
 
       res.json({ success: true, data: analytics });
@@ -1917,19 +1763,17 @@ class PaymentController {
 
       let timeline = payment.timeline;
       if (status) {
-        timeline = timeline.filter(event => event.status === status);
+        timeline = timeline.filter((event) => event.status === status);
       }
 
       const stats = {
         totalEvents: timeline.length,
-        uniqueStatuses: [...new Set(timeline.map(e => e.status))],
-        avgTimeBetweenEvents: timeline.length > 1 ?
-          timeline.reduce((sum, _, i, arr) => i < arr.length - 1 ?
-            sum + (arr[i + 1].timestamp - arr[i].timestamp) : sum, 0) / (timeline.length - 1) : 0,
+        uniqueStatuses: [...new Set(timeline.map((e) => e.status))],
+        avgTimeBetweenEvents: timeline.length > 1 ? timeline.reduce((sum, _, i, arr) => (i < arr.length - 1 ? sum + (arr[i + 1].timestamp - arr[i].timestamp) : sum), 0) / (timeline.length - 1) : 0,
         eventsByUpdater: timeline.reduce((acc, event) => {
           acc[event.updated_by] = (acc[event.updated_by] || 0) + 1;
           return acc;
-        }, {})
+        }, {}),
       };
 
       res.json({ success: true, data: { stats, timeline } });
@@ -1953,7 +1797,7 @@ class PaymentController {
         status,
         'paymentDetails.providerPaymentId': providerPaymentId,
         'paymentDetails.providerResponse': providerResponse,
-        metadata: { ...payment.metadata, webhookReceivedAt: new Date() }
+        metadata: { ...payment.metadata, webhookReceivedAt: new Date() },
       };
 
       await payment.updateStatus(status, `Webhook from provider: ${status}`, 'webhook');
@@ -2026,15 +1870,15 @@ class PaymentController {
 
       const usage = await PaymentModel.aggregate([
         {
-          $unwind: { path: '$tags', preserveNullAndEmptyArrays: true }
+          $unwind: { path: '$tags', preserveNullAndEmptyArrays: true },
         },
         {
           $group: {
             _id: '$tags',
-            count: { $sum: 1 }
-          }
+            count: { $sum: 1 },
+          },
         },
-        { $sort: { count: -1 } }
+        { $sort: { count: -1 } },
       ]);
 
       res.json({ success: true, data: usage });
@@ -2068,8 +1912,8 @@ class PaymentController {
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(totalCount / parseInt(limit)),
-          totalCount
-        }
+          totalCount,
+        },
       });
     } catch (err) {
       handleError(res, err, 'Failed to search payments by notes');
@@ -2101,8 +1945,8 @@ class PaymentController {
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(totalCount / parseInt(limit)),
-          totalCount
-        }
+          totalCount,
+        },
       });
     } catch (err) {
       handleError(res, err, 'Failed to fetch payments by tag');
@@ -2162,7 +2006,7 @@ class PaymentController {
         return res.status(403).json({ error: 'Admin access required' });
       }
 
-      payment.tags = payment.tags.filter(t => t !== tag);
+      payment.tags = payment.tags.filter((t) => t !== tag);
       await payment.save();
       await payment.addTimelineEntry('Tag removed', `Removed tag: ${tag}`, 'admin');
 
@@ -2217,10 +2061,10 @@ class PaymentController {
           $group: {
             _id: '$metadata.fraudFlags',
             count: { $sum: 1 },
-            totalAmount: { $sum: '$amount' }
-          }
+            totalAmount: { $sum: '$amount' },
+          },
         },
-        { $sort: { count: -1 } }
+        { $sort: { count: -1 } },
       ]);
 
       res.json({ success: true, data: stats });
@@ -2242,10 +2086,7 @@ class PaymentController {
         return res.status(403).json({ error: 'Admin access required' });
       }
 
-      const result = await PaymentModel.updateMany(
-        { _id: { $in: paymentIds } },
-        { $addToSet: { tags: tag } }
-      );
+      const result = await PaymentModel.updateMany({ _id: { $in: paymentIds } }, { $addToSet: { tags: tag } });
 
       // logger.info('Bulk tags added', { paymentIds: paymentIds.length, tag });
       res.json({ success: true, data: { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount } });
@@ -2278,8 +2119,8 @@ class PaymentController {
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(totalCount / parseInt(limit)),
-          totalCount
-        }
+          totalCount,
+        },
       });
     } catch (err) {
       handleError(res, err, 'Failed to fetch payments by country');
@@ -2313,8 +2154,8 @@ class PaymentController {
           totalPages: Math.ceil(totalCount / parseInt(limit)),
           totalCount,
           hasNextPage: parseInt(page) < Math.ceil(totalCount / parseInt(limit)),
-          hasPrevPage: parseInt(page) > 1
-        }
+          hasPrevPage: parseInt(page) > 1,
+        },
       });
     } catch (err) {
       handleError(res, err, 'Failed to fetch payments by currency');
@@ -2330,7 +2171,7 @@ class PaymentController {
 
       const { period = 'day', dateFrom, dateTo } = req.query;
       const matchStage = {
-        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) }
+        createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
       };
 
       if (req.user.role !== 'admin') {
@@ -2359,10 +2200,10 @@ class PaymentController {
             _id: groupBy,
             totalVolume: { $sum: '$amount' },
             paymentCount: { $sum: 1 },
-            successfulVolume: { $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, '$amount', 0] } }
-          }
+            successfulVolume: { $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, '$amount', 0] } },
+          },
         },
-        { $sort: { _id: 1 } }
+        { $sort: { _id: 1 } },
       ]);
 
       res.json({ success: true, data: volume });
@@ -2381,7 +2222,7 @@ class PaymentController {
       const { limit = 10, dateFrom, dateTo } = req.query;
       const matchStage = {
         createdAt: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
-        status: 'COMPLETED'
+        status: 'COMPLETED',
       };
 
       if (req.user.role !== 'admin') {
@@ -2394,8 +2235,8 @@ class PaymentController {
           $group: {
             _id: '$customerId',
             totalAmount: { $sum: '$amount' },
-            paymentCount: { $sum: 1 }
-          }
+            paymentCount: { $sum: 1 },
+          },
         },
         { $sort: { totalAmount: -1 } },
         { $limit: parseInt(limit) },
@@ -2405,10 +2246,10 @@ class PaymentController {
             localField: '_id',
             foreignField: '_id',
             as: 'customer',
-            pipeline: [{ $project: { name: 1, email: 1 } }]
-          }
+            pipeline: [{ $project: { name: 1, email: 1 } }],
+          },
         },
-        { $unwind: '$customer' }
+        { $unwind: '$customer' },
       ]);
 
       res.json({ success: true, data: topCustomers });
@@ -2485,26 +2326,22 @@ class PaymentController {
             _id: { period: groupBy, paymentMethod: '$paymentMethod' },
             totalPayments: { $sum: 1 },
             successfulPayments: {
-              $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] }
-            }
-          }
+              $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] },
+            },
+          },
         },
         {
           $project: {
             period: '$_id.period',
             paymentMethod: '$_id.paymentMethod',
             successRate: {
-              $cond: [
-                { $eq: ['$totalPayments', 0] },
-                0,
-                { $multiply: [{ $divide: ['$successfulPayments', '$totalPayments'] }, 100] }
-              ]
+              $cond: [{ $eq: ['$totalPayments', 0] }, 0, { $multiply: [{ $divide: ['$successfulPayments', '$totalPayments'] }, 100] }],
             },
             totalPayments: 1,
-            successfulPayments: 1
-          }
+            successfulPayments: 1,
+          },
         },
-        { $sort: { period: 1, paymentMethod: 1 } }
+        { $sort: { period: 1, paymentMethod: 1 } },
       ]);
 
       // Format the response to group by period
@@ -2516,7 +2353,7 @@ class PaymentController {
         acc[period].methods[paymentMethod] = {
           successRate: parseFloat(successRate.toFixed(2)),
           totalPayments,
-          successfulPayments
+          successfulPayments,
         };
         return acc;
       }, {});
@@ -2537,10 +2374,7 @@ class PaymentController {
     }
   }
 
-
   static async getPaymentsByIP(req, res) {
-
-
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -2571,8 +2405,8 @@ class PaymentController {
           totalPages: Math.ceil(totalCount / parseInt(limit)),
           totalCount,
           hasNextPage: parseInt(page) < Math.ceil(totalCount / parseInt(limit)),
-          hasPrevPage: parseInt(page) > 1
-        }
+          hasPrevPage: parseInt(page) > 1,
+        },
       });
     } catch (err) {
       handleError(res, err, 'Failed to fetch payments by IP address');
@@ -2618,7 +2452,4 @@ class PaymentController {
       handleError(res, err, 'Failed to process bulk refunds');
     }
   }
-
-
-
 }

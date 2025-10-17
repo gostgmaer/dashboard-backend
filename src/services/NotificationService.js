@@ -9,51 +9,40 @@ class NotificationService {
       USER_CREATED: {
         title: 'Welcome to our platform!',
         message: 'Your account has been successfully created.',
-        priority: 'MEDIUM'
+        priority: 'MEDIUM',
       },
       USER_UPDATED: {
         title: 'Profile Updated',
         message: 'Your profile information has been updated successfully.',
-        priority: 'LOW'
+        priority: 'LOW',
       },
       ORDER_CREATED: {
         title: 'Order Placed',
         message: 'Your order #{orderId} has been placed successfully.',
-        priority: 'HIGH'
+        priority: 'HIGH',
       },
       ORDER_SHIPPED: {
         title: 'Order Shipped',
         message: 'Your order #{orderId} has been shipped.',
-        priority: 'HIGH'
+        priority: 'HIGH',
       },
       PAYMENT_SUCCESS: {
         title: 'Payment Successful',
         message: 'Your payment of ${amount} has been processed successfully.',
-        priority: 'HIGH'
+        priority: 'HIGH',
       },
       ROLE_ASSIGNED: {
         title: 'New Role Assigned',
         message: 'You have been assigned the role: {roleName}',
-        priority: 'MEDIUM'
-      }
+        priority: 'MEDIUM',
+      },
     };
   }
 
   // Create notification
   async create(notificationData) {
     try {
-      const {
-        recipient,
-        sender,
-        type,
-        title,
-        message,
-        data = {},
-        priority = 'MEDIUM',
-        channels = ['IN_APP'],
-        scheduledFor,
-        metadata = {}
-      } = notificationData;
+      const { recipient, sender, type, title, message, data = {}, priority = 'MEDIUM', channels = ['IN_APP'], scheduledFor, metadata = {}, template } = notificationData;
       const notification = new Notification({
         recipient,
         sender,
@@ -64,7 +53,7 @@ class NotificationService {
         priority: priority,
         channels,
         scheduledFor: scheduledFor || new Date(),
-        metadata
+        metadata,
       });
 
       await notification.save();
@@ -72,7 +61,7 @@ class NotificationService {
 
       // Send real-time notification if scheduled for now
       if (!scheduledFor || scheduledFor <= new Date()) {
-        await this.deliver(notification);
+        await this.deliver(notification, template);
       }
 
       return notification;
@@ -105,14 +94,14 @@ class NotificationService {
           data: notification.data,
           createdAt: notification.createdAt,
           sender: notification.sender,
-          metadata: notification.metadata
+          metadata: notification.metadata,
         });
       }
 
       // Email notification
-      // if (channels.includes('EMAIL')) {
-      //   await emailService.sendNotification(notification);
-      // }
+      if (channels.includes('EMAIL')) {
+        await emailService.sendNotification(notification);
+      }
 
       // Mark as delivered
       notification.deliveredAt = new Date();
@@ -128,17 +117,10 @@ class NotificationService {
   // Get notifications for user
   async getAll(userId, options = {}) {
     try {
-      const {
-        page = 1,
-        limit = 20,
-        status,
-        type,
-        priority,
-        unreadOnly = false
-      } = options;
+      const { page = 1, limit = 20, status, type, priority, unreadOnly = false } = options;
 
       const query = { recipient: userId };
-      
+
       if (status) query.status = status;
       if (type) query.type = type;
       if (priority) query.priority = priority;
@@ -154,7 +136,7 @@ class NotificationService {
       const total = await Notification.countDocuments(query);
       const unreadCount = await Notification.countDocuments({
         recipient: userId,
-        status: 'UNREAD'
+        status: 'UNREAD',
       });
 
       return {
@@ -164,9 +146,9 @@ class NotificationService {
           totalPages: Math.ceil(total / limit),
           totalCount: total,
           hasNext: page * limit < total,
-          hasPrev: page > 1
+          hasPrev: page > 1,
         },
-        unreadCount
+        unreadCount,
       };
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -179,9 +161,9 @@ class NotificationService {
     try {
       const notification = await Notification.findOneAndUpdate(
         { _id: notificationId, recipient: userId },
-        { 
+        {
           status: 'read',
-          readAt: new Date()
+          readAt: new Date(),
         },
         { new: true }
       );
@@ -194,7 +176,7 @@ class NotificationService {
       socketService.sendToUser(userId, 'notification_updated', {
         id: notification._id,
         status: 'read',
-        readAt: notification.readAt
+        readAt: notification.readAt,
       });
 
       return notification;
@@ -209,15 +191,15 @@ class NotificationService {
     try {
       const result = await Notification.updateMany(
         { recipient: userId, status: 'UNREAD' },
-        { 
+        {
           status: 'read',
-          readAt: new Date()
+          readAt: new Date(),
         }
       );
 
       // Send real-time update
       socketService.sendToUser(userId, 'all_notifications_read', {
-        updatedCount: result.modifiedCount
+        updatedCount: result.modifiedCount,
       });
 
       return result;
@@ -232,7 +214,7 @@ class NotificationService {
     try {
       const notification = await Notification.findOneAndDelete({
         _id: notificationId,
-        recipient: userId
+        recipient: userId,
       });
 
       if (!notification) {
@@ -241,7 +223,7 @@ class NotificationService {
 
       // Send real-time update
       socketService.sendToUser(userId, 'notification_deleted', {
-        id: notificationId
+        id: notificationId,
       });
 
       return notification;
@@ -256,7 +238,7 @@ class NotificationService {
     try {
       return await Notification.countDocuments({
         recipient: userId,
-        status: 'UNREAD'
+        status: 'UNREAD',
       });
     } catch (error) {
       console.error('Error getting unread count:', error);
@@ -268,7 +250,7 @@ class NotificationService {
   async createBulk(notifications) {
     try {
       const createdNotifications = await Notification.insertMany(notifications);
-      
+
       // Send real-time notifications
       for (const notification of createdNotifications) {
         await this.deliver(notification);
@@ -289,7 +271,7 @@ class NotificationService {
 
       const result = await Notification.deleteMany({
         createdAt: { $lt: cutoffDate },
-        status: { $in: ['read', 'ARCHIVED'] }
+        status: { $in: ['read', 'ARCHIVED'] },
       });
 
       console.log(`Cleaned up ${result.deletedCount} old notifications`);
