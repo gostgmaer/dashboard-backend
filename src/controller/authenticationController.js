@@ -402,7 +402,12 @@ class authController {
           // Skip OTP for trusted device
           await user.handleSuccessfulLogin(deviceInfo);
           const tokens = await user.generateTokens(deviceInfo);
-
+          await ActivityHelper.logAuth(req, 'login', 'success', {
+            userId: user._id,
+            email: user.email,
+            loginMethod: 'password',
+            tokenGenerated: true,
+          });
           return standardResponse(
             res,
             true,
@@ -508,13 +513,13 @@ class authController {
     try {
       const { identifier, profileData, deviceTrust = false, provider, providerId, email, name, profile } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-      if (!provider || !providerId || !email || !name) {
+      if (!provider || !providerId) {
         return res.status(400).json({ success: false, message: 'Missing required fields' });
       }
-      const { user, isNewUser } = await verifyAndLinkUser({ provider, providerId, email, name, profile });
+      const { user, isNewUser } = await User.verifyAndLinkUser({ provider, providerId, email: identifier, name: profile.name, profile });
 
       // Authenticate user
-      const authResult = await User.authenticateSocial(profileData, identifier, deviceInfo);
+      const authResult = await User.authenticateSocial({ ...user, provider, providerId }, identifier, deviceInfo);
       let u = authResult.user;
       res.locals.user = u;
       const tokens = await u.generateTokens(deviceInfo);
@@ -525,10 +530,10 @@ class authController {
       await ActivityHelper.logAuth(req, 'login', 'success', {
         userId: u._id,
         email: u.email,
-        loginMethod: 'password',
+        loginMethod: 'Social',
         tokenGenerated: true,
       });
-
+      NotificationMiddleware.onLoginSuccess(req, res, () => {});
       return standardResponse(
         res,
         true,
@@ -536,7 +541,7 @@ class authController {
           user: {
             id: u._id,
             email: u.email,
-            image: u.profilePicture,
+            image: u.profilePicture.image,
             username: u.username,
             fullName: u.fullName,
             role: u.role?.name,
@@ -548,7 +553,6 @@ class authController {
         },
         'Login successful'
       );
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
     } catch (error) {
       await ActivityHelper.logAuth(req, 'login attempt', 'error', {
         error: error.message,
@@ -1042,6 +1046,12 @@ class authController {
 
       const result = await user.changePassword(currentPassword, newPassword);
       await user.logSecurityEvent('password_changed', 'Password changed successfully', 'medium', deviceInfo);
+      await ActivityHelper.logAuth(req, 'change-password', 'success', {
+        userId: user._id,
+        email: user.email,
+        loginMethod: 'password',
+        tokenGenerated: true,
+      });
       NotificationMiddleware.onPasswordChange(req, res, () => {});
       return standardResponse(
         res,
@@ -1798,6 +1808,13 @@ class authController {
       await req.user.updateProfile(req.body);
       res.locals.changes = req.body;
       NotificationMiddleware.onUserUpdate(req, res, () => {});
+      await ActivityHelper.logCRUD(req, 'User', 'update', {
+        id: req.user._id,
+        role: req.user.role.name,
+        email: req.user.email,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+      });
       return standardResponse(res, true, {}, 'Profile updated successfully');
     } catch (error) {
       console.error('Update profile error:', error);
@@ -3258,11 +3275,15 @@ class authController {
       const user = req.user;
       const linkedAccounts = user.getSocialAccounts();
 
-      res.json({
-        success: true,
-        linkedAccounts,
-        availableProviders: ['google', 'facebook', 'twitter', 'github'],
-      });
+      return standardResponse(
+        res,
+        true,
+        {
+          linkedAccounts,
+          availableProviders: ['google', 'facebook', 'twitter', 'github'],
+        },
+        'Security events retrieved successfully'
+      );
     } catch (error) {
       res.status(500).json({
         success: false,
