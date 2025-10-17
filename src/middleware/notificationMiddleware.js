@@ -1,5 +1,6 @@
 const notificationService = require('../services/NotificationService');
 const User = require('../models/user');
+const { loginAlertTemplate } = require('../email/emailTemplate');
 
 class NotificationMiddleware {
   // ==== USER-RELATED NOTIFICATIONS ====
@@ -18,7 +19,7 @@ class NotificationMiddleware {
           username: user.username,
           email: user.email,
         },
-        channels: ['IN_APP', 'EMAIL'],
+        channels: ['EMAIL'],
         priority: 'MEDIUM',
         metadata: {
           category: 'user',
@@ -50,7 +51,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -67,8 +68,9 @@ class NotificationMiddleware {
             userId: user._id,
             username: user.username,
             email: user.email,
+            admin: admin.username,
           },
-          channels: ['IN_APP', 'EMAIL'],
+          channels: ['IN_APP'],
           priority: 'MEDIUM',
           metadata: {
             category: 'admin',
@@ -139,7 +141,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -183,6 +185,7 @@ class NotificationMiddleware {
         message: `You have been assigned the role: ${newRole.name}`,
         data: {
           roleName: newRole.name,
+          username: user.username,
           permissions: newRole.permissions,
         },
         channels: ['IN_APP', 'EMAIL'],
@@ -382,6 +385,7 @@ class NotificationMiddleware {
           relatedResource: user._id,
           resourceModel: 'User',
         },
+        loginAlertTemplate,
       });
     } catch (error) {
       console.error('Error creating login success notification:', error);
@@ -2280,7 +2284,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -3374,7 +3378,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -3435,7 +3439,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -3603,7 +3607,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -3720,7 +3724,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5143,7 +5147,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5266,7 +5270,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5417,7 +5421,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5480,7 +5484,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5613,7 +5617,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5674,7 +5678,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5771,7 +5775,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5833,7 +5837,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -5895,7 +5899,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -7999,7 +8003,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -8065,7 +8069,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -8130,7 +8134,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },
@@ -8197,7 +8201,7 @@ class NotificationMiddleware {
         {
           $project: {
             _id: 1,
-            name: 1,
+            username: 1,
             email: 1, // optional – include if you need it
             role: '$role_info.name',
           },

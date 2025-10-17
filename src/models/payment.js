@@ -1,119 +1,122 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const { Logger } = require('../config/logger');
-const logger = Logger('PaymentModel');
 
-const RefundItemSchema = new mongoose.Schema({
-  refundId: { type: String, required: true, index: true }, // unique if top-level
-  gatewayRefundId: String,
-  amount: { type: Number, required: true, min: 0 },
-  reason: {
-    type: String,
-    enum: ['CUSTOMER_REQUEST', 'ORDER_CANCELLED', 'DUPLICATE_PAYMENT', 'FRAUD', 'OTHER'],
-    required: true
+const RefundItemSchema = new mongoose.Schema(
+  {
+    refundId: { type: String, required: true, index: true }, // unique if top-level
+    gatewayRefundId: String,
+    amount: { type: Number, required: true, min: 0 },
+    reason: {
+      type: String,
+      enum: ['CUSTOMER_REQUEST', 'ORDER_CANCELLED', 'DUPLICATE_PAYMENT', 'FRAUD', 'OTHER'],
+      required: true,
+    },
+    description: String,
+    status: {
+      type: String,
+      enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'],
+      default: 'PENDING',
+    },
+    failureReason: String,
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+    initiatedAt: { type: Date, default: Date.now },
+    processedAt: Date,
   },
-  description: String,
-  status: {
-    type: String,
-    enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'],
-    default: 'PENDING'
-  },
-  failureReason: String,
-  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
-  initiatedAt: { type: Date, default: Date.now },
-  processedAt: Date
-}, {
- 
-  timestamps: true,  
-        toJSON: { virtuals: true },
-        toObject: { virtuals: true },
-});
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
 
-const paymentSchema = new mongoose.Schema({
-  paymentId: { type: String, required: true, unique: true, index: true },
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: true, index: true },
-  amount: { type: Number, required: true, min: 0 },
-  currency: {
-    type: String,
-    required: true,
-    default: "USD",
-    enum: ["USD", "EUR", "GBP", "INR", "JPY", "CAD", "AUD"]
-  },
-  method: {
-    type: String,
-    enum: ["CREDIT_CARD", "DEBIT_CARD", "UPI", "BANK_TRANSFER", "COD", "DIGITAL_WALLET", "CRYPTO", "NET_BANKING"]
-  },
-  gateway: {
-    type: String,
-    required: true,
-    enum: ["STRIPE", "PAYPAL", "RAZORPAY", "SQUARE", "ADYEN", "PAYU", "CASHFREE", "INTERNAL", "PAYTM", "COD"]
-  },
-  gatewayPaymentId: { type: String, index: true },
-  status: {
-    type: String,
-    required: true,
-    default: "PENDING",
-    enum: ["PENDING", "PROCESSING", "AUTHORIZED", "COMPLETED", "FAILED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "EXPIRED"]
-  },
-  // Refund Information
-  refunds: [RefundItemSchema],
-  totalRefunded: { type: Number, default: 0, min: 0 },
-  refundableAmount: {
-    type: Number,
-    default: function () {
-      return this.amount - this.totalRefunded;
-    }
-  },
-  isRecurring: { type: Boolean, default: false },
-  subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: "Subscription", index: true },
-  sourceId: { type: String, index: true },
-  failureReason: { type: String, index: true },
-  retryCount: { type: Number, default: 0, min: 0 },
-  maxRetries: { type: Number, default: 3, min: 0 },
-  paymentDetails: {
-    providerPaymentId: String,
-    providerTransactionId: String,
-    providerResponse: mongoose.Schema.Types.Mixed,
-    last4: String,
-    cardBrand: String,
-    expiryMonth: Number,
-    expiryYear: Number,
-    bankName: String,
-    upiId: String,
-    walletType: String
-  },
+const paymentSchema = new mongoose.Schema(
+  {
+    paymentId: { type: String, required: true, unique: true, index: true },
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
+    amount: { type: Number, required: true, min: 0 },
+    currency: {
+      type: String,
+      required: true,
+      default: 'USD',
+      enum: ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD'],
+    },
+    method: {
+      type: String,
+      enum: ['CREDIT_CARD', 'DEBIT_CARD', 'UPI', 'BANK_TRANSFER', 'COD', 'DIGITAL_WALLET', 'CRYPTO', 'NET_BANKING'],
+    },
+    gateway: {
+      type: String,
+      required: true,
+      enum: ['STRIPE', 'PAYPAL', 'RAZORPAY', 'SQUARE', 'ADYEN', 'PAYU', 'CASHFREE', 'INTERNAL', 'PAYTM', 'COD'],
+    },
+    gatewayPaymentId: { type: String, index: true },
+    status: {
+      type: String,
+      required: true,
+      default: 'PENDING',
+      enum: ['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED', 'EXPIRED'],
+    },
+    // Refund Information
+    refunds: [RefundItemSchema],
+    totalRefunded: { type: Number, default: 0, min: 0 },
+    refundableAmount: {
+      type: Number,
+      default: function () {
+        return this.amount - this.totalRefunded;
+      },
+    },
+    isRecurring: { type: Boolean, default: false },
+    subscriptionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subscription', index: true },
+    sourceId: { type: String, index: true },
+    failureReason: { type: String, index: true },
+    retryCount: { type: Number, default: 0, min: 0 },
+    maxRetries: { type: Number, default: 3, min: 0 },
+    paymentDetails: {
+      providerPaymentId: String,
+      providerTransactionId: String,
+      providerResponse: mongoose.Schema.Types.Mixed,
+      last4: String,
+      cardBrand: String,
+      expiryMonth: Number,
+      expiryYear: Number,
+      bankName: String,
+      upiId: String,
+      walletType: String,
+    },
 
-  billingAddress: {
-    name: String,
-    email: String,
-    phone: String,
-    street: String,
-    city: String,
-    state: String,
-    country: String,
-    postalCode: String
-  },
+    billingAddress: {
+      name: String,
+      email: String,
+      phone: String,
+      street: String,
+      city: String,
+      state: String,
+      country: String,
+      postalCode: String,
+    },
 
-  fees: {
-    processingFee: { type: Number, default: 0 },
-    platformFee: { type: Number, default: 0 },
-    taxAmount: { type: Number, default: 0 },
-    totalFees: { type: Number, default: 0 }
-  },
+    fees: {
+      processingFee: { type: Number, default: 0 },
+      platformFee: { type: Number, default: 0 },
+      taxAmount: { type: Number, default: 0 },
+      totalFees: { type: Number, default: 0 },
+    },
 
-  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
-  timeline: [timelineSchema],
-  lastRetryAt: { type: Date },
-  completedAt: { type: Date },
-  expiresAt: { type: Date, index: { expireAfterSeconds: 0 } },
-  tags: [{ type: String }],
-  notes: { type: String }
-}, {
-  timestamps: true,
-  versionKey: false,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+    timeline: [timelineSchema],
+    lastRetryAt: { type: Date },
+    completedAt: { type: Date },
+    expiresAt: { type: Date, index: { expireAfterSeconds: 0 } },
+    tags: [{ type: String }],
+    notes: { type: String },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
+);
 
 // Indexes for performance optimization
 paymentSchema.index({ orderId: 1, createdAt: -1 });
@@ -127,7 +130,6 @@ paymentSchema.index({ createdAt: -1 });
 paymentSchema.index({ 'refunds.refundId': 1 });
 paymentSchema.index({ 'refunds.status': 1 });
 
-
 // Virtual for refund status
 paymentSchema.virtual('refundStatus').get(function () {
   if (this.refunds.length === 0) return 'none';
@@ -138,14 +140,12 @@ paymentSchema.virtual('refundStatus').get(function () {
 
 // Virtual for active refunds
 paymentSchema.virtual('activeRefunds').get(function () {
-  return this.refunds.filter(refund =>
-    ['pending', 'processing'].includes(refund.status)
-  );
+  return this.refunds.filter((refund) => ['pending', 'processing'].includes(refund.status));
 });
 
 // Virtual for completed refunds
 paymentSchema.virtual('completedRefunds').get(function () {
-  return this.refunds.filter(refund => refund.status === 'completed');
+  return this.refunds.filter((refund) => refund.status === 'completed');
 });
 
 // Virtual for payment age in hours
@@ -164,9 +164,7 @@ paymentSchema.virtual('paymentAge').get(function () {
 
 // Virtual for retry eligibility
 paymentSchema.virtual('canRetry').get(function () {
-  return this.status === 'failed' &&
-    this.retryCount < this.maxRetries &&
-    (!this.lastRetryAt || (Date.now() - this.lastRetryAt) > 60000); // 1 minute cooldown
+  return this.status === 'failed' && this.retryCount < this.maxRetries && (!this.lastRetryAt || Date.now() - this.lastRetryAt > 60000); // 1 minute cooldown
 });
 
 // Pre-save middleware to set expiration for pending payments
@@ -189,16 +187,7 @@ paymentSchema.statics.generatePaymentId = function () {
 
 // Find payments by customer with pagination
 paymentSchema.statics.findByCustomer = async function (customerId, options = {}) {
-  const {
-    page = 1,
-    limit = 20,
-    status,
-    paymentMethod,
-    dateFrom,
-    dateTo,
-    sortBy = 'createdAt',
-    sortOrder = -1
-  } = options;
+  const { page = 1, limit = 20, status, paymentMethod, dateFrom, dateTo, sortBy = 'createdAt', sortOrder = -1 } = options;
 
   const query = { customerId };
 
@@ -225,8 +214,8 @@ paymentSchema.statics.findByCustomer = async function (customerId, options = {})
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-      hasPrevPage: page > 1
-    }
+      hasPrevPage: page > 1,
+    },
   };
 };
 
@@ -236,11 +225,11 @@ paymentSchema.statics.getAnalytics = async function (filters = {}) {
     dateFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
     dateTo = new Date(),
     customerId,
-    paymentProvider
+    paymentProvider,
   } = filters;
 
   const matchStage = {
-    createdAt: { $gte: dateFrom, $lte: dateTo }
+    createdAt: { $gte: dateFrom, $lte: dateTo },
   };
 
   if (customerId) matchStage.customerId = new mongoose.Types.ObjectId(customerId);
@@ -255,26 +244,26 @@ paymentSchema.statics.getAnalytics = async function (filters = {}) {
         totalAmount: { $sum: '$amount' },
         avgAmount: { $avg: '$amount' },
         successfulPayments: {
-          $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] }
+          $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] },
         },
         failedPayments: {
-          $sum: { $cond: [{ $eq: ['$status', 'FAILED'] }, 1, 0] }
+          $sum: { $cond: [{ $eq: ['$status', 'FAILED'] }, 1, 0] },
         },
         totalRefunded: {
           $sum: {
             $sum: {
               $filter: {
                 input: '$refunds',
-                cond: { $eq: ['$$this.status', 'COMPLETED'] }
-              }
-            }
-          }
+                cond: { $eq: ['$$this.status', 'COMPLETED'] },
+              },
+            },
+          },
         },
         paymentMethods: { $addToSet: '$paymentMethod' },
         paymentProviders: { $addToSet: '$paymentProvider' },
-        currencies: { $addToSet: '$currency' }
-      }
-    }
+        currencies: { $addToSet: '$currency' },
+      },
+    },
   ]);
 
   const statusBreakdown = await this.aggregate([
@@ -283,9 +272,9 @@ paymentSchema.statics.getAnalytics = async function (filters = {}) {
       $group: {
         _id: '$status',
         count: { $sum: 1 },
-        totalAmount: { $sum: '$amount' }
-      }
-    }
+        totalAmount: { $sum: '$amount' },
+      },
+    },
   ]);
 
   const methodBreakdown = await this.aggregate([
@@ -296,20 +285,19 @@ paymentSchema.statics.getAnalytics = async function (filters = {}) {
         count: { $sum: 1 },
         totalAmount: { $sum: '$amount' },
         successRate: {
-          $avg: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] }
-        }
-      }
-    }
+          $avg: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] },
+        },
+      },
+    },
   ]);
 
   return {
     overview: analytics[0] || {},
     statusBreakdown,
     methodBreakdown,
-    successRate: analytics[0] ? (analytics[0].successfulPayments / analytics[0].totalPayments * 100) : 0
+    successRate: analytics[0] ? (analytics[0].successfulPayments / analytics[0].totalPayments) * 100 : 0,
   };
 };
-
 
 paymentSchema.statics.getFailedAttemptsSummary = async function (options = {}) {
   const { dateFrom, dateTo } = options;
@@ -326,9 +314,9 @@ paymentSchema.statics.getFailedAttemptsSummary = async function (options = {}) {
         _id: '$paymentMethod',
         totalAttempts: { $sum: '$attempts' },
         failedPayments: { $sum: { $cond: [{ $eq: ['$status', 'FAILED'] }, 1, 0] } },
-        averageAttempts: { $avg: '$attempts' }
-      }
-    }
+        averageAttempts: { $avg: '$attempts' },
+      },
+    },
   ]);
 };
 
@@ -342,16 +330,16 @@ paymentSchema.statics.bulkCancelPayments = async function (paymentIds, reason = 
           status: 'CANCELLED',
           timestamp: new Date(),
           note: reason,
-          updated_by
-        }
-      }
+          updated_by,
+        },
+      },
     }
   );
 };
 paymentSchema.statics.getRecentPayments = async function (options = {}) {
   const { limit = 50, hours = 24 } = options;
   return this.find({
-    createdAt: { $gte: new Date(Date.now() - hours * 60 * 60 * 1000) }
+    createdAt: { $gte: new Date(Date.now() - hours * 60 * 60 * 1000) },
   })
     .populate('customerId', 'name email')
     .populate('orderId', 'orderNumber')
@@ -361,10 +349,7 @@ paymentSchema.statics.getRecentPayments = async function (options = {}) {
 };
 
 paymentSchema.statics.findByProviderTransactionId = async function (providerTransactionId) {
-  return this.findOne({ 'paymentDetails.providerTransactionId': providerTransactionId })
-    .populate('customerId', 'name email')
-    .populate('orderId', 'orderNumber')
-    .lean();
+  return this.findOne({ 'paymentDetails.providerTransactionId': providerTransactionId }).populate('customerId', 'name email').populate('orderId', 'orderNumber').lean();
 };
 
 paymentSchema.statics.findByOrder = async function (orderId, options = {}) {
@@ -385,8 +370,8 @@ paymentSchema.statics.findByOrder = async function (orderId, options = {}) {
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-      hasPrevPage: page > 1
-    }
+      hasPrevPage: page > 1,
+    },
   };
 };
 
@@ -395,12 +380,7 @@ paymentSchema.statics.findSuspicious = async function (options = {}) {
   const { limit = 50, minRiskScore = 70 } = options;
 
   return this.find({
-    $or: [
-      { 'metadata.riskScore': { $gte: minRiskScore } },
-      { 'metadata.fraudFlags': { $exists: true, $ne: [] } },
-      { attempts: { $gt: 2 } },
-      { status: 'FAILED' }
-    ]
+    $or: [{ 'metadata.riskScore': { $gte: minRiskScore } }, { 'metadata.fraudFlags': { $exists: true, $ne: [] } }, { attempts: { $gt: 2 } }, { status: 'FAILED' }],
   })
     .populate('customerId', 'name email')
     .populate('orderId', 'orderNumber')
@@ -416,9 +396,9 @@ paymentSchema.statics.findRequiringAction = async function () {
       { status: 'PROCESSING' },
       {
         status: 'PENDING',
-        createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) } // Older than 30 minutes
-      }
-    ]
+        createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) }, // Older than 30 minutes
+      },
+    ],
   })
     .populate('customerId', 'name email')
     .populate('orderId', 'orderNumber')
@@ -436,9 +416,9 @@ paymentSchema.statics.bulkUpdateStatus = async function (paymentIds, newStatus, 
           status: newStatus,
           timestamp: new Date(),
           note,
-          updated_by
-        }
-      }
+          updated_by,
+        },
+      },
     }
   );
 };
@@ -461,8 +441,8 @@ paymentSchema.statics.findByPaymentMethod = async function (sourceId, options = 
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-      hasPrevPage: page > 1
-    }
+      hasPrevPage: page > 1,
+    },
   };
 };
 // Get payment summary
@@ -473,11 +453,11 @@ paymentSchema.statics.getPaymentSummary = async function (filters = {}) {
     customerId,
     status,
     paymentMethod,
-    paymentProvider
+    paymentProvider,
   } = filters;
 
   const matchStage = {
-    createdAt: { $gte: dateFrom, $lte: dateTo }
+    createdAt: { $gte: dateFrom, $lte: dateTo },
   };
 
   if (customerId) matchStage.customerId = new mongoose.Types.ObjectId(customerId);
@@ -499,19 +479,19 @@ paymentSchema.statics.getPaymentSummary = async function (filters = {}) {
             $sum: {
               $filter: {
                 input: '$refunds',
-                cond: { $eq: ['$$this.status', 'COMPLETED'] }
-              }
-            }
-          }
+                cond: { $eq: ['$$this.status', 'COMPLETED'] },
+              },
+            },
+          },
         },
         averageAmount: { $avg: '$amount' },
         paymentCountByStatus: {
           $push: {
             status: '$status',
-            count: 1
-          }
-        }
-      }
+            count: 1,
+          },
+        },
+      },
     },
     {
       $project: {
@@ -533,36 +513,34 @@ paymentSchema.statics.getPaymentSummary = async function (filters = {}) {
                     $map: {
                       input: '$paymentCountByStatus',
                       as: 'item',
-                      in: { $cond: [{ $eq: ['$$item.status', '$$status'] }, 1, 0] }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+                      in: { $cond: [{ $eq: ['$$item.status', '$$status'] }, 1, 0] },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   ]);
 
-  return summary[0] || {
-    totalPayments: 0,
-    totalAmount: 0,
-    totalFees: 0,
-    totalNetAmount: 0,
-    totalRefunded: 0,
-    averageAmount: 0,
-    statusBreakdown: {}
-  };
+  return (
+    summary[0] || {
+      totalPayments: 0,
+      totalAmount: 0,
+      totalFees: 0,
+      totalNetAmount: 0,
+      totalRefunded: 0,
+      averageAmount: 0,
+      statusBreakdown: {},
+    }
+  );
 };
 
 // Get tracking history
 paymentSchema.statics.getTrackingHistory = async function (paymentId) {
-  const payment = await this.findById(paymentId)
-    .select('timeline paymentId status amount customerId orderId')
-    .populate('customerId', 'name email')
-    .populate('orderId', 'orderNumber')
-    .lean();
+  const payment = await this.findById(paymentId).select('timeline paymentId status amount customerId orderId').populate('customerId', 'name email').populate('orderId', 'orderNumber').lean();
 
   if (!payment) {
     throw new Error('Payment not found');
@@ -574,13 +552,13 @@ paymentSchema.statics.getTrackingHistory = async function (paymentId) {
     amount: payment.amount,
     customer: payment.customerId,
     order: payment.orderId,
-    timeline: payment.timeline.map(event => ({
+    timeline: payment.timeline.map((event) => ({
       status: event.status,
       timestamp: event.timestamp,
       note: event.note,
       updated_by: event.updated_by,
-      additionalData: event.additionalData
-    }))
+      additionalData: event.additionalData,
+    })),
   };
 };
 
@@ -593,7 +571,7 @@ paymentSchema.methods.addTimelineEntry = function (status, note, updated_by = 's
     timestamp: new Date(),
     note,
     updated_by,
-    additionalData
+    additionalData,
   });
   return this.save();
 };
@@ -619,7 +597,7 @@ paymentSchema.methods.addDispute = function (disputeData) {
   const dispute = {
     disputeId: `DIS_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
     ...disputeData,
-    createdAt: new Date()
+    createdAt: new Date(),
   };
   this.disputes.push(dispute);
   return this.save();
@@ -629,7 +607,7 @@ paymentSchema.methods.addRefund = function (refundData) {
   const refund = {
     refundId: `REF_${Date.now().toString(36)}_${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
     ...refundData,
-    createdAt: new Date()
+    createdAt: new Date(),
   };
 
   this.refunds.push(refund);
@@ -690,12 +668,12 @@ paymentSchema.methods.calculateRiskScore = function () {
 
   // Payment method risk
   const methodRisk = {
-    'CRYPTO': 30,
-    'BANK_TRANSFER': 5,
-    'CREDIT_CARD': 10,
-    'DEBIT_CARD': 8,
-    'UPI': 5,
-    'COD': 2
+    CRYPTO: 30,
+    BANK_TRANSFER: 5,
+    CREDIT_CARD: 10,
+    DEBIT_CARD: 8,
+    UPI: 5,
+    COD: 2,
   };
   score += methodRisk[this.paymentMethod] || 0;
 
@@ -716,9 +694,7 @@ paymentSchema.pre('save', function (next) {
 
   // Calculate total refunded amount
   if (this.isModified('refunds')) {
-    this.totalRefunded = this.refunds
-      .filter(refund => refund.status === 'completed')
-      .reduce((total, refund) => total + refund.amount, 0);
+    this.totalRefunded = this.refunds.filter((refund) => refund.status === 'completed').reduce((total, refund) => total + refund.amount, 0);
 
     // Update payment status based on refund amount
     if (this.totalRefunded > 0 && this.status === 'completed') {
@@ -748,12 +724,12 @@ paymentSchema.methods.toAPIResponse = function () {
   // Format amounts
   payment.formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: payment.currency
+    currency: payment.currency,
   }).format(payment.amount);
 
   payment.formattedTotalAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: payment.currency
+    currency: payment.currency,
   }).format(payment.totalAmountWithFees);
 
   return payment;
@@ -767,7 +743,7 @@ PaymentSchema.methods.addRefund = function (refundData) {
     amount: refundData.amount,
     reason: refundData.reason,
     description: refundData.description,
-    status: 'pending'
+    status: 'pending',
   };
 
   this.refunds.push(refund);
@@ -776,7 +752,7 @@ PaymentSchema.methods.addRefund = function (refundData) {
 
 // Instance method to update refund status
 PaymentSchema.methods.updateRefundStatus = function (refundId, status, gatewayRefundId = null, metadata = {}) {
-  const refund = this.refunds.id(refundId) || this.refunds.find(r => r.refundId === refundId);
+  const refund = this.refunds.id(refundId) || this.refunds.find((r) => r.refundId === refundId);
 
   if (!refund) {
     throw new Error('Refund not found');
@@ -795,7 +771,7 @@ PaymentSchema.methods.updateRefundStatus = function (refundId, status, gatewayRe
 
 // Instance method to get refund by ID
 PaymentSchema.methods.getRefund = function (refundId) {
-  return this.refunds.id(refundId) || this.refunds.find(r => r.refundId === refundId);
+  return this.refunds.id(refundId) || this.refunds.find((r) => r.refundId === refundId);
 };
 
 // Instance method to check if refund is possible
@@ -813,7 +789,7 @@ PaymentSchema.methods.canRefund = function (amount = null) {
   if (amount && amount > availableAmount) {
     return {
       canRefund: false,
-      reason: `Refund amount exceeds available balance. Available: ${availableAmount}`
+      reason: `Refund amount exceeds available balance. Available: ${availableAmount}`,
     };
   }
 
@@ -823,7 +799,7 @@ PaymentSchema.methods.canRefund = function (amount = null) {
 // Static method to find payments with pending refunds
 PaymentSchema.statics.findWithPendingRefunds = function () {
   return this.find({
-    'refunds.status': { $in: ['pending', 'processing'] }
+    'refunds.status': { $in: ['pending', 'processing'] },
   });
 };
 
@@ -843,9 +819,9 @@ PaymentSchema.statics.getRefundStats = function (dateRange = {}) {
       $group: {
         _id: '$refunds.status',
         count: { $sum: 1 },
-        totalAmount: { $sum: '$refunds.amount' }
-      }
-    }
+        totalAmount: { $sum: '$refunds.amount' },
+      },
+    },
   ]);
 };
 // Mark payment as paid
@@ -891,7 +867,7 @@ paymentSchema.pre('save', function (next) {
       status: 'EXPIRED',
       timestamp: new Date(),
       note: 'Payment expired automatically',
-      updated_by: 'system'
+      updated_by: 'system',
     });
   }
 
@@ -899,14 +875,7 @@ paymentSchema.pre('save', function (next) {
 });
 
 // Post-save middleware
-paymentSchema.post('save', function (doc) {
-  logger.info('Payment saved', {
-    paymentId: doc.paymentId,
-    status: doc.status,
-    amount: doc.amount,
-    currency: doc.currency
-  });
-});
+paymentSchema.post('save', function (doc) {});
 
 // Create and export model
 const Payment = mongoose.model('Payment', paymentSchema);

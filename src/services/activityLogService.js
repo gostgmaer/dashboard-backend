@@ -126,6 +126,7 @@ class ActivityLogService {
       { pattern: '/logout', action: 'user logout' },
       { pattern: '/register', action: 'user registration' },
       { pattern: '/reset-password', action: 'password reset' },
+      { pattern: '/change-password', action: 'password reset' },
       { pattern: '/checkout', action: 'checkout initiated' },
       { pattern: '/apply-coupon', action: 'applied coupon' },
       { pattern: '/wishlist/clear', action: 'cleared wishlist' },
