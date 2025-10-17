@@ -479,13 +479,13 @@ const accountReactivatedTemplate = ({ username }) => {
  * @param {Object} data - Data object containing required parameters.
  * @returns {Object} Email content with subject, html, and optional attachments.
  */
-const roleUpdatedTemplate = ({ username, role }) => {
+const ROLE_ASSIGNED = ({ username, rolename }) => {
   return {
     subject: `Role Updated`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
     <h2>Permissions Updated 🔑</h2>
     <p>Hi ${username || 'User'}, your role has been updated.</p>
-    <p><strong>New Role:</strong> ${role}</p>
+    <p><strong>New Role:</strong> ${rolename}</p>
   </div>`,
     attachments: [], // Include any attachments if provided
   };
@@ -2223,12 +2223,12 @@ const productDisabledAdminTemplate = ({ adminName, productId, productName }) => 
   };
 };
 
-const USER_CREATED = ({ adminName, newUserName, userId }) => {
+const USER_CREATED = ({ userId, email, admin, username }) => {
   return {
-    subject: `New User Registered - ${newUserName}`,
+    subject: `New User Registered - ${username}`,
     html: `<div style="font-family: Arial, sans-serif; padding:20px;">
-      <h2>Hello ${adminName || 'Admin'},</h2>
-      <p>A new user <strong>${newUserName}</strong> (ID: ${userId}) has just registered.</p>
+      <h2>Hello ${admin || 'Admin'},</h2>
+      <p>A new user <strong>${username}</strong> (ID: ${userId}) has just registered.</p>
       <p>Please verify and onboard as necessary.</p>
     </div>`,
     attachments: [],
@@ -2593,7 +2593,7 @@ module.exports = {
   newsletterTemplate,
   accountDeactivationWarningTemplate,
   accountReactivatedTemplate,
-  roleUpdatedTemplate,
+  ROLE_ASSIGNED,
   newDeviceLoginTemplate,
   subscriptionRenewalReminderTemplate,
   subscriptionCancelledTemplate,
