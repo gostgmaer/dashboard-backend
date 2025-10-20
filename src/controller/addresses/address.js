@@ -10,7 +10,7 @@ exports.createAddress = async (req, res) => {
   try {
     const addressData = {
       ...req.body,
-      user: req.user.id
+      user: req.user.id,
     };
     const address = new Address(addressData);
     await address.save();
@@ -44,11 +44,10 @@ exports.getAddressUserId = async (req, res) => {
     });
 
     if (!addresses || addresses.length === 0) {
-      return sendResponse(res, 404, false, null, 'Address not found');
+      return sendResponse(res, 200, false, [], 'Address not found');
     }
 
     // Since _id is unique, there will be only one address
-
 
     return sendResponse(res, 200, true, addresses);
   } catch (error) {
@@ -161,14 +160,7 @@ exports.compareAddresses = async (req, res) => {
     const { addressId1, addressId2 } = req.params;
     const address1 = await Address.findById(addressId1);
     const address2 = await Address.findById(addressId2);
-    if (
-      !address1 ||
-      !address2 ||
-      address1.status === 'deleted' ||
-      address2.status === 'deleted' ||
-      address1.user.toString() !== req.user.id ||
-      address2.user.toString() !== req.user.id
-    ) {
+    if (!address1 || !address2 || address1.status === 'deleted' || address2.status === 'deleted' || address1.user.toString() !== req.user.id || address2.user.toString() !== req.user.id) {
       return sendResponse(res, 404, false, null, 'One or both addresses not found');
     }
     const comparison = await address1.compareAddress(address2);
@@ -219,11 +211,7 @@ exports.removeUserAddresses = async (req, res) => {
 exports.findNearbyAddresses = async (req, res) => {
   try {
     const { lat, lng, maxDistance = 10000 } = req.query;
-    const addresses = await Address.findNearbyAddresses(
-      parseFloat(lat),
-      parseFloat(lng),
-      parseInt(maxDistance)
-    );
+    const addresses = await Address.findNearbyAddresses(parseFloat(lat), parseFloat(lng), parseInt(maxDistance));
     sendResponse(res, 200, true, addresses);
   } catch (error) {
     sendResponse(res, 500, false, null, error.message);

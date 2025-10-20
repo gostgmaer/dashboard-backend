@@ -683,14 +683,7 @@ router.put(
 // ========================================
 
 // POST /api/users/:id/addresses - Add address
-router.post(
-  '/:id/addresses',
-  authMiddleware,
-
-  instanceCheckMiddleware,
-  userValidation.address,
-  UserController.addAddress
-);
+router.post('/:id/addresses', authMiddleware, instanceCheckMiddleware, userValidation.address, UserController.addAddress);
 
 // DELETE /api/users/:id/addresses - Remove address
 router.delete(
