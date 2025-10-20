@@ -119,6 +119,17 @@ authRoute.get('/otp/settings', authMiddleware, authController.getOTPSettings);
 authRoute.put('/otp/settings', authMiddleware, authAccess.requireOTP('update_otp_settings'), authController.updateOTPSettings);
 
 // ========================================
+// 📍 ADDRESS ROUTES
+// ========================================
+
+authRoute.post('/addresses', authMiddleware, authController.addAddress);
+authRoute.delete('/addresses/:addressId', authMiddleware, authController.removeAddress);
+authRoute.put('/addresses/default/:addressId', authMiddleware, authController.setDefaultAddress);
+authRoute.patch('/addresses/default/:addressId', authMiddleware, authController.setDefaultAddress);
+authRoute.put('/addresses/:addressId', authMiddleware, authController.updateAddress);
+authRoute.patch('/addresses/:addressId', authMiddleware, authController.updateAddress);
+
+// ========================================
 // 👤 PROFILE & SOCIAL ACCOUNTS
 // ========================================
 authRoute.patch('/profile', authMiddleware, authController.updateProfile);

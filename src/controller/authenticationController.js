@@ -853,9 +853,6 @@ class authController {
       const user = req.user;
       const deviceInfo = DeviceDetector.detectDevice(req);
 
-      // Revoke current token
-      await user.revokeToken(token);
-
       // Log logout event
       if (token) {
         await user.revokeToken(token, 'user_logout');
@@ -3377,6 +3374,81 @@ class authController {
       res.status(200).json({ success: true, data: result });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async addAddress(req, res) {
+    try {
+      const addresses = await req.user.addAddress(req.body);
+      await ActivityHelper.logCRUD(req, 'addresses', 'create', {
+        id: addresses._id,
+        status: addresses.status,
+      });
+      return standardResponse(res, true, addresses, 'Address added successfully');
+    } catch (error) {
+      console.error('Add address error:', error);
+      return errorResponse(res, 'Failed to add address', 500, error.message);
+    }
+  }
+
+  static async removeAddress(req, res) {
+    try {
+      const { addressId } = req.params;
+
+      if (!addressId) {
+        return errorResponse(res, 'Address ID is required', 400);
+      }
+
+      const addresses = await req.user.removeAddress(addressId);
+      await ActivityHelper.logCRUD(req, 'addresses', 'delete', {
+        id: addresses._id,
+        status: addresses.status,
+      });
+      return standardResponse(res, true, addresses, 'Address removed successfully');
+    } catch (error) {
+      console.error('Remove address error:', error);
+      return errorResponse(res, 'Failed to remove address', 500, error.message);
+    }
+  }
+
+  static async updateAddress(req, res) {
+    try {
+      const { addressId } = req.params;
+
+      if (!addressId) {
+        return errorResponse(res, 'Address ID is required', 400);
+      }
+
+      const addresses = await req.user.updateAddress(addressId, req.body);
+      await ActivityHelper.logCRUD(req, 'addresses', 'update', {
+        id: addresses._id,
+        status: addresses.status,
+      });
+      return standardResponse(res, true, addresses, 'Address updated successfully');
+    } catch (error) {
+      console.error('Remove address error:', error);
+      return errorResponse(res, 'Failed to remove address', 500, error.message);
+    }
+  }
+
+  /**
+   * SET DEFAULT ADDRESS
+   */
+  static async setDefaultAddress(req, res) {
+    try {
+      if (!addressId) {
+        return errorResponse(res, 'Address ID is required', 400);
+      }
+
+      const addresses = await req.user.setDefaultAddress(addressId);
+      await ActivityHelper.logCRUD(req, 'addresses', 'update', {
+        id: addresses._id,
+        status: addresses.status,
+      });
+      return standardResponse(res, true, addresses, 'Default address set');
+    } catch (error) {
+      console.error('Set default address error:', error);
+      return errorResponse(res, 'Failed to set default address', 500, error.message);
     }
   }
 }

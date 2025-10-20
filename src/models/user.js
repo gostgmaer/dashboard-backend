@@ -3016,11 +3016,52 @@ userSchema.method({
     await this.save();
   },
   async addAddress(addressObj) {
-    const newAddress = await Address.create(addressObj);
-    this.address.push(newAddress._id);
-    await this.save();
+    try {
+      // Ensure user reference is always set
+      addressObj.user = this._id;
+
+      // Fill in missing fields from user
+      if (!addressObj.fullName) addressObj.fullName = this.name || this.fullName || 'Unknown User';
+      if (!addressObj.phone) addressObj.phone = this.phoneNumber || '';
+      if (!addressObj.email) addressObj.email = this.email || '';
+
+      // Optional: ensure country default
+      if (!addressObj.country) addressObj.country = 'India';
+
+      // Optional: validate or normalize data (like trimming strings)
+      addressObj = {
+        ...addressObj,
+        fullName: addressObj.fullName.trim(),
+        city: addressObj.city?.trim(),
+        state: addressObj.state?.trim(),
+        addressLine1: addressObj.addressLine1?.trim(),
+        email: addressObj.email?.toLowerCase(),
+      };
+
+      // Create the address
+      const newAddress = await Address.create({
+        ...addressObj,
+      });
+
+      // Push the address ID into the user's address list
+      this.address.push(newAddress._id);
+      await this.save();
+
+      // Return populated addresses
+      return newAddress;
+    } catch (error) {
+      console.error('Error adding address:', error);
+      throw new Error('Failed to add address');
+    }
+  },
+
+  async updateAddress(addressId, updatedFields) {
+    // Find and update the address
+    await Address.findByIdAndUpdate(addressId, { $set: updatedFields }, { new: true, runValidators: true });
+    // Return the updated address list
     return this.populate('address');
   },
+
   async removeAddress(addressId) {
     this.address = this.address.filter((id) => id.toString() !== addressId.toString());
     await this.save();
@@ -3036,8 +3077,7 @@ userSchema.method({
     return this.populate('address');
   },
 
-  async revokeToken(token) {
-    this.tokens = this.tokens.filter((t) => t.token !== token);
+  async revokeToken(token, reason) {
     const tokenData = this.authTokens.find((t) => t.token === token);
     if (tokenData) {
       tokenData.isRevoked = true;
