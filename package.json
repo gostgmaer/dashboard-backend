@@ -81,7 +81,7 @@
     "ua-parser-js": "^2.0.6",
     "useragent": "^2.3.0",
     "util": "^0.12.5",
-    "uuid": "^13.0.0",
+    "uuid": "^8.3.2",
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
