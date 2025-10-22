@@ -102,6 +102,7 @@ app.use('/api/files', checkRoute('Attachment Files', fileRoutes));
 app.use('/api/components', checkRoute('components', componentsRoutes));
 app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));
 app.use('/api/templates', checkRoute('components', templateRoutes));
+app.use('/api/contacts', checkRoute('contacts', contactsRoute));
 // API Routes
 // app.use('/api/resumes', resumeRoutes);
 // app.use('/api/templates', templateRoutes);
