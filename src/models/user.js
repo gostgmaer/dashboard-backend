@@ -4146,17 +4146,17 @@ userSchema.statics.getSessionStatistics = async function () {
 };
 
 userSchema.statics.fetchUserSettings = async function (userId) {
-  const selectedKeys = ['otpSettings', 'createdAt', 'lastLogin', 'currentOTP', 'twoFactorAuth', 'loginSecurity', 'socialMedia', 'preferences', 'username', 'interests', 'email', 'firstName', 'lastName', 'dateOfBirth', 'gender', 'phoneNumber', 'profilePicture', 'session', 'status', 'isVerified', 'subscriptionStatus', 'subscriptionType', 'paymentMethods', 'updatedAt', 'emailVerified', 'phoneVerified', 'twoFactorEnabled', 'loginHistory', 'securityEvents', 'activeSessions', 'knownDevices', 'socialAccounts', 'lastLoginAttempt', 'referralCode', 'role', 'updated_by', 'loyaltyPoints'];
+  const selectedKeys = ['createdAt', 'lastLogin', 'loginSecurity', 'socialMedia', 'preferences', 'username', 'interests', 'email', 'firstName', 'lastName', 'dateOfBirth', 'gender', 'phoneNumber', 'profilePicture', 'session', 'status', 'isVerified', 'subscriptionStatus', 'subscriptionType', 'paymentMethods', 'updatedAt', 'emailVerified', 'phoneVerified', 'lastLoginAttempt', 'referralCode', 'role', 'updated_by', 'loyaltyPoints'];
 
   // Predefine the population fields
   const populationFields = [
     {
       path: 'updated_by',
-      select: 'firstName lastName _id',
+      select: 'firstName lastName',
     },
     {
       path: 'role',
-      select: 'name isActive _id',
+      select: 'name',
     },
   ];
 
