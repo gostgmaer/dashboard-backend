@@ -1,27 +1,19 @@
 // @ts-nocheck
-const {
-  ReasonPhrases,
-  StatusCodes,
-} = require("http-status-codes");
-const mongoose = require("mongoose");
-const {
-  FilterOptions,
-} = require("../../utils/helper");
+const { ReasonPhrases, StatusCodes } = require('http-status-codes');
+const mongoose = require('mongoose');
+const { FilterOptions } = require('../../utils/helper');
 
-const Contact = require("../../models/contact");
+const Contact = require('../../models/contact');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 
 const getData = async (req, res) => {
   try {
-
     // const { sort, page, limit, filter, select_keys } = req.query;
-    const filterData = FilterOptions(req.query,Contact);
+    const filterData = FilterOptions(req.query, Contact);
     let query = { ...filterData.query };
     // let projection = { projection: filterData.arrayOfValues };
 
-    const objects = await Contact.find(query).sort(filterData.options.sort)
-      .skip(filterData.options.skip)
-      .limit(parseInt(filterData.options.limit)).exec()
+    const objects = await Contact.find(query).sort(filterData.options.sort).skip(filterData.options.skip).limit(parseInt(filterData.options.limit)).exec();
     const totalCount = await Contact.countDocuments(query);
 
     res.status(StatusCodes.OK).json({
@@ -36,14 +28,12 @@ const getData = async (req, res) => {
       message: error.message,
       statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
       status: ReasonPhrases.INTERNAL_SERVER_ERROR,
-     
     });
   }
 };
 
 const getSingleRecord = async (req, res) => {
   try {
-    
     const objectId = req.params.id;
     if (!objectId) {
       res.status(StatusCodes.NOT_FOUND).json({
@@ -80,15 +70,47 @@ const getSingleRecord = async (req, res) => {
 };
 const create = async (req, res) => {
   try {
-    await Contact.create(req.body);
-    res.status(StatusCodes.CREATED).json({
-      message: "Record Created Successfully!",
+    const { firstName, lastName, email, phone, company, subject, message, isAgreed, category, priority } = req.body;
+
+    // Basic validation (in case client skips Zod or frontend validation)
+    if (!firstName || !lastName || !email || !subject || !message) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'First name, last name, email, subject, and message are required.',
+        statusCode: StatusCodes.BAD_REQUEST,
+        status: ReasonPhrases.BAD_REQUEST,
+      });
+    }
+
+    // Automatically capture metadata
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    const created_by = req.user?._id || null; // assumes auth middleware adds req.user
+
+    // Create the record
+    await Contact.create({
+      firstName,
+      lastName,
+      email,
+      phone,
+      company,
+      subject,
+      message,
+      isAgreed,
+      category,
+      priority,
+      ipAddress,
+      userAgent,
+    });
+
+    return res.status(StatusCodes.CREATED).json({
+      message: 'Record created successfully!',
       status: ReasonPhrases.CREATED,
-      statusCode: StatusCodes.CREATED
+      statusCode: StatusCodes.CREATED,
     });
   } catch (error) {
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      message: error.message,
+    console.error('Contact creation error:', error);
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      message: error.message || 'Internal Server Error',
       statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
       status: ReasonPhrases.INTERNAL_SERVER_ERROR,
     });
@@ -108,11 +130,7 @@ const remove = async (req, res) => {
       });
     }
     const ID = new mongoose.Types.ObjectId(objectId);
-    const object = await Contact.findOneAndUpdate(
-      { _id: ID },
-      { $set: { ...req.body, status: "INACTIVE" } },
-      { returnOriginal: false }
-    );
+    const object = await Contact.findOneAndUpdate({ _id: ID }, { $set: { ...req.body, status: 'INACTIVE' } }, { returnOriginal: false });
     if (object?.lastErrorObject?.n == 0) {
       res.status(StatusCodes.NOT_FOUND).json({
         message: `No record Found for Given id!`,
@@ -149,11 +167,7 @@ const removeMany = async (req, res) => {
       });
     }
     const ID = new mongoose.Types.ObjectId(objectId);
-    const object = await Contact.bulkWrite(
-      { _id: ID },
-      { $set: { ...req.body, status: "INACTIVE" } },
-      { returnOriginal: false }
-    );
+    const object = await Contact.bulkWrite({ _id: ID }, { $set: { ...req.body, status: 'INACTIVE' } }, { returnOriginal: false });
     if (object?.lastErrorObject?.n == 0) {
       res.status(StatusCodes.NOT_FOUND).json({
         message: `No record Found for Given id!`,
@@ -191,11 +205,7 @@ const update = async (req, res) => {
     const ID = new mongoose.Types.ObjectId(objectId);
     const objectToUpdate = req.body;
 
-    const result = await Contact.findOneAndUpdate(
-      { _id: ID },
-      { $set: objectToUpdate },
-      { returnOriginal: false }
-    );
+    const result = await Contact.findOneAndUpdate({ _id: ID }, { $set: objectToUpdate }, { returnOriginal: false });
 
     if (!result) {
       res.status(StatusCodes.NOT_FOUND).json({
@@ -205,7 +215,6 @@ const update = async (req, res) => {
       });
     } else {
       res.status(StatusCodes.OK).json({
-    
         message: `Update successfully!`,
         statusCode: StatusCodes.OK,
         status: ReasonPhrases.OK,
@@ -220,8 +229,6 @@ const update = async (req, res) => {
     });
   }
 };
-
-
 
 const delData = async (req, res) => {
   try {
@@ -272,7 +279,7 @@ const delMany = async (req, res) => {
         status: ReasonPhrases.NOT_FOUND,
       });
     }
-    const objectIds = ids.map(id => mongoose.Types.ObjectId(id));
+    const objectIds = ids.map((id) => mongoose.Types.ObjectId(id));
     const result = await Contact.deleteMany({ _id: { $in: objectIds } });
     if (object?.lastErrorObject?.n == 0) {
       res.status(StatusCodes.NOT_FOUND).json({
@@ -303,5 +310,7 @@ module.exports = {
   getSingleRecord,
   remove,
   removeMany,
-  update,delData,delMany
+  update,
+  delData,
+  delMany,
 };
