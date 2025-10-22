@@ -2,29 +2,31 @@ const mongoose = require('mongoose');
 
 const contactUsSchema = new mongoose.Schema(
   {
-    firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, required: true, trim: true },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
     email: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, trim: true },
     company: { type: String, trim: true },
-     isDeleted: { type: Boolean, default: false},
+    isDeleted: { type: Boolean, default: false },
     subject: { type: String, required: true, trim: true },
     message: { type: String, required: true, trim: true },
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     isAgreed: { type: String },
     category: {
       type: String,
-      enum: ['General Inquiry', 'Technical Support', 'Feedback', 'Other']
+      enum: ['General Inquiry', 'Technical Support', 'Feedback', 'Other'],
     },
     priority: {
       type: String,
       enum: ['Low', 'Medium', 'High'],
-      default: 'Medium'
+      default: 'Medium',
     },
     status: { type: String, default: 'New' }, // Added default
     userAgent: { type: String },
-    ipAddress: { type: String }
+    ipAddress: { type: String },
+    // ✅ Added siteKey field
+    siteKey: { type: String, trim: true, required: false },
   },
   { timestamps: true }
 );
@@ -37,6 +39,9 @@ const contactUsSchema = new mongoose.Schema(
 contactUsSchema.methods.getFullName = function () {
   return `${this.firstName} ${this.lastName}`;
 };
+contactUsSchema.virtual('name').get(function () {
+  return `${this.firstName} ${this.lastName}`;
+});
 
 // Mark as resolved
 contactUsSchema.methods.markResolved = async function (updated_by) {
@@ -70,34 +75,18 @@ contactUsSchema.methods.addInternalNote = async function (note) {
 //
 
 // Get all contacts with pagination & filters
-contactUsSchema.statics.getPaginatedContacts = async function ({
-  page = 1,
-  limit = 10,
-  status,
-  category,
-  priority,
-  search
-}) {
+contactUsSchema.statics.getPaginatedContacts = async function ({ page = 1, limit = 10, status, category, priority, search }) {
   const query = {};
   if (status) query.status = status;
   if (category) query.category = category;
   if (priority) query.priority = priority;
   if (search) {
-    query.$or = [
-      { firstName: { $regex: search, $options: 'i' } },
-      { lastName: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
-      { subject: { $regex: search, $options: 'i' } },
-      { message: { $regex: search, $options: 'i' } }
-    ];
+    query.$or = [{ firstName: { $regex: search, $options: 'i' } }, { lastName: { $regex: search, $options: 'i' } }, { email: { $regex: search, $options: 'i' } }, { subject: { $regex: search, $options: 'i' } }, { message: { $regex: search, $options: 'i' } }];
   }
 
   const skip = (page - 1) * limit;
 
-  const [items, total] = await Promise.all([
-    this.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
-    this.countDocuments(query)
-  ]);
+  const [items, total] = await Promise.all([this.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit), this.countDocuments(query)]);
 
   return { items, total, page, pages: Math.ceil(total / limit) };
 };
@@ -114,18 +103,12 @@ contactUsSchema.statics.bulkDelete = function (ids) {
 
 // Get stats by category
 contactUsSchema.statics.getStatsByCategory = async function () {
-  return this.aggregate([
-    { $group: { _id: "$category", count: { $sum: 1 } } },
-    { $sort: { count: -1 } }
-  ]);
+  return this.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { count: -1 } }]);
 };
 
 // Get stats by status
 contactUsSchema.statics.getStatsByStatus = async function () {
-  return this.aggregate([
-    { $group: { _id: "$status", count: { $sum: 1 } } },
-    { $sort: { count: -1 } }
-  ]);
+  return this.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }, { $sort: { count: -1 } }]);
 };
 
 // Get high priority unresolved contacts
