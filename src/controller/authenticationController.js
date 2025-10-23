@@ -1664,35 +1664,6 @@ class authController {
     }
   }
 
-  /**
-   * Trust device
-   */
-  static async trustDevice(req, res) {
-    try {
-      const { deviceId } = req.body;
-      const user = req.user;
-
-      if (!deviceId) {
-        return res.status(400).json({
-          success: false,
-          message: 'Device ID is required',
-        });
-      }
-
-      await user.trustDevice(deviceId);
-
-      res.status(200).json({
-        success: true,
-        message: 'Device trusted successfully',
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to trust device',
-      });
-    }
-  }
-
   // ========================================
   // 📊 OTP SETTINGS MANAGEMENT
   // ========================================
@@ -3369,8 +3340,22 @@ class authController {
   // Get user's paginated known devices
   static async getKnownDevices(req, res) {
     try {
+      const currentDevice = DeviceDetector.detectDevice(req);
       const options = req.query;
       const result = await req.user.getPaginatedKnownDevices(options);
+
+      // Check if the current device exists in the known devices
+      const deviceIndex = result.result?.findIndex((device) => device.deviceId === currentDevice.deviceId);
+
+      if (deviceIndex !== -1) {
+        // Merge any extra info into the matched device
+        result.result[deviceIndex] = {
+          ...result.result[deviceIndex],
+          ...currentDevice,
+          isCurrent: true, // flag to indicate this is the device being used now
+        };
+      }
+
       res.status(200).json({ success: true, data: result });
     } catch (err) {
       res.status(500).json({ success: false, message: err.message });
