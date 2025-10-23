@@ -70,7 +70,7 @@ class NotificationMiddleware {
             email: user.email,
             admin: admin.username,
           },
-          channels: ['IN_APP'],
+          channels: ['IN_APP', 'EMAIL'],
           priority: 'MEDIUM',
           metadata: {
             category: 'admin',

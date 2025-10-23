@@ -1,35 +1,6 @@
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
-const {
-  mailService,
-  mailUserName,
-  mailPassword,
-  emailHost,
-  emailPort,
-  emailSecure,mailSender,
-  oauth2ClientId,
-  oauth2ClientSecret,
-  oauth2RefreshToken,
-  oauth2RedirectUri,
-  fallbackMailService,
-  fallbackEmailHost,
-  fallbackEmailPort,
-  fallbackEmailSecure,
-  fallbackEmailUser,
-  fallbackEmailPassword,
-  emailPool,
-  emailMaxConnections,
-  emailMaxMessages,
-  emailRateLimit,
-  emailRateDelta,
-  emailConnectionTimeout,
-  emailGreetingTimeout,
-  emailTlsRejectUnauthorized,
-  emailTlsMinVersion,
-  emailDebug,
-  emailVerifyRetries,
-  emailVerifyDelay,
-} = require('../config/setting');
+const { mailService, mailUserName, mailPassword, emailHost, emailPort, emailSecure, mailSender, oauth2ClientId, oauth2ClientSecret, oauth2RefreshToken, oauth2RedirectUri, fallbackMailService, fallbackEmailHost, fallbackEmailPort, fallbackEmailSecure, fallbackEmailUser, fallbackEmailPassword, emailPool, emailMaxConnections, emailMaxMessages, emailRateLimit, emailRateDelta, emailConnectionTimeout, emailGreetingTimeout, emailTlsRejectUnauthorized, emailTlsMinVersion, emailDebug, emailVerifyRetries, emailVerifyDelay } = require('../config/setting');
 
 // Metrics for monitoring email service performance
 const metrics = {
@@ -143,7 +114,7 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
       await transporter.verify();
       console.log('✅ Email service is ready');
       metrics.connectionSuccesses++;
-      return "✅ Email service connection verified"
+      return '✅ Email service connection verified';
       //  return { success: true, message: 'Email service connection verified', metrics };
     } catch (error) {
       attempts++;
@@ -192,7 +163,7 @@ const sendEmail = async (EmailTemplate, data) => {
 
     const { subject, html, attachments = [] } = EmailTemplate(data);
     const mailOptions = {
-      from: mailSender || `"Your App Name" <${mailSender}>`,
+      from: mailSender || `"Easy Dev" <${mailSender}>`,
       to: data.email,
       subject,
       html,
