@@ -208,7 +208,7 @@ class ActivityHelper {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      logs: logsWithSummary,
+      result: logsWithSummary,
       pagination: {
         total,
         page: parseInt(page),
