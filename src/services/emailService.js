@@ -310,11 +310,12 @@ class EmailService {
         title: notification.title,
         message: notification.message,
         username: recipient.username || recipient.firstName || 'User',
-        appName: process.env.APP_NAME || 'Your App',
+        email: recipient.email,
+        additionalInfo: notification.data,
+        appName: process.env.APP_NAME || 'Easy Dev',
         year: new Date().getFullYear(),
         actionUrl: notification.metadata?.actionUrl ? `${process.env.CLIENT_URL}${notification.metadata.actionUrl}` : null,
         priorityClass: notification.priority === 'HIGH' ? 'priority-high' : notification.priority === 'URGENT' ? 'priority-urgent' : '',
-        ...notification.data,
       };
       const m = await sendEmail(t[notification.type], templateData);
       console.log('Email sent successfully:', m.messageId);

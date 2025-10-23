@@ -527,13 +527,11 @@ function removeKeysFromObject(obj, keysToRemove) {
   return newObj;
 }
 
-
-
 function buildFilters(query) {
   const filters = {};
 
   // Pick only keys starting with filter_
-  const filterKeys = Object.keys(query).filter((key) => key.startsWith("filter_"));
+  const filterKeys = Object.keys(query).filter((key) => key.startsWith('filter_'));
 
   if (filterKeys.length === 0) {
     return query;
@@ -541,48 +539,90 @@ function buildFilters(query) {
 
   filterKeys.forEach((key) => {
     if (query[key]) {
-      const cleanKey = key.replace("filter_", "");
-      filters[cleanKey] = { $regex: query[key], $options: "i" };
+      const cleanKey = key.replace('filter_', '');
+      filters[cleanKey] = { $regex: query[key], $options: 'i' };
     }
   });
 
   return filters;
 }
-function paginateSortSearch(items, { page = 1, limit = 10, sortBy = 'timestamp', sortDir = 'desc', search = '', searchFields = [] }) {
-  let filteredItems = items;
-  
-  // Search filter by checking if search term found in any searchFields (case-insensitive)
+function paginateSortSearch(items, { page = 1, limit = 10, sortBy = 'timestamp', sortDir = 'desc', search = '', searchFields = [], appliedFilters = {} } = {}) {
+  // Convert pagination params to numbers safely
+  page = Number(page) || 1;
+  limit = Number(limit) || 10;
+
+  let filteredItems = [...items];
+
+  // 🔍 1. Apply Search Filter
   if (search && searchFields.length) {
     const searchLower = search.toLowerCase();
-    filteredItems = filteredItems.filter(item =>
-      searchFields.some(field => item[field] && String(item[field]).toLowerCase().includes(searchLower))
-    );
+    filteredItems = filteredItems.filter((item) => searchFields.some((field) => item[field] && String(item[field]).toLowerCase().includes(searchLower)));
   }
 
-  // Sort items
+  // ⚙️ 2. Apply Other Filters
+  if (appliedFilters && typeof appliedFilters === 'object') {
+    Object.entries(appliedFilters).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '' || value === 'undefined') return;
+
+      // Array filter (like tags, interests, etc.)
+      if (Array.isArray(value)) {
+        filteredItems = filteredItems.filter((item) => value.includes(item[key]));
+      }
+      // Comma-separated filter
+      else if (typeof value === 'string' && value.includes(',')) {
+        const parts = value.split(',').map((v) => v.trim());
+        filteredItems = filteredItems.filter((item) => parts.includes(String(item[key])));
+      }
+      // Boolean/Exact filter
+      else {
+        filteredItems = filteredItems.filter((item) => {
+          const fieldVal = item[key];
+          if (typeof fieldVal === 'boolean') return fieldVal === (value === 'true');
+          return String(fieldVal).toLowerCase().includes(String(value).toLowerCase());
+        });
+      }
+    });
+  }
+
+  // 🧭 3. Sort Items
   filteredItems.sort((a, b) => {
-    const aVal = a[sortBy];
-    const bVal = b[sortBy];
+    const aVal = a?.[sortBy];
+    const bVal = b?.[sortBy];
+
+    if (aVal == null && bVal == null) return 0;
     if (aVal == null) return 1;
     if (bVal == null) return -1;
-    if (sortDir === 'asc') return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-    else return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+
+    return sortDir === 'asc' ? (aVal > bVal ? 1 : aVal < bVal ? -1 : 0) : aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
   });
-  
-  // Paginate results
+
+  // 📄 4. Pagination
   const total = filteredItems.length;
   const start = (page - 1) * limit;
-  const paginatedItems = filteredItems.slice(start, start + limit);
+  const results = filteredItems.slice(start, start + limit);
+  const pages = Math.ceil(total / limit);
 
+  // 📦 5. Final Response (like getUsers)
   return {
-    total,
-    page,
-    limit,
-    pages: Math.ceil(total / limit),
-    items: paginatedItems
+    result: results,
+    pagination: {
+      page,
+      totalPages: pages,
+      total,
+      hasNext: page < pages,
+      hasPrev: page > 1,
+      limit,
+    },
+    filters: {
+      applied: Object.keys(appliedFilters || {}).length,
+      search: search || null,
+    },
   };
 }
-
 
 function formatRelativeDuration(dateInput) {
   // Convert input to Date object
@@ -626,5 +666,7 @@ module.exports = {
   agGridFilterToMongoQuery,
   sendResponse,
   sendError,
-  formatRelativeDuration,buildFilters,paginateSortSearch
+  formatRelativeDuration,
+  buildFilters,
+  paginateSortSearch,
 };
