@@ -40,6 +40,7 @@ const LoggerService = require('./src/services/logger');
 const { componentsRoutes } = require('./src/routes/component');
 const DeviceDetector = require('./src/services/deviceDetector');
 const { userActivityroute } = require('./src/routes/activity');
+const { publicRoutes } = require('./src/routes/public');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -103,6 +104,7 @@ app.use('/api/components', checkRoute('components', componentsRoutes));
 app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));
 app.use('/api/templates', checkRoute('components', templateRoutes));
 app.use('/api/contacts', checkRoute('contacts', contactsRoute));
+app.use('/api', checkRoute('Public', publicRoutes));
 // API Routes
 // app.use('/api/resumes', resumeRoutes);
 // app.use('/api/templates', templateRoutes);
