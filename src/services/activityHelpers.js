@@ -1,5 +1,5 @@
 // utils/activityHelpers.js
-const activityLogService = require('../services/activityLogService');
+const activityLogService = require('./activityLogService');
 const UserActivityLog = require('../models/UserActivityLog');
 /**
  * Helper function for manual activity logging in controllers
