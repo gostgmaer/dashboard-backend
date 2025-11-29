@@ -41,6 +41,7 @@ const { componentsRoutes } = require('./src/routes/component');
 const DeviceDetector = require('./src/services/deviceDetector');
 const { userActivityroute } = require('./src/routes/activity');
 const { publicRoutes } = require('./src/routes/public');
+const { InquiryRoutes } = require('./src/routes/inquiry');
 // Import routes
 // const productRoutes = require('./features/products/product.routes');
 // Import other feature routes similarly...
@@ -105,6 +106,7 @@ app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));
 app.use('/api/templates', checkRoute('components', templateRoutes));
 app.use('/api/contacts', checkRoute('contacts', contactsRoute));
 app.use('/api', checkRoute('Public', publicRoutes));
+app.use('/api/inquiry', checkRoute('Inquiry', InquiryRoutes));
 // API Routes
 // app.use('/api/resumes', resumeRoutes);
 // app.use('/api/templates', templateRoutes);
