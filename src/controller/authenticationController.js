@@ -191,7 +191,7 @@ class authController {
         data: user,
       });
       // Send welcome email
-      // let emaildata = await sendEmail(welcomeEmailTemplate, user);
+      let emaildata = await sendEmail(welcomeEmailTemplate, user);
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
