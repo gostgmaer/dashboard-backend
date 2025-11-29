@@ -51,6 +51,7 @@
     "js2xmlparser": "^5.0.0",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
+    "kafkajs": "^2.2.4",
     "mime": "^4.1.0",
     "mongoose": "^8.19.1",
     "mongoose-dynamic-schemas": "^1.2.6",

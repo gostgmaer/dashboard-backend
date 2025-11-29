@@ -15,7 +15,7 @@ const metrics = {
  * Validates required email configuration variables.
  * Skips host/port validation if a service is specified.
  * @param {Object} options - Optional override for configuration.
- * @throws {Error} If required variables are missing.
+ * @throws {Error} If required variables are missing. 
  */
 const validateEmailConfig = (options = {}) => {
   const requiredVars = ['mailUserName', 'emailHost', 'emailPort'];
