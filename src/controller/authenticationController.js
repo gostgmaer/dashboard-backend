@@ -183,10 +183,8 @@ class authController {
       if (otpService.isEnabled(user.otpSettings)) {
         verificationResult = await user.generateOTP('email_verification', deviceInfo, 'email');
       }
-      await sendMessage('development.email.notification.send.v1', {
+      await sendMessage(`${process.env.NODE_ENV}.email.notification.send`, {
         requestId: user.id,
-        type: 'welcomeEmailTemplate',
-        template: 'welcomeEmailTemplate',
         to: email,
         subject: 'Welcome to Our Service!',
         templateId: 'welcomeEmailTemplate',
@@ -197,7 +195,7 @@ class authController {
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-      // await NotificationMiddleware.onUserCreate(req, res, () => {});
+      await NotificationMiddleware.onUserCreate(req, res, () => {});
 
       return standardResponse(
         res,
