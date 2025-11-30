@@ -28,7 +28,7 @@ const contactInquirySchema = new Schema(
       servicesInterested: [
         {
           type: String,
-          enum: ['Web Design', 'Development', 'SEO', 'Consulting', 'Maintenance'],
+          // enum: ['Web Design', 'Development', 'SEO', 'Consulting', 'Maintenance'],
         },
       ],
       budgetRange: {
