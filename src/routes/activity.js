@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const ActivityHelper = require('../utils/activityHelpers');
+const ActivityHelper = require('../services/activityHelpers');
 const activityLogService = require('../services/activityLogService');
 const { authMiddleware } = require('../middleware/auth'); // Single auth middleware
 

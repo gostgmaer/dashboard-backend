@@ -12,7 +12,7 @@ const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
 const { checkPasswordStrength } = require('../utils/security');
 const { buildFilters, formatRelativeDuration } = require('../utils/helper');
-const ActivityHelper = require('../utils/activityHelpers');
+const ActivityHelper = require('../services/activityHelpers');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
 const DeviceDetector = require('../services/deviceDetector');
 /**
