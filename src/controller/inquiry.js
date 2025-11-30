@@ -13,35 +13,16 @@ class ContactInquiryController {
   static async createInquiry(req, res) {
     try {
       const inquiryData = {
-        client: {
-          name: req.body.client?.name,
-          email: req.body.client?.email,
-          phone: req.body.client?.phone,
-          companyName: req.body.client?.companyName,
-          websiteUrl: req.body.client?.websiteUrl,
-          socialHandle: req.body.client?.socialHandle,
-        },
+        client: req.body.client,
         projectDetails: req.body.projectDetails,
-        message: {
-          subject: req.body.message?.subject || 'New Inquiry',
-          body: req.body.message?.body,
-        },
+        message: req.body.message,
         preferences: req.body.preferences,
       };
-
       const inquiry = new ContactInquiry(inquiryData);
       await inquiry.save();
-
-      // Send notification email to admin
-      // await sendEmail(NEW_INQUIRY_ADMIN, {
-      //   to: process.env.ADMIN_EMAIL,
-      //   subject: `New High Priority Inquiry: ${inquiry.client.fullIdentifier}`,
-      //   template: 'new-inquiry',
-      //   ...inquiry.toAPIResponse(),
-      // });
       const d = inquiry.toAPIResponse();
       await sendEmail(NEW_INQUIRY_CLIENT, { ...d.client, ...d.message, ...d.projectDetails, ...d, inquiry: inquiry.toAPIResponse() });
-
+       await sendEmail(NEW_INQUIRY_ADMIN, { ...d.client, ...d.message, ...d.projectDetails, ...d, inquiry: inquiry.toAPIResponse(),email:'kishor81160@gmail.com' });
       res.status(201).json({
         success: true,
         message: 'Inquiry submitted successfully',
