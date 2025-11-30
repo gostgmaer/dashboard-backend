@@ -9,7 +9,7 @@ const { connectProducer } = require('./src/kafka/producer');
 // Connect DB first, then start server
 const startServer = async () => {
   await connectDB();
-  await connectProducer();
+  // await connectProducer();
 
   //   const port = process.env.PORT || 3000;
   const server = http.createServer(app);
