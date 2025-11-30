@@ -8,9 +8,10 @@ const { buildFilters } = require('../utils/helper');
 const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
-const ActivityHelper = require('../utils/activityHelpers');
+// const ActivityHelper = require('../utils/activityHelpers');
 const DeviceDetector = require('../services/deviceDetector');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
+const ActivityHelper = require('../services/activityHelpers');
 
 /**
  * 🚀 CONSOLIDATED ROBUST PRODUCT CONTROLLER
@@ -2051,67 +2052,63 @@ class ProductController {
   }
 
   static async getActiveDealStatics(req, res) {
-  try {
-    // Fetch products that are active, not deleted, and part of a deal
-    const products = await Product.find(
-      { isDeleted: false, status: 'active' },
-      { tags: 1, brand: 1, category: 1 }
-    )
-      .populate('brand', 'name _id')
-      .populate('category', 'title _id');
+    try {
+      // Fetch products that are active, not deleted, and part of a deal
+      const products = await Product.find({ isDeleted: false, status: 'active' }, { tags: 1, brand: 1, category: 1 }).populate('brand', 'name _id').populate('category', 'title _id');
 
-    // Initialize unique sets/maps
-    const tagsSet = new Set();
-    const brandsMap = new Map();
-    const categoryMap = new Map();
+      // Initialize unique sets/maps
+      const tagsSet = new Set();
+      const brandsMap = new Map();
+      const categoryMap = new Map();
 
-    for (const product of products) {
-      // ✅ Collect tags
-      if (Array.isArray(product.tags)) {
-        product.tags.forEach((tag) => {
-          if (tag && typeof tag === 'string') tagsSet.add(tag);
-        });
+      for (const product of products) {
+        // ✅ Collect tags
+        if (Array.isArray(product.tags)) {
+          product.tags.forEach((tag) => {
+            if (tag && typeof tag === 'string') tagsSet.add(tag);
+          });
+        }
+
+        // ✅ Collect brand
+        if (product.brand && product.brand._id) {
+          brandsMap.set(product.brand._id.toString(), {
+            id: product.brand._id,
+            title: product.brand.name,
+          });
+        }
+
+        // ✅ Collect category (single object)
+        if (product.category && product.category._id) {
+          categoryMap.set(product.category._id.toString(), {
+            id: product.category._id,
+            title: product.category.title,
+          });
+        }
       }
 
-      // ✅ Collect brand
-      if (product.brand && product.brand._id) {
-        brandsMap.set(product.brand._id.toString(), {
-          id: product.brand._id,
-          title: product.brand.name,
-        });
-      }
+      // ✅ Format tags as [{ id, title }]
+      const tags = Array.from(tagsSet).map((tag) => ({
+        id: tag,
+        title: tag,
+      }));
 
-      // ✅ Collect category (single object)
-      if (product.category && product.category._id) {
-        categoryMap.set(product.category._id.toString(), {
-          id: product.category._id,
-          title: product.category.title,
-        });
-      }
+      return res.status(200).json({
+        success: true,
+        data: {
+          tags,
+          brands: Array.from(brandsMap.values()),
+          categories: Array.from(categoryMap.values()),
+        },
+      });
+    } catch (err) {
+      console.error('Error fetching statics:', err);
+      res.status(500).json({
+        success: false,
+        message: 'Server error while fetching active deal statics',
+        error: err.message,
+      });
     }
-
-    // ✅ Format tags as [{ id, title }]
-    const tags = Array.from(tagsSet).map((tag) => ({
-      id: tag,
-      title: tag,
-    }));
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        tags,
-        brands: Array.from(brandsMap.values()),
-        categories: Array.from(categoryMap.values()),
-      },
-    });
-  } catch (err) {
-    console.error('Error fetching statics:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching active deal statics',
-      error: err.message,
-    });
-  }}
+  }
 }
 
 module.exports = ProductController;

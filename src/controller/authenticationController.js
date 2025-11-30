@@ -17,10 +17,11 @@ const otpService = require('../services/otpService');
 const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTemplate } = require('../email/emailTemplate');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
 const { jwtSecret } = require('../config/setting');
-const ActivityHelper = require('../utils/activityHelpers');
+const ActivityHelper = require('../services/activityHelpers');
 const passport = require('passport');
 const socialAccountControllers = require('./social-account-controllers');
 const { isSupportedProvider } = require('../services/socialProvider');
+const { sendMessage } = require('../kafka/producer');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -177,13 +178,21 @@ class authController {
       );
 
       // Send email verification if OTP is enabled
+
       let verificationResult = null;
       if (otpService.isEnabled(user.otpSettings)) {
         verificationResult = await user.generateOTP('email_verification', deviceInfo, 'email');
       }
-
+      await sendMessage(`${process.env.NODE_ENV}.email.notification.send`, {
+        requestId: user.id,
+        to: email,
+        subject: 'Welcome to Our Service!',
+        templateId: 'welcomeEmailTemplate',
+        data: user,
+      });
       // Send welcome email
       let emaildata = await sendEmail(welcomeEmailTemplate, user);
+
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
       await NotificationMiddleware.onUserCreate(req, res, () => {});
@@ -201,7 +210,8 @@ class authController {
           verificationRequired: user.status === 'pending',
           verificationSent: !!verificationResult,
         },
-        emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account',
+        'Registration successful',
+        // emaildata.success ? 'Registration successful' : 'Registration successful but failed to send welcome email Please Activate Your Account',
         201
       );
     } catch (err) {
