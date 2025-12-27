@@ -13,6 +13,7 @@ const masterSchema = new mongoose.Schema(
     domain: { type: String, trim: true, index: true },
     sortOrder: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true, index: true },
+    isDefault: { type: Boolean, default: false, index: true },
     isDeleted: { type: Boolean, default: false, index: true },
     metadata: { type: Map, of: mongoose.Schema.Types.Mixed, default: undefined },
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
