@@ -251,6 +251,7 @@ class MasterService {
     },
   ];
 
+  
   const [typeCounts, groupedData] = await Promise.all([
     Master.aggregate(countPipeline),
     Master.aggregate(dataPipeline)
