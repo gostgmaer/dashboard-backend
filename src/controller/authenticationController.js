@@ -1239,13 +1239,13 @@ class authController {
         return errorResponse(res, 'Token and new password are required', 400);
       }
       const passwordStrength = checkPasswordStrength(newPassword);
-      if (!passwordStrength.isValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Password does not meet requirements',
-          passwordRequirements: passwordStrength.checks,
-        });
-      }
+      // if (!passwordStrength.isValid) {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: 'Password does not meet requirements',
+      //     passwordRequirements: passwordStrength.checks,
+      //   });
+      // }
 
       const user = await User.findOne({
         'passwordReset.token': token,
