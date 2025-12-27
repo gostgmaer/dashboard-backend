@@ -43,14 +43,13 @@ jobs:
 
       - name: Write version file
         run: |
-          mkdir -p src
           echo "export const APP_VERSION = \"$NEW_TAG\";" > /version.js
 
       - name: Commit version file
         run: |
           git config user.name "gostgmaer"
           git config user.email "kishor81160@gmail.com"
-          git add src/version.ts
+          git add /version.ts
           git commit -m "chore: auto release $NEW_TAG" || echo "No changes"
 
       - name: Create & push tag
