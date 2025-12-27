@@ -1,6 +1,6 @@
 const Master = require('../models/master');
 const AppError = require('../utils/appError');
-const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'createdBy', 'updatedBy'];
+const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'created_by', 'updated_by'];
 
 class MasterService {
   // Build projection: exclude defaults OR include only requested fields
