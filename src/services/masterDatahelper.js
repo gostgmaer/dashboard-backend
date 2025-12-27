@@ -1,6 +1,6 @@
 const Master = require('../models/master');
 const AppError = require('../utils/appError');
-const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'createdBy', 'updatedBy'];
+const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'created_by', 'updated_by'];
 
 class MasterService {
   // Build projection: exclude defaults OR include only requested fields
@@ -159,7 +159,7 @@ class MasterService {
 
     const baseFilter = {
       isActive: isActive ? { $ne: false } : true,
-      isDeleted: includeDeleted ? { $ne: true } : false,
+      isDeleted: includeDeleted ? true : false,
     };
 
     if (type) baseFilter.type = type.toUpperCase();
@@ -182,11 +182,11 @@ class MasterService {
     ]);
 
     return {
-      data: docs,
+      result: docs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total,
+        totalPages:total,
         pages: Math.ceil(total / limit),
         hasNext: skip + docs.length < total,
         hasPrev: page > 1,
@@ -276,7 +276,7 @@ class MasterService {
 }
 
 
-  async updateById(id, payload) {
+  async updateById(id, payload,user) {
     const doc = await Master.findById(id);
     if (!doc) throw new AppError(404, 'Record not found');
     // Apply updates
@@ -284,7 +284,7 @@ class MasterService {
     if (payload.type) doc.type = payload.type.toUpperCase();
     if (payload.code) doc.code = payload.code.trim();
     if (payload.label) doc.label = payload.label.trim();
-    doc.updatedBy = req.user?.id || null;
+    doc.updated_by = user?._id || null;
 
     // ✅ Use .save() to trigger pre-save hook
     await doc.save();
