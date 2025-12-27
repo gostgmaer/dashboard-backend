@@ -73,7 +73,7 @@ class MasterController {
   // GET LIST with pagination and filters
   async getList(req, res, next) {
     try {
-      const { page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search, type, tenantId, domain, isActive, includeDeleted, fields } = req.query;
+      const { page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search, type, tenantId, domain, isActive, isArchive, fields } = req.query;
 
       const result = await MasterService.getList({
         page: parseInt(page),
@@ -85,7 +85,7 @@ class MasterController {
         tenantId,
         domain,
         isActive: isActive === 'true',
-        includeDeleted: includeDeleted === 'true',
+        includeDeleted: isArchive === 'true',
         fields,
       });
 
@@ -129,16 +129,12 @@ class MasterController {
       const { id } = req.params;
       const payload = req.body;
 
-      const doc = await MasterService.updateById(id, payload);
+      const doc = await MasterService.updateById(id, payload,req.user);
 
       if (!doc) {
         return next(new AppError(404, 'Master record not found'));
       }
-
-      res.status(200).json({
-        success: true,
-        data: doc,
-      });
+     standardResponse(res, true, null, `Master Record Update Successfull!`, 200);
     } catch (error) {
       next(error);
     }
@@ -157,7 +153,6 @@ class MasterController {
 
       res.status(200).json({
         success: true,
-        data: doc,
         message: 'Record soft deleted successfully',
       });
     } catch (error) {
