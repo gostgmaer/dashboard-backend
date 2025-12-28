@@ -4,10 +4,6 @@ const mongoose = require('mongoose');
 const { dbUrl, enviroment } = require('./setting');
 require('dotenv').config();
 
-const { EventEmitter } = require('events');
-
-require('dotenv').config();
-
 const options = {
   // Connection pool
   maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 20, // increase pool size
