@@ -36,7 +36,7 @@ masterSchema.pre('save', async function (next) {
     this.type = this.type?.toUpperCase()?.trim();
     this.code = this.code?.trim();
     this.label = this.label?.trim();
-    this.tenantId = this.tenantId?.trim() || null;
+    // this.tenantId = this.tenantId?.trim() || null;
 
     // SKIP if soft-deleted (allow updates to deleted records)
     if (this.isDeleted) return next();
@@ -64,7 +64,7 @@ masterSchema.pre('save', async function (next) {
     const codeDuplicate = await this.constructor.findOne({
       type: this.type,
       code: this.code,
-      tenantId: this.tenantId,
+      // tenantId: this.tenantId,
       _id: { $ne: this._id }, // Exclude self for updates
       isDeleted: false,
     });
@@ -77,7 +77,7 @@ masterSchema.pre('save', async function (next) {
     const labelDuplicate = await this.constructor.findOne({
       type: this.type,
       label: this.label,
-      tenantId: this.tenantId,
+      // tenantId: this.tenantId,
       _id: { $ne: this._id }, // Exclude self for updates
       isDeleted: false,
     });

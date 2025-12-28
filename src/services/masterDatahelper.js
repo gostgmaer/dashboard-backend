@@ -153,7 +153,16 @@ class MasterService {
 
     const projection = this.buildProjection(fields);
 
-    return Master.findOne(filter, projection).lean();
+    const doc = await Master.findOne(filter, projection).lean().populate('tenantId', 'name slug');
+
+    if (!doc) return null;
+
+    // 🔥 Transform tenantId → tenantName
+    return {
+      ...doc,
+      tenantId: doc.tenantId?.name || null,
+      tenantSlug: doc.tenantId?.slug || null,
+    };
   }
 
   async getList({ page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search = '', type, tenantId, domain, isActive = false, includeDeleted = false, fields = null }) {
@@ -184,9 +193,14 @@ class MasterService {
         .populate('tenantId', 'name slug'),
       Master.countDocuments(baseFilter),
     ]);
+    const transformedDocs = docs.map((doc) => ({
+      ...doc,
+      tenantId: doc.tenantId?.name || null,
+      tenantSlug: doc.tenantId?.slug || null,
+    }));
 
     return {
-      result: docs,
+      result: transformedDocs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
