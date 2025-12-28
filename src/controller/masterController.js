@@ -18,7 +18,7 @@ class MasterController {
 
       await MasterService.create(payload, userId);
 
-      standardResponse(res, true, null, `Master Record Created SuccessFul!`, 201);
+      standardResponse(res, true, null, `Master Record Created SuccessFull!`, 201);
     } catch (error) {
       errorResponse(res, error.message, error.statusCode || 500);
     }
@@ -49,7 +49,7 @@ class MasterController {
   // GET BY ID or CODE
   async getByIdOrCode(req, res, next) {
     try {
-      const { idOrCode, fields } = req.query;
+      const { idOrCode, fields } = req.params;
 
       if (!idOrCode) {
         return next(new AppError(400, 'idOrCode is required'));
