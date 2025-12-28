@@ -1682,7 +1682,7 @@ userSchema.method({
       const now = new Date();
       const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_EXPIRY)));
       const refreshTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_REFRESH_EXPIRY)));
-      // console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
+      // //console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
       const deviceData = {
         name: deviceInfo.name,
         type: deviceInfo.type,
@@ -2661,7 +2661,7 @@ userSchema.method({
         isActive: true,
         fingerprint: deviceInfo.fingerprint || null,
       };
-      // console.log(device);
+      // //console.log(device);
 
       this.knownDevices.push(device);
 

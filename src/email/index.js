@@ -112,7 +112,7 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
     try {
       const transporter = createTransporter();
       await transporter.verify();
-      console.log('✅ Email service is ready');
+      //console.log('✅ Email service is ready');
       metrics.connectionSuccesses++;
       return '✅ Email service connection verified';
       //  return { success: true, message: 'Email service connection verified', metrics };
@@ -125,7 +125,7 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
         if (fallbackTransporter) {
           try {
             await fallbackTransporter.verify();
-            console.log('✅ Fallback email service is ready');
+            //console.log('✅ Fallback email service is ready');
             metrics.connectionSuccesses++;
             return { success: true, message: 'Fallback email service connection verified', metrics };
           } catch (fallbackError) {
@@ -180,7 +180,7 @@ const sendEmail = async (EmailTemplate, data) => {
     try {
       info = await transporter.sendMail(mailOptions);
       metrics.emailsSent++;
-      console.log(`Email sent: ${info.messageId}`);
+      //console.log(`Email sent: ${info.messageId}`);
       return { success: true, messageId: info.messageId, metrics };
     } catch (error) {
       console.error(`Primary transporter failed: ${error.message}`);
@@ -189,7 +189,7 @@ const sendEmail = async (EmailTemplate, data) => {
         try {
           info = await fallbackTransporter.sendMail(mailOptions);
           metrics.emailsSent++;
-          console.log(`Email sent via fallback: ${info.messageId}`);
+          //console.log(`Email sent via fallback: ${info.messageId}`);
           return { success: true, messageId: info.messageId, metrics, usedFallback: true };
         } catch (fallbackError) {
           metrics.emailsFailed++;

@@ -23,7 +23,7 @@ async function createOrder(body) {
     const response = await razorpay.orders.create(options);
     return response;
   } catch (error) {
-    console.log(error);
+    //console.log(error);
     
     throw new Error('Unable to create order');
   }

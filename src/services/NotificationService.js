@@ -274,7 +274,7 @@ class NotificationService {
         status: { $in: ['read', 'ARCHIVED'] },
       });
 
-      console.log(`Cleaned up ${result.deletedCount} old notifications`);
+      //console.log(`Cleaned up ${result.deletedCount} old notifications`);
       return result;
     } catch (error) {
       console.error('Error cleaning up notifications:', error);

@@ -23,7 +23,7 @@ class SocketService {
 
         this.setupMiddleware();
         this.setupEventHandlers();
-        console.log('Socket.IO initialized successfully');
+        //console.log('Socket.IO initialized successfully');
         return this.io;
     }
 
@@ -53,7 +53,7 @@ class SocketService {
 
     setupEventHandlers() {
         this.io.on('connection', (socket) => {
-            console.log(`User connected: ${socket.user.username} (${socket.userId})`);
+            //console.log(`User connected: ${socket.user.username} (${socket.userId})`);
             // Store user connection
             this.connectedUsers.set(socket.userId, socket.id);
 
@@ -99,7 +99,7 @@ class SocketService {
 
             // Handle disconnection
             socket.on('disconnect', () => {
-                console.log(`User disconnected: ${socket.user.username} (${socket.userId})`);
+                //console.log(`User disconnected: ${socket.user.username} (${socket.userId})`);
                 this.connectedUsers.delete(socket.userId);
                 this.userRooms.delete(socket.userId);
             });

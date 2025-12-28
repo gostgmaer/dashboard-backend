@@ -12,7 +12,7 @@ const addCoupon = async (req, res) => {
   try {
     const newCoupon = new Coupon(req.body);
     await newCoupon.save();
-    // console.log(newCoupon);
+    // //console.log(newCoupon);
 
     // var invalidProducts ;
     // const items = await Promise.all(
@@ -92,7 +92,7 @@ const addAllCoupon = async (req, res) => {
 };
 
 const getAllCoupons = async (req, res) => {
-  // console.log('coupe')
+  // //console.log('coupe')
   try {
     const queryObject = {};
     const { status } = req.query;
@@ -101,7 +101,7 @@ const getAllCoupons = async (req, res) => {
       queryObject.status = { $regex: `${status}`, $options: 'i' };
     }
     const coupons = await Coupon.find(queryObject).sort({ _id: -1 });
-    // console.log('coups',coupons)
+    // //console.log('coups',coupons)
     res.send(coupons);
   } catch (err) {
     res.status(500).send({
