@@ -1205,7 +1205,7 @@ class authController {
       const result = await User.initiatePasswordReset(email, req.deviceInfo);
       await sendEmail(passwordResetRequestTemplate, result.user);
       try {
-        console.log(`Password reset token for ${user.email}: ${result.resetToken}`);
+        //console.log(`Password reset token for ${user.email}: ${result.resetToken}`);
       } catch (error) {
         console.error('Failed to send reset email:', error);
       }

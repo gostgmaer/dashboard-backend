@@ -4,7 +4,7 @@ const producer = kafka.producer();
 module.exports = {
   connectProducer: async () => {
     await producer.connect();
-    console.log('User Service Producer connected');
+    //console.log('User Service Producer connected');
   },
 
   sendMessage: async (topic, message) => {

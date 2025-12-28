@@ -407,7 +407,7 @@ attachmentSchema.pre("save", function (next) {
 });
 
 attachmentSchema.post("save", function (doc) {
-  console.log(`[AUDIT] Attachment ${doc._id} saved for tenant ${doc.tenant || "N/A"}`);
+  //console.log(`[AUDIT] Attachment ${doc._id} saved for tenant ${doc.tenant || "N/A"}`);
 });
 
 /* ===========================

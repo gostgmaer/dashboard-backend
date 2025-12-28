@@ -23,9 +23,9 @@ const sendEmail = (body, res, message) => {
       res.status(403).send({
         message: `Error happen when verify ${err.message}`,
       });
-      console.log(err.message);
+      //console.log(err.message);
     } else {
-      console.log("Server is ready to take our messages");
+      //console.log("Server is ready to take our messages");
     }
   });
 

@@ -209,7 +209,7 @@ async function checkoutMiddleware(req, res, next) {
 
 
       if (!user) {
-        console.log("ERROR");
+        //console.log("ERROR");
         
       } else {
         const newBody = {

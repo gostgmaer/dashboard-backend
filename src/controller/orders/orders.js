@@ -156,7 +156,7 @@ const verifyPayment = async (req, res) => {
 
 const getOrders = async (req, res) => {
   // log("getOrders called");
-  console.log('getOrders called');
+  //console.log('getOrders called');
 
   try {
     // const { sort, page, limit, filter } = req.query;

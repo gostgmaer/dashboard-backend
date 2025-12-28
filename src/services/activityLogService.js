@@ -267,13 +267,13 @@ class ActivityLogService {
 
       if (validLogs.length > 0) {
         await UserActivityLog.insertMany(validLogs, { ordered: false });
-        console.log(`Successfully logged ${validLogs.length} activities`);
+        //console.log(`Successfully logged ${validLogs.length} activities`);
       }
 
       // Log anonymous actions to a different collection or ignore
       const anonymousLogs = batch.filter((log) => !log.userId);
       if (anonymousLogs.length > 0) {
-        console.log(`Skipped ${anonymousLogs.length} anonymous activities`);
+        //console.log(`Skipped ${anonymousLogs.length} anonymous activities`);
         // Optionally: await AnonymousActivityLog.insertMany(anonymousLogs);
       }
     } catch (error) {
