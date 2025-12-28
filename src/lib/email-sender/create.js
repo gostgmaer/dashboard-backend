@@ -13,7 +13,7 @@ const handleCreateInvoice = async (invoice, path) => {
     generateInvoiceTable(doc, invoice);
     // generateFooter(doc);
 
-    // //console.log('doc', doc);
+    // console.log('doc', doc);
 
     // doc.pipe(fs.createWriteStream(`invoices/${invoice.invoice}.pdf`));
 
@@ -30,9 +30,9 @@ const handleCreateInvoice = async (invoice, path) => {
 
   // fs.writeFile(pdfBuffer, 'test', function (err) {
   //   if (err) {
-  //     return //console.log('err when saving file', err);
+  //     return console.log('err when saving file', err);
   //   }
-  //   //console.log('The file was saved!');
+  //   console.log('The file was saved!');
   // });
 
   return pdfBuffer;
@@ -46,13 +46,13 @@ const getImage = async (doc, invoice) => {
     align: 'center',
     width: 40,
   });
-  // //console.log('logo >>>>>', img);
+  // console.log('logo >>>>>', img);
   return img;
 };
 
 const generateHeader = (doc, invoice) => {
   // const logo = getImage(doc, invoice);
-  // //console.log('logooooo>>>', logo);
+  // console.log('logooooo>>>', logo);
 
   doc
     .fontSize(17)
@@ -271,7 +271,7 @@ function generateHr(doc, y) {
 }
 
 function formatCurrency(curr, cents) {
-  // //console.log('formatCurrency', curr + '' + cents);
+  // console.log('formatCurrency', curr + '' + cents);
   return curr + '' + Number(cents).toFixed(2);
 }
 

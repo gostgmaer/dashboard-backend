@@ -58,7 +58,7 @@ const handleProductQuantity = async (cart) => {
       }
     });
   } catch (err) {
-    //console.log("err on handleProductQuantity", err.message);
+    console.log("err on handleProductQuantity", err.message);
   }
 };
 
@@ -67,7 +67,7 @@ const handleProductAttribute = async (key, value, multi) => {
     // const products = await Product.find({ 'variants.1': { $exists: true } });
     const products = await Product.find({ isCombination: true });
 
-    // //console.log('products', products);
+    // console.log('products', products);
 
     if (multi) {
       await products.forEach(async (p) => {
@@ -82,7 +82,7 @@ const handleProductAttribute = async (key, value, multi) => {
       });
     } else {
       await products.forEach(async (p) => {
-        // //console.log('p', p._id);
+        // console.log('p', p._id);
         await Product.updateOne(
           { _id: p._id },
           {
@@ -94,7 +94,7 @@ const handleProductAttribute = async (key, value, multi) => {
       });
     }
   } catch (err) {
-    //console.log("err, when delete product variants", err.message);
+    console.log("err, when delete product variants", err.message);
   }
 };
 
@@ -103,7 +103,7 @@ const removeOrderedItemsFromWishlist = async (userId, orderedItems) => {
   try {
     // Delete the wishlist entries where the product is in the orderedItems
 
-    // //console.log(orderedItems);
+    // console.log(orderedItems);
     const productIds = orderedItems.map(item => item.product);
     
     const wishlistItemsToDelete = await Wishlist.find({

@@ -44,7 +44,7 @@ const paymentSuccess = async (req, res) => {
 
     const trans = paypal.payment.get(paymentId, (err, data) => {
       if (err) {
-        //console.log(err.message);
+        console.log(err.message);
       } else {
         var newTrans = [];
 
@@ -234,7 +234,7 @@ const razorpayVerifyPayment = async (req, res) => {
 
   if (isValidSignature) {
     // Log payment details or perform other actions on successful payment
-    //console.log(`Payment successful. Payment ID: ${paymentId}, Order ID: ${orderId}`);
+    console.log(`Payment successful. Payment ID: ${paymentId}, Order ID: ${orderId}`);
     
     // Respond to the client indicating successful payment
     res.send('Payment successful');

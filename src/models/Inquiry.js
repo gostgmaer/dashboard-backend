@@ -178,7 +178,7 @@ contactInquirySchema.pre('save', function (next) {
 // ===============================
 
 contactInquirySchema.post('save', function (doc) {
-  //console.log(`New inquiry saved: ${doc.client.fullIdentifier} [${doc.status}]`);
+  console.log(`New inquiry saved: ${doc.client.fullIdentifier} [${doc.status}]`);
 });
 
 // ================================

@@ -100,7 +100,7 @@ const getAllAttributes = async (req, res) => {
 
 const getShowingAttributes = async (req, res) => {
   try {
-    // //console.log('attributes')
+    // console.log('attributes')
     const attributes = await Attribute.aggregate([
       {
         $match: {
@@ -176,7 +176,7 @@ const getAttributeById = async (req, res) => {
   try {
     const attribute = await Attribute.findById(req.params.id);
 
-    // //console.log(attribute);
+    // console.log(attribute);
 
     res.send(attribute);
   } catch (err) {
@@ -420,7 +420,7 @@ const deleteChildAttribute = async (req, res) => {
 const deleteManyAttribute = async (req, res) => {
   try {
     await Attribute.deleteMany({ _id: req.body.ids });
-    // //console.log('delete many attribute');
+    // console.log('delete many attribute');
     res.send({
       message: `Attributes Delete Successfully!`,
     });

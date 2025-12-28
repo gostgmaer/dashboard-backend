@@ -25,7 +25,7 @@ class WebhookController {
         }
 
         const event = req.body;
-        //console.log('PayPal Webhook Event:', event.event_type);
+        console.log('PayPal Webhook Event:', event.event_type);
 
         try {
             switch (event.event_type) {
@@ -43,7 +43,7 @@ class WebhookController {
                     await this.handlePaypalRefundCompleted(event);
                     break;
                 default:
-                    //console.log('Unhandled PayPal event:', event.event_type);
+                    console.log('Unhandled PayPal event:', event.event_type);
             }
 
             await this.logWebhookEvent('paypal', event.event_type, event);
@@ -64,7 +64,7 @@ class WebhookController {
         }
 
         const event = req.body;
-        //console.log('Razorpay Webhook Event:', event.event);
+        console.log('Razorpay Webhook Event:', event.event);
 
         try {
             switch (event.event) {
@@ -90,7 +90,7 @@ class WebhookController {
                     await this.handleRazorpayRefundFailed(event);
                     break;
                 default:
-                    //console.log('Unhandled Razorpay event:', event.event);
+                    console.log('Unhandled Razorpay event:', event.event);
             }
 
             await this.logWebhookEvent('razorpay', event.event, event);
@@ -111,7 +111,7 @@ class WebhookController {
         }
 
         const event = verification.event;
-        //console.log('Stripe Webhook Event:', event.type);
+        console.log('Stripe Webhook Event:', event.type);
 
         try {
             switch (event.type) {
@@ -131,7 +131,7 @@ class WebhookController {
                     await this.handleStripeInvoicePaymentSucceeded(event);
                     break;
                 default:
-                    //console.log('Unhandled Stripe event:', event.type);
+                    console.log('Unhandled Stripe event:', event.type);
             }
 
             await this.logWebhookEvent('stripe', event.type, event);
@@ -376,12 +376,12 @@ class WebhookController {
         const chargeId = dispute.charge;
 
         // Handle dispute logic - update payment status, notify admin, etc.
-        //console.log('Stripe dispute created for charge:', chargeId);
+        console.log('Stripe dispute created for charge:', chargeId);
     }
 
     async handleStripeInvoicePaymentSucceeded(event) {
         const invoice = event.data.object;
-        //console.log('Stripe invoice payment succeeded:', invoice.id);
+        console.log('Stripe invoice payment succeeded:', invoice.id);
         // Handle recurring payment logic
     }
 

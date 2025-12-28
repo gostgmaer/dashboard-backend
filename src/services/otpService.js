@@ -608,7 +608,7 @@ class OTPService {
       };
 
       // In production, send to logging service or store in database
-      //console.log('OTP Event:', JSON.stringify(event, null, 2));
+      console.log('OTP Event:', JSON.stringify(event, null, 2));
 
       // Add to user's security events
       if (user.securityEvents) {
@@ -650,7 +650,7 @@ class OTPService {
         }
       );
 
-      //console.log(`Cleaned up ${result.modifiedCount} expired OTPs`);
+      console.log(`Cleaned up ${result.modifiedCount} expired OTPs`);
       return result.modifiedCount;
     } catch (error) {
       console.error('Failed to cleanup expired OTPs:', error);

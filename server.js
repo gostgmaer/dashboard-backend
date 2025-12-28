@@ -4,7 +4,7 @@ const app = require('./app');
 const { serverPort } = require('./src/config/setting');
 const connectDB = require('./src/config/dbConnact');
 const socketService = require('./src/services/socketService');
-const { connectProducer } = require('./src/kafka/producer');
+// const { connectProducer } = require('./src/kafka/producer');
 
 // Connect DB first, then start server
 const startServer = async () => {
@@ -15,7 +15,7 @@ const startServer = async () => {
   const server = http.createServer(app);
   const io = socketService.initialize(server);
   server.listen(serverPort || 3500, () => {
-    //console.log(`🚀 Server running on port ${serverPort}`);
+    console.log(`🚀 Server running on port ${serverPort}`);
   });
 
   // Handle server errors globally
@@ -26,9 +26,9 @@ const startServer = async () => {
 
   // Graceful shutdown on termination signals
   const gracefulShutdown = () => {
-    //console.log('⏳ Shutting down gracefully...');
+    console.log('⏳ Shutting down gracefully...');
     server.close(() => {
-      //console.log('✅ Server closed');
+      console.log('✅ Server closed');
       process.exit(0);
     });
     // If after 10 seconds forced exit
