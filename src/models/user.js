@@ -12,6 +12,8 @@ const Role = require('./role');
 const { jwtSecret } = require('../config/setting');
 const otpService = require('../services/otpService');
 const { paginateSortSearch } = require('../utils/helper');
+const { default: tenant } = require('./tenant');
+
 const SALT_ROUNDS = 10;
 
 // Environment variables with enhanced defaults
@@ -59,6 +61,12 @@ const userSchema = new mongoose.Schema(
     lastName: { type: String, trim: true },
     dateOfBirth: { type: Date, default: null },
     isActive: { type: Boolean, default: true },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
     gender: {
       type: String,
       enum: ['male', 'female', 'other', 'prefer_not_to_say'],
