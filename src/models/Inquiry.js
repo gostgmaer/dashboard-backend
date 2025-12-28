@@ -153,7 +153,7 @@ contactInquirySchema.pre('save', function (next) {
     return next(err);
   }
 
-  next();
+  
 });
 
 // Pre-save: Clean up empty arrays/objects
@@ -170,7 +170,7 @@ contactInquirySchema.pre('save', function (next) {
 
   // Trim all string fields recursively
   this.trimAllStrings();
-  next();
+  
 });
 
 // ================================

@@ -30,65 +30,53 @@ const masterSchema = new mongoose.Schema(
  * PRE-SAVE HOOK: Automatic duplicate check + normalization
  * Runs BEFORE every .save(), .create(), bulkWrite upsert
  */
-masterSchema.pre('save', async function (next) {
-  try {
-    // Normalize fields
-    this.type = this.type?.toUpperCase()?.trim();
-    this.code = this.code?.trim();
-    this.label = this.label?.trim();
-    // this.tenantId = this.tenantId?.trim() || null;
+masterSchema.pre('save', async function () {
+  // Normalize fields
+  this.type = this.type?.toUpperCase()?.trim();
+  this.code = this.code?.trim();
+  this.label = this.label?.trim();
 
-    // SKIP if soft-deleted (allow updates to deleted records)
-    if (this.isDeleted) return next();
+  // Allow updates to soft-deleted records, but skip validations
+  if (this.isDeleted) return;
 
-    // ✅ 1. isDefault LOGIC (NEW)
-    if (this.isDefault === true) {
-      // Reset ALL existing defaults for same type (active only)
-      await this.constructor.updateMany(
-        {
-          type: this.type,
-          isDefault: true,
-          isActive: true,
-          isDeleted: false,
-          _id: { $ne: this._id }, // exclude current doc
-        },
-        {
-          $set: {
-            isDefault: false,
-          },
-        }
-      );
-    }
+  // ✅ 1. isDefault LOGIC
+  if (this.isDefault === true) {
+    await this.constructor.updateMany(
+      {
+        type: this.type,
+        isDefault: true,
+        isActive: true,
+        isDeleted: false,
+        _id: { $ne: this._id }, // exclude current doc
+      },
+      {
+        $set: { isDefault: false },
+      }
+    );
+  }
 
-    // 2. CHECK CODE DUPLICATES (EXISTING)
-    const codeDuplicate = await this.constructor.findOne({
-      type: this.type,
-      code: this.code,
-      // tenantId: this.tenantId,
-      _id: { $ne: this._id }, // Exclude self for updates
-      isDeleted: false,
-    });
+  // ✅ 2. CHECK CODE DUPLICATES
+  const codeDuplicate = await this.constructor.findOne({
+    type: this.type,
+    code: this.code,
+    _id: { $ne: this._id },
+    isDeleted: false,
+  });
 
-    if (codeDuplicate) {
-      return next(new AppError(409, `Duplicate CODE '${this.code}' already exists for TYPE '${this.type}'${this.tenantId ? ` in TENANT '${this.tenantId}'` : ''}`));
-    }
+  if (codeDuplicate) {
+    throw new AppError(409, `Duplicate CODE '${this.code}' already exists for TYPE '${this.type}'${this.tenantId ? ` in TENANT '${this.tenantId}'` : ''}`);
+  }
 
-    // 3. CHECK LABEL DUPLICATES (EXISTING)
-    const labelDuplicate = await this.constructor.findOne({
-      type: this.type,
-      label: this.label,
-      // tenantId: this.tenantId,
-      _id: { $ne: this._id }, // Exclude self for updates
-      isDeleted: false,
-    });
+  // ✅ 3. CHECK LABEL DUPLICATES
+  const labelDuplicate = await this.constructor.findOne({
+    type: this.type,
+    label: this.label,
+    _id: { $ne: this._id },
+    isDeleted: false,
+  });
 
-    if (labelDuplicate) {
-      return next(new AppError(409, `Duplicate LABEL '${this.label}' already exists for TYPE '${this.type}'${this.tenantId ? ` in TENANT '${this.tenantId}'` : ''}`));
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+  if (labelDuplicate) {
+    throw new AppError(409, `Duplicate LABEL '${this.label}' already exists for TYPE '${this.type}'${this.tenantId ? ` in TENANT '${this.tenantId}'` : ''}`);
   }
 });
 

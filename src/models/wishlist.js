@@ -134,7 +134,7 @@ wishlistSchema.pre('save', async function (next) {
       throw new ValidationError('Product is not available');
     }
 
-    next();
+    
   } catch (error) {
     next(error);
   }
@@ -143,7 +143,7 @@ wishlistSchema.pre('save', async function (next) {
 // Pre-find middleware for soft delete handling
 wishlistSchema.pre(/find/, function (next) {
   this.where({ status: { $ne: 'DELETED' } });
-  next();
+  
 });
 
 // ===== Static Methods =====

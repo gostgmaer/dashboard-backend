@@ -173,7 +173,7 @@ paymentSchema.pre('save', function (next) {
     // Set expiration to 30 minutes for pending payments
     this.expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   }
-  next();
+  
 });
 
 // STATIC METHODS
@@ -706,7 +706,7 @@ paymentSchema.pre('save', function (next) {
     }
   }
 
-  next();
+  
 });
 paymentSchema.methods.updateMetadata = function (metadataUpdate, note = 'Metadata updated', updated_by = 'system') {
   this.metadata = { ...this.metadata, ...metadataUpdate };
@@ -871,7 +871,7 @@ paymentSchema.pre('save', function (next) {
     });
   }
 
-  next();
+  
 });
 
 // Post-save middleware

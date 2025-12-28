@@ -68,7 +68,7 @@ roleSchema.pre('save', async function (next) {
     this.permissions = activePermissions.map(p => p._id);
   }
 
-  next();
+  
 });
 
 

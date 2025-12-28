@@ -143,7 +143,7 @@ addressSchema.pre('save', async function (next) {
       { $set: { isDefault: false } }
     );
   }
-  next();
+  
 });
 
 // Middleware: Update updated_by
@@ -151,7 +151,7 @@ addressSchema.pre('save', function (next) {
   if (this.isModified() && !this.isNew) {
     this.updated_by = this.updated_by || this.created_by;
   }
-  next();
+  
 });
 
 // Middleware: Track history on create
@@ -166,7 +166,7 @@ addressSchema.pre('save', function (next) {
       },
     ];
   }
-  next();
+  
 });
 
 // Middleware: Track history on update
@@ -187,7 +187,7 @@ addressSchema.pre('save', function (next) {
   if (this.history.length > 100) {
     this.history = this.history.slice(-100);
   }
-  next();
+  
 });
 
 // Middleware: Soft delete
@@ -200,7 +200,7 @@ addressSchema.pre('deleteOne', { document: true, query: true }, async function (
     changes: [],
   });
   await this.save();
-  next();
+  
 });
 
 // Middleware: Log sensitive operations to external audit system (placeholder)
@@ -209,7 +209,7 @@ addressSchema.post('save', async function (doc, next) {
     // Placeholder: Log to external audit system
     // await auditService.logOperation('address', this._id, this.updated_by, this.history[this.history.length - 1]);
   }
-  next();
+  
 });
 
 // Instance Methods
