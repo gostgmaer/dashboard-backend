@@ -1,3 +1,4 @@
+const { default: mongoose } = require('mongoose');
 const Master = require('../models/master');
 const AppError = require('../utils/appError');
 const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'created_by', 'updated_by'];
@@ -37,7 +38,7 @@ class MasterService {
     return doc;
   }
 
-  async bulkUpsert(list,userId) {
+  async bulkUpsert(list, userId) {
     if (!Array.isArray(list) || list.length === 0) return { result: null, count: 0 };
 
     // PRE-CHECK DUPLICATES (before bulkWrite)
@@ -139,18 +140,29 @@ class MasterService {
     return { result, count: ids.length };
   }
 
-  async getByIdOrCode(idOrCode) {
+  async getByIdOrCode(idOrCode, fields) {
     if (!idOrCode) return null;
 
+    const isObjectId = mongoose.Types.ObjectId.isValid(idOrCode);
+
     const filter = {
-      $or: [{ _id: idOrCode }, { code: idOrCode }],
+      ...(isObjectId ? { _id: idOrCode } : { code: idOrCode }),
       isActive: true,
       isDeleted: false,
     };
 
     const projection = this.buildProjection(fields);
 
-    return Master.findOne(filter, projection).lean();
+    const doc = await Master.findOne(filter, projection).lean().populate('tenantId', 'name slug');
+
+    if (!doc) return null;
+
+    // 🔥 Transform tenantId → tenantName
+    return {
+      ...doc,
+      tenantId: doc.tenantId?.name || null,
+      tenantSlug: doc.tenantId?.slug || null,
+    };
   }
 
   async getList({ page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search = '', type, tenantId, domain, isActive = false, includeDeleted = false, fields = null }) {
@@ -177,16 +189,22 @@ class MasterService {
         .sort({ [sortBy]: sortDirection })
         .skip(skip)
         .limit(parseInt(limit))
-        .lean(),
+        .lean()
+        .populate('tenantId', 'name slug'),
       Master.countDocuments(baseFilter),
     ]);
+    const transformedDocs = docs.map((doc) => ({
+      ...doc,
+      tenantId: doc.tenantId?.name || null,
+      tenantSlug: doc.tenantId?.slug || null,
+    }));
 
     return {
-      result: docs,
+      result: transformedDocs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages:total,
+        totalPages: total,
         pages: Math.ceil(total / limit),
         hasNext: skip + docs.length < total,
         hasPrev: page > 1,
@@ -194,89 +212,84 @@ class MasterService {
     };
   }
   async getGroupedByType({ tenantId, domain, includeInactive = false, includeDeleted = false, limitPerType = 1000 }) {
-  const baseFilter = {
-    isActive: includeInactive ? { $ne: false } : true,
-    isDeleted: includeDeleted ? { $ne: true } : false,
-  };
+    const baseFilter = {
+      isActive: includeInactive ? { $ne: false } : true,
+      isDeleted: includeDeleted ? { $ne: true } : false,
+    };
 
-  if (tenantId) baseFilter.tenantId = tenantId;
-  if (domain) baseFilter.domain = domain;
+    if (tenantId) baseFilter.tenantId = tenantId;
+    if (domain) baseFilter.domain = domain;
 
-  // Fixed projection: only _id, type, code, label, isActive
-  const projection = {
-    _id: 1,
-    type: 1,
-    code: 1,
-    label: 1,
-    // isActive: 1
-  };
+    // Fixed projection: only _id, type, code, label, isActive
+    const projection = {
+      _id: 1,
+      type: 1,
+      code: 1,
+      label: 1,
+      // isActive: 1
+    };
 
-  // Pipeline 1: Group + count total records per type
-  const countPipeline = [
-    { $match: baseFilter },
-    {
-      $group: {
-        _id: '$type',
-        totalCount: { $sum: 1 },
-      },
-    },
-  ];
-
-  // Pipeline 2: Group + limited values
-  const dataPipeline = [
-    { $match: baseFilter },
-    { $project: projection },
-    {
-      $group: {
-        _id: '$type',
-        values: { $push: '$$ROOT' },
-        count: { $sum: 1 },
-      },
-    },
-    {
-      $sort: {
-        _id: 1,
-        'values.sortOrder': 1,
-        'values.label': 1,
-      },
-    },
-    {
-      $project: {
-        type: '$_id',
-        values: {
-          $slice: ['$values', limitPerType],
+    // Pipeline 1: Group + count total records per type
+    const countPipeline = [
+      { $match: baseFilter },
+      {
+        $group: {
+          _id: '$type',
+          totalCount: { $sum: 1 },
         },
-        count: 1, // limited count
       },
-    },
-  ];
+    ];
 
-  
-  const [typeCounts, groupedData] = await Promise.all([
-    Master.aggregate(countPipeline),
-    Master.aggregate(dataPipeline)
-  ]);
+    // Pipeline 2: Group + limited values
+    const dataPipeline = [
+      { $match: baseFilter },
+      { $project: projection },
+      {
+        $group: {
+          _id: '$type',
+          values: { $push: '$$ROOT' },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: {
+          _id: 1,
+          'values.sortOrder': 1,
+          'values.label': 1,
+        },
+      },
+      {
+        $project: {
+          type: '$_id',
+          values: {
+            $slice: ['$values', limitPerType],
+          },
+          count: 1, // limited count
+        },
+      },
+    ];
 
-  // Merge total counts with grouped data
-  const typeCountMap = {};
-  typeCounts.forEach((item) => {
-    typeCountMap[item._id] = item.totalCount;
-  });
+    const [typeCounts, groupedData] = await Promise.all([Master.aggregate(countPipeline), Master.aggregate(dataPipeline)]);
 
-  const types = groupedData.map((group) => ({
-    type: group.type,
-    values: group.values,
-    count: group.count, // limited records returned
-    // totalCount: typeCountMap[group.type] || group.count, // actual total
-  }));
+    // Merge total counts with grouped data
+    const typeCountMap = {};
+    typeCounts.forEach((item) => {
+      typeCountMap[item._id] = item.totalCount;
+    });
 
-  return {
-    types
-  };
-}
+    const types = groupedData.map((group) => ({
+      type: group.type,
+      values: group.values,
+      count: group.count, // limited records returned
+      // totalCount: typeCountMap[group.type] || group.count, // actual total
+    }));
 
+    return {
+      types,
+    };
+  }
 
-  async updateById(id, payload,user) {
+  async updateById(id, payload, user) {
     const doc = await Master.findById(id);
     if (!doc) throw new AppError(404, 'Record not found');
     // Apply updates

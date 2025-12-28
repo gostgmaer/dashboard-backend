@@ -9,7 +9,12 @@ const masterSchema = new mongoose.Schema(
     altLabel: { type: String, trim: true },
     description: { type: String, trim: true, maxlength: 500 },
     parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Master', default: null, index: true },
-    tenantId: { type: String, default: null, index: true },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
     domain: { type: String, trim: true, index: true },
     sortOrder: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true, index: true },
@@ -31,16 +36,35 @@ masterSchema.pre('save', async function (next) {
     this.type = this.type?.toUpperCase()?.trim();
     this.code = this.code?.trim();
     this.label = this.label?.trim();
-    this.tenantId = this.tenantId?.trim() || null;
+    // this.tenantId = this.tenantId?.trim() || null;
 
     // SKIP if soft-deleted (allow updates to deleted records)
     if (this.isDeleted) return next();
 
-    // 1. CHECK CODE DUPLICATES
+    // ✅ 1. isDefault LOGIC (NEW)
+    if (this.isDefault === true) {
+      // Reset ALL existing defaults for same type (active only)
+      await this.constructor.updateMany(
+        {
+          type: this.type,
+          isDefault: true,
+          isActive: true,
+          isDeleted: false,
+          _id: { $ne: this._id }, // exclude current doc
+        },
+        {
+          $set: {
+            isDefault: false,
+          },
+        }
+      );
+    }
+
+    // 2. CHECK CODE DUPLICATES (EXISTING)
     const codeDuplicate = await this.constructor.findOne({
       type: this.type,
       code: this.code,
-      tenantId: this.tenantId,
+      // tenantId: this.tenantId,
       _id: { $ne: this._id }, // Exclude self for updates
       isDeleted: false,
     });
@@ -49,11 +73,11 @@ masterSchema.pre('save', async function (next) {
       return next(new AppError(409, `Duplicate CODE '${this.code}' already exists for TYPE '${this.type}'${this.tenantId ? ` in TENANT '${this.tenantId}'` : ''}`));
     }
 
-    // 2. CHECK LABEL DUPLICATES
+    // 3. CHECK LABEL DUPLICATES (EXISTING)
     const labelDuplicate = await this.constructor.findOne({
       type: this.type,
       label: this.label,
-      tenantId: this.tenantId,
+      // tenantId: this.tenantId,
       _id: { $ne: this._id }, // Exclude self for updates
       isDeleted: false,
     });

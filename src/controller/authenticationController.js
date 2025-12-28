@@ -21,7 +21,7 @@ const ActivityHelper = require('../services/activityHelpers');
 const passport = require('passport');
 const socialAccountControllers = require('./social-account-controllers');
 const { isSupportedProvider } = require('../services/socialProvider');
-const { sendMessage } = require('../kafka/producer');
+// const { sendMessage } = require('../kafka/producer');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -183,15 +183,15 @@ class authController {
       if (otpService.isEnabled(user.otpSettings)) {
         verificationResult = await user.generateOTP('email_verification', deviceInfo, 'email');
       }
-      await sendMessage(`${process.env.NODE_ENV}.email.notification.send`, {
-        requestId: user.id,
-        to: email,
-        subject: 'Welcome to Our Service!',
-        templateId: 'welcomeEmailTemplate',
-        data: user,
-      });
+      // await sendMessage(`${process.env.NODE_ENV}.email.notification.send`, {
+      //   requestId: user.id,
+      //   to: email,
+      //   subject: 'Welcome to Our Service!',
+      //   templateId: 'welcomeEmailTemplate',
+      //   data: user,
+      // });
       // Send welcome email
-      let emaildata = await sendEmail(welcomeEmailTemplate, user);
+       await sendEmail(welcomeEmailTemplate, user);
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
