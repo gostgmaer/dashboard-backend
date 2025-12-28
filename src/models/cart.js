@@ -123,7 +123,7 @@ cartSchema.pre('save', async function(next) {
       item.reservedUntil = new Date(Date.now() + 60 * 60 * 1000);
     }
 
-    next();
+    
   } catch (error) {
     next(error);
   }
@@ -138,7 +138,7 @@ cartSchema.pre('remove', async function(next) {
         { $inc: { stock: item.quantity } }
       );
     }
-    next();
+    
   } catch (error) {
     next(error);
   }
