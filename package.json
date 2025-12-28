@@ -10,6 +10,9 @@
     "dev": "nodemon server.js",
     "lint": "npm lint"
   },
+    "engines": {
+    "node": ">=20"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
