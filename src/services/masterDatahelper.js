@@ -204,7 +204,8 @@ class MasterService {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: total,
+        total,
+        totalPages: Math.ceil(total / limit),
         pages: Math.ceil(total / limit),
         hasNext: skip + docs.length < total,
         hasPrev: page > 1,
