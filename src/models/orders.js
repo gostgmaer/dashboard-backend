@@ -253,7 +253,7 @@ orderSchema.pre("save", async function (next) {
     if (!this.invoice) {
       this.invoice = `INV-${this.order_id}`;
     }
-    next();
+    
   } catch (error) {
     next(error);
   }
@@ -269,7 +269,7 @@ orderSchema.pre("save", async function (next) {
         throw new Error(`Insufficient stock for product ${item.product}`);
       }
     }
-    next();
+    
   } catch (error) {
     next(error);
   }

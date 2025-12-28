@@ -408,7 +408,7 @@ projectSchema.pre('save', async function (next) {
     this.clientContact = this.clientContact.trim();
   }
 
-  next();
+  
 });
 
 // Export model

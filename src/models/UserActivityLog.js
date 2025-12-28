@@ -214,7 +214,7 @@ userActivityLogSchema.pre('save', function (next) {
     }
   }
 
-  next();
+  
 });
 
 module.exports = mongoose.model('UserActivityLog', userActivityLogSchema);

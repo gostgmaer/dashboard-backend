@@ -50,7 +50,7 @@ categorySchema.pre("validate", function (next) {
   if (this.isModified("title")) {
     this.slug = slugify(this.title, { lower: true, strict: true });
   }
-  next();
+  
 });
 
 categorySchema.pre("save", async function (next) {
@@ -70,7 +70,7 @@ categorySchema.pre("save", async function (next) {
       });
     }
   }
-  next();
+  
 });
 
 categorySchema.pre("init", function (doc) {

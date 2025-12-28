@@ -170,7 +170,7 @@ class MasterService {
     const sortDirection = sortOrder === 'desc' ? -1 : 1;
 
     const baseFilter = {
-      isActive: isActive ? { $ne: false } : true,
+      isActive: isActive,
       isDeleted: includeDeleted ? true : false,
     };
 
@@ -204,7 +204,8 @@ class MasterService {
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        totalPages: total,
+        total,
+        totalPages: Math.ceil(total / limit),
         pages: Math.ceil(total / limit),
         hasNext: skip + docs.length < total,
         hasPrev: page > 1,

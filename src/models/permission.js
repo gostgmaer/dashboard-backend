@@ -45,13 +45,13 @@ permissionSchema.pre('save', function (next) {
   if (!this.key && this.action && this.resource) {
     this.key = `${this.action}:${this.resource}`;
   }
-  next();
+  
 });
 permissionSchema.pre('validate', function (next) {
   if (!this.key && this.action && this.resource) {
     this.key = `${this.action.trim().toLowerCase()}:${this.resource.trim().toLowerCase()}`;
   }
-  next();
+  
 });
 // ===== Static Methods =====
 
