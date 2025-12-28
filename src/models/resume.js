@@ -190,7 +190,7 @@ resumeSchema.pre('save', async function (next) {
     }
   }
 
-  next();
+  
 });
 
 // Virtual populate for project count (Projects linked by resume _id)

@@ -586,7 +586,7 @@ notificationSchema.pre('save', async function (next) {
       this.version = (this.version || 1) + 1;
     }
     // Any other custom validations/error triggers here
-    next();
+    
   } catch (err) {
     next(err);
   }
@@ -669,9 +669,9 @@ notificationSchema.post('save', async function (doc, next) {
       } catch (e) {}
     }
     // Add extra integrations/analytics here
-    next();
+    
   } catch (err) {
-    next(); // Don't fail save based on analytics/integration errors
+     // Don't fail save based on analytics/integration errors
   }
 });
 

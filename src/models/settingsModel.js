@@ -200,7 +200,7 @@ settingSchema.pre('save', async function (next) {
   if (this.maxUploadSizeMB < 0) {
     return next(new Error('maxUploadSizeMB must be non-negative'));
   }
-  next();
+  
 });
 
 // Instance Methods

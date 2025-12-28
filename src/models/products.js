@@ -291,7 +291,7 @@ productSchema.pre('save', function (next) {
     // Update finalPrice
     product.finalPrice = finalPrice;
 
-    next();
+    
   } catch (error) {
     next(error);
   }
@@ -487,7 +487,7 @@ productSchema.pre('save', async function (next) {
       this.updatedAt = new Date();
     }
 
-    next();
+    
   } catch (error) {
     next(error);
   }
@@ -500,7 +500,7 @@ productSchema.pre('save', async function (next) {
     const isModified = this.isModified();
 
     if (!isNewProduct && !isModified) {
-      return next();
+      return 
     }
 
     // 1. Generate unique identifiers
@@ -530,7 +530,7 @@ productSchema.pre('save', async function (next) {
     // 9. Trigger notifications for important changes
     await this.triggerChangeNotifications();
 
-    next();
+    
   } catch (error) {
     next(error);
   }
@@ -549,7 +549,7 @@ productSchema.pre('save', function (next) {
     }
   }
 
-  next();
+  
 });
 
 // Validate inventory changes
@@ -564,7 +564,7 @@ productSchema.pre('save', function (next) {
     }
   }
 
-  next();
+  
 });
 
 // Generate unique SKU and slug

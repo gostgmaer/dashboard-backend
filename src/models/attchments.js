@@ -403,7 +403,7 @@ attachmentSchema.pre("save", function (next) {
     }
   }
   
-  next();
+  
 });
 
 attachmentSchema.post("save", function (doc) {
