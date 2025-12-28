@@ -59,7 +59,7 @@ const getAll = async (req, res) => {
 
 const getRoleStatistics = async (req, res) => {
 
-  //console.log("Fetching role statistics..." ,req.query);
+  console.log("Fetching role statistics..." ,req.query);
   
   try {
     const options = {

@@ -5,9 +5,9 @@ const products = require("../utils/products");
 
 const updateManyProducts = async () => {
   try {
-    //console.log("process running!");
+    console.log("process running!");
 
-    //console.log("products", products.length);
+    console.log("products", products.length);
     const result = products?.map((el) => {
       const newObj = {
         slug: el.slug,
@@ -35,10 +35,10 @@ const updateManyProducts = async () => {
     });
 
     fs.writeFileSync("data.json", JSON.stringify(result));
-    //console.log("data updated successfully!", result);
+    console.log("data updated successfully!", result);
     process.exit();
   } catch (err) {
-    //console.log("error", err);
+    console.log("error", err);
     process.exit(1);
   }
 };

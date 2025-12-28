@@ -38,7 +38,7 @@ class EmailService {
   //       if (error) {
   //         console.error('Email service connection error:', error);
   //       } else {
-  //         //console.log('Email service connected successfully');
+  //         console.log('Email service connected successfully');
   //       }
   //     });
   //   } catch (error) {
@@ -51,7 +51,7 @@ class EmailService {
   //   try {
   //     const templatesDir = path.join(__dirname, '../email/emailTemplate.js');
 
-  //     //console.log(templatesDir);
+  //     console.log(templatesDir);
 
   //     // Create templates directory if it doesn't exist
   //     if (!fs.existsSync(templatesDir)) {
@@ -70,7 +70,7 @@ class EmailService {
   //       }
   //     });
 
-  //     //console.log(`Loaded ${this.templates.size} email templates`);
+  //     console.log(`Loaded ${this.templates.size} email templates`);
   //   } catch (error) {
   //     console.error('Error loading email templates:', error);
   //   }
@@ -292,7 +292,7 @@ class EmailService {
   //       fs.writeFileSync(filePath, content);
   //     });
 
-  //     //console.log('Created default email templates');
+  //     console.log('Created default email templates');
   //   }
 
   // Send notification email
@@ -318,7 +318,7 @@ class EmailService {
         priorityClass: notification.priority === 'HIGH' ? 'priority-high' : notification.priority === 'URGENT' ? 'priority-urgent' : '',
       };
       const m = await sendEmail(t[notification.type], templateData);
-      //console.log('Email sent successfully:', m.messageId);
+      console.log('Email sent successfully:', m.messageId);
 
       return {
         success: true,

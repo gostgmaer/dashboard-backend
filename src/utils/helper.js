@@ -97,7 +97,7 @@ const FilterOptions = (params, model) => {
     sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
   }
 
-  //console.log(Number(limit));
+  console.log(Number(limit));
 
   const options = {
     skip: (Number(page || 1) - 1) * Number(limit || 10),

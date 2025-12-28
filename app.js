@@ -61,7 +61,7 @@ function checkRoute(name, route) {
   if (!route || typeof route !== 'function') {
     console.error(`❌ Route "${name}" is NOT a valid router. Got:`, route);
   } else {
-    // //console.log(`✅ Route "${name}" loaded successfully.`);
+    // console.log(`✅ Route "${name}" loaded successfully.`);
   }
   return route;
 }
@@ -73,7 +73,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// verifyEmailConnection().then((result) => //console.log(result));
+verifyEmailConnection().then((result) => console.log(result));
 notificationService.socketService = socketService;
 
 app.use(LoggerService.expressRequestLogger());

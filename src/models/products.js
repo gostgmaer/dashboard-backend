@@ -560,7 +560,7 @@ productSchema.pre('save', function (next) {
 
     // Log significant inventory changes
     if (Math.abs(oldInventory - newInventory) > 10) {
-      //console.log(`Significant inventory change for ${this.sku}: ${oldInventory} → ${newInventory}`);
+      console.log(`Significant inventory change for ${this.sku}: ${oldInventory} → ${newInventory}`);
     }
   }
 
@@ -968,7 +968,7 @@ productSchema.methods.updateMetadata = function () {
 productSchema.methods.triggerChangeNotifications = async function () {
   if (this.isNew) {
     // New product notification
-    //console.log(`New product created: ${this.title} (${this.sku})`);
+    console.log(`New product created: ${this.title} (${this.sku})`);
     // Trigger webhook or notification service
     // await notificationService.sendNewProductAlert(this);
   } else {
@@ -977,7 +977,7 @@ productSchema.methods.triggerChangeNotifications = async function () {
     const modifiedImportantFields = importantFields.filter((field) => this.isModified(field));
 
     if (modifiedImportantFields.length > 0) {
-      //console.log(`Important product changes for ${this.title}:`, modifiedImportantFields);
+      console.log(`Important product changes for ${this.title}:`, modifiedImportantFields);
       // Trigger webhook or notification service
       // await notificationService.sendProductUpdateAlert(this, modifiedImportantFields);
     }
@@ -1067,7 +1067,7 @@ productSchema.methods.autoRestock = async function (restockQuantity) {
       reason: 'auto_restock_triggered',
     });
 
-    //console.log(`Auto-restocked product ${this.title} with ${restockQuantity} units`);
+    console.log(`Auto-restocked product ${this.title} with ${restockQuantity} units`);
     return true;
   }
   return false;
@@ -1884,7 +1884,7 @@ productSchema.methods.updateAvailabilityStatus = async function () {
 // Trigger low stock alert (webhook/notification)
 productSchema.methods.triggerLowStockAlert = async function () {
   // Implementation would depend on your notification system
-  //console.log(`Low stock alert for product: ${this.title} (ID: ${this._id}), Stock: ${this.inventory}`);
+  console.log(`Low stock alert for product: ${this.title} (ID: ${this._id}), Stock: ${this.inventory}`);
 
   // You could emit an event here for your notification service
   // eventEmitter.emit('lowStock', { product: this });

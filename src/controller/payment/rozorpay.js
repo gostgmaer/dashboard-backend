@@ -23,7 +23,7 @@ const createRazorpayOrder = async (amount, currency, invoice) => {
     const order = await razorpayInstance.orders.create(options);
     return order;
   } catch (error) {
-    //console.log(error);
+    console.log(error);
 
     throw new Error("Error creating Razorpay order");
   }

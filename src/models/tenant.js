@@ -46,7 +46,7 @@ const TenantSchema = new mongoose.Schema(
 );
 
 // 🔍 Indexes
-TenantSchema.index({ slug: 1 });
+// TenantSchema.index({ slug: 1 });
 TenantSchema.index({ isActive: 1, isDeleted: 1 });
 
 export default mongoose.model("Tenant", TenantSchema);

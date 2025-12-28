@@ -101,7 +101,7 @@ const getAllPermissions = async (req, res) => {
 
 
 const getGroupedPermissions = async (req, res) => {
-  //console.log(req);
+  console.log(req);
 
   try {
     const data = await Permission.getPermissionsGroupedByCategoryAndAction();

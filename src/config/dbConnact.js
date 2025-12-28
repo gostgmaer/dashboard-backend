@@ -4,10 +4,6 @@ const mongoose = require('mongoose');
 const { dbUrl, enviroment } = require('./setting');
 require('dotenv').config();
 
-const { EventEmitter } = require('events');
-
-require('dotenv').config();
-
 const options = {
   // Connection pool
   maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 20, // increase pool size
@@ -61,7 +57,7 @@ const connectDB = async () => {
     }
 
     mongoose.connection.on('connected', () => {
-      //console.log('✅ MongoDB connected');
+      console.log('✅ MongoDB connected');
     });
 
     mongoose.connection.on('error', (err) => {
@@ -75,7 +71,7 @@ const connectDB = async () => {
     // Capture termination signals and close connection gracefully
     const gracefulExit = () => {
       mongoose.connection.close(() => {
-        //console.log('🛑 MongoDB connection closed through app termination');
+        console.log('🛑 MongoDB connection closed through app termination');
         process.exit(0);
       });
     };
