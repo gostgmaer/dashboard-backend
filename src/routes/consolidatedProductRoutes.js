@@ -197,7 +197,6 @@ router.put('/:id',
 // DELETE /api/products/:id - Delete product (soft delete by default)
 router.delete('/:id',
   authMiddleware,
-
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
