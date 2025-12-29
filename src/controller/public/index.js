@@ -1,6 +1,7 @@
 const { standardResponse, errorResponse } = require('../../utils/apiUtils');
 
 const { apiCall } = require('../../lib/axiosCall');
+const publicServices = require('../../services/publicservice');
 
 class publicController {
   static async getGooglePlaces(req, res) {
@@ -222,6 +223,74 @@ class publicController {
 
     return standardResponse(res, true, result.data, 'Place deleted successfully!', 200);
   }
+  static async getMemoryUsage(req, res) {
+    try {
+      const memoryData = await publicServices.getMemoryUsage();
+      res.status(200).json(memoryData);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to retrieve memory usage', details: error.message });
+    }
+  }
+
+  static async getCpuMetrics(req, res) {
+    try {
+      const cpuData = await publicServices.getCpuMetrics();
+      res.status(200).json(cpuData);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to retrieve CPU metrics', details: error.message });
+    }
+  }
+
+  static async getServerInfo(req, res) {
+    try {
+      const serverInfo = await publicServices.getServerInfo();
+      res.status(200).json(serverInfo);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to retrieve server info', details: error.message });
+    }
+  }
+
+  static async getHealth(req, res) {
+    try {
+      const health = await publicServices.getHealthStatus();
+      res.status(health.status === 'healthy' ? 200 : 503).json(health);
+    } catch (error) {
+      res.status(500).json({ error: 'Health check failed', details: error.message });
+    }
+  }
+
+  static async getDashboard(req, res) {
+    try {
+      const [memory, cpu, server] = await Promise.all([publicServices.getMemoryUsage(), publicServices.getCpuMetrics(), publicServices.getServerInfo()]);
+
+      res.status(200).json({
+        ...server,
+        memory: memory.process,
+        cpu: cpu.loadAverage,
+        status: 'healthy',
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Dashboard generation failed', details: error.message });
+    }
+  }
+
+  static async getDiskUsage(req, res) {
+  try {
+    const diskData = await publicServices.getDiskUsage();
+    return standardResponse(res, true, diskData, 'Disk usage retrieved successfully!', 200);
+  } catch (error) {
+    return errorResponse(res, 'Failed to retrieve disk usage', 500);
+  }
+}
+
+static async getNetworkStats(req, res) {
+  try {
+    const networkData = await publicServices.getNetworkStats();
+    return standardResponse(res, true, networkData, 'Network stats retrieved successfully!', 200);
+  } catch (error) {
+    return errorResponse(res, 'Failed to retrieve network stats', 500);
+  }
+}
 }
 
 module.exports = publicController;

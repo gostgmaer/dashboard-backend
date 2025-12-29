@@ -52,4 +52,13 @@ router.get('/place/find-place-from-text', googlePlacesValidation.findPlaceFromTe
 // Place Photo (redirect)
 router.get('/place/photo', googlePlacesValidation.placePhoto, publicController.getPlacePhoto);
 
+
+router.get('/health', publicController.getHealth);
+router.get('/info', publicController.getServerInfo);
+router.get('/memory', publicController.getMemoryUsage);
+router.get('/cpu', publicController.getCpuMetrics);
+router.get('/disk', publicController.getDiskUsage);        // 🔥 NEW
+router.get('/network', publicController.getNetworkStats);  // 🔥 NEW
+router.get('/analytics', publicController.getDashboard);   // 🔥 NEW
+
 module.exports = { publicRoutes: router };
