@@ -161,13 +161,25 @@ class ProductController {
    */
   static async getProducts(req, res) {
     try {
-      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
+      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search,  isActive,
+      isArchive, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
 
       page = Number(page);
       limit = Number(limit);
 
       // --- Filters ---
       const filters = { deletedAt: { $exists: false } };
+
+      if (isArchive === 'true') {
+      filters.isDeleted = true;
+      filters.isActive = false;
+    } else {
+      filters.isDeleted = isArchive === 'true' ? { $in: [true, false] } : false;
+      filters.isActive =
+        isActive === 'false'
+          ? false
+          : true; // default active
+    }
 
       if (status) filters.status = status;
       if (productType) filters.productType = productType;
@@ -439,7 +451,7 @@ class ProductController {
       const { id } = req.params;
       const userId = req.user?._id; // optional (from auth middleware)
 
-      if (!productId) {
+      if (!id) {
         return res.status(400).json({
           success: false,
           message: 'Product ID is required',
@@ -487,6 +499,46 @@ class ProductController {
     }
   }
 
+  static async restoreProduct(req, res) {
+    try {
+      const { id } = req.params;
+
+      const restored = await Product.findOneAndUpdate(
+        {
+          _id: id,
+          isDeleted: true,
+        },
+        {
+          $set: {
+            isDeleted: false,
+            isActive: true,
+            status: 'active',
+            isAvailable: true,
+          },
+        },
+        { new: true }
+      );
+
+      if (!restored) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found or not deleted',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Product restored successfully',
+        data: restored,
+      });
+    } catch (error) {
+      console.error('Restore Product Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
   // ========================================
   // 📦 BULK OPERATIONS
   // ========================================
@@ -509,10 +561,13 @@ class ProductController {
 
       let result;
       if (permanent) {
-        result = await Product.deleteMany({
-          _id: { $in: validIds },
-          deletedAt: { $exists: false },
-        });
+        result = await Product.deleteMany(
+          {
+            _id: { $in: validIds },
+            deletedAt: { $exists: false },
+          },
+          req.body.user._id
+        );
       } else {
         await Product.bulkDelete(validIds);
         result = { deletedCount: validIds.length };
