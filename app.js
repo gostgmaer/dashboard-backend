@@ -115,15 +115,12 @@ app.use('/api/masters', checkRoute('Master', masterRoute));
 
 // Mount other feature routes here...
 app.get('/', (req, res) => {
-  res.send('APP is working!', JSON.stringify(req));
-});
-
-app.get('/api', (req, res) => {
-  res.send('api is working!', JSON.stringify(req));
-});
-// Healthcheck endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: Date.now() });
+  res.status(200).json({
+    success: true,
+    message: '🚀 Application is running successfully',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+  });
 });
 
 // 404 handler
@@ -136,7 +133,7 @@ app.use((req, res, next) => {
 app.use((err, req, res, next) => {
   console.error('Unhandled Error:', err);
   res.status(500).json({ success: false, message: 'Internal server error' });
-    next();
+  next();
 });
 
 module.exports = app;
