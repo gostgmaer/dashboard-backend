@@ -12,9 +12,9 @@ class FileService {
     this.storageAdapter = AdapterFactory.createAdapter();
   }
 
-  generateStorageKey(originalName, uploaderId) {
+ async generateStorageKey(originalName, uploaderId) {
     const timestamp = Date.now();
-    const uuid = uuidv4();
+    const uuid = await generateUUID();;
     const extension = path.extname(originalName);
     const sanitizedName = path.basename(originalName, extension)
       .replace(/[^a-zA-Z0-9-_]/g, '_')
