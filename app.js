@@ -33,7 +33,7 @@ const notificationService = require('./src/services/NotificationService');
 const NotificationMiddleware = require('./src/middleware/notificationMiddleware');
 const { notificationRoute } = require('./src/routes/notificationRoutes');
 // Import routes
-const resumeRoutes = require('./src/controller/resume/Resume_Routes');
+// const resumeRoutes = require('./src/controller/resume/Resume_Routes');
 const templateRoutes = require('./src/controller/resume/Template_Routes');
 const fileRoutes = require('./src/routes/fileRoutes');
 const LoggerService = require('./src/services/logger');
@@ -103,7 +103,7 @@ app.use('/api/logs', checkRoute('Activity Logs', logRoutes));
 app.use('/api/activity-logs', checkRoute('Activity Logs', userActivityroute));
 app.use('/api/files', checkRoute('Attachment Files', fileRoutes));
 app.use('/api/components', checkRoute('components', componentsRoutes));
-app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));
+// app.use('/api/resumes', checkRoute('Attachment Files', resumeRoutes));
 app.use('/api/templates', checkRoute('components', templateRoutes));
 app.use('/api/contacts', checkRoute('contacts', contactsRoute));
 app.use('/api', checkRoute('Public', publicRoutes));
