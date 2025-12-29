@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 const Brand = require('./brands');
 const Category = require('./categories');
 
-
 const variantSchema = new mongoose.Schema({
   sku: { type: String },
   title: { type: String }, // e.g., 'Red, Size M'
@@ -31,6 +30,7 @@ const productSchema = new mongoose.Schema(
     material: { type: String },
     color: { type: String },
     isDeleted: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
     size: { type: String },
     ageGroup: { type: String },
     gender: { type: String },
@@ -290,13 +290,10 @@ productSchema.pre('save', function (next) {
 
     // Update finalPrice
     product.finalPrice = finalPrice;
-
-    
   } catch (error) {
     next(error);
   }
 });
-
 
 productSchema.virtual('ratingStatistics').get(function () {
   if (this.reviews && this.reviews.length > 0) {
@@ -443,8 +440,48 @@ productSchema.virtual('stockStatus').get(function () {
   return 'In Stock';
 });
 productSchema.add({ deletedAt: { type: Date } });
-productSchema.statics.bulkDelete = function (ids) {
-  return this.updateMany({ _id: { $in: ids }, deletedAt: { $exists: false } }, { $set: { deletedAt: new Date(), status: 'archived' } });
+productSchema.statics.bulkDelete = async function (ids, userId = null) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error('ids must be a non-empty array');
+  }
+
+  return this.updateMany(
+    {
+      _id: { $in: ids },
+      isDeleted: { $ne: true }, // prevent double delete
+    },
+    {
+      $set: {
+        isDeleted: true,
+        isActive: false,
+        status: 'archived',
+        isAvailable: false,
+        updated_by: userId,
+      },
+    }
+  );
+};
+
+productSchema.statics.bulkRestore = async function (ids, userId = null) {
+  if (!Array.isArray(ids) || !ids.length) {
+    throw new Error('ids must be a non-empty array');
+  }
+
+  return this.updateMany(
+    {
+      _id: { $in: ids },
+      isDeleted: true,
+    },
+    {
+      $set: {
+        isDeleted: false,
+        isActive: true,
+        status: 'active',
+        isAvailable: true,
+        updated_by: userId,
+      },
+    }
+  );
 };
 
 productSchema.pre('save', async function (next) {
@@ -486,8 +523,6 @@ productSchema.pre('save', async function (next) {
     if (this.isModified() && !this.isNew) {
       this.updatedAt = new Date();
     }
-
-    
   } catch (error) {
     next(error);
   }
@@ -500,7 +535,7 @@ productSchema.pre('save', async function (next) {
     const isModified = this.isModified();
 
     if (!isNewProduct && !isModified) {
-      return 
+      return;
     }
 
     // 1. Generate unique identifiers
@@ -529,8 +564,6 @@ productSchema.pre('save', async function (next) {
 
     // 9. Trigger notifications for important changes
     await this.triggerChangeNotifications();
-
-    
   } catch (error) {
     next(error);
   }
@@ -548,8 +581,6 @@ productSchema.pre('save', function (next) {
       return next(new Error('Digital products must have download information'));
     }
   }
-
-  
 });
 
 // Validate inventory changes
@@ -563,8 +594,6 @@ productSchema.pre('save', function (next) {
       console.log(`Significant inventory change for ${this.sku}: ${oldInventory} → ${newInventory}`);
     }
   }
-
-  
 });
 
 // Generate unique SKU and slug
@@ -3461,8 +3490,8 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       ecoFriendlyCount,
       lowStockProductsCount,
       thisMonthProducts,
-      totalBrands,      // New
-      totalCategories   // New
+      totalBrands, // New
+      totalCategories, // New
     ] = await Promise.all([
       Product.countDocuments({}), // Total products
       Product.countDocuments({ status: 'active', isDeleted: false }),
@@ -3504,8 +3533,8 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       }),
 
       // New additions
-      Brand.countDocuments({}),      // Total brands
-      Category.countDocuments({})    // Total categories
+      Brand.countDocuments({}), // Total brands
+      Category.countDocuments({}), // Total categories
     ]);
 
     return {
@@ -3530,15 +3559,14 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       ecoFriendlyCount,
       lowStockProductsCount,
       thisMonthProducts,
-      totalBrands,       // New
-      totalCategories    // New
+      totalBrands, // New
+      totalCategories, // New
     };
   } catch (error) {
     console.error('Error fetching product dashboard counts:', error);
     throw error;
   }
 };
-
 
 const Product = mongoose.model('Product', productSchema);
 module.exports = Product;

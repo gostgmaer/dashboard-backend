@@ -5,6 +5,35 @@ const PromoCode = require('../../models/Coupon');
 const { priceWithRules, applyPromoCode, applyDiscountsAtCheckout } = require('../../services/discount');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 const Product = require('../../models/products');
+
+const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'created_by', 'updated_by'];
+
+const buildProjection = (fields) => {
+  if (!fields) {
+    // Exclude sensitive fields by default
+    const projection = {};
+    DEFAULT_EXCLUDE_FIELDS.forEach((field) => {
+      projection[field] = 0;
+    });
+    return projection;
+  }
+
+  // Include only requested fields (comma-separated or array)
+  if (typeof fields === 'string') {
+    fields = fields.split(',');
+  }
+
+  const projection = {};
+  fields.forEach((field) => {
+    const trimmed = field.trim();
+    // Always exclude these keys even if requested
+    if (!DEFAULT_EXCLUDE_FIELDS.includes(trimmed)) {
+      projection[trimmed] = 1;
+    }
+  });
+
+  return projection;
+};
 // Create or update a discount rule
 exports.upsertDiscountRule = async (req, res) => {
   try {
@@ -23,44 +52,71 @@ exports.upsertDiscountRule = async (req, res) => {
 // List discount rules with pagination and filters
 exports.listDiscountRules = async (req, res) => {
   try {
-    const { page = 1, limit = 10, activeOnly = 'false', search = '' } = req.query;
-
-    const query = {};
-
-    // Filter for active rules if requested
-    if (activeOnly === 'true') query.isActive = true;
-
-    // Optional search (e.g., by name or description)
-    if (search) {
-      query.$or = [{ name: { $regex: search, $options: 'i' } }, { description: { $regex: search, $options: 'i' } }];
-    }
+    const { page = 1, limit = 10, sortBy = 'priority', sortOrder = 'asc', search = '', isActive, isArchive, discountType, productId, categoryId, brandId, startDate, endDate, fields } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sortDirection = sortOrder === 'desc' ? -1 : 1;
 
-    // Count total matching records
-    const total = await DiscountRule.countDocuments(query);
+    /**
+     * BASE FILTER (same logic style as reference)
+     */
+    const baseFilter = {
+      ...(typeof isActive !== 'undefined' && { isActive: isActive === 'true' }),
+      ...(typeof isArchive !== 'undefined' ? { isDeleted: isArchive === 'true' } : { isDeleted: false }),
+    };
 
-    // Fetch rules with pagination
-    const result = await DiscountRule.find(query).sort({ priority: 1, startDate: -1 }).skip(skip).limit(parseInt(limit));
+    /**
+     * SEARCH
+     */
+    if (search) {
+      baseFilter.$or = [{ name: { $regex: search, $options: 'i' } }, { discountType: { $regex: search, $options: 'i' } }, { description: { $regex: search, $options: 'i' } }, { tags: { $regex: search, $options: 'i' } }];
+    }
 
-    // Pagination details
-    const totalPages = Math.ceil(total / parseInt(limit));
+    /**
+     * FILTERS
+     */
+    if (discountType) baseFilter.discountType = discountType;
+    if (productId) baseFilter.productIds = productId;
+    if (categoryId) baseFilter.categoryIds = categoryId;
+    if (brandId) baseFilter.brandIds = brandId;
+
+    /**
+     * DATE RANGE FILTER
+     */
+    if (startDate || endDate) {
+      baseFilter.startDate = {};
+      if (startDate) baseFilter.startDate.$gte = new Date(startDate);
+      if (endDate) baseFilter.startDate.$lte = new Date(endDate);
+    }
+
+    /**
+     * FETCH DATA
+     */
+    const projection = buildProjection(fields);
+    const [docs, total] = await Promise.all([
+      DiscountRule.find(baseFilter, projection)
+        .sort({ [sortBy]: sortDirection })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      DiscountRule.countDocuments(baseFilter),
+    ]);
 
     return res.status(200).json({
       success: true,
       status: 200,
       data: {
-        result,
+        result: docs,
         pagination: {
           page: parseInt(page),
-          totalPages,
-          total,
-          hasNext: parseInt(page) < totalPages,
-          hasPrev: parseInt(page) > 1,
           limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: skip + docs.length < total,
+          hasPrev: parseInt(page) > 1,
         },
       },
-      message: `Retrieved ${total} discount rules`,
+      message: `Retrieved ${docs.length} discount rules`,
     });
   } catch (err) {
     console.error('Error fetching discount rules:', err);
@@ -144,96 +200,189 @@ exports.checkoutWithDiscounts = async () => {
 
 exports.applyDiscountRule = async (req, res) => {
   try {
-    const ruleId = req.params.ruleId;
-    const rule = await DiscountRule.findById(ruleId);
-    if (!rule || !rule.isActive) throw new Error('Rule not found or inactive');
+    const { ruleId } = req.params;
 
-    // 🔍 Build the product query dynamically based on what’s defined in the rule
+    // 1️⃣ Fetch rule
+    const rule = await DiscountRule.findById(ruleId).lean();
+    if (!rule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Discount rule not found',
+      });
+    }
+
+    if (!rule.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount rule is inactive',
+      });
+    }
+
+    if (rule.in_use) {
+      return res.status(400).json({
+        success: false,
+        message: 'Discount rule is already applied',
+      });
+    }
+
+    // 2️⃣ Build product match conditions
     const orConditions = [];
-    if (rule.productIds?.length) orConditions.push({ _id: { $in: rule.productIds } });
-    if (rule.categoryIds?.length) orConditions.push({ category: { $in: rule.categoryIds } });
-    if (rule.brandIds?.length) orConditions.push({ brand: { $in: rule.brandIds } });
-    if (rule.tags?.length) orConditions.push({ tags: { $in: rule.tags } });
 
-    if (!orConditions.length) throw new Error('No applicable targets found in this rule');
+    if (rule.productIds?.length) {
+      orConditions.push({ _id: { $in: rule.productIds } });
+    }
 
-    const query = { $or: orConditions };
+    if (rule.categoryIds?.length) {
+      orConditions.push({ category: { $in: rule.categoryIds } });
+    }
 
-    // 🧮 MongoDB aggregation update for discount calculation
-    let update = {};
+    if (rule.brandIds?.length) {
+      orConditions.push({ brand: { $in: rule.brandIds } });
+    }
+
+    if (rule.tags?.length) {
+      orConditions.push({ tags: { $in: rule.tags } });
+    }
+
+    if (!orConditions.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'No applicable targets found in this rule',
+      });
+    }
+
+    const productQuery = {
+      $or: orConditions,
+      isDeleted: { $ne: true },
+    };
+
+    // 3️⃣ Build aggregation update pipeline
+    let updatePipeline;
+
     if (rule.discountType === 'percentage') {
-      update = [
+      updatePipeline = [
         {
           $set: {
-            finalPrice: {
-              $max: [{ $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }] }, 0],
-            },
-            salePrice: {
-              $max: [{ $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }] }, 0],
-            },
             discountType: rule.discountType,
             discountValue: rule.discountValue,
-            discount: { $multiply: ['$basePrice', rule.discountValue / 100] },
+            discount: {
+              $round: [{ $multiply: ['$basePrice', rule.discountValue / 100] }, 2],
+            },
+            finalPrice: {
+              $max: [
+                {
+                  $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }],
+                },
+                0,
+              ],
+            },
+            salePrice: {
+              $max: [
+                {
+                  $subtract: ['$basePrice', { $multiply: ['$basePrice', rule.discountValue / 100] }],
+                },
+                0,
+              ],
+            },
           },
         },
       ];
     } else if (rule.discountType === 'fixed') {
-      update = [
+      updatePipeline = [
         {
           $set: {
-            finalPrice: { $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0] },
-            salePrice: { $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0] },
             discountType: rule.discountType,
             discountValue: rule.discountValue,
             discount: rule.discountValue,
+            finalPrice: {
+              $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0],
+            },
+            salePrice: {
+              $max: [{ $subtract: ['$basePrice', rule.discountValue] }, 0],
+            },
           },
         },
       ];
     } else {
-      throw new Error('Invalid discount type');
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid discount type',
+      });
     }
 
-    // ⚙️ Fetch affected products (for tracking)
-    const affectedProducts = await Product.find(query, '_id');
-    if (!affectedProducts.length) return res.json({ success: false, message: 'No matching products found' });
+    // 4️⃣ Fetch affected products (for tracking)
+    const affectedProducts = await Product.find(productQuery, '_id').lean();
 
-    // 🧾 Apply the update
-    const result = await Product.updateMany(query, update);
+    if (!affectedProducts.length) {
+      return res.status(200).json({
+        success: false,
+        message: 'No matching products found',
+      });
+    }
 
-    // 🗂️ Track which products got this rule applied
+    // 5️⃣ Apply discount using aggregation pipeline update
+    const updateResult = await Product.updateMany(productQuery, updatePipeline, { updatePipeline: true });
+
+    // 6️⃣ Track applied discounts
     const appliedRecords = affectedProducts.map((p) => ({
       ruleId: rule._id,
       productId: p._id,
+      appliedAt: new Date(),
     }));
 
     await AppliedDiscount.insertMany(appliedRecords);
-    await DiscountRule.findByIdAndUpdate(ruleId, { in_use: true });
 
-    return res.json({
+    // 7️⃣ Mark rule as in use
+    await DiscountRule.findByIdAndUpdate(ruleId, {
+      in_use: true,
+    });
+
+    // 8️⃣ Success response
+    return res.status(200).json({
       success: true,
-      message: `Discount rule applied successfully to ${affectedProducts.length} products`,
-      modifiedCount: result.modifiedCount,
+      message: `Discount rule applied successfully`,
+      affectedProducts: affectedProducts.length,
+      modifiedCount: updateResult.modifiedCount,
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error('Apply Discount Rule Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error',
+    });
   }
 };
 
 exports.removeDiscountRule = async (req, res) => {
   try {
-    const ruleId = req.params.ruleId;
-    const rule = await DiscountRule.findById(ruleId);
-    if (!rule) throw new Error('Rule not found');
+    const { ruleId } = req.params;
 
-    // 🔍 Find all product IDs where this rule was applied
-    const applied = await AppliedDiscount.find({ ruleId, isActive: true });
+    // 1️⃣ Fetch rule
+    const rule = await DiscountRule.findById(ruleId);
+    if (!rule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Discount rule not found',
+      });
+    }
+
+    // 2️⃣ Find applied & active products
+    const applied = await AppliedDiscount.find({
+      ruleId,
+      isActive: true,
+    }).lean();
+
     const productIds = applied.map((a) => a.productId);
 
-    if (!productIds.length) return res.json({ success: false, message: 'No active products found for this rule' });
+    if (!productIds.length) {
+      return res.status(200).json({
+        success: false,
+        message: 'No active products found for this rule',
+      });
+    }
 
-    // ♻️ Reset product prices to base
-    const result = await Product.updateMany({ _id: { $in: productIds } }, [
+    // 3️⃣ Reset prices using aggregation pipeline update
+    const updatePipeline = [
       {
         $set: {
           finalPrice: '$basePrice',
@@ -243,19 +392,39 @@ exports.removeDiscountRule = async (req, res) => {
           discount: 0,
         },
       },
-    ]);
+    ];
 
-    // 🗂️ Mark AppliedDiscounts as inactive
-    await AppliedDiscount.updateMany({ ruleId, isActive: true }, { $set: { isActive: false, removedAt: new Date() } });
+    const result = await Product.updateMany(
+      { _id: { $in: productIds } },
+      updatePipeline,
+      { updatePipeline: true } // ✅ REQUIRED
+    );
 
-    await DiscountRule.findByIdAndUpdate(ruleId, {  in_use: false }, { new: true, runValidators: true });
+    // 4️⃣ Mark AppliedDiscount records as inactive
+    await AppliedDiscount.updateMany(
+      { ruleId, isActive: true },
+      {
+        $set: {
+          isActive: false,
+          removedAt: new Date(),
+        },
+      }
+    );
 
-    return res.json({
+    // 5️⃣ Mark rule as not in use
+    await DiscountRule.findByIdAndUpdate(ruleId, { in_use: false }, { new: true, runValidators: true });
+
+    // 6️⃣ Success response
+    return res.status(200).json({
       success: true,
       message: `Removed discount rule from ${result.modifiedCount} products`,
+      modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error('Remove Discount Rule Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error',
+    });
   }
 };
