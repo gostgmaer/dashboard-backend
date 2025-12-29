@@ -84,7 +84,7 @@ class MasterController {
         type,
         tenantId,
         domain,
-        isActive: isActive === 'true',
+        isActive: isArchive === 'true' ? false : isActive === 'false' ? false : true,
         includeDeleted: isArchive === 'true',
         fields,
       });
@@ -129,12 +129,12 @@ class MasterController {
       const { id } = req.params;
       const payload = req.body;
 
-      const doc = await MasterService.updateById(id, payload,req.user);
+      const doc = await MasterService.updateById(id, payload, req.user);
 
       if (!doc) {
         return next(new AppError(404, 'Master record not found'));
       }
-     standardResponse(res, true, null, `Master Record Update Successfull!`, 200);
+      standardResponse(res, true, null, `Master Record Update Successfull!`, 200);
     } catch (error) {
       next(error);
     }

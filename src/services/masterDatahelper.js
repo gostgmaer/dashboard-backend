@@ -165,13 +165,13 @@ class MasterService {
     };
   }
 
-  async getList({ page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search = '', type, tenantId, domain, isActive = false, includeDeleted = false, fields = null }) {
+  async getList({ page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search = '', type, tenantId, domain, isActive , includeDeleted, fields = null }) {
     const skip = (page - 1) * limit;
     const sortDirection = sortOrder === 'desc' ? -1 : 1;
 
     const baseFilter = {
       isActive: isActive,
-      isDeleted: includeDeleted ? true : false,
+      isDeleted: includeDeleted,
     };
 
     if (type) baseFilter.type = type.toUpperCase();
