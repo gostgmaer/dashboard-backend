@@ -355,18 +355,34 @@ exports.applyDiscountRule = async (req, res) => {
 
 exports.removeDiscountRule = async (req, res) => {
   try {
-    const ruleId = req.params.ruleId;
-    const rule = await DiscountRule.findById(ruleId);
-    if (!rule) throw new Error('Rule not found');
+    const { ruleId } = req.params;
 
-    // 🔍 Find all product IDs where this rule was applied
-    const applied = await AppliedDiscount.find({ ruleId, isActive: true });
+    // 1️⃣ Fetch rule
+    const rule = await DiscountRule.findById(ruleId);
+    if (!rule) {
+      return res.status(404).json({
+        success: false,
+        message: 'Discount rule not found',
+      });
+    }
+
+    // 2️⃣ Find applied & active products
+    const applied = await AppliedDiscount.find({
+      ruleId,
+      isActive: true,
+    }).lean();
+
     const productIds = applied.map((a) => a.productId);
 
-    if (!productIds.length) return res.json({ success: false, message: 'No active products found for this rule' });
+    if (!productIds.length) {
+      return res.status(200).json({
+        success: false,
+        message: 'No active products found for this rule',
+      });
+    }
 
-    // ♻️ Reset product prices to base
-    const result = await Product.updateMany({ _id: { $in: productIds } }, [
+    // 3️⃣ Reset prices using aggregation pipeline update
+    const updatePipeline = [
       {
         $set: {
           finalPrice: '$basePrice',
@@ -376,19 +392,39 @@ exports.removeDiscountRule = async (req, res) => {
           discount: 0,
         },
       },
-    ]);
+    ];
 
-    // 🗂️ Mark AppliedDiscounts as inactive
-    await AppliedDiscount.updateMany({ ruleId, isActive: true }, { $set: { isActive: false, removedAt: new Date() } });
+    const result = await Product.updateMany(
+      { _id: { $in: productIds } },
+      updatePipeline,
+      { updatePipeline: true } // ✅ REQUIRED
+    );
 
+    // 4️⃣ Mark AppliedDiscount records as inactive
+    await AppliedDiscount.updateMany(
+      { ruleId, isActive: true },
+      {
+        $set: {
+          isActive: false,
+          removedAt: new Date(),
+        },
+      }
+    );
+
+    // 5️⃣ Mark rule as not in use
     await DiscountRule.findByIdAndUpdate(ruleId, { in_use: false }, { new: true, runValidators: true });
 
-    return res.json({
+    // 6️⃣ Success response
+    return res.status(200).json({
       success: true,
       message: `Removed discount rule from ${result.modifiedCount} products`,
+      modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error('Remove Discount Rule Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error',
+    });
   }
 };
