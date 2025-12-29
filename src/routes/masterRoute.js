@@ -62,11 +62,11 @@ router.patch('/:id', authMiddleware, validateIdParam, validatePartialUpdate, val
 router.put('/type/:type/bulk', authMiddleware, param('type').isString().notEmpty().isLength({ max: 50 }), query('tenantId').optional().isString().isLength({ max: 100 }), validateBulkUpdateByType, validateRequest, masterController.bulkUpdateByType);
 // UPDATE - Bulk by Type
 router.patch('/type/:type/bulk', authMiddleware, param('type').isString().notEmpty().isLength({ max: 50 }), query('tenantId').optional().isString().isLength({ max: 100 }), validateBulkUpdateByType, validateRequest, masterController.bulkUpdateByType);
+// DELETE - Bulk Soft Delete
+router.delete('/bulk', authMiddleware, validateIdsArray, validateRequest, masterController.bulkDeleteByIds);
 
 // DELETE - Single Soft Delete
 router.delete('/:id', authMiddleware, validateIdParam, validateRequest, masterController.softDeleteById);
 
-// DELETE - Bulk Soft Delete
-router.delete('/bulk', authMiddleware, validateIdsArray, validateRequest, masterController.bulkDeleteByIds);
 
 module.exports = { masterRoute: router };
