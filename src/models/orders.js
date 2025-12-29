@@ -77,26 +77,8 @@ const orderSchema = new mongoose.Schema(
       required: [true, "Phone number is required"],
       match: [/^\+?[\d\s-]{10,}$/, "Please provide a valid phone number"],
     },
-    shippingAddress: {
-      addressLine1: { type: String, required: true, trim: true },
-      addressLine2: { type: String, trim: true },
-      city: { type: String, required: [true, "City is required"], trim: true },
-      state: { type: String, trim: true },
-      postalCode: {
-        type: String,
-        required: [true, "Postal code is required"],
-        trim: true,
-      },
-      country: { type: String, required: [true, "Country is required"], trim: true },
-    },
-    billingAddress: {
-      addressLine1: { type: String, trim: true },
-      addressLine2: { type: String, trim: true },
-      city: { type: String, trim: true },
-      state: { type: String, trim: true },
-      postalCode: { type: String, trim: true },
-      country: { type: String, trim: true },
-    },
+    shippingAddress: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
+    billingAddress: { type: mongoose.Schema.Types.ObjectId, ref: "Address" },
     shippingMethod: {
       type: String,
       enum: ["standard", "express", "overnight", "pickup"],
