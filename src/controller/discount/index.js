@@ -5,6 +5,35 @@ const PromoCode = require('../../models/Coupon');
 const { priceWithRules, applyPromoCode, applyDiscountsAtCheckout } = require('../../services/discount');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 const Product = require('../../models/products');
+
+const DEFAULT_EXCLUDE_FIELDS = ['isDeleted', 'metadata', 'created_by', 'updated_by'];
+
+const  buildProjection=(fields) =>{
+    if (!fields) {
+      // Exclude sensitive fields by default
+      const projection = {};
+      DEFAULT_EXCLUDE_FIELDS.forEach((field) => {
+        projection[field] = 0;
+      });
+      return projection;
+    }
+
+    // Include only requested fields (comma-separated or array)
+    if (typeof fields === 'string') {
+      fields = fields.split(',');
+    }
+
+    const projection = {};
+    fields.forEach((field) => {
+      const trimmed = field.trim();
+      // Always exclude these keys even if requested
+      if (!DEFAULT_EXCLUDE_FIELDS.includes(trimmed)) {
+        projection[trimmed] = 1;
+      }
+    });
+
+    return projection;
+  }
 // Create or update a discount rule
 exports.upsertDiscountRule = async (req, res) => {
   try {
@@ -23,44 +52,71 @@ exports.upsertDiscountRule = async (req, res) => {
 // List discount rules with pagination and filters
 exports.listDiscountRules = async (req, res) => {
   try {
-    const { page = 1, limit = 10, activeOnly = 'false', search = '' } = req.query;
-
-    const query = {};
-
-    // Filter for active rules if requested
-    if (activeOnly === 'true') query.isActive = true;
-
-    // Optional search (e.g., by name or description)
-    if (search) {
-      query.$or = [{ name: { $regex: search, $options: 'i' } }, { description: { $regex: search, $options: 'i' } }];
-    }
+    const { page = 1, limit = 10, sortBy = 'priority', sortOrder = 'asc', search = '', isActive, isArchive, discountType, productId, categoryId, brandId, startDate, endDate,fields } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const sortDirection = sortOrder === 'desc' ? -1 : 1;
 
-    // Count total matching records
-    const total = await DiscountRule.countDocuments(query);
+    /**
+     * BASE FILTER (same logic style as reference)
+     */
+    const baseFilter = {
+      ...(typeof isActive !== 'undefined' && { isActive: isActive === 'true' }),
+      ...(typeof isArchive !== 'undefined' ? { isDeleted: isArchive === 'true' } : { isDeleted: false }),
+    };
 
-    // Fetch rules with pagination
-    const result = await DiscountRule.find(query).sort({ priority: 1, startDate: -1 }).skip(skip).limit(parseInt(limit));
+    /**
+     * SEARCH
+     */
+    if (search) {
+      baseFilter.$or = [{ name: { $regex: search, $options: 'i' } },{ discountType: { $regex: search, $options: 'i' } }, { description: { $regex: search, $options: 'i' } }, { tags: { $regex: search, $options: 'i' } }];
+    }
 
-    // Pagination details
-    const totalPages = Math.ceil(total / parseInt(limit));
+    /**
+     * FILTERS
+     */
+    if (discountType) baseFilter.discountType = discountType;
+    if (productId) baseFilter.productIds = productId;
+    if (categoryId) baseFilter.categoryIds = categoryId;
+    if (brandId) baseFilter.brandIds = brandId;
+
+    /**
+     * DATE RANGE FILTER
+     */
+    if (startDate || endDate) {
+      baseFilter.startDate = {};
+      if (startDate) baseFilter.startDate.$gte = new Date(startDate);
+      if (endDate) baseFilter.startDate.$lte = new Date(endDate);
+    }
+
+    /**
+     * FETCH DATA
+     */
+    const projection = buildProjection(fields);
+    const [docs, total] = await Promise.all([
+      DiscountRule.find(baseFilter,projection)
+        .sort({ [sortBy]: sortDirection })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      DiscountRule.countDocuments(baseFilter),
+    ]);
 
     return res.status(200).json({
       success: true,
       status: 200,
       data: {
-        result,
+        result: docs,
         pagination: {
           page: parseInt(page),
-          totalPages,
-          total,
-          hasNext: parseInt(page) < totalPages,
-          hasPrev: parseInt(page) > 1,
           limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNext: skip + docs.length < total,
+          hasPrev: parseInt(page) > 1,
         },
       },
-      message: `Retrieved ${total} discount rules`,
+      message: `Retrieved ${docs.length} discount rules`,
     });
   } catch (err) {
     console.error('Error fetching discount rules:', err);
@@ -248,7 +304,7 @@ exports.removeDiscountRule = async (req, res) => {
     // 🗂️ Mark AppliedDiscounts as inactive
     await AppliedDiscount.updateMany({ ruleId, isActive: true }, { $set: { isActive: false, removedAt: new Date() } });
 
-    await DiscountRule.findByIdAndUpdate(ruleId, {  in_use: false }, { new: true, runValidators: true });
+    await DiscountRule.findByIdAndUpdate(ruleId, { in_use: false }, { new: true, runValidators: true });
 
     return res.json({
       success: true,
