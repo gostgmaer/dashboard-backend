@@ -41,7 +41,7 @@ export const blobServiceClient = storageType === "azure" ? BlobServiceClient.fro
 export const upload = multer({
     storage: storageType === "local" ? multer.diskStorage({
         destination: (req, file, cb) => cb(null, localStoragePath),
-        filename: (req, file, cb) => cb(null, `${await generateUUID();}${path.extname(file.originalname)}`),
+        filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
     }) : multer.memoryStorage(),
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
     fileFilter: (req, file, cb) => {

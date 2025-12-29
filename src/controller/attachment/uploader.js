@@ -46,7 +46,7 @@ if (storageType === 'firebase' || storageType === 'local') {
  const upload = multer({
     storage: storageType === "local" ? multer.diskStorage({
         destination: (req, file, cb) => cb(null, localStoragePath),
-        filename: (req, file, cb) => cb(null, `${await generateUUID();}${path.extname(file.originalname)}`),
+        filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`),
     }) : multer.memoryStorage(),
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
@@ -91,7 +91,7 @@ exports.uploadFile = [
             const { tenantId, _id } = req.user; // From auth middleware
             const file = req.file;
             const fileExtension = path.extname(file.originalname).toLowerCase().replace('.', '');
-            const fileName = `${await generateUUID();}${fileExtension ? `.${fileExtension}` : ''}`;
+            const fileName = `${uuidv4()}${fileExtension ? `.${fileExtension}` : ''}`;
             let fileUrl, storagePath;
 
             // Handle file upload based on storage type
@@ -291,7 +291,7 @@ exports.renameFile = async (req, res, next) => {
         let newStoragePath = attachment.storagePath;
 
         if (storageType !== 'local') {
-            newStoragePath = `tenants/${tenantId}/${await generateUUID();}.${fileExtension}`;
+            newStoragePath = `tenants/${tenantId}/${uuidv4()}.${fileExtension}`;
             switch (storageType) {
                 case 'firebase':
                     const oldRef = ref(firebaseStorage, attachment.storagePath);
@@ -337,7 +337,7 @@ exports.renameFile = async (req, res, next) => {
         } else {
             // Rename locally
             const oldPath = attachment.storagePath;
-            newStoragePath = path.join(localStoragePath, `${await generateUUID();}.${fileExtension}`);
+            newStoragePath = path.join(localStoragePath, `${uuidv4()}.${fileExtension}`);
             await fs.rename(oldPath, newStoragePath);
             fileUrl = `${req.protocol}://${req.get('host')}/uploads/${path.basename(newStoragePath)}`;
         }
