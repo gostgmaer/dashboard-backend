@@ -1,15 +1,14 @@
 const FileService = require('../../services/FileService');
-// const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid');
 
 // const logger = require('../utils/logger');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
-const { generateUUID } = require('../../utils/helper');
 // Create a single instance of FileService
 const fileService = new FileService();
 
 // Upload files handler
 const uploadFiles = async (req, res, next) => {
-  const requestId = await generateUUID();;
+  const requestId = uuidv4();
 
   try {
     if (!req.files || req.files.length === 0) {
@@ -135,7 +134,7 @@ const downloadFile = async (req, res, next) => {
 
 // Update file metadata handler
 const updateFileMetadata = async (req, res, next) => {
-  const requestId =  await generateUUID();
+  const requestId = uuidv4();
 
   try {
     const { id } = req.params;
@@ -156,7 +155,7 @@ const updateFileMetadata = async (req, res, next) => {
 
 // Replace file content handler
 const replaceFileContent = async (req, res, next) => {
-  const requestId = await generateUUID();;
+  const requestId = uuidv4();
 
   try {
     const { id } = req.params;
@@ -183,7 +182,7 @@ const replaceFileContent = async (req, res, next) => {
 
 // Delete file handler
 const deleteFile = async (req, res, next) => {
-  const requestId = await generateUUID();;
+  const requestId = uuidv4();
 
   try {
     const { id } = req.params;
