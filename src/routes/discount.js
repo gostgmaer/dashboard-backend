@@ -167,7 +167,6 @@
   // GET /api/discount/rules - List discount rules
   discountRoute.get('/rules',
     authMiddleware,
-
     discountValidation.query,
     ctrl.listDiscountRules
   );

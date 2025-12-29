@@ -161,13 +161,25 @@ class ProductController {
    */
   static async getProducts(req, res) {
     try {
-      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
+      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search,  isActive,
+      isArchive, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
 
       page = Number(page);
       limit = Number(limit);
 
       // --- Filters ---
       const filters = { deletedAt: { $exists: false } };
+
+      if (isArchive === 'true') {
+      filters.isDeleted = true;
+      filters.isActive = false;
+    } else {
+      filters.isDeleted = isArchive === 'true' ? { $in: [true, false] } : false;
+      filters.isActive =
+        isActive === 'false'
+          ? false
+          : true; // default active
+    }
 
       if (status) filters.status = status;
       if (productType) filters.productType = productType;
@@ -210,7 +222,7 @@ class ProductController {
 
       // --- Search ---
       if (search) {
-        filters.$or = [{ title: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { tags: { $regex: search, $options: 'i' } }, { 'descriptions.short': { $regex: search, $options: 'i' } }];
+        filters.$or = [{ title: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { tags: { $regex: search, $options: 'i' } }, { 'descriptions.short': { $regex: search, $options: 'i' } }, { productType: { $regex: search, $options: 'i' } }];
       }
 
       // --- Sort ---
@@ -433,49 +445,100 @@ class ProductController {
   /**
    * DELETE PRODUCT - soft delete with archive
    */
+
   static async deleteProduct(req, res) {
     try {
       const { id } = req.params;
-      const { permanent = false } = req.query;
+      const userId = req.user?._id; // optional (from auth middleware)
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
-        return errorResponse(res, 'Invalid product ID format', 400);
-      }
-
-      const product = await Product.findById(id);
-      if (!product) {
-        return errorResponse(res, 'Product not found', 404);
-      }
-
-      let result;
-      if (permanent === 'true') {
-        // Permanent delete
-        result = await Product.findOneAndDelete({
-          _id: id,
-          deletedAt: { $exists: false },
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Product ID is required',
         });
-      } else {
-        // Soft delete using model method
-        await Product.bulkDelete([id]);
-        result = { _id: id };
       }
 
-      res.locals.product = result;
-      // Using manual logging with detailed info
-      await ActivityHelper.logCRUD(req, 'product', 'Update', {
-        id: product._id,
-        name: product.title,
-        category: product.category,
-        price: product.price,
+      const deletedProduct = await Product.findOneAndUpdate(
+        {
+          _id: id,
+          isDeleted: { $ne: true }, // prevent double delete
+        },
+        {
+          $set: {
+            isDeleted: true,
+            isActive: false,
+            status: 'archived',
+            isAvailable: false,
+            updated_by: userId || null,
+          },
+        },
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
+
+      if (!deletedProduct) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found or already deleted',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Product soft deleted successfully',
+        data: deletedProduct,
       });
-      await NotificationMiddleware.onProductDeleted(req, res, () => {});
-      return standardResponse(res, true, { id: result._id }, permanent === 'true' ? 'Product permanently deleted' : 'Product deleted successfully');
     } catch (error) {
-      console.error('Failed to delete product:', error);
-      return errorResponse(res, 'Failed to delete product', 500, error.message);
+      console.error('Soft Delete Product Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Internal server error',
+      });
     }
   }
 
+  static async restoreProduct(req, res) {
+    try {
+      const { id } = req.params;
+
+      const restored = await Product.findOneAndUpdate(
+        {
+          _id: id,
+          isDeleted: true,
+        },
+        {
+          $set: {
+            isDeleted: false,
+            isActive: true,
+            status: 'active',
+            isAvailable: true,
+          },
+        },
+        { new: true }
+      );
+
+      if (!restored) {
+        return res.status(404).json({
+          success: false,
+          message: 'Product not found or not deleted',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Product restored successfully',
+        data: restored,
+      });
+    } catch (error) {
+      console.error('Restore Product Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
   // ========================================
   // 📦 BULK OPERATIONS
   // ========================================
@@ -498,10 +561,13 @@ class ProductController {
 
       let result;
       if (permanent) {
-        result = await Product.deleteMany({
-          _id: { $in: validIds },
-          deletedAt: { $exists: false },
-        });
+        result = await Product.deleteMany(
+          {
+            _id: { $in: validIds },
+            deletedAt: { $exists: false },
+          },
+          req.body.user._id
+        );
       } else {
         await Product.bulkDelete(validIds);
         result = { deletedCount: validIds.length };

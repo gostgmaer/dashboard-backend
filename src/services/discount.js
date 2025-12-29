@@ -15,25 +15,23 @@ function isWithin(now, start, end) {
 
 // Matchers
 function matchesRuleTargets(rule, product) {
-  const inProducts = rule.productIds?.some(id => id.equals(product._id));
-  const inCategories = rule.categoryIds?.some(id => product.categories?.some(cid => cid.equals(id)));
-  const inBrand = rule.brandIds?.some(id => product.brand && id.equals(product.brand));
-  const tagMatched = rule.tags?.some(t => product.tags?.includes(t));
+  const inProducts = rule.productIds?.some((id) => id.equals(product._id));
+  const inCategories = rule.categoryIds?.some((id) => product.categories?.some((cid) => cid.equals(id)));
+  const inBrand = rule.brandIds?.some((id) => product.brand && id.equals(product.brand));
+  const tagMatched = rule.tags?.some((t) => product.tags?.includes(t));
 
-  const stockOk = (!rule.minStock || product.stock >= rule.minStock) &&
-    (!rule.maxStock || product.stock <= rule.maxStock);
-  const priceOk = (!rule.minPrice || product.price >= rule.minPrice) &&
-    (!rule.maxPrice || product.price <= rule.maxPrice);
+  const stockOk = (!rule.minStock || product.stock >= rule.minStock) && (!rule.maxStock || product.stock <= rule.maxStock);
+  const priceOk = (!rule.minPrice || product.price >= rule.minPrice) && (!rule.maxPrice || product.price <= rule.maxPrice);
 
   return (inProducts || inCategories || inBrand || tagMatched) && stockOk && priceOk;
 }
 
 function matchesPromoTargets(promo, product) {
-  const inProducts = promo.productIds?.some(id => id.equals(product._id));
-  const inCategories = promo.categoryIds?.some(id => product.categories?.some(cid => cid.equals(id)));
-  const inBrand = promo.brandIds?.some(id => product.brand && id.equals(product.brand));
-  const tagMatched = promo.tags?.some(t => product.tags?.includes(t));
-  return (inProducts || inCategories || inBrand || tagMatched);
+  const inProducts = promo.productIds?.some((id) => id.equals(product._id));
+  const inCategories = promo.categoryIds?.some((id) => product.categories?.some((cid) => cid.equals(id)));
+  const inBrand = promo.brandIds?.some((id) => product.brand && id.equals(product.brand));
+  const tagMatched = promo.tags?.some((t) => product.tags?.includes(t));
+  return inProducts || inCategories || inBrand || tagMatched;
 }
 
 /**
@@ -45,15 +43,17 @@ exports.priceWithRules = async ({ items }) => {
   const now = new Date();
 
   const [products, rules] = await Promise.all([
-    Product.find({ _id: { $in: items.map(i => i.productId) } }).lean(),
+    Product.find({ _id: { $in: items.map((i) => i.productId) } }).lean(),
     DiscountRule.find({
       isActive: true,
       startDate: { $lte: now },
-      endDate: { $gte: now }
-    }).sort({ priority: 1 }).lean()
+      endDate: { $gte: now },
+    })
+      .sort({ priority: 1 })
+      .lean(),
   ]);
 
-  const productMap = new Map(products.map(p => [String(p._id), p]));
+  const productMap = new Map(products.map((p) => [String(p._id), p]));
 
   let cartSubtotal = 0;
   let cartDiscountTotal = 0;
@@ -81,7 +81,7 @@ exports.priceWithRules = async ({ items }) => {
           type: rule.discountType,
           value: rule.discountValue,
           before: lineFinalPrice,
-          after: newPrice
+          after: newPrice,
         });
         lineFinalPrice = newPrice;
         if (rule.exclusive) {
@@ -107,7 +107,7 @@ exports.priceWithRules = async ({ items }) => {
       lineSubtotal,
       lineTotal,
       lineDiscount,
-      appliedRules
+      appliedRules,
     });
   }
 
@@ -115,7 +115,7 @@ exports.priceWithRules = async ({ items }) => {
     items: lineItems,
     cartSubtotal,
     cartDiscountFromRules: cartDiscountTotal,
-    cartTotalAfterRules: cartSubtotal - cartDiscountTotal
+    cartTotalAfterRules: cartSubtotal - cartDiscountTotal,
   };
 };
 
@@ -129,7 +129,7 @@ exports.applyPromoCode = async ({ code, customerId, items }) => {
     code: code.toUpperCase(),
     isActive: true,
     startDate: { $lte: now },
-    endDate: { $gte: now }
+    endDate: { $gte: now },
   });
 
   if (!promo) {
@@ -143,8 +143,8 @@ exports.applyPromoCode = async ({ code, customerId, items }) => {
   const priced = await exports.priceWithRules({ items });
 
   // Fetch products to check targets
-  const products = await Product.find({ _id: { $in: items.map(i => i.productId) } }).lean();
-  const productMap = new Map(products.map(p => [String(p._id), p]));
+  const products = await Product.find({ _id: { $in: items.map((i) => i.productId) } }).lean();
+  const productMap = new Map(products.map((p) => [String(p._id), p]));
 
   let promoDiscountTotal = 0;
   const promoApplications = [];
@@ -167,7 +167,7 @@ exports.applyPromoCode = async ({ code, customerId, items }) => {
         before,
         after,
         unitPromoDiscount,
-        linePromoDiscount
+        linePromoDiscount,
       });
 
       // modify the priced view for final totals
@@ -188,12 +188,12 @@ exports.applyPromoCode = async ({ code, customerId, items }) => {
       code: promo.code,
       discountType: promo.discountType,
       discountValue: promo.discountValue,
-      exclusive: promo.exclusive
+      exclusive: promo.exclusive,
     },
     ...priced,
     promoDiscountTotal,
     cartTotalAfterPromo,
-    promoApplications
+    promoApplications,
   };
 };
 
@@ -203,47 +203,79 @@ exports.applyPromoCode = async ({ code, customerId, items }) => {
  * - Update promo usage (atomic)
  * - Optionally reduce stock here or in order service
  */
+
 exports.applyDiscountsAtCheckout = async ({ session, order }) => {
-  // order: { items: [{ productId, quantity }], promoCode, customerId }
-  const items = order.items;
-  const hasPromo = Boolean(order.promoCode);
+  if (!order || !Array.isArray(order.items) || !order.items.length) {
+    throw new Error('Invalid order or empty items');
+  }
+
+  const { items, promoCode, customerId } = order;
+  const hasPromo = Boolean(promoCode);
 
   let pricing;
+
+  /**
+   * 1️⃣ Apply pricing rules or promo code
+   */
   if (hasPromo) {
     pricing = await exports.applyPromoCode({
-      code: order.promoCode,
-      customerId: order.customerId,
-      items
+      code: promoCode,
+      customerId,
+      items,
+      session, // pass session through if promo logic writes
     });
   } else {
     pricing = await exports.priceWithRules({ items });
+
     pricing.promoDiscountTotal = 0;
     pricing.cartTotalAfterPromo = pricing.cartTotalAfterRules;
   }
 
-  // If promo exists, increment usage in the same transaction
+  /**
+   * 2️⃣ Increment promo usage safely (transactional)
+   */
   if (hasPromo) {
     const now = new Date();
-    const updated = await PromoCode.updateOne(
+
+    const promoUpdateResult = await PromoCode.updateOne(
       {
-        code: order.promoCode.toUpperCase(),
+        code: promoCode.toUpperCase(),
         isActive: true,
         startDate: { $lte: now },
         endDate: { $gte: now },
+
+        // usage limit checks
         $or: [
-          { globalUsageLimit: { $exists: false } },
+          { globalUsageLimit: { $exists: false } }, // unlimited
+          { globalUsageLimit: 0 }, // unlimited
           { $expr: { $gt: ['$globalUsageLimit', '$usedCount'] } },
-          { globalUsageLimit: 0 } // unlimited if you treat 0 as unlimited
-        ]
+        ],
       },
-      { $inc: { usedCount: 1 } },
+      {
+        $inc: { usedCount: 1 },
+        $set: { lastUsedAt: now },
+      },
       { session }
     );
 
-    if (updated.modifiedCount === 0) {
-      throw new Error('Promo usage could not be updated (limit reached or invalid).');
+    if (promoUpdateResult.modifiedCount === 0) {
+      throw new Error('Promo code is invalid, expired, or usage limit reached');
     }
   }
 
-  return pricing;
+  /**
+   * 3️⃣ Final pricing sanity checks
+   */
+  if (pricing.cartTotalAfterPromo < 0 || pricing.cartTotalAfterRules < 0) {
+    throw new Error('Invalid pricing calculation');
+  }
+
+  /**
+   * 4️⃣ Return pricing snapshot (immutable)
+   */
+  return {
+    ...pricing,
+    appliedPromo: hasPromo ? promoCode.toUpperCase() : null,
+    pricedAt: new Date(),
+  };
 };

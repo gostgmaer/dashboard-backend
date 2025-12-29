@@ -197,11 +197,18 @@ router.put('/:id',
 // DELETE /api/products/:id - Delete product (soft delete by default)
 router.delete('/:id',
   authMiddleware,
-
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
   ProductController.deleteProduct
+);
+
+router.post('/restore/:id',
+  authMiddleware,
+  instanceCheckMiddleware,
+  param('id').isMongoId().withMessage('Invalid product ID'),
+  validate,
+  ProductController.restoreProduct
 );
 
 // ========================================
@@ -211,7 +218,6 @@ router.delete('/:id',
 // DELETE /api/products/bulk/delete - Bulk delete products
 router.delete('/bulk/delete',
   authMiddleware,
-
   bulkOperationLimiter,
   body('ids').isArray({ min: 1 }).withMessage('Product IDs array is required'),
   body('ids.*').isMongoId().withMessage('Invalid product ID in array'),
