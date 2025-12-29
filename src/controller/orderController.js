@@ -1,67 +1,36 @@
-
-
-
-const { validationResult } = require("express-validator");
+const { validationResult } = require('express-validator');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 
-
-
-
-
-
-const Order = require("../models/orders");
-const Product = require("../models/products");
-const mongoose = require("mongoose");
+const Order = require('../models/orders');
+const Product = require('../models/products');
+const mongoose = require('mongoose');
 
 class OrderController {
-  constructor() { }
+  constructor() {}
 
   handleError(res, error, status = 400) {
-    return res.status(status).json({ error: error.message || "An error occurred" });
+    return res.status(status).json({ error: error.message || 'An error occurred' });
   }
 
   isValidObjectId(id) {
     return mongoose.Types.ObjectId.isValid(id);
   }
 
-
-
   //---------------------------------------------------------------
   // CORE CRUD OPERATIONS
   //---------------------------------------------------------------
 
-
   // Create order
   async createOrder(req, res) {
     try {
-      const {
-        user,
-        email,
-        firstName,
-        lastName,
-        phone,
-        shippingAddress,
-        billingAddress,
-        shippingMethod,
-        shippingPrice,
-        items,
-        additionalNotes,
-        couponCode,
-        payment_method,
-        orderSource,
-        ipAddress,
-        deviceInfo,
-        utmParameters,
-        created_by
-      } = req.body;
+      const { user, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, items, additionalNotes, couponCode, payment_method, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
 
-      if (!this.isValidObjectId(user)) throw new Error("Invalid user ID");
-      if (!email || !email.match(/^\S+@\S+\.\S+$/)) throw new Error("Valid email is required");
-      if (!firstName || !lastName) throw new Error("First and Last name required");
-      if (!phone || !phone.match(/^\+?[\d\s-]{10,}$/)) throw new Error("Valid phone number is required");
-      if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city || !shippingAddress.postalCode || !shippingAddress.country)
-        throw new Error("Complete shipping address is required");
-      if (!Array.isArray(items) || items.length === 0) throw new Error("At least one order item required");
+      if (!this.isValidObjectId(user)) throw new Error('Invalid user ID');
+      if (!email || !email.match(/^\S+@\S+\.\S+$/)) throw new Error('Valid email is required');
+      if (!firstName || !lastName) throw new Error('First and Last name required');
+      if (!phone || !phone.match(/^\+?[\d\s-]{10,}$/)) throw new Error('Valid phone number is required');
+      if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city || !shippingAddress.postalCode || !shippingAddress.country) throw new Error('Complete shipping address is required');
+      if (!Array.isArray(items) || items.length === 0) throw new Error('At least one order item required');
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
@@ -72,8 +41,8 @@ class OrderController {
         if (!product) throw new Error(`Product not found for item ${i}`);
         if (product.stock < item.quantity) throw new Error(`Insufficient stock for product ${product._id}`);
 
-        item.price = typeof item.price === "number" && item.price >= 0 ? item.price : product.price;
-        item.discount = typeof item.discount === "number" && item.discount >= 0 ? item.discount : 0;
+        item.price = typeof item.price === 'number' && item.price >= 0 ? item.price : product.price;
+        item.discount = typeof item.discount === 'number' && item.discount >= 0 ? item.discount : 0;
       }
 
       const order = new Order({
@@ -84,19 +53,19 @@ class OrderController {
         phone: phone.trim(),
         shippingAddress,
         billingAddress,
-        shippingMethod: shippingMethod || "standard",
+        shippingMethod: shippingMethod || 'standard',
         shippingPrice: shippingPrice || 0,
         items,
-        additionalNotes: additionalNotes ? additionalNotes.trim() : "",
-        couponCode: couponCode ? couponCode.trim() : "",
+        additionalNotes: additionalNotes ? additionalNotes.trim() : '',
+        couponCode: couponCode ? couponCode.trim() : '',
         payment_method,
         orderSource,
         ipAddress,
         deviceInfo,
         utmParameters,
         created_by,
-        payment_status: "unpaid",
-        status: "pending",
+        payment_status: 'unpaid',
+        status: 'pending',
         subtotal: 0,
         taxAmount: 0,
         discountAmount: 0,
@@ -104,7 +73,7 @@ class OrderController {
         loyaltyPointsRedeemed: 0,
         amount_paid: 0,
         amount_due: 0,
-        currency: "INR"
+        currency: 'INR',
       });
 
       if (couponCode) {
@@ -113,7 +82,7 @@ class OrderController {
 
       await order.save();
 
-      return res.status(201).json({ message: "Order created successfully", order_id: order.order_id, invoice: order.invoice });
+      return res.status(201).json({ message: 'Order created successfully', order_id: order.order_id, invoice: order.invoice });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -126,13 +95,13 @@ class OrderController {
 
       let order = null;
       if (this.isValidObjectId(id)) {
-        order = await Order.findById(id).populate("items.product").populate("user", "firstName lastName email");
+        order = await Order.findById(id).populate('items.product').populate('user', 'firstName lastName email');
       }
       if (!order) {
-        order = await Order.findOne({ order_id: id }).populate("items.product").populate("user", "firstName lastName email");
+        order = await Order.findOne({ order_id: id }).populate('items.product').populate('user', 'firstName lastName email');
       }
 
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       return res.json(order);
     } catch (error) {
@@ -145,88 +114,178 @@ class OrderController {
 
   async getOrders(req, res) {
     try {
-      let { page = 1, limit = 20, sort = "createdAt", order = "desc", ...filters } = req.query;
+      let {
+        page = 1,
+        limit = 10,
+        sort = 'createdAt',
+        order = 'desc',
+        search,
 
-      page = parseInt(page);
-      limit = parseInt(limit);
-      order = order.toLowerCase() === "asc" ? 1 : -1;
+        status,
+        payment_status,
+        payment_method,
+        orderSource,
+        priorityLevel,
 
-      // Fields that support multiple values separated by commas
-      const multiValueFields = ["status", "payment_status", "orderSource", "priorityLevel"];
+        user,
+        email,
+        customerName,
+        dateFrom,
+        dateTo,
+      } = req.query;
 
-      const filter = {};
+      page = Number(page);
+      limit = Number(limit);
 
-      // Process multi-value filters (e.g., status=pending,completed)
-      multiValueFields.forEach(field => {
-        if (filters[field]) {
-          const values = filters[field].split(",").map(v => v.trim());
-          filter[field] = { $in: values };
-          delete filters[field]; // Remove so no duplicate processing
-        }
-      });
+      /* -------------------------
+       Filters
+    ------------------------- */
+      const filters = {};
+      const orConditions = [];
 
-      // Handle user filter (single or multi)
-      if (filters.user) {
-        const users = filters.user.split(",").filter(id => this.isValidObjectId(id));
-        if (users.length) {
-          filter.user = { $in: users };
-        }
-        delete filters.user;
+      /* -------------------------
+       Multi-value filters (SINGLE HANDLER)
+    ------------------------- */
+      const applyMultiValueFilters = (fields, target) => {
+        Object.entries(fields).forEach(([key, value]) => {
+          if (!value) return;
+
+          target[key] = value.includes(',') ? { $in: value.split(',').map((v) => v.trim()) } : value.trim();
+        });
+      };
+
+      applyMultiValueFilters(
+        {
+          status,
+          payment_status,
+          payment_method,
+          orderSource,
+          priorityLevel,
+        },
+        filters
+      );
+
+      /* -------------------------
+       User filter
+    ------------------------- */
+      if (user) {
+        const users = user.split(',').filter((id) => this.isValidObjectId(id));
+        if (users.length) filters.user = { $in: users };
       }
 
-      // Text search on email or name if specified
-      if (filters.email) {
-        filter.email = { $regex: filters.email.trim(), $options: "i" };
-        delete filters.email;
+      /* -------------------------
+       Email filter
+    ------------------------- */
+      if (email) {
+        filters.email = { $regex: email.trim(), $options: 'i' };
       }
 
-      if (filters.customerName) {
-        // For customerName we would need a lookup or denormalized field; alternatively partial firstName or lastName search
-        filter.$or = [
-          { firstName: { $regex: filters.customerName.trim(), $options: "i" } },
-          { lastName: { $regex: filters.customerName.trim(), $options: "i" } },
-        ];
-        delete filters.customerName;
+      /* -------------------------
+       Customer name
+    ------------------------- */
+      if (customerName) {
+        const nameRegex = { $regex: customerName.trim(), $options: 'i' };
+        orConditions.push({ firstName: nameRegex }, { lastName: nameRegex });
       }
 
-      // Date range filtering
-      if (filters.dateFrom || filters.dateTo) {
-        filter.createdAt = {};
-        if (filters.dateFrom) filter.createdAt.$gte = new Date(filters.dateFrom);
-        if (filters.dateTo) filter.createdAt.$lte = new Date(filters.dateTo);
-        delete filters.dateFrom;
-        delete filters.dateTo;
+      /* -------------------------
+       Date range
+    ------------------------- */
+      if (dateFrom || dateTo) {
+        filters.createdAt = {};
+        if (dateFrom) filters.createdAt.$gte = new Date(dateFrom);
+        if (dateTo) filters.createdAt.$lte = new Date(dateTo);
       }
 
-      // Additional exact match filters (e.g., deviceInfo, ipAddress)
-      Object.entries(filters).forEach(([key, value]) => {
-        if (typeof value === "string" && value.trim().length > 0) {
-          filter[key] = value.trim();
-        }
-      });
+      /* -------------------------
+       Global Search
+    ------------------------- */
+      if (search) {
+        const searchRegex = { $regex: search.trim(), $options: 'i' };
 
-      const orders = await Order.find(filter)
-        .populate("items.product", "name sku price")
-        .populate("user", "firstName lastName email")
-        .sort({ [sort]: order })
+        orConditions.push({ orderNumber: searchRegex }, { email: searchRegex }, { firstName: searchRegex }, { lastName: searchRegex }, { status: searchRegex }, { payment_status: searchRegex }, { orderSource: searchRegex });
+      }
+
+      if (orConditions.length) {
+        filters.$or = orConditions;
+      }
+
+      /* -------------------------
+       Sort
+    ------------------------- */
+      const sortObj = { [sort]: order === 'desc' ? -1 : 1 };
+
+      /* -------------------------
+       Count
+    ------------------------- */
+      const total = await Order.countDocuments(filters);
+      const projection = `
+      order_id
+      invoice
+      user
+      email
+      firstName
+      lastName
+      status
+      payment_status
+      payment_method
+      subtotal
+      discountAmount
+      taxAmount
+      total
+      currency
+      priorityLevel
+      orderSource
+      trackingNumber
+      carrier
+      createdAt
+      updatedAt
+    `;
+
+      /* -------------------------
+       Query
+    ------------------------- */
+      const orders = await Order.find(filters)
+        .sort(sortObj)
+        .select(projection)
         .skip((page - 1) * limit)
-        .limit(limit);
+        .limit(limit)
+        .populate('user', 'firstName lastName email')
+        .lean();
 
-      const total = await Order.countDocuments(filter);
+      /* -------------------------
+       Transform
+    ------------------------- */
+      const result = orders.map((o) => ({
+        ...o,
+        id: o._id,
+      }));
 
-      return res.json({
-        page,
-        totalPages: Math.ceil(total / limit),
-        totalItems: total,
-        items: orders,
-      });
+      /* -------------------------
+       Response
+    ------------------------- */
+      const response = {
+        result,
+        pagination: {
+          page,
+          totalPages: Math.ceil(total / limit),
+          total,
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+          limit,
+        },
+        filters: {
+          applied: Object.keys(filters).length,
+          search: search || null,
+        },
+      };
+
+      return standardResponse(res, true, response, `Retrieved ${result.length} orders`);
     } catch (error) {
-      return res.json({
-        400: error.message || "An error occurred while fetching orders"
-      });
+      console.error('Error in getOrders:', error);
+      return errorResponse(res, 'Failed to fetch orders', 500, error.message);
     }
   }
-
 
   // Update order partially
   async updateOrder(req, res) {
@@ -234,7 +293,7 @@ class OrderController {
       const { id } = req.params;
       const updates = req.body;
 
-      const blockedFields = ["order_id", "invoice", "_id", "amount_paid", "amount_due", "payment_status", "payment_method", "user"];
+      const blockedFields = ['order_id', 'invoice', '_id', 'amount_paid', 'amount_due', 'payment_status', 'payment_method', 'user'];
       for (const field of blockedFields) {
         if (updates.hasOwnProperty(field)) {
           delete updates[field];
@@ -248,7 +307,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       for (const key in updates) {
         order[key] = updates[key];
@@ -267,7 +326,7 @@ class OrderController {
 
       await order.save();
 
-      return res.json({ message: "Order updated", order_id: order.order_id });
+      return res.json({ message: 'Order updated', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -285,20 +344,19 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      if (["delivered", "completed", "canceled"].includes(order.status)) {
-        return res.status(400).json({ error: "Order cannot be deleted due to its current status" });
+      if (['delivered', 'completed', 'canceled'].includes(order.status)) {
+        return res.status(400).json({ error: 'Order cannot be deleted due to its current status' });
       }
 
-      await order.cancelOrder("Order deleted by user/admin");
+      await order.cancelOrder('Order deleted by user/admin');
 
-      return res.json({ message: "Order canceled (soft deleted) successfully", order_id: order.order_id });
+      return res.json({ message: 'Order canceled (soft deleted) successfully', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
   }
-
 
   //---------------------------------------------------------------
   // PAYMENT & TRANSACTIONS
@@ -310,8 +368,8 @@ class OrderController {
       const { id } = req.params;
       const { transactionId, amount } = req.body;
 
-      if (!transactionId) throw new Error("Transaction ID is required");
-      if (typeof amount !== "number" || amount <= 0) throw new Error("Valid payment amount is required");
+      if (!transactionId) throw new Error('Transaction ID is required');
+      if (typeof amount !== 'number' || amount <= 0) throw new Error('Valid payment amount is required');
 
       let order;
       if (this.isValidObjectId(id)) {
@@ -320,13 +378,13 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       await order.markAsPaid(transactionId.trim(), amount);
 
       await order.save();
 
-      return res.json({ message: "Payment recorded successfully", order_id: order.order_id, payment_status: order.payment_status });
+      return res.json({ message: 'Payment recorded successfully', order_id: order.order_id, payment_status: order.payment_status });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -338,7 +396,7 @@ class OrderController {
       const { id } = req.params;
       const { amount, reason } = req.body;
 
-      if (typeof amount !== "number" || amount <= 0) throw new Error("Valid refund amount is required");
+      if (typeof amount !== 'number' || amount <= 0) throw new Error('Valid refund amount is required');
 
       let order;
       if (this.isValidObjectId(id)) {
@@ -347,13 +405,13 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
-      await order.refundOrder(amount, reason || "Customer refund requested");
+      await order.refundOrder(amount, reason || 'Customer refund requested');
 
       await order.save();
 
-      return res.json({ message: "Refund processed successfully", order_id: order.order_id, payment_status: order.payment_status });
+      return res.json({ message: 'Refund processed successfully', order_id: order.order_id, payment_status: order.payment_status });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -364,15 +422,15 @@ class OrderController {
     try {
       const { orderIds, amount, reason } = req.body;
 
-      if (!Array.isArray(orderIds) || orderIds.length === 0) throw new Error("Order IDs array is required");
-      if (typeof amount !== "number" || amount <= 0) throw new Error("Valid refund amount is required");
+      if (!Array.isArray(orderIds) || orderIds.length === 0) throw new Error('Order IDs array is required');
+      if (typeof amount !== 'number' || amount <= 0) throw new Error('Valid refund amount is required');
 
       // Verify orderIds are all valid format
-      const validOrderIds = orderIds.filter(id => typeof id === "string");
+      const validOrderIds = orderIds.filter((id) => typeof id === 'string');
 
-      if (validOrderIds.length === 0) throw new Error("Valid order IDs required");
+      if (validOrderIds.length === 0) throw new Error('Valid order IDs required');
 
-      const result = await Order.bulkRefundOrders(validOrderIds, amount, reason || "Bulk refund processed");
+      const result = await Order.bulkRefundOrders(validOrderIds, amount, reason || 'Bulk refund processed');
 
       return res.json({ message: `Bulk refund processed for ${result.modifiedCount} orders` });
     } catch (error) {
@@ -386,7 +444,7 @@ class OrderController {
       const { id } = req.params;
       const { points } = req.body;
 
-      if (!Number.isInteger(points) || points <= 0) throw new Error("Points must be a positive integer");
+      if (!Number.isInteger(points) || points <= 0) throw new Error('Points must be a positive integer');
 
       let order;
       if (this.isValidObjectId(id)) {
@@ -395,7 +453,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       await order.redeemLoyaltyPoints(points);
 
@@ -416,7 +474,7 @@ class OrderController {
       const { id } = req.params;
       const { newStatus, reason } = req.body;
 
-      if (!newStatus) throw new Error("New status is required");
+      if (!newStatus) throw new Error('New status is required');
 
       let order = null;
       if (this.isValidObjectId(id)) {
@@ -425,7 +483,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       order.updateStatus(newStatus, reason);
 
@@ -442,14 +500,14 @@ class OrderController {
     try {
       const { orderIds, newStatus, reason } = req.body;
 
-      if (!Array.isArray(orderIds) || orderIds.length === 0) throw new Error("orderIds array is required");
-      if (!newStatus) throw new Error("New status is required");
+      if (!Array.isArray(orderIds) || orderIds.length === 0) throw new Error('orderIds array is required');
+      if (!newStatus) throw new Error('New status is required');
 
       // Validate newStatus against enum values - static method or schema enums can be used
-      const validStatuses = Order.schema.path("status").enumValues;
+      const validStatuses = Order.schema.path('status').enumValues;
       if (!validStatuses.includes(newStatus)) throw new Error(`Invalid status: ${newStatus}`);
 
-      const result = await Order.bulkUpdateStatus(orderIds, newStatus, reason || "");
+      const result = await Order.bulkUpdateStatus(orderIds, newStatus, reason || '');
 
       return res.json({ message: `Bulk status update applied to ${result.modifiedCount} orders` });
     } catch (error) {
@@ -463,7 +521,7 @@ class OrderController {
       const { id } = req.params;
       const { itemsToSplit } = req.body;
 
-      if (!Array.isArray(itemsToSplit) || itemsToSplit.length === 0) throw new Error("itemsToSplit array is required");
+      if (!Array.isArray(itemsToSplit) || itemsToSplit.length === 0) throw new Error('itemsToSplit array is required');
 
       let order = null;
       if (this.isValidObjectId(id)) {
@@ -472,12 +530,12 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       const newOrder = await order.splitOrder(itemsToSplit);
 
       return res.json({
-        message: "Order split successful",
+        message: 'Order split successful',
         original_order_id: order.order_id,
         new_order_id: newOrder.order_id,
       });
@@ -492,7 +550,7 @@ class OrderController {
       const { id } = req.params;
       const { carrier, trackingNumber } = req.body;
 
-      if (!carrier || !trackingNumber) throw new Error("Carrier and trackingNumber are required");
+      if (!carrier || !trackingNumber) throw new Error('Carrier and trackingNumber are required');
 
       let order = null;
       if (this.isValidObjectId(id)) {
@@ -501,12 +559,12 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       order.addTracking(carrier.trim(), trackingNumber.trim());
       await order.save();
 
-      return res.json({ message: "Tracking info added and status updated to shipped", order_id: order.order_id });
+      return res.json({ message: 'Tracking info added and status updated to shipped', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -524,13 +582,13 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       await order.markAsDelivered();
 
       await order.save();
 
-      return res.json({ message: "Order marked as delivered", order_id: order.order_id, status: order.status });
+      return res.json({ message: 'Order marked as delivered', order_id: order.order_id, status: order.status });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -542,8 +600,8 @@ class OrderController {
       const { id } = req.params;
       const { priority } = req.body;
 
-      if (!priority) throw new Error("Priority level is required");
-      const validPriorities = Order.schema.path("priorityLevel").enumValues;
+      if (!priority) throw new Error('Priority level is required');
+      const validPriorities = Order.schema.path('priorityLevel').enumValues;
       if (!validPriorities.includes(priority)) throw new Error(`Invalid priority level: ${priority}`);
 
       let order = null;
@@ -553,7 +611,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       order.setPriorityLevel(priority);
       await order.save();
@@ -574,7 +632,7 @@ class OrderController {
       const { newQuantity } = req.body;
 
       if (!Number.isInteger(newQuantity) || newQuantity < 1) {
-        throw new Error("Quantity must be a positive integer");
+        throw new Error('Quantity must be a positive integer');
       }
 
       let order = null;
@@ -584,11 +642,11 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       const index = parseInt(itemIndex);
       if (isNaN(index) || index < 0 || index >= order.items.length) {
-        throw new Error("Invalid item index");
+        throw new Error('Invalid item index');
       }
 
       await order.updateItemQuantity(index, newQuantity);
@@ -606,8 +664,8 @@ class OrderController {
       const { id } = req.params;
       const { message } = req.body;
 
-      if (!message || typeof message !== "string" || !message.trim()) {
-        throw new Error("Gift message must be a non-empty string");
+      if (!message || typeof message !== 'string' || !message.trim()) {
+        throw new Error('Gift message must be a non-empty string');
       }
 
       let order = null;
@@ -617,12 +675,12 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       order.addGiftMessage(message.trim());
       await order.save();
 
-      return res.json({ message: "Gift message added/updated", order_id: order.order_id });
+      return res.json({ message: 'Gift message added/updated', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -634,8 +692,8 @@ class OrderController {
       const { id } = req.params;
       const { couponCode } = req.body;
 
-      if (!couponCode || typeof couponCode !== "string" || !couponCode.trim()) {
-        throw new Error("Coupon code must be provided");
+      if (!couponCode || typeof couponCode !== 'string' || !couponCode.trim()) {
+        throw new Error('Coupon code must be provided');
       }
 
       let order = null;
@@ -645,7 +703,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       await order.applyCoupon(couponCode.trim());
 
@@ -655,7 +713,7 @@ class OrderController {
         message: `Coupon ${couponCode.trim()} applied`,
         order_id: order.order_id,
         discountAmount: order.discountAmount,
-        total: order.total
+        total: order.total,
       });
     } catch (error) {
       return this.handleError(res, error);
@@ -667,8 +725,8 @@ class OrderController {
       const { id } = req.params;
       const { reason } = req.body;
 
-      if (!reason || typeof reason !== "string" || !reason.trim()) {
-        throw new Error("Return reason is required and must be a non-empty string");
+      if (!reason || typeof reason !== 'string' || !reason.trim()) {
+        throw new Error('Return reason is required and must be a non-empty string');
       }
 
       let order = null;
@@ -678,14 +736,14 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       order.requestReturn(reason.trim());
 
       await order.save();
 
       return res.json({
-        message: "Return request submitted",
+        message: 'Return request submitted',
         order_id: order.order_id,
         returnRequest: order.returnRequest,
       });
@@ -700,9 +758,9 @@ class OrderController {
       const { id } = req.params;
       const { action, note } = req.body; // action = "approved" | "rejected" | "processed"
 
-      const allowedActions = ["approved", "rejected", "processed"];
+      const allowedActions = ['approved', 'rejected', 'processed'];
       if (!allowedActions.includes(action)) {
-        throw new Error(`Invalid action. Allowed: ${allowedActions.join(", ")}`);
+        throw new Error(`Invalid action. Allowed: ${allowedActions.join(', ')}`);
       }
 
       let order = null;
@@ -712,14 +770,14 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
-      if (order.returnRequest.status === "none") {
-        throw new Error("No return request to resolve");
+      if (order.returnRequest.status === 'none') {
+        throw new Error('No return request to resolve');
       }
 
       order.returnRequest.status = action;
-      if (note && typeof note === "string") {
+      if (note && typeof note === 'string') {
         order.notes.push(`Return request ${action}: ${note}`);
       } else {
         order.notes.push(`Return request ${action}`);
@@ -736,23 +794,23 @@ class OrderController {
   // List return requests by status with pagination
   async getReturnRequests(req, res) {
     try {
-      const { status = "requested", dateFrom, dateTo, page = 1, limit = 20 } = req.query;
+      const { status = 'requested', dateFrom, dateTo, page = 1, limit = 20 } = req.query;
       const pageNum = parseInt(page);
       const limitNum = parseInt(limit);
 
       // Validate status
-      const validStatuses = Order.schema.path("returnRequest.status").enumValues;
+      const validStatuses = Order.schema.path('returnRequest.status').enumValues;
       if (!validStatuses.includes(status)) {
         throw new Error(`Invalid returnRequest status: ${status}`);
       }
 
       // Build query filter
-      const filter = { "returnRequest.status": status };
+      const filter = { 'returnRequest.status': status };
 
       if (dateFrom || dateTo) {
-        filter["returnRequest.requestedAt"] = {};
-        if (dateFrom) filter["returnRequest.requestedAt"].$gte = new Date(dateFrom);
-        if (dateTo) filter["returnRequest.requestedAt"].$lte = new Date(dateTo);
+        filter['returnRequest.requestedAt'] = {};
+        if (dateFrom) filter['returnRequest.requestedAt'].$gte = new Date(dateFrom);
+        if (dateTo) filter['returnRequest.requestedAt'].$lte = new Date(dateTo);
       }
 
       // Fetch total count
@@ -760,9 +818,9 @@ class OrderController {
 
       // Query return requests
       const requests = await Order.find(filter)
-        .populate("user", "firstName lastName email")
-        .select("order_id returnRequest customerName createdAt total")
-        .sort({ "returnRequest.requestedAt": 1 })
+        .populate('user', 'firstName lastName email')
+        .select('order_id returnRequest customerName createdAt total')
+        .sort({ 'returnRequest.requestedAt': 1 })
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum)
         .lean();
@@ -778,8 +836,6 @@ class OrderController {
     }
   }
 
-  
-  
   // Get top customers by total spending and loyalty points earned, with limit
   async getTopCustomers(req, res) {
     try {
@@ -801,7 +857,7 @@ class OrderController {
       const { userId } = req.params;
       let { limit = 20 } = req.query;
 
-      if (!this.isValidObjectId(userId)) throw new Error("Invalid user ID");
+      if (!this.isValidObjectId(userId)) throw new Error('Invalid user ID');
       limit = parseInt(limit);
       if (isNaN(limit) || limit < 1) limit = 20;
 
@@ -815,7 +871,7 @@ class OrderController {
   async getOrderStats(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -831,7 +887,7 @@ class OrderController {
   async getOrderTrends(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -847,7 +903,7 @@ class OrderController {
   async getRevenueBySource(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -863,7 +919,7 @@ class OrderController {
   async getProductPerformance(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -879,7 +935,7 @@ class OrderController {
   async getOrderConversionFunnel(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -920,7 +976,6 @@ class OrderController {
     }
   }
 
-  
   // Estimate delivery date for an order with optional days parameter
   async estimateDelivery(req, res) {
     try {
@@ -937,7 +992,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       const estimatedDate = order.estimateDelivery(days);
 
@@ -959,7 +1014,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       const summary = order.getSummary();
 
@@ -981,17 +1036,17 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) return res.status(404).json({ error: "Original order not found" });
+      if (!order) return res.status(404).json({ error: 'Original order not found' });
 
       const newOrder = await order.reorder();
 
-      return res.status(201).json({ message: "Reorder created successfully", new_order_id: newOrder.order_id });
+      return res.status(201).json({ message: 'Reorder created successfully', new_order_id: newOrder.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
   }
 
-   async getFraudulentOrders(req, res) {
+  async getFraudulentOrders(req, res) {
     try {
       let { threshold = 80, limit = 20 } = req.query;
       threshold = Number(threshold);
@@ -1019,7 +1074,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       // Example compliance checks could be inserted here, or you might call instance method, omitted for demo
       // For now just respond with complianceStatus field
@@ -1035,13 +1090,13 @@ class OrderController {
       const { id } = req.params;
       const { complianceStatus, fraudScore, notes } = req.body;
 
-      const allowedStatuses = ["pending", "approved", "flagged", "rejected"];
+      const allowedStatuses = ['pending', 'approved', 'flagged', 'rejected'];
       if (complianceStatus && !allowedStatuses.includes(complianceStatus)) {
         throw new Error(`Invalid compliance status: ${complianceStatus}`);
       }
 
-      if (fraudScore !== undefined && (typeof fraudScore !== "number" || fraudScore < 0 || fraudScore > 100)) {
-        throw new Error("Fraud score must be a number between 0 and 100");
+      if (fraudScore !== undefined && (typeof fraudScore !== 'number' || fraudScore < 0 || fraudScore > 100)) {
+        throw new Error('Fraud score must be a number between 0 and 100');
       }
 
       let order = null;
@@ -1051,7 +1106,7 @@ class OrderController {
       if (!order) {
         order = await Order.findOne({ order_id: id });
       }
-      if (!order) throw new Error("Order not found");
+      if (!order) throw new Error('Order not found');
 
       if (complianceStatus) order.complianceStatus = complianceStatus;
       if (fraudScore !== undefined) order.fraudScore = fraudScore;
@@ -1060,22 +1115,21 @@ class OrderController {
 
       await order.save();
 
-      return res.json({ message: "Order flagged/updated successfully", order_id: order.order_id });
+      return res.json({ message: 'Order flagged/updated successfully', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
   }
 
-  
   // Validate stock for a batch of orders (pass array of order objects in request body)
   async validateStockBulk(req, res) {
     try {
       const { orders } = req.body;
       if (!Array.isArray(orders) || orders.length === 0) {
-        throw new Error("Orders array is required");
+        throw new Error('Orders array is required');
       }
       await Order.validateStock(orders);
-      return res.json({ message: "Stock validated for all provided orders" });
+      return res.json({ message: 'Stock validated for all provided orders' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1086,20 +1140,20 @@ class OrderController {
     try {
       const { orderIds } = req.body;
       if (!Array.isArray(orderIds) || orderIds.length === 0) {
-        throw new Error("orderIds array is required");
+        throw new Error('orderIds array is required');
       }
 
       const results = [];
       for (const orderId of orderIds) {
         try {
           await Order.updateStock(orderId);
-          results.push({ orderId, status: "success" });
+          results.push({ orderId, status: 'success' });
         } catch (ex) {
-          results.push({ orderId, status: "failure", error: ex.message });
+          results.push({ orderId, status: 'failure', error: ex.message });
         }
       }
 
-      return res.json({ message: "Stock update completed", results });
+      return res.json({ message: 'Stock update completed', results });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1113,7 +1167,7 @@ class OrderController {
 
       // Implementation might query orders and generate export file
       // Here return a dummy success message
-      return res.json({ message: "Order export prepared. Implement file generation logic here." });
+      return res.json({ message: 'Order export prepared. Implement file generation logic here.' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1126,12 +1180,11 @@ class OrderController {
       // Validate and create orders accordingly
 
       // Return dummy success message for now
-      return res.json({ message: "Order import successful. Implement validation and batch create logic." });
+      return res.json({ message: 'Order import successful. Implement validation and batch create logic.' });
     } catch (error) {
       return this.handleError(res, error);
     }
   }
-
 
   // Audit changes to orders - requires change log or versioning system integration
   async auditOrderChanges(req, res) {
@@ -1160,15 +1213,15 @@ class OrderController {
     try {
       const { id } = req.params;
       const { event, details } = req.body;
-      if (!event) throw new Error("Event is required");
+      if (!event) throw new Error('Event is required');
 
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      order.notes.push(`[Event] ${event}: ${details || ""}`);
+      order.notes.push(`[Event] ${event}: ${details || ''}`);
       await order.save();
 
-      return res.json({ message: "Event logged", order_id: order.order_id });
+      return res.json({ message: 'Event logged', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1178,14 +1231,14 @@ class OrderController {
     try {
       const { id } = req.params;
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      if (order.status !== "canceled") return res.status(400).json({ error: "Order is not canceled" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status !== 'canceled') return res.status(400).json({ error: 'Order is not canceled' });
 
-      order.status = "pending";
-      order.notes.push("Order restored from canceled state");
+      order.status = 'pending';
+      order.notes.push('Order restored from canceled state');
       await order.save();
 
-      return res.json({ message: "Order restored", order_id: order.order_id });
+      return res.json({ message: 'Order restored', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1194,7 +1247,7 @@ class OrderController {
   async archiveCompletedOrders(req, res) {
     try {
       // Implement logic to archive completed orders (e.g., move to archive collection, or set flag)
-      return res.json({ message: "Archive completed orders - implement logic here" });
+      return res.json({ message: 'Archive completed orders - implement logic here' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1213,7 +1266,7 @@ class OrderController {
   async getHistoricalOrderData(req, res) {
     try {
       // Placeholder for historical order data query, e.g., for trend analysis or audit
-      return res.json({ message: "Historical order data - implement query here" });
+      return res.json({ message: 'Historical order data - implement query here' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1222,7 +1275,7 @@ class OrderController {
   async getOrderGrowthStats(req, res) {
     try {
       // Placeholder for order growth statistics calculations
-      return res.json({ message: "Order growth stats - implement analytics here" });
+      return res.json({ message: 'Order growth stats - implement analytics here' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1233,13 +1286,13 @@ class OrderController {
       const { id } = req.params;
       const { ratings } = req.body; // Expected format: [{itemIndex: 0, rating: 5, comment: ""}, ...]
 
-      if (!Array.isArray(ratings) || ratings.length === 0) throw new Error("Ratings array required");
+      if (!Array.isArray(ratings) || ratings.length === 0) throw new Error('Ratings array required');
 
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       // Implement rating logic here, e.g., attaching rating to order items or separate collection
-      return res.json({ message: "Order items rated - implement storage logic" });
+      return res.json({ message: 'Order items rated - implement storage logic' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1250,13 +1303,13 @@ class OrderController {
       const { id } = req.params;
       const { review } = req.body;
 
-      if (!review || typeof review !== "string") throw new Error("Review text required");
+      if (!review || typeof review !== 'string') throw new Error('Review text required');
 
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       // Implement review storage logic
-      return res.json({ message: "Order experience reviewed - implement storage logic" });
+      return res.json({ message: 'Order experience reviewed - implement storage logic' });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1277,16 +1330,16 @@ class OrderController {
       const { id } = req.params;
       const { agentId } = req.body;
 
-      if (!agentId) throw new Error("Agent ID is required");
+      if (!agentId) throw new Error('Agent ID is required');
 
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       order.assignedAgent = agentId;
       order.notes.push(`Order assigned to agent ${agentId}`);
       await order.save();
 
-      return res.json({ message: "Order assigned successfully", order_id: order.order_id });
+      return res.json({ message: 'Order assigned successfully', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1366,13 +1419,13 @@ class OrderController {
     try {
       const { id } = req.params;
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       order.auditLock = true;
-      order.notes.push("Order locked for audit");
+      order.notes.push('Order locked for audit');
       await order.save();
 
-      return res.json({ message: "Order locked for audit", order_id: order.order_id });
+      return res.json({ message: 'Order locked for audit', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1382,13 +1435,13 @@ class OrderController {
     try {
       const { id } = req.params;
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
       order.auditLock = false;
-      order.notes.push("Order audit lock released");
+      order.notes.push('Order audit lock released');
       await order.save();
 
-      return res.json({ message: "Order audit lock released", order_id: order.order_id });
+      return res.json({ message: 'Order audit lock released', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1397,20 +1450,20 @@ class OrderController {
   async cancelOrderByAdmin(req, res) {
     try {
       const { id } = req.params;
-      const { reason = "Canceled by admin" } = req.body;
+      const { reason = 'Canceled by admin' } = req.body;
 
       let order = await Order.findById(id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (!order) return res.status(404).json({ error: 'Order not found' });
 
-      if (["delivered", "completed"].includes(order.status)) {
-        return res.status(400).json({ error: "Cannot cancel delivered or completed order" });
+      if (['delivered', 'completed'].includes(order.status)) {
+        return res.status(400).json({ error: 'Cannot cancel delivered or completed order' });
       }
 
       await order.cancelOrder(reason);
 
       await order.save();
 
-      return res.json({ message: "Order canceled by admin", order_id: order.order_id });
+      return res.json({ message: 'Order canceled by admin', order_id: order.order_id });
     } catch (error) {
       return this.handleError(res, error);
     }
@@ -1419,7 +1472,7 @@ class OrderController {
   async getAverageOrderValue(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -1436,7 +1489,7 @@ class OrderController {
   async searchOrdersByCustomerName(req, res) {
     try {
       const { name, limit = 20 } = req.query;
-      if (!name || !name.trim()) throw new Error("Name query parameter is required");
+      if (!name || !name.trim()) throw new Error('Name query parameter is required');
 
       const results = await Order.searchOrdersByCustomerName(name.trim(), parseInt(limit));
 
@@ -1450,7 +1503,7 @@ class OrderController {
   async getOrdersByPaymentMethod(req, res) {
     try {
       const { paymentMethod, startDate, endDate } = req.query;
-      if (!paymentMethod || !startDate || !endDate) throw new Error("paymentMethod, startDate and endDate are required");
+      if (!paymentMethod || !startDate || !endDate) throw new Error('paymentMethod, startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -1482,7 +1535,7 @@ class OrderController {
   async getLoyaltyPointsSummary(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+      if (!startDate || !endDate) throw new Error('startDate and endDate are required');
 
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -1494,8 +1547,6 @@ class OrderController {
       return this.handleError(res, error);
     }
   }
-
 }
 
 module.exports = new OrderController();
-
