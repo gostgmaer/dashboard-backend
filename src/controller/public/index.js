@@ -291,6 +291,23 @@ static async getNetworkStats(req, res) {
     return errorResponse(res, 'Failed to retrieve network stats', 500);
   }
 }
+ static async getApiStatus(req, res){
+  try {
+    const data = await publicServices.getApiStatus();
+
+    res.status(200).json({
+      success: true,
+      message: "API is healthy and running",
+      data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch server info",
+      error: error.message
+    });
+  }
+ }
 }
 
 module.exports = publicController;

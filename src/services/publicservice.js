@@ -174,6 +174,62 @@ class publicServices {
     });
   }
 
+  static async getApiStatus() {
+    const uptime = process.uptime();
+    const interfaces = os.networkInterfaces();
+
+    return {
+      timestamp: new Date().toISOString(),
+
+      process: {
+      
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+      
+        uptime: {
+          seconds: Math.floor(uptime),
+          formatted: this.formatUptime(uptime),
+          startedAt: new Date(Date.now() - uptime * 1000).toISOString()
+        },
+
+        env: {
+          nodeEnv: process.env.NODE_ENV || "development",
+          // port: process.env.PORT || 3000,
+          totalVars: Object.keys(process.env).length
+        },
+
+        // memory: {
+        //   rss: this.formatBytes(process.memoryUsage().rss),
+        //   heapUsed: this.formatBytes(process.memoryUsage().heapUsed),
+        //   heapTotal: this.formatBytes(process.memoryUsage().heapTotal)
+        // }
+      },
+
+      system: {
+        // hostname: os.hostname(),
+        // platform: `${os.platform()} ${os.release()}`,
+        type: os.type(),
+        architecture: os.arch(),
+
+        // cpu: {
+        //   cores: os.cpus().length,
+        //   model: os.cpus()[0]?.model?.split(" @ ")[0] || "Unknown"
+        // },
+
+        // memory: {
+        //   total: this.formatBytes(os.totalmem()),
+        //   free: this.formatBytes(os.freemem())
+        // },
+
+        network: {
+          interfaces: Object.keys(interfaces),
+          primary: Object.keys(interfaces)[0] || null
+        },
+      }
+    };
+  }
+
   static async getNetworkStats() {
     return new Promise((resolve) => {
       const interfaces = os.networkInterfaces();

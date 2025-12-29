@@ -59,6 +59,7 @@ router.get('/memory', publicController.getMemoryUsage);
 router.get('/cpu', publicController.getCpuMetrics);
 router.get('/disk', publicController.getDiskUsage);        // 🔥 NEW
 router.get('/network', publicController.getNetworkStats);  // 🔥 NEW
-router.get('/analytics', publicController.getDashboard);   // 🔥 NEW
+router.get('/analytics', publicController.getDashboard);  
+router.get('', publicController.getApiStatus);  // 🔥 NEW
 
 module.exports = { publicRoutes: router };
