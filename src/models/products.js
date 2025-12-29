@@ -440,8 +440,48 @@ productSchema.virtual('stockStatus').get(function () {
   return 'In Stock';
 });
 productSchema.add({ deletedAt: { type: Date } });
-productSchema.statics.bulkDelete = function (ids) {
-  return this.updateMany({ _id: { $in: ids }, deletedAt: { $exists: false } }, { $set: { deletedAt: new Date(), status: 'archived' } });
+productSchema.statics.bulkDelete = async function (ids, userId = null) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error('ids must be a non-empty array');
+  }
+
+  return this.updateMany(
+    {
+      _id: { $in: ids },
+      isDeleted: { $ne: true }, // prevent double delete
+    },
+    {
+      $set: {
+        isDeleted: true,
+        isActive: false,
+        status: 'archived',
+        isAvailable: false,
+        updated_by: userId,
+      },
+    }
+  );
+};
+
+productSchema.statics.bulkRestore = async function (ids, userId = null) {
+  if (!Array.isArray(ids) || !ids.length) {
+    throw new Error('ids must be a non-empty array');
+  }
+
+  return this.updateMany(
+    {
+      _id: { $in: ids },
+      isDeleted: true,
+    },
+    {
+      $set: {
+        isDeleted: false,
+        isActive: true,
+        status: 'active',
+        isAvailable: true,
+        updated_by: userId,
+      },
+    }
+  );
 };
 
 productSchema.pre('save', async function (next) {
