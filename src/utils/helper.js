@@ -624,6 +624,11 @@ function paginateSortSearch(items, { page = 1, limit = 10, sortBy = 'timestamp',
   };
 }
 
+async function generateUUID() {
+  const { v4: uuidv4 } = await import("uuid");
+  return await generateUUID();;
+}
+
 function formatRelativeDuration(dateInput) {
   // Convert input to Date object
   const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
@@ -668,5 +673,5 @@ module.exports = {
   sendError,
   formatRelativeDuration,
   buildFilters,
-  paginateSortSearch,
+  paginateSortSearch,generateUUID
 };
