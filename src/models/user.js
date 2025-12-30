@@ -401,7 +401,7 @@ userSchema.pre('save', function (next) {
     if (this.isVerified && this.status === 'pending') {
       this.status = 'active';
     }
-  }  
+  }
 });
 // Common population logic for all get methods
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];

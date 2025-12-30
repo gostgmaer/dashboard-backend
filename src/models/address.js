@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
-const ISO_COUNTRIES = require('iso-3166-1-alpha-2'); // Assuming an external library for ISO country codes
 
 const addressSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     isDeleted: { type: Boolean, default: false },
-    label: { type: String, enum: ["home", "work", "other"], default: "home" },
+    isActive: { type: Boolean, default: true },
+    label: { type: String, enum: ['home', 'work', 'other'], default: 'home' },
     fullName: { type: String, required: true },
-    phone: { type: String, required: true },
+    phoneNumber: { type: String, required: true },
     email: { type: String },
     status: {
       type: String,
@@ -17,91 +17,32 @@ const addressSchema = new mongoose.Schema(
       index: true,
     },
     addressLine1: { type: String, required: true },
-    addressLine2: { type: String },
-    addressLine3: { type: String },
+    addressLine2: String,
+    addressLine3: String,
     city: { type: String, required: true },
     state: { type: String, required: true },
     country: {
       type: String,
+      default: 'IN',
       trim: true,
-      default: 'India',
-      required: [true, 'Country is required'],
-      validate: {
-        validator: function (v) {
-          return ISO_COUNTRIES.getCode(v) !== undefined;
-        },
-        message: 'Invalid country code',
-      },
+      required: true,
     },
-    postalCode: {
-      type: String,
-      trim: true,
-      required: [true, 'Postal code is required'],
-      validate: {
-        validator: function (v) {
-          if (this.country === 'IN') {
-            return /^\d{6}$/.test(v); // India-specific postal code
-          } else if (this.country === 'US') {
-            return /^\d{5}(-\d{4})?$/.test(v); // US ZIP code
-          }
-          return true; // Add other country validations as needed
-        },
-        message: 'Invalid postal code for the specified country',
-      },
-    },
+
+    postalCode: { type: String, required: true, trim: true },
     isDefault: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
     coordinates: {
       type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: {
-        type: [Number], // [lng, lat]
-        default: [0, 0],
-        validate: {
-          validator: function (v) {
-            return (
-              v.length === 2 &&
-              v[0] >= -180 &&
-              v[0] <= 180 && // lng
-              v[1] >= -90 &&
-              v[1] <= 90 // lat
-            );
-          },
-          message: 'Invalid coordinates: lng must be -180 to 180, lat must be -90 to 90',
-        },
-      },
+      coordinates: { type: [Number], default: [0, 0] },
     },
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User", },
-    tags: [
-      {
-        type: String,
-        trim: true,
-        validate: {
-          validator: function (v) {
-            return /^[a-zA-Z0-9_-]{1,50}$/.test(v) && this.tags.length <= 20;
-          },
-          message: 'Invalid tag format or too many tags (max 20, 50 chars each)',
-        },
-      },
-    ],
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    tags: [{ type: String, trim: true }],
     history: [
       {
         action: {
           type: String,
-          enum: [
-            'created',
-            'updated',
-            'soft_deleted',
-            'archived',
-            'restored',
-            'tag_added',
-            'tag_removed',
-            'merged',
-            'status_changed',
-            'label_changed',
-            'verified',
-            'standardized',
-          ],
+          enum: ['created', 'updated', 'soft_deleted', 'archived', 'restored', 'tag_added', 'tag_removed', 'merged', 'status_changed', 'label_changed', 'verified', 'standardized'],
         },
         user: {
           type: mongoose.Schema.Types.ObjectId,
@@ -127,23 +68,26 @@ addressSchema.index({ user: 1, isDefault: 1, status: 1 });
 addressSchema.index({ coordinates: '2dsphere' });
 addressSchema.index({ tags: 1 });
 addressSchema.index({ isVerified: 1 });
+addressSchema.index({ isActive: 1, isDeleted: 1 });
 
 // Virtuals
 addressSchema.virtual('formattedAddress').get(function () {
-  return `${this.addressLine1 || ''}, ${this.addressLine2 ? this.addressLine2 + ', ' : ''
-    }${this.addressLine3 ? this.addressLine3 + ', ' : ''}${this.city || ''}, ${this.state || ''}, ${this.country || ''
-    }${this.postalCode ? ' - ' + this.postalCode : ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
+  return `${this.addressLine1 || ''}, ${this.addressLine2 ? this.addressLine2 + ', ' : ''}${this.addressLine3 ? this.addressLine3 + ', ' : ''}${this.city || ''}, ${this.state || ''}, ${this.country || ''}${this.postalCode ? ' - ' + this.postalCode : ''}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '');
 });
 
 // Middleware: Ensure one default address
 addressSchema.pre('save', async function (next) {
-  if (this.isDefault) {
-    await this.model('Address').updateMany(
-      { user: this.user, _id: { $ne: this._id } },
+  if (this.isDefault && this.isActive && !this.isDeleted) {
+    await this.constructor.updateMany(
+      {
+        user: this.user,
+        _id: { $ne: this._id },
+        isDeleted: false,
+      },
       { $set: { isDefault: false } }
     );
   }
-  
+  next();
 });
 
 // Middleware: Update updated_by
@@ -151,7 +95,6 @@ addressSchema.pre('save', function (next) {
   if (this.isModified() && !this.isNew) {
     this.updated_by = this.updated_by || this.created_by;
   }
-  
 });
 
 // Middleware: Track history on create
@@ -166,7 +109,6 @@ addressSchema.pre('save', function (next) {
       },
     ];
   }
-  
 });
 
 // Middleware: Track history on update
@@ -187,7 +129,6 @@ addressSchema.pre('save', function (next) {
   if (this.history.length > 100) {
     this.history = this.history.slice(-100);
   }
-  
 });
 
 // Middleware: Soft delete
@@ -200,7 +141,6 @@ addressSchema.pre('deleteOne', { document: true, query: true }, async function (
     changes: [],
   });
   await this.save();
-  
 });
 
 // Middleware: Log sensitive operations to external audit system (placeholder)
@@ -209,170 +149,156 @@ addressSchema.post('save', async function (doc, next) {
     // Placeholder: Log to external audit system
     // await auditService.logOperation('address', this._id, this.updated_by, this.history[this.history.length - 1]);
   }
-  
 });
 
 // Instance Methods
 
-/**
- * Sets this address as the default for the user, unsetting other defaults.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.setAsDefault = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can update');
-  }
-  try {
-    await this.model('Address').updateMany(
-      { user: this.user, _id: { $ne: this._id } },
-      { $set: { isDefault: false } }
-    );
+addressSchema.methods = {
+  /* ---------------- DEFAULT ---------------- */
+
+  async setAsDefault(updated_by) {
+    await this.model('Address').updateMany({ user: this.user, _id: { $ne: this._id }, isDeleted: false }, { $set: { isDefault: false } });
+
     this.isDefault = true;
     this.updated_by = updated_by;
+
     this.history.push({
       action: 'updated',
       user: updated_by,
-      timestamp: new Date(),
       changes: [{ field: 'isDefault', value: 'true' }],
     });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to set default address: ${error.message}`);
-  }
-};
 
-/**
- * Returns the formatted address string.
- * @returns {String} The formatted address.
- */
-addressSchema.methods.formatAddress = function () {
-  return this.formattedAddress;
-};
+    return this.save();
+  },
 
-/**
- * Soft deletes the address by setting its status to 'deleted'.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.softDelete = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can delete');
-  }
-  try {
-    this.status = 'deleted';
-    this.updated_by = updated_by;
-    this.history.push({
-      action: 'soft_deleted',
-      user: updated_by,
-      timestamp: new Date(),
-      changes: [],
-    });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to soft delete address: ${error.message}`);
-  }
-};
+  formatAddress() {
+    return this.formattedAddress;
+  },
 
-/**
- * Archives the address by setting its status to 'archived'.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.archive = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can archive');
-  }
-  try {
+  /* ---------------- LIFECYCLE ---------------- */
+
+  async softDelete(updated_by) {
+    this.isDeleted = true;
+    this.isActive = false;
+    this.isDefault = false;
     this.status = 'archived';
     this.updated_by = updated_by;
-    this.history.push({
-      action: 'archived',
-      user: updated_by,
-      timestamp: new Date(),
-      changes: [],
-    });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to archive address: ${error.message}`);
-  }
-};
 
-/**
- * Partially updates the address with allowed fields.
- * @param {Object} updates - The fields to update.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.partialUpdate = async function (updates, updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can update');
-  }
-  try {
-    const allowedFields = [
-      'fullName',
-      'phoneNumber',
-      'addressLine1',
-      'addressLine2',
-      'addressLine3',
-      'city',
-      'state',
-      'country',
-      'postalCode',
-      'label',
-      'coordinates',
-      'isDefault',
-      'isVerified',
-      'tags',
-    ];
-    for (const key of Object.keys(updates)) {
+    this.history.push({ action: 'soft_deleted', user: updated_by });
+    return this.save();
+  },
+
+  async restore(updated_by) {
+    this.isDeleted = false;
+    this.isActive = true;
+    this.status = 'active';
+    this.updated_by = updated_by;
+
+    this.history.push({ action: 'restored', user: updated_by });
+    return this.save();
+  },
+  /* ---------------- UPDATE ---------------- */
+
+  async partialUpdate(updates, updated_by) {
+    const allowedFields = ['fullName', 'phoneNumber', 'addressLine1', 'addressLine2', 'addressLine3', 'city', 'state', 'country', 'postalCode', 'label', 'coordinates', 'isDefault', 'isVerified', 'tags'];
+
+    Object.keys(updates).forEach((key) => {
       if (allowedFields.includes(key)) {
         this[key] = updates[key];
       }
-    }
+    });
+
     this.updated_by = updated_by;
+
     this.history.push({
       action: 'updated',
       user: updated_by,
-      timestamp: new Date(),
-      changes: Object.keys(updates).map((key) => ({ field: key, value: String(updates[key]) })),
+      changes: Object.keys(updates).map((k) => ({
+        field: k,
+        value: String(updates[k]),
+      })),
     });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to update address: ${error.message}`);
-  }
-};
 
-/**
- * Clones the address to create a new draft address.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The cloned address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.cloneAddress = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can clone');
-  }
-  try {
-    const clonedData = {
+    return this.save();
+  },
+
+  /* ---------------- TAGS ---------------- */
+
+  async addTag(tag, updated_by) {
+    if (!this.tags.includes(tag)) {
+      this.tags.push(tag);
+      this.updated_by = updated_by;
+
+      this.history.push({
+        action: 'tag_added',
+        user: updated_by,
+        changes: [{ field: 'tag', value: tag }],
+      });
+
+      await this.save();
+    }
+    return this;
+  },
+
+  async removeTag(tag, updated_by) {
+    this.tags = this.tags.filter((t) => t !== tag);
+    this.updated_by = updated_by;
+
+    this.history.push({
+      action: 'tag_removed',
+      user: updated_by,
+      changes: [{ field: 'tag', value: tag }],
+    });
+
+    return this.save();
+  },
+
+  async clearTags(updated_by) {
+    const removed = [...this.tags];
+    this.tags = [];
+    this.updated_by = updated_by;
+
+    this.history.push({
+      action: 'tag_removed',
+      user: updated_by,
+      changes: removed.map((t) => ({ field: 'tag', value: t })),
+    });
+
+    return this.save();
+  },
+
+  /* ---------------- GEO ---------------- */
+
+  async updateCoordinates(lat, lng, updated_by) {
+    this.coordinates = { type: 'Point', coordinates: [lng, lat] };
+    this.updated_by = updated_by;
+
+    this.history.push({
+      action: 'updated',
+      user: updated_by,
+      changes: [{ field: 'coordinates', value: `${lat},${lng}` }],
+    });
+
+    return this.save();
+  },
+
+  /* ---------------- CLONE ---------------- */
+
+  async cloneAddress() {
+    return this.model('Address').create({
       user: this.user,
+
+      status: 'draft',
+      isActive: false,
+      isDeleted: false,
+      isDefault: false,
+      isVerified: false,
+
       label: this.label,
       fullName: this.fullName,
       phoneNumber: this.phoneNumber,
-      status: 'draft',
+      email: this.email,
+
       addressLine1: this.addressLine1,
       addressLine2: this.addressLine2,
       addressLine3: this.addressLine3,
@@ -380,41 +306,57 @@ addressSchema.methods.cloneAddress = async function (updated_by, permissions = {
       state: this.state,
       country: this.country,
       postalCode: this.postalCode,
-      coordinates: this.coordinates,
-      tags: this.tags,
-      isVerified: false,
-      created_by: updated_by,
-      updated_by: updated_by,
-    };
-    const clonedAddress = new this.model('Address')(clonedData);
-    await clonedAddress.save();
-    return clonedAddress;
-  } catch (error) {
-    throw new Error(`Failed to clone address: ${error.message}`);
-  }
-};
 
-/**
- * Compares this address with another to identify differences.
- * @param {Object} otherAddress - The address to compare with.
- * @returns {Object} An object indicating if addresses are identical and listing differences.
- * @throws {Error} If the comparison fails.
- */
-addressSchema.methods.compareAddress = function (otherAddress) {
-  try {
-    const fieldsToCompare = [
-      'fullName',
-      'phoneNumber',
-      'addressLine1',
-      'addressLine2',
-      'addressLine3',
-      'city',
-      'state',
-      'country',
-      'postalCode',
-    ];
+      coordinates: this.coordinates,
+      tags: [...(this.tags || [])],
+
+      created_by: this.updated_by || this.created_by,
+      updated_by: this.updated_by || this.created_by,
+
+      history: [
+        {
+          action: 'created',
+          user: this.updated_by || this.created_by,
+          changes: [{ field: 'clonedFrom', value: String(this._id) }],
+        },
+      ],
+    });
+  },
+
+  /* ---------------- MERGE ---------------- */
+
+  async mergeAddress(otherAddress) {
+    const fields = ['fullName', 'phoneNumber', 'email', 'addressLine1', 'addressLine2', 'addressLine3', 'city', 'state', 'country', 'postalCode', 'label', 'coordinates', 'tags'];
+
+    const changes = [];
+
+    for (const field of fields) {
+      if (!this[field] && otherAddress[field]) {
+        this[field] = otherAddress[field];
+        changes.push({ field, value: String(otherAddress[field]) });
+      }
+    }
+
+    if (changes.length) {
+      this.history.push({
+        action: 'merged',
+        user: this.updated_by || this.created_by,
+        changes,
+      });
+      await this.save();
+    }
+
+    return this;
+  },
+
+  /* ---------------- COMPARE ---------------- */
+
+  compareAddress(otherAddress) {
+    const fields = ['fullName', 'phoneNumber', 'email', 'addressLine1', 'addressLine2', 'addressLine3', 'city', 'state', 'country', 'postalCode'];
+
     const differences = {};
-    for (const field of fieldsToCompare) {
+
+    for (const field of fields) {
       if (String(this[field] || '') !== String(otherAddress[field] || '')) {
         differences[field] = {
           current: this[field],
@@ -422,1012 +364,526 @@ addressSchema.methods.compareAddress = function (otherAddress) {
         };
       }
     }
+
     return {
       isIdentical: Object.keys(differences).length === 0,
       differences,
     };
-  } catch (error) {
-    throw new Error(`Failed to compare addresses: ${error.message}`);
-  }
-};
+  },
 
-/**
- * Restores a deleted or archived address to active status.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The restored address document.
- * @throws {Error} If the operation fails or address is not restorable.
- */
-addressSchema.methods.restore = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can restore');
-  }
-  try {
-    if (this.status === 'deleted' || this.status === 'archived') {
-      this.status = 'active';
-      this.updated_by = updated_by;
-      this.history.push({
-        action: 'restored',
-        user: updated_by,
-        timestamp: new Date(),
-        changes: [],
-      });
-      await this.save();
-      return this;
-    }
-    throw new Error('Address is not deleted or archived');
-  } catch (error) {
-    throw new Error(`Failed to restore address: ${error.message}`);
-  }
-};
+  /* ---------------- LABEL ---------------- */
 
-/**
- * Adds a tag to the address if not already present.
- * @param {String} tag - The tag to add.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.addTag = async function (tag, updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can add tags');
-  }
-  try {
-    if (!this.tags) this.tags = [];
-    if (!this.tags.includes(tag)) {
-      this.tags.push(tag);
-      this.updated_by = updated_by;
-      this.history.push({
-        action: 'tag_added',
-        user: updated_by,
-        timestamp: new Date(),
-        changes: [{ field: 'tag', value: tag }],
-      });
-      await this.save();
-    }
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to add tag: ${error.message}`);
-  }
-};
-
-/**
- * Removes a tag from the address if present.
- * @param {String} tag - The tag to remove.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.removeTag = async function (tag, updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can remove tags');
-  }
-  try {
-    if (!this.tags) this.tags = [];
-    const index = this.tags.indexOf(tag);
-    if (index !== -1) {
-      this.tags.splice(index, 1);
-      this.updated_by = updated_by;
-      this.history.push({
-        action: 'tag_removed',
-        user: updated_by,
-        timestamp: new Date(),
-        changes: [{ field: 'tag', value: tag }],
-      });
-      await this.save();
-    }
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to remove tag: ${error.message}`);
-  }
-};
-
-/**
- * Clears all tags from the address.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.clearTags = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can clear tags');
-  }
-  try {
-    if (this.tags && this.tags.length > 0) {
-      const removedTags = this.tags.slice();
-      this.tags = [];
-      this.updated_by = updated_by;
-      this.history.push({
-        action: 'tag_removed',
-        user: updated_by,
-        timestamp: new Date(),
-        changes: removedTags.map((tag) => ({ field: 'tag', value: tag })),
-      });
-      await this.save();
-    }
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to clear tags: ${error.message}`);
-  }
-};
-
-/**
- * Merges fields from another address into this one if they are empty.
- * @param {mongoose.Types.ObjectId} otherAddressId - The ID of the address to merge.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.mergeAddress = async function (otherAddressId, updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can merge');
-  }
-  try {
-    const otherAddress = await this.model('Address').findById(otherAddressId);
-    if (!otherAddress || otherAddress.user.toString() !== this.user.toString()) {
-      throw new Error('Invalid or unauthorized address for merging');
-    }
-    const fieldsToMerge = [
-      'fullName',
-      'phoneNumber',
-      'addressLine1',
-      'addressLine2',
-      'addressLine3',
-      'city',
-      'state',
-      'country',
-      'postalCode',
-      'label',
-      'coordinates',
-      'tags',
-    ];
-    const changes = [];
-    for (const field of fieldsToMerge) {
-      if (otherAddress[field] && !this[field]) {
-        this[field] = otherAddress[field];
-        changes.push({ field, value: String(otherAddress[field]) });
-      }
-    }
-    if (changes.length > 0) {
-      this.updated_by = updated_by;
-      this.history.push({
-        action: 'merged',
-        user: updated_by,
-        timestamp: new Date(),
-        changes,
-      });
-      await this.save();
-    }
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to merge address: ${error.message}`);
-  }
-};
-
-/**
- * Updates the coordinates of the address.
- * @param {Number} lat - The latitude.
- * @param {Number} lng - The longitude.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.updateCoordinates = async function (lat, lng, updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can update coordinates');
-  }
-  try {
-    this.coordinates = { type: 'Point', coordinates: [lng, lat] };
-    this.updated_by = updated_by;
-    this.history.push({
-      action: 'updated',
-      user: updated_by,
-      timestamp: new Date(),
-      changes: [{ field: 'coordinates', value: `lat: ${lat}, lng: ${lng}` }],
-    });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to update coordinates: ${error.message}`);
-  }
-};
-
-/**
- * Updates the label of the address.
- * @param {String} label - The new label.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the operation fails or user is unauthorized.
- */
-addressSchema.methods.setLabel = async function (label, updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can update label');
-  }
-  try {
+  async setLabel(label) {
     this.label = label;
-    this.updated_by = updated_by;
+
     this.history.push({
       action: 'label_changed',
-      user: updated_by,
-      timestamp: new Date(),
+      user: this.updated_by || this.created_by,
       changes: [{ field: 'label', value: label }],
     });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to update label: ${error.message}`);
-  }
-};
 
-/**
- * Validates the address using an external geocoding service and marks it as verified.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If validation fails or user is unauthorized.
- */
-addressSchema.methods.verifyAddress = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can verify');
-  }
-  try {
-    // Placeholder for external geocoding API call
-    // const result = await geocodeAddress(this.formattedAddress);
-    // if (!result.valid) throw new Error('Invalid address');
-    // this.coordinates = { type: 'Point', coordinates: [result.lng, result.lat] };
+    return this.save();
+  },
+
+  /* ---------------- VERIFY ---------------- */
+
+  async verifyAddress() {
     this.isVerified = true;
-    this.updated_by = updated_by;
+
     this.history.push({
       action: 'verified',
-      user: updated_by,
-      timestamp: new Date(),
+      user: this.updated_by || this.created_by,
       changes: [{ field: 'isVerified', value: 'true' }],
     });
-    await this.save();
-    return this;
-  } catch (error) {
-    throw new Error(`Address verification failed: ${error.message}`);
-  }
+
+    return this.save();
+  },
+
+  /* ---------------- STANDARDIZE ---------------- */
+
+  async standardizeAddress() {
+    this.history.push({
+      action: 'standardized',
+      user: this.updated_by || this.created_by,
+      changes: [],
+    });
+
+    return this.save();
+  },
 };
 
-/**
- * Standardizes the address format based on country-specific rules.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If standardization fails or user is unauthorized.
- */
-addressSchema.methods.standardizeAddress = async function (updated_by, permissions = {}) {
-  if (!this.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can standardize');
-  }
-  try {
-    // Placeholder for external address standardization service
-    // const standardized = await standardizeAddressService(this.formattedAddress, this.country);
-    const changes = [];
-    // Example: Update fields based on standardized result
-    // if (standardized.city && standardized.city !== this.city) {
-    //   changes.push({ field: 'city', value: standardized.city });
-    //   this.city = standardized.city;
-    // }
-    if (changes.length > 0) {
-      this.updated_by = updated_by;
-      this.history.push({
-        action: 'standardized',
-        user: updated_by,
-        timestamp: new Date(),
-        changes,
-      });
-      await this.save();
+addressSchema.statics = {
+  /* ---------------- BASIC GETTERS ---------------- */
+
+  getDeletedAddresses(userId) {
+    return this.find({ user: userId, isDeleted: true }).lean();
+  },
+
+  getDefaultAddress(userId) {
+    return this.findOne({
+      user: userId,
+      isDefault: true,
+      isDeleted: false,
+      isActive: true,
+    });
+  },
+
+  async ensureDefaultAddress(userId) {
+    const existing = await this.findOne({
+      user: userId,
+      isDefault: true,
+      isDeleted: false,
+      isActive: true,
+    });
+
+    if (existing) return existing;
+
+    const firstActive = await this.findOne({
+      user: userId,
+      isDeleted: false,
+      isActive: true,
+    }).sort({ createdAt: 1 });
+
+    if (!firstActive) return null;
+
+    await this.updateOne({ _id: firstActive._id }, { $set: { isDefault: true } });
+
+    return firstActive;
+  },
+
+  getUserAddresses(userId, { page = 1, limit = 10 } = {}) {
+    return this.find({
+      user: userId,
+      isDeleted: false,
+      isActive: true,
+    })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+  },
+
+  /* ---------------- BULK LIFECYCLE ---------------- */
+
+  bulkSoftDelete(filter, updated_by) {
+    return this.updateMany(
+      { ...filter, isDeleted: false },
+      {
+        $set: {
+          isDeleted: true,
+          isActive: false,
+          isDefault: false,
+          status: 'archived',
+          updated_by,
+        },
+        $push: {
+          history: {
+            action: 'soft_deleted',
+            user: updated_by,
+            timestamp: new Date(),
+            changes: [],
+          },
+        },
+      }
+    );
+  },
+
+  bulkRestore(filter, updated_by) {
+    return this.updateMany(
+      { ...filter, isDeleted: true },
+      {
+        $set: {
+          isDeleted: false,
+          isActive: true,
+          status: 'active',
+          updated_by,
+        },
+        $push: {
+          history: {
+            action: 'restored',
+            user: updated_by,
+            timestamp: new Date(),
+            changes: [],
+          },
+        },
+      }
+    );
+  },
+
+  bulkArchive(filter, updated_by) {
+    return this.updateMany(
+      { ...filter, isDeleted: false },
+      {
+        $set: {
+          status: 'archived',
+          updated_by,
+        },
+        $push: {
+          history: {
+            action: 'archived',
+            user: updated_by,
+            timestamp: new Date(),
+            changes: [],
+          },
+        },
+      }
+    );
+  },
+
+  purgeDeletedAddresses(days = 30) {
+    const threshold = new Date(Date.now() - days * 86400000);
+    return this.deleteMany({
+      isDeleted: true,
+      updatedAt: { $lte: threshold },
+    });
+  },
+
+  /* ---------------- SEARCH & FILTER ---------------- */
+
+  searchAddresses(userId, query, { page = 1, limit = 10 } = {}) {
+    const regex = new RegExp(query, 'i');
+
+    return this.find({
+      user: userId,
+      isDeleted: false,
+      $or: [{ fullName: regex }, { addressLine1: regex }, { addressLine2: regex }, { addressLine3: regex }, { city: regex }, { state: regex }, { country: regex }, { postalCode: regex }],
+    })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+  },
+
+  getAddressesByTag(userId, tag, { page = 1, limit = 10 } = {}) {
+    return this.find({
+      user: userId,
+      tags: tag,
+      isDeleted: false,
+    })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+  },
+
+  findByLabel(userId, label, { page = 1, limit = 10 } = {}) {
+    return this.find({
+      user: userId,
+      label,
+      isDeleted: false,
+    })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+  },
+
+  /* ---------------- GEO ---------------- */
+
+  findNearbyAddresses(lat, lng, maxDistance = 10000, filter = {}) {
+    return this.find({
+      ...filter,
+      isDeleted: false,
+      coordinates: {
+        $nearSphere: {
+          $geometry: { type: 'Point', coordinates: [lng, lat] },
+          $maxDistance: maxDistance,
+        },
+      },
+    }).lean();
+  },
+
+  /* ---------------- HISTORY ---------------- */
+
+  getAddressHistory(addressId) {
+    return this.findById(addressId).select('history').lean();
+  },
+
+  getRecentChanges(userId, { limit = 10 } = {}) {
+    return this.aggregate([
+      { $match: { user: userId } },
+      { $unwind: '$history' },
+      { $sort: { 'history.timestamp': -1 } },
+      { $limit: limit },
+      {
+        $project: {
+          addressId: '$_id',
+          action: '$history.action',
+          user: '$history.user',
+          timestamp: '$history.timestamp',
+          changes: '$history.changes',
+        },
+      },
+    ]);
+  },
+
+  /* ---------------- ANALYTICS ---------------- */
+
+  async getAddressAnalytics(userId) {
+    const match = userId ? { user: userId, isDeleted: false } : { isDeleted: false };
+
+    return Promise.all([this.aggregate([{ $match: match }, { $group: { _id: '$city', count: { $sum: 1 } } }, { $sort: { count: -1 } }, { $limit: 10 }]), this.aggregate([{ $match: match }, { $unwind: '$tags' }, { $group: { _id: '$tags', count: { $sum: 1 } } }, { $sort: { count: -1 } }, { $limit: 10 }]), this.aggregate([{ $match: match }, { $group: { _id: '$status', count: { $sum: 1 } } }])]).then(([cityCounts, tagCounts, statusCounts]) => ({
+      cityCounts,
+      tagCounts,
+      statusCounts,
+    }));
+  },
+
+  /* ---------------- STREAM ---------------- */
+
+  async streamUserAddresses(userId, callback) {
+    const cursor = this.find({
+      user: userId,
+      isDeleted: false,
+    })
+      .lean()
+      .cursor();
+
+    for await (const doc of cursor) {
+      await callback(doc);
     }
-    return this;
-  } catch (error) {
-    throw new Error(`Failed to standardize address: ${error.message}`);
-  }
-};
+  },
+  async exportUserAddresses(userId, format = 'json') {
+    const addresses = await this.find({
+      user: userId,
+      isDeleted: false,
+    }).lean();
 
-// Static Methods
+    if (format === 'csv') {
+      const headers = ['fullName', 'phoneNumber', 'email', 'addressLine1', 'addressLine2', 'addressLine3', 'city', 'state', 'country', 'postalCode', 'label', 'isDefault', 'isVerified', 'tags', 'status', 'createdAt', 'updatedAt'];
 
-/**
- * Retrieves the default address for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @returns {Promise<Address|null>} The default address or null.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.getDefaultAddress = async function (userId) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  return this.findOne({ user: userId, isDefault: true, status: 'active' });
-};
+      let csv = headers.join(',') + '\n';
 
-/**
- * Ensures at least one active address is set as default for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @returns {Promise<Address|null>} The default address or null if no active addresses exist.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.ensureDefaultAddress = async function (userId) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  const defaultAddress = await this.findOne({ user: userId, isDefault: true, status: 'active' });
-  if (!defaultAddress) {
-    const address = await this.findOne({ user: userId, status: 'active' }).sort({ createdAt: 1 });
-    if (address) {
-      address.isDefault = true;
-      await address.save();
-      return address;
+      for (const addr of addresses) {
+        const row = headers
+          .map((field) => {
+            let value = addr[field] ?? '';
+
+            if (Array.isArray(value)) {
+              value = value.join(';');
+            }
+
+            return `"${String(value).replace(/"/g, '""')}"`;
+          })
+          .join(',');
+
+        csv += row + '\n';
+      }
+
+      return csv;
     }
-  }
-  return defaultAddress;
-};
 
-/**
- * Retrieves paginated addresses for a user, excluding deleted ones.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {Object} options - Pagination and filtering options (page, limit, status, tags).
- * @returns {Promise<Array>} List of addresses.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.getUserAddresses = async function (userId, { page = 1, limit = 10, status, tags } = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  const query = { user: userId, status: { $ne: 'deleted' } };
-  if (status) query.status = status;
-  if (tags) query.tags = { $all: Array.isArray(tags) ? tags : [tags] };
-  return this.find(query)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
-};
+    // Default JSON export
+    return addresses;
+  },
 
-/**
- * Soft deletes all addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Object>} Update result.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.removeUserAddresses = async function (userId, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
-    throw new Error('Unauthorized: Only admins can delete addresses for other users');
-  }
-  return this.updateMany(
-    { user: userId },
-    {
-      status: 'deleted',
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'soft_deleted',
-          user: updated_by,
+  async importUserAddresses(addresses, userId, created_by) {
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+      return [];
+    }
+
+    const docs = addresses.map((addr) => ({
+      user: userId,
+
+      // lifecycle
+      status: addr.status || 'draft',
+      isActive: addr.isActive ?? true,
+      isDeleted: false,
+      isDefault: false,
+      isVerified: false,
+
+      // core fields
+      label: addr.label || 'home',
+      fullName: addr.fullName,
+      phoneNumber: addr.phoneNumber,
+      email: addr.email,
+
+      addressLine1: addr.addressLine1,
+      addressLine2: addr.addressLine2,
+      addressLine3: addr.addressLine3,
+      city: addr.city,
+      state: addr.state,
+      country: addr.country || 'IN',
+      postalCode: addr.postalCode,
+
+      coordinates: addr.coordinates,
+      tags: addr.tags || [],
+
+      created_by,
+      updated_by: created_by,
+
+      history: [
+        {
+          action: 'created',
+          user: created_by,
           timestamp: new Date(),
+          changes: [{ field: 'imported', value: 'true' }],
+        },
+      ],
+    }));
+
+    // ordered:false → continue on individual document errors
+    return this.insertMany(docs, { ordered: false });
+  },
+  findDuplicateAddresses(userId) {
+    return this.aggregate([
+      {
+        $match: {
+          user: userId,
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: {
+            addressLine1: '$addressLine1',
+            city: '$city',
+            state: '$state',
+            country: '$country',
+            postalCode: '$postalCode',
+          },
+          count: { $sum: 1 },
+          ids: { $push: '$_id' },
+        },
+      },
+      {
+        $match: {
+          count: { $gt: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          address: '$_id',
+          count: 1,
+          ids: 1,
+        },
+      },
+    ]);
+  },
+  async batchCreateAddresses(addresses, userId, created_by) {
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+      return [];
+    }
+
+    const docs = addresses.map((addr) => ({
+      user: userId,
+
+      isActive: addr.isActive ?? true,
+      isDeleted: false,
+      isDefault: false,
+      isVerified: false,
+
+      status: addr.status || 'draft',
+
+      label: addr.label || 'home',
+      fullName: addr.fullName,
+      phoneNumber: addr.phoneNumber,
+      email: addr.email,
+
+      addressLine1: addr.addressLine1,
+      addressLine2: addr.addressLine2,
+      addressLine3: addr.addressLine3,
+      city: addr.city,
+      state: addr.state,
+      country: addr.country || 'IN',
+      postalCode: addr.postalCode,
+
+      coordinates: addr.coordinates,
+      tags: addr.tags || [],
+
+      created_by,
+      updated_by: created_by,
+
+      history: [
+        {
+          action: 'created',
+          user: created_by,
           changes: [],
         },
-      },
-    }
-  );
-};
+      ],
+    }));
 
-/**
- * Archives all non-deleted addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Object>} Update result.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.bulkArchiveAddresses = async function (userId, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
-    throw new Error('Unauthorized: Only admins can archive addresses for other users');
-  }
-  return this.updateMany(
-    { user: userId, status: { $ne: 'deleted' } },
-    {
-      status: 'archived',
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'archived',
-          user: updated_by,
-          timestamp: new Date(),
-          changes: [],
+    return this.insertMany(docs, { ordered: false });
+  },
+  /* =========================
+     GETTERS
+  ========================= */
+
+  getDeletedAddresses(userId) {
+    return this.find({
+      user: userId,
+      isDeleted: true,
+    }).lean();
+  },
+
+  getDefaultAddress(userId) {
+    return this.findOne({
+      user: userId,
+      isDefault: true,
+      isDeleted: false,
+      isActive: true,
+    });
+  },
+
+  /* =========================
+     BULK SOFT DELETE
+  ========================= */
+
+  async bulkSoftDelete(filter, updated_by) {
+    return this.updateMany(
+      {
+        ...filter,
+        isDeleted: false,
+      },
+      {
+        $set: {
+          isDeleted: true,
+          isActive: false,
+          isDefault: false,
+          status: 'archived',
+          updated_by,
         },
-      },
-    }
-  );
-};
-
-/**
- * Restores all deleted or archived addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Object>} Update result.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.bulkRestoreAddresses = async function (userId, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
-    throw new Error('Unauthorized: Only admins can restore addresses for other users');
-  }
-  return this.updateMany(
-    { user: userId, status: { $in: ['deleted', 'archived'] } },
-    {
-      status: 'active',
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'restored',
-          user: updated_by,
-          timestamp: new Date(),
-          changes: [],
+        $push: {
+          history: {
+            action: 'soft_deleted',
+            user: updated_by,
+            timestamp: new Date(),
+            changes: [],
+          },
         },
+      }
+    );
+  },
+
+  /* =========================
+     BULK RESTORE
+  ========================= */
+
+  async bulkRestore(filter, updated_by) {
+    return this.updateMany(
+      {
+        ...filter,
+        isDeleted: true,
       },
-    }
-  );
-};
-
-/**
- * Permanently deletes addresses marked as deleted after a specified period.
- * @param {Number} days - Number of days to consider for purging (default: 30).
- * @returns {Promise<Object>} Deletion result.
- */
-addressSchema.statics.purgeDeletedAddresses = async function (days = 30) {
-  const threshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return this.deleteMany({
-    status: 'deleted',
-    'history.timestamp': { $lte: threshold },
-    'history.action': 'soft_deleted',
-  });
-};
-
-/**
- * Retrieves recent changes across all addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {Object} options - Options for limiting results (limit).
- * @returns {Promise<Array>} List of recent changes.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.getRecentChanges = async function (userId, { limit = 10 } = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  return this.aggregate([
-    { $match: { user: new mongoose.Types.ObjectId(userId) } },
-    { $unwind: '$history' },
-    { $sort: { 'history.timestamp': -1 } },
-    { $limit: limit },
-    {
-      $project: {
-        addressId: '$_id',
-        action: '$history.action',
-        user: '$history.user',
-        timestamp: '$history.timestamp',
-        changes: '$history.changes',
-      },
-    },
-  ]);
-};
-
-/**
- * Finds addresses near a given location.
- * @param {Number} lat - Latitude of the center point.
- * @param {Number} lng - Longitude of the center point.
- * @param {Number} maxDistance - Maximum distance in meters (default: 10000).
- * @param {Object} options - Additional filters (userId, status).
- * @returns {Promise<Array>} List of nearby addresses.
- */
-addressSchema.statics.findNearbyAddresses = async function (lat, lng, maxDistance = 10000, { userId, status } = {}) {
-  const query = {
-    coordinates: {
-      $nearSphere: {
-        $geometry: { type: 'Point', coordinates: [lng, lat] },
-        $maxDistance: maxDistance,
-      },
-    },
-    status: status || 'active',
-  };
-  if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-    query.user = userId;
-  }
-  return this.find(query).lean();
-};
-
-/**
- * Updates the status of a specific address.
- * @param {mongoose.Types.ObjectId} addressId - The ID of the address.
- * @param {String} status - The new status.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The updated address document.
- * @throws {Error} If the address ID is invalid or user is unauthorized.
- */
-addressSchema.statics.updateAddressStatus = async function (addressId, status, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(addressId)) {
-    throw new Error('Invalid address ID');
-  }
-  const address = await this.findById(addressId);
-  if (!address) {
-    throw new Error('Address not found');
-  }
-  if (!address.user.equals(updated_by) && !permissions.canManageAllAddresses) {
-    throw new Error('Unauthorized: Only the address owner or admin can update status');
-  }
-  return this.findByIdAndUpdate(
-    addressId,
-    {
-      status,
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'status_changed',
-          user: updated_by,
-          timestamp: new Date(),
-          changes: [{ field: 'status', value: status }],
+      {
+        $set: {
+          isDeleted: false,
+          isActive: true,
+          status: 'active',
+          updated_by,
         },
-      },
-    },
-    { new: true }
-  );
-};
-
-/**
- * Updates the status of all non-deleted addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} status - The new status.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Object>} Update result.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.bulkUpdateStatus = async function (userId, status, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
-    throw new Error('Unauthorized: Only admins can update status for other users');
-  }
-  return this.updateMany(
-    { user: userId, status: { $ne: 'deleted' } },
-    {
-      status,
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'status_changed',
-          user: updated_by,
-          timestamp: new Date(),
-          changes: [{ field: 'status', value: status }],
+        $push: {
+          history: {
+            action: 'restored',
+            user: updated_by,
+            timestamp: new Date(),
+            changes: [],
+          },
         },
-      },
-    }
-  );
-};
-
-/**
- * Retrieves the history of a specific address.
- * @param {mongoose.Types.ObjectId} addressId - The ID of the address.
- * @returns {Promise<Array>} The history array.
- * @throws {Error} If the address ID is invalid.
- */
-addressSchema.statics.getAddressHistory = async function (addressId) {
-  if (!mongoose.Types.ObjectId.isValid(addressId)) {
-    throw new Error('Invalid address ID');
-  }
-  const address = await this.findById(addressId).select('history');
-  return address ? address.history : [];
-};
-
-/**
- * Searches addresses for a user based on a query string.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} query - The search query.
- * @param {Object} options - Pagination and filtering options (page, limit, status).
- * @returns {Promise<Array>} List of matching addresses.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.searchAddresses = async function (userId, query, { page = 1, limit = 10, status } = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  const searchRegex = new RegExp(query, 'i');
-  const queryObj = {
-    user: userId,
-    status: status || { $ne: 'deleted' },
-    $or: [
-      { fullName: searchRegex },
-      { addressLine1: searchRegex },
-      { addressLine2: searchRegex },
-      { addressLine3: searchRegex },
-      { city: searchRegex },
-      { state: searchRegex },
-      { country: searchRegex },
-      { postalCode: searchRegex },
-    ],
-  };
-  return this.find(queryObj)
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
-};
-
-/**
- * Creates multiple addresses for a user in a batch.
- * @param {Array} addresses - Array of address objects.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} created_by - The ID of the user creating the addresses.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Array>} List of created addresses.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.batchCreateAddresses = async function (addresses, userId, created_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(created_by)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== created_by.toString()) {
-    throw new Error('Unauthorized: Only admins can create addresses for other users');
-  }
-  const errors = await this.validateBatchAddresses(addresses);
-  if (errors.length > 0) {
-    throw new Error(`Validation errors: ${JSON.stringify(errors)}`);
-  }
-  const docs = addresses.map((addr) => ({
-    ...addr,
-    user: userId,
-    created_by: created_by,
-    updated_by: created_by,
-    status: addr.status || 'draft',
-    isVerified: false,
-  }));
-  return this.insertMany(docs, { ordered: false });
-};
-
-/**
- * Validates a batch of addresses before creation.
- * @param {Array} addresses - Array of address objects.
- * @returns {Promise<Array>} Array of validation errors or empty if valid.
- */
-addressSchema.statics.validateBatchAddresses = async function (addresses) {
-  const errors = [];
-  for (let i = 0; i < addresses.length; i++) {
-    const addr = addresses[i];
-    const temp = new this({ ...addr, user: new mongoose.Types.ObjectId(), created_by: new mongoose.Types.ObjectId() });
-    try {
-      await temp.validate();
-    } catch (error) {
-      errors.push({ index: i, error: error.message });
-    }
-  }
-  return errors;
-};
-
-/**
- * Retrieves the count of addresses by status for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @returns {Promise<Array>} Array of status counts.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.getAddressCountByStatus = async function (userId) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  return this.aggregate([
-    { $match: { user: new mongoose.Types.ObjectId(userId) } },
-    { $group: { _id: '$status', count: { $sum: 1 } } },
-  ]);
-};
-
-/**
- * Finds duplicate addresses for a user based on key fields.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @returns {Promise<Array>} List of duplicate address groups.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.findDuplicateAddresses = async function (userId) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  return this.aggregate([
-    { $match: { user: new mongoose.Types.ObjectId(userId), status: { $ne: 'deleted' } } },
-    {
-      $group: {
-        _id: {
-          addressLine1: '$addressLine1',
-          city: '$city',
-          state: '$state',
-          country: '$country',
-          postalCode: '$postalCode',
-        },
-        count: { $sum: 1 },
-        ids: { $push: '$_id' },
-      },
-    },
-    { $match: { count: { $gt: 1 } } },
-    { $project: { _id: 0, address: '$_id', ids: 1, count: 1 } },
-  ]);
-};
-
-/**
- * Adds a tag to multiple addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} tag - The tag to add.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Object>} Update result.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.addTagToMultiple = async function (userId, tag, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
-    throw new Error('Unauthorized: Only admins can add tags for other users');
-  }
-  return this.updateMany(
-    { user: userId, status: { $ne: 'deleted' } },
-    {
-      $addToSet: { tags: tag },
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'tag_added',
-          user: updated_by,
-          timestamp: new Date(),
-          changes: [{ field: 'tag', value: tag }],
-        },
-      },
-    }
-  );
-};
-
-/**
- * Removes a tag from multiple addresses for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} tag - The tag to remove.
- * @param {mongoose.Types.ObjectId} updated_by - The ID of the user making the change.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Object>} Update result.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.removeTagFromMultiple = async function (userId, tag, updated_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== updated_by.toString()) {
-    throw new Error('Unauthorized: Only admins can remove tags for other users');
-  }
-  return this.updateMany(
-    { user: userId, status: { $ne: 'deleted' }, tags: tag },
-    {
-      $pull: { tags: tag },
-      updated_by: updated_by,
-      $push: {
-        history: {
-          action: 'tag_removed',
-          user: updated_by,
-          timestamp: new Date(),
-          changes: [{ field: 'tag', value: tag }],
-        },
-      },
-    }
-  );
-};
-
-/**
- * Exports all non-deleted addresses for a user in a specified format.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} format - The export format ('json' or 'csv').
- * @returns {Promise<String|Array>} The exported data.
- * @throws {Error} If the user ID is invalid or format is unsupported.
- */
-addressSchema.statics.exportUserAddresses = async function (userId, format = 'json') {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  const addresses = await this.find({ user: userId, status: { $ne: 'deleted' } }).lean();
-  if (format === 'csv') {
-    const headers = [
-      'fullName',
-      'phoneNumber',
-      'addressLine1',
-      'addressLine2',
-      'addressLine3',
-      'city',
-      'state',
-      'country',
-      'postalCode',
-      'label',
-      'isDefault',
-      'isVerified',
-      'tags',
-      'createdAt',
-      'updatedAt',
-    ];
-    let csv = headers.join(',') + '\n';
-    for (const addr of addresses) {
-      const row = headers
-        .map((field) => {
-          let value = addr[field] || '';
-          if (Array.isArray(value)) value = value.join(';');
-          return `"${String(value).replace(/"/g, '""')}"`;
-        })
-        .join(',');
-      csv += row + '\n';
-    }
-    return csv;
-  }
-  return addresses; // Default to JSON
-};
-
-/**
- * Imports addresses from a JSON array for a user.
- * @param {Array} addresses - Array of address objects.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} created_by - The ID of the user creating the addresses.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Array>} List of created addresses.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.importUserAddresses = async function (addresses, userId, created_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(created_by)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== created_by.toString()) {
-    throw new Error('Unauthorized: Only admins can import addresses for other users');
-  }
-  const errors = await this.validateBatchAddresses(addresses);
-  if (errors.length > 0) {
-    throw new Error(`Validation errors: ${JSON.stringify(errors)}`);
-  }
-  const docs = addresses.map((addr) => ({
-    ...addr,
-    user: userId,
-    created_by: created_by,
-    updated_by: created_by,
-    status: addr.status || 'draft',
-    isVerified: false,
-  }));
-  return this.insertMany(docs, { ordered: false });
-};
-
-/**
- * Retrieves addresses by tag for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} tag - The tag to filter by.
- * @param {Object} options - Pagination options (page, limit).
- * @returns {Promise<Array>} List of matching addresses.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.getAddressesByTag = async function (userId, tag, { page = 1, limit = 10 } = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  return this.find({ user: userId, tags: tag, status: { $ne: 'deleted' } })
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
-};
-
-/**
- * Finds addresses by label for a user.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {String} label - The label to filter by.
- * @param {Object} options - Pagination options (page, limit).
- * @returns {Promise<Array>} List of matching addresses.
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.findByLabel = async function (userId, label, { page = 1, limit = 10 } = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  return this.find({ user: userId, label, status: { $ne: 'deleted' } })
-    .sort({ createdAt: -1 })
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .lean();
-};
-
-/**
- * Creates a sample address for testing purposes.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {mongoose.Types.ObjectId} created_by - The ID of the user creating the address.
- * @param {Object} permissions - User permissions for RBAC.
- * @returns {Promise<Address>} The created address document.
- * @throws {Error} If the user ID is invalid or user is unauthorized.
- */
-addressSchema.statics.createSampleAddress = async function (userId, created_by, permissions = {}) {
-  if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(created_by)) {
-    throw new Error('Invalid user ID');
-  }
-  if (!permissions.canManageAllAddresses && userId.toString() !== created_by.toString()) {
-    throw new Error('Unauthorized: Only admins can create sample addresses for other users');
-  }
-  const sample = {
-    user: userId,
-    label: 'home',
-    fullName: 'John Doe',
-    phoneNumber: '+1234567890',
-    addressLine1: '123 Main St',
-    city: 'Sample City',
-    state: 'Sample State',
-    country: 'IN',
-    postalCode: '123456',
-    created_by: created_by,
-    updated_by: created_by,
-    isVerified: false,
-  };
-  return this.create(sample);
-};
-
-/**
- * Generates analytics on address data for a user or all users.
- * @param {mongoose.Types.ObjectId} [userId] - The ID of the user (optional).
- * @returns {Promise<Object>} Analytics data (e.g., city counts, tag counts).
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.getAddressAnalytics = async function (userId) {
-  if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  const match = userId ? { user: new mongoose.Types.ObjectId(userId), status: { $ne: 'deleted' } } : { status: { $ne: 'deleted' } };
-  const [cityCounts, tagCounts, statusCounts] = await Promise.all([
-    this.aggregate([
-      { $match: match },
-      { $group: { _id: '$city', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-    ]),
-    this.aggregate([
-      { $match: match },
-      { $unwind: '$tags' },
-      { $group: { _id: '$tags', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-    ]),
-    this.aggregate([
-      { $match: match },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]),
-  ]);
-  return { cityCounts, tagCounts, statusCounts };
-};
-
-/**
- * Streams addresses for a user for efficient large-scale exports.
- * @param {mongoose.Types.ObjectId} userId - The ID of the user.
- * @param {Function} callback - Callback to handle each address.
- * @returns {Promise<void>}
- * @throws {Error} If the user ID is invalid.
- */
-addressSchema.statics.streamUserAddresses = async function (userId, callback) {
-  if (!mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('Invalid user ID');
-  }
-  const stream = this.find({ user: userId, status: { $ne: 'deleted' } }).lean().cursor();
-  for await (const doc of stream) {
-    await callback(doc);
-  }
+      }
+    );
+  },
 };
 
 // Error handling middleware
