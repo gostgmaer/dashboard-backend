@@ -1,4 +1,5 @@
 const Cart = require('../../models/cart');
+const Product = require('../../models/products');
 // const logger = require('../../config/logger');
 const mongoose = require('mongoose');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
@@ -9,104 +10,191 @@ const isValidDiscount = (discount) => typeof discount === 'number' && discount >
 const isValidStatus = (status) => ['active', 'abandoned', 'converted', 'expired'].includes(status);
 
 // Add item to cart
-exports.addItem = async (req, res) => {
+
+exports.getOrCreateCart = async (req, res, next) => {
   try {
-    const { productId, quantity, itemDiscount = 0 } = req.body;
-    const userId = req.user._id;
+    const userId = req.user?._id || null;
+    const sessionId = req.sessionID || null;
 
-    if (!isValidMongoId(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid product ID' });
-    }
-    if (!isValidQuantity(quantity)) {
-      return res.status(400).json({ success: false, message: 'Quantity must be a positive integer' });
-    }
-    if (!isValidDiscount(itemDiscount)) {
-      return res.status(400).json({ success: false, message: 'Item discount must be between 0 and 100' });
-    }
+    const cart = await Cart.getOrCreateCart({ userId, sessionId });
 
-    const cart = await Cart.getOrCreateCart(userId, req.sessionID);
-    await cart.addItem(productId, quantity, userId, itemDiscount);
     res.status(200).json({
       success: true,
       data: cart,
-      message: 'Item added to cart successfully'
     });
-  } catch (error) {
-    //logger.error(`Add item error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.addItemToCart = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { productId, quantity = 1, itemDiscount = 0 } = req.body;
+    const userId = req.user._id;
+
+    /* 1️⃣ Reserve inventory */
+    const product = await Product.findOneAndUpdate({ _id: productId, inventory: { $gte: quantity } }, { $inc: { inventory: -quantity } }, { new: true, session });
+
+    if (!product) {
+      throw new Error('Insufficient inventory');
+    }
+
+    /* 2️⃣ Get or create cart */
+    const cart = await Cart.getOrCreateCart({ userId });
+
+    /* 3️⃣ Add item (NO PRICE STORED) */
+    await cart.addItem(
+      {
+        product: productId,
+        quantity,
+        itemDiscount,
+      },
+      userId
+    );
+
+    /* 4️⃣ Populate product data */
+    await cart.populate('items.product');
+
+    /* 5️⃣ Calculate totals AFTER populate */
+    const totals = cart.calculateTotals();
+
+    await session.commitTransaction();
+    session.endSession();
+
+    /* 6️⃣ SHAPED RESPONSE (DTO) */
+    res.status(200).json({
+      success: true,
+      data: {
+        cartId: cart._id,
+        status: cart.status,
+
+        totalItems: totals.totalItems,
+        subtotal: totals.subtotal,
+        payableTotal: totals.payableTotal,
+
+        items: cart.items.map((item) => {
+          const price = item.product?.finalPrice || 0;
+          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
+
+          return {
+            productId: item.product._id,
+            name: item.product.name,
+            price,
+            quantity: item.quantity.toFixed(2),
+            itemDiscount: item.itemDiscount,
+            subtotal: itemSubtotal.toFixed(2),
+            thumbnail: item.product.thumbnail,
+            slug: item.product.slug,
+          };
+        }),
+      },
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    next(err);
   }
 };
 
 // Remove item from cart
-exports.removeItem = async (req, res) => {
+exports.removeCartItem = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { productId } = req.params;
     const userId = req.user._id;
 
-    if (!isValidMongoId(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid product ID' });
-    }
+    const cart = await Cart.getActiveCartByUser(userId);
+    const item = cart.items.find((i) => i.product.toString() === productId);
 
-    const cart = await Cart.getCartByUser(userId);
+    if (!item) throw new Error('Item not found');
+
+    await Product.updateOne({ _id: productId }, { $inc: { inventory: item.quantity } }, { session });
+
     await cart.removeItem(productId, userId);
+
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(200).json({
       success: true,
-      data: cart,
-      message: 'Item removed from cart successfully'
+      data: await cart.populate('items.product'),
     });
-  } catch (error) {
-    //logger.error(`Remove item error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    next(err);
   }
 };
 
-// Update item quantity
-exports.updateQuantity = async (req, res) => {
+exports.updateCartItem = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const { productId } = req.params;
-    const { quantity, itemDiscount } = req.body;
+    const { productId, quantity, itemDiscount } = req.body;
     const userId = req.user._id;
 
-    if (!isValidMongoId(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid product ID' });
-    }
-    if (!isValidQuantity(quantity)) {
-      return res.status(400).json({ success: false, message: 'Quantity must be a positive integer' });
-    }
-    if (itemDiscount !== undefined && !isValidDiscount(itemDiscount)) {
-      return res.status(400).json({ success: false, message: 'Item discount must be between 0 and 100' });
+    const cart = await Cart.getActiveCartByUser(userId);
+    const item = cart.items.find((i) => i.product.toString() === productId);
+
+    if (!item) throw new Error('Item not found');
+
+    const diff = quantity - item.quantity;
+
+    if (diff !== 0) {
+      const product = await Product.findOneAndUpdate({ _id: productId, inventory: { $gte: diff } }, { $inc: { inventory: -diff } }, { new: true, session });
+      if (!product) throw new Error('Insufficient inventory');
     }
 
-    const cart = await Cart.getCartByUser(userId);
-    await cart.updateQuantity(productId, quantity, userId, itemDiscount);
+    await cart.updateItem({ product: productId, quantity, itemDiscount }, userId);
+
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(200).json({
       success: true,
-      data: cart,
-      message: 'Cart item quantity updated successfully'
+      data: await cart.populate('items.product'),
     });
-  } catch (error) {
-    //logger.error(`Update quantity error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    next(err);
   }
 };
 
 // Clear cart
-exports.clearCart = async (req, res) => {
+exports.clearCart = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const userId = req.user._id;
-    const cart = await Cart.getCartByUser(userId);
+    const cart = await Cart.getActiveCartByUser(userId);
+
+    for (const item of cart.items) {
+      await Product.updateOne({ _id: item.product }, { $inc: { inventory: item.quantity } }, { session });
+    }
+
     await cart.clearCart(userId);
+
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(200).json({
       success: true,
       data: cart,
-      message: 'Cart cleared successfully'
     });
-  } catch (error) {
-    //logger.error(`Clear cart error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    next(err);
   }
 };
-
 // Get cart by user
 exports.getCart = async (req, res) => {
   try {
@@ -115,7 +203,7 @@ exports.getCart = async (req, res) => {
     res.status(200).json({
       success: true,
       data: cart,
-      message: 'Cart retrieved successfully'
+      message: 'Cart retrieved successfully',
     });
   } catch (error) {
     //logger.error(`Get cart error: ${error.message}`);
@@ -124,26 +212,42 @@ exports.getCart = async (req, res) => {
 };
 
 // Apply cart discount
-exports.applyDiscount = async (req, res) => {
+exports.applyCartDiscount = async (req, res, next) => {
   try {
-    const { discountPercent } = req.body;
+    const { discount } = req.body;
     const userId = req.user._id;
 
-    if (!isValidDiscount(discountPercent)) {
-      return res.status(400).json({ success: false, message: 'Discount percentage must be between 0 and 100' });
-    }
+    const cart = await Cart.getActiveCartByUser(userId);
+    cart.cartDiscount = discount;
+    cart.updated_by = userId;
 
-    const cart = await Cart.getCartByUser(userId);
-    const discountedTotal = await cart.applyDiscount(discountPercent);
     await cart.save();
+
     res.status(200).json({
       success: true,
-      data: { cart, discountedTotal },
-      message: 'Discount applied successfully'
+      data: cart,
     });
-  } catch (error) {
-    //logger.error(`Apply discount error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    next(err);
+  }
+};
+exports.convertCart = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+
+    const cart = await Cart.getActiveCartByUser(userId);
+    cart.status = 'converted';
+    cart.updated_by = userId;
+
+    await cart.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cart converted successfully',
+      data: cart,
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -167,7 +271,7 @@ exports.mergeCart = async (req, res) => {
     res.status(200).json({
       success: true,
       data: cart,
-      message: 'Carts merged successfully'
+      message: 'Carts merged successfully',
     });
   } catch (error) {
     //logger.error(`Merge cart error: ${error.message}`);
@@ -190,7 +294,7 @@ exports.setMetadata = async (req, res) => {
     res.status(200).json({
       success: true,
       data: cart,
-      message: 'Metadata updated successfully'
+      message: 'Metadata updated successfully',
     });
   } catch (error) {
     //logger.error(`Set metadata error: ${error.message}`);
@@ -209,12 +313,12 @@ exports.getPaginatedCarts = async (req, res) => {
     const result = await Cart.getPaginatedCarts({
       page: parseInt(page),
       limit: parseInt(limit),
-      status
+      status,
     });
     res.status(200).json({
       success: true,
       data: result,
-      message: 'Carts retrieved successfully'
+      message: 'Carts retrieved successfully',
     });
   } catch (error) {
     //logger.error(`Get paginated carts error: ${error.message}`);
@@ -229,12 +333,12 @@ exports.getAbandonedCarts = async (req, res) => {
     const result = await Cart.getAbandonedCarts({
       days: parseInt(days),
       page: parseInt(page),
-      limit: parseInt(limit)
+      limit: parseInt(limit),
     });
     res.status(200).json({
       success: true,
       data: result,
-      message: 'Abandoned carts retrieved successfully'
+      message: 'Abandoned carts retrieved successfully',
     });
   } catch (error) {
     //logger.error(`Get abandoned carts error: ${error.message}`);
@@ -258,7 +362,7 @@ exports.bulkUpdateCartStatus = async (req, res) => {
     res.status(200).json({
       success: true,
       data: result,
-      message: 'Cart statuses updated successfully'
+      message: 'Cart statuses updated successfully',
     });
   } catch (error) {
     //logger.error(`Bulk update cart status error: ${error.message}`);
@@ -276,12 +380,12 @@ exports.getCartAnalytics = async (req, res) => {
 
     const result = await Cart.getCartAnalytics({
       startDate: new Date(startDate),
-      endDate: new Date(endDate)
+      endDate: new Date(endDate),
     });
     res.status(200).json({
       success: true,
       data: result,
-      message: 'Cart analytics retrieved successfully'
+      message: 'Cart analytics retrieved successfully',
     });
   } catch (error) {
     //logger.error(`Cart analytics error: ${error.message}`);
@@ -301,7 +405,7 @@ exports.removeProductFromAllCarts = async (req, res) => {
     res.status(200).json({
       success: true,
       data: result,
-      message: 'Product removed from all carts successfully'
+      message: 'Product removed from all carts successfully',
     });
   } catch (error) {
     //logger.error(`Remove product from all carts error: ${error.message}`);
@@ -321,7 +425,7 @@ exports.clearAllCarts = async (req, res) => {
     res.status(200).json({
       success: true,
       data: result,
-      message: 'All carts cleared successfully'
+      message: 'All carts cleared successfully',
     });
   } catch (error) {
     //logger.error(`Clear all carts error: ${error.message}`);

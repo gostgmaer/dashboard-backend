@@ -9,7 +9,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const helmet = require('helmet');
-
+const session = require('express-session');
 /* =========================
    Core Services & Middleware
 ========================= */
@@ -113,7 +113,7 @@ app.use('/api/reviews', safeRoute('Reviews', reviewRoute));
 app.use('/api/orders', safeRoute('Orders', orderRoutes));
 app.use('/api/permissions', safeRoute('Permissions', permissionRoute));
 app.use('/api/roles', safeRoute('Roles', roleRoute));
-app.use('/api/carts', safeRoute('Carts', cartRoutes));
+app.use('/api/cart', safeRoute('Carts', cartRoutes));
 app.use('/api/brands', safeRoute('Brands', BrandRoute));
 app.use('/api/auth', safeRoute('Auth', authRoute));
 app.use('/api/attributes', safeRoute('Attributes', attributeRouter));
@@ -142,7 +142,19 @@ app.get('/', (_req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
-
+app.use(
+  session({
+    name: 'sid',
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+      httpOnly: true,
+      secure: false,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    },
+  })
+);
 /* =========================
    404 Handler
 ========================= */

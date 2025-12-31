@@ -401,7 +401,7 @@ userSchema.pre('save', function (next) {
     if (this.isVerified && this.status === 'pending') {
       this.status = 'active';
     }
-  }  
+  }
 });
 // Common population logic for all get methods
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
@@ -4419,73 +4419,144 @@ userSchema.statics.getUserStats = async function () {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfThisWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(startOfThisMonth.getTime() - 1);
   const startOfLastWeek = new Date(startOfThisWeek);
   startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
   const endOfLastWeek = new Date(startOfThisWeek.getTime() - 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const endOfLastMonth = new Date(startOfThisMonth.getTime() - 1);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // Basic counts: total, active, inactive, deleted, pending, banned, archived, draft
+  /* =========================
+     BASIC USER COUNTS
+  ========================= */
   const [totalUsers, activeUsers, inactiveUsers, deletedUsers, pendingUsers, bannedUsers, archivedUsers, draftUsers] = await Promise.all([this.countDocuments({}), this.countDocuments({ status: 'active' }), this.countDocuments({ status: 'inactive' }), this.countDocuments({ status: 'deleted' }), this.countDocuments({ status: 'pending' }), this.countDocuments({ status: 'banned' }), this.countDocuments({ status: 'archived' }), this.countDocuments({ status: 'draft' })]);
 
-  // Verification counts: email verified, phone verified, 2FA enabled
-  const [emailVerifiedCount, phoneVerifiedCount, twoFactorEnabledCount] = await Promise.all([this.countDocuments({ emailVerified: true }), this.countDocuments({ phoneVerified: true }), this.countDocuments({ 'twoFactorAuth.enabled': true })]);
+  /* =========================
+     VERIFICATION / SECURITY
+  ========================= */
+  const [emailVerifiedCount, phoneVerifiedCount, twoFactorEnabledCount, twoFactorDisabledCount, unverifiedUsers] = await Promise.all([
+    this.countDocuments({ emailVerified: true }),
+    this.countDocuments({ phoneVerified: true }),
+    this.countDocuments({ 'twoFactorAuth.enabled': true }),
+    this.countDocuments({ 'twoFactorAuth.enabled': false }),
+    this.countDocuments({
+      $or: [{ emailVerified: false }, { phoneVerified: false }],
+    }),
+  ]);
 
-  // New users: today, this week, this month
-  const [newUsersToday, newUsersThisWeek, newUsersThisMonth] = await Promise.all([this.countDocuments({ createdAt: { $gte: startOfToday } }), this.countDocuments({ createdAt: { $gte: startOfThisWeek } }), this.countDocuments({ createdAt: { $gte: startOfThisMonth } })]);
+  /* =========================
+     NEW USERS
+  ========================= */
+  const [newUsersToday, newUsersThisWeek, newUsersThisMonth, newUsersLastWeek, newUsersLastMonth] = await Promise.all([
+    this.countDocuments({ createdAt: { $gte: startOfToday } }),
+    this.countDocuments({ createdAt: { $gte: startOfThisWeek } }),
+    this.countDocuments({ createdAt: { $gte: startOfThisMonth } }),
+    this.countDocuments({
+      createdAt: { $gte: startOfLastWeek, $lte: endOfLastWeek },
+    }),
+    this.countDocuments({
+      createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    }),
+  ]);
 
-  // User growth rate: weekly and monthly (percentage change in new users)
-  const [newUsersLastWeek, newUsersLastMonth] = await Promise.all([this.countDocuments({ createdAt: { $gte: startOfLastWeek, $lte: endOfLastWeek } }), this.countDocuments({ createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth } })]);
   const weeklyGrowthRate = newUsersLastWeek > 0 ? ((newUsersThisWeek - newUsersLastWeek) / newUsersLastWeek) * 100 : newUsersThisWeek > 0 ? 100 : 0;
+
   const monthlyGrowthRate = newUsersLastMonth > 0 ? ((newUsersThisMonth - newUsersLastMonth) / newUsersLastMonth) * 100 : newUsersThisMonth > 0 ? 100 : 0;
 
-  // Active sessions count (current)
-  const activeSessionsCount = await this.aggregate([{ $unwind: '$activeSessions' }, { $match: { 'activeSessions.isActive': true, 'activeSessions.expiresAt': { $gt: now } } }, { $count: 'total' }]).then((result) => result[0]?.total || 0);
+  /* =========================
+     ACTIVE SESSIONS (REAL-TIME)
+  ========================= */
+  const activeSessionsAgg = await this.aggregate([
+    { $unwind: '$activeSessions' },
+    {
+      $match: {
+        'activeSessions.isActive': true,
+        'activeSessions.expiresAt': { $gt: now },
+      },
+    },
+    {
+      $group: {
+        _id: '$_id',
+        sessionCount: { $sum: 1 },
+      },
+    },
+  ]);
 
-  // Average session duration (placeholder; requires historical closed sessions data. Assuming average from active ones for demo)
-  const sessionDurations = await this.aggregate([{ $unwind: '$activeSessions' }, { $match: { 'activeSessions.isActive': true } }, { $project: { duration: { $subtract: ['$activeSessions.lastActivity', '$activeSessions.createdAt'] } } }, { $group: { _id: null, avgDuration: { $avg: '$duration' } } }]).then((result) => result[0]?.avgDuration || 0);
-  const averageSessionDurationMs = sessionDurations; // in ms; convert as needed e.g., to minutes
+  const currentlyLoggedInUsers = activeSessionsAgg.length;
+  const activeSessionsCount = activeSessionsAgg.reduce((sum, u) => sum + u.sessionCount, 0);
 
-  // Users by role (for chart)
-  const usersByRole = await this.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }, { $lookup: { from: 'roles', localField: '_id', foreignField: '_id', as: 'roleDetails' } }, { $unwind: '$roleDetails' }, { $project: { name: '$roleDetails.name', value: '$count', _id: 0 } }]);
+  const usersWithMultipleActiveSessions = activeSessionsAgg.filter((u) => u.sessionCount > 1).length;
 
-  // Users by device (unwind knownDevices, group by type; counts users with at least one device of that type)
-  const usersByDevice = await this.aggregate([{ $unwind: '$knownDevices' }, { $group: { _id: '$knownDevices.type', users: { $addToSet: '$_id' } } }, { $project: { name: '$_id', value: { $size: '$users' }, _id: 0 } }]);
+  const avgSessionsPerUser = currentlyLoggedInUsers > 0 ? (activeSessionsCount / currentlyLoggedInUsers).toFixed(2) : 0;
 
-  // Users by country (using getUserCountByCountry static if available, or replicate)
-  const usersByCountry = await this.getUserCountByCountry(); // Assuming it's defined as in the schema
+  /* =========================
+     LOGIN ACTIVITY
+  ========================= */
+  const [usersLoggedInLast24h, usersLoggedInLast7d, usersLoggedInLast30d, neverLoggedInUsers] = await Promise.all([this.countDocuments({ lastLogin: { $gte: twentyFourHoursAgo } }), this.countDocuments({ lastLogin: { $gte: sevenDaysAgo } }), this.countDocuments({ lastLogin: { $gte: thirtyDaysAgo } }), this.countDocuments({ lastLogin: { $exists: false } })]);
 
-  // Newsletter subscriptions
-  const [newsletterSubscribed, newsletterUnsubscribed] = await Promise.all([this.countDocuments({ 'preferences.newsletter': true }), this.countDocuments({ 'preferences.newsletter': false })]);
-
-  // Recent users (last 5)
-  const recentUsers = await this.find({}).sort({ createdAt: -1 }).limit(5).select('username email firstName lastName role status createdAt lastLogin').populate('role', 'name').lean();
-
-  // More stats: users with orders, without orders (as in provided code)
-  const [usersWithOrders, usersWithoutOrders] = await Promise.all([this.countDocuments({ orders: { $exists: true, $not: { $size: 0 } } }), this.countDocuments({ $or: [{ orders: { $exists: false } }, { orders: { $size: 0 } }] })]);
-
-  // Active users: daily, weekly, monthly (users with lastLogin in period)
+  /* =========================
+     ACTIVE USERS
+  ========================= */
   const [dailyActiveUsers, weeklyActiveUsers, monthlyActiveUsers] = await Promise.all([this.countDocuments({ lastLogin: { $gte: startOfToday } }), this.countDocuments({ lastLogin: { $gte: startOfThisWeek } }), this.countDocuments({ lastLogin: { $gte: startOfThisMonth } })]);
 
-  // Churned users (users inactive for 30 days, but registered before)
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const churnedUsers30Days = await this.countDocuments({
+  /* =========================
+     ENGAGEMENT / RETENTION
+  ========================= */
+  const inactiveUsers30Days = await this.countDocuments({
     lastLogin: { $lt: thirtyDaysAgo },
-    createdAt: { $lt: thirtyDaysAgo },
     status: 'active',
   });
 
-  // New vs Returning (this month)
-  const newVsReturningUsers = {
-    newUsers: newUsersThisMonth,
-    returningUsers: monthlyActiveUsers - newUsersThisMonth,
-  };
-  const totalActiveRole = await Role.countDocuments({ isActive: true });
+  const retentionRate30Days = activeUsers > 0 ? (((activeUsers - inactiveUsers30Days) / activeUsers) * 100).toFixed(2) : 0;
 
-  // Placeholders or additional (e.g., from Order model if needed)
-  // const totalOrders = await Order.countDocuments();
-  // const averageOrderValue = await Order.aggregate([...]); // etc.
+  const engagementRateMonthly = totalUsers > 0 ? ((monthlyActiveUsers / totalUsers) * 100).toFixed(2) : 0;
 
+  /* =========================
+     USERS BY ROLE
+  ========================= */
+  const usersByRole = await this.aggregate([
+    { $group: { _id: '$role', count: { $sum: 1 } } },
+    {
+      $lookup: {
+        from: 'roles',
+        localField: '_id',
+        foreignField: '_id',
+        as: 'role',
+      },
+    },
+    { $unwind: '$role' },
+    { $project: { name: '$role.name', value: '$count', _id: 0 } },
+  ]);
+
+  /* =========================
+     USERS BY DEVICE
+  ========================= */
+  const usersByDevice = await this.aggregate([
+    { $unwind: '$knownDevices' },
+    {
+      $group: {
+        _id: '$knownDevices.type',
+        users: { $addToSet: '$_id' },
+      },
+    },
+    { $project: { name: '$_id', value: { $size: '$users' }, _id: 0 } },
+  ]);
+
+  /* =========================
+     USERS BY COUNTRY
+  ========================= */
+  const usersByCountry = await this.getUserCountByCountry();
+
+  /* =========================
+     RECENT USERS
+  ========================= */
+  const recentUsers = await this.find({}).sort({ createdAt: -1 }).limit(5).select('username email firstName lastName role status createdAt lastLogin').populate('role', 'name').lean();
+
+  /* =========================
+     FINAL RESPONSE
+  ========================= */
   return {
     totalUsers,
     activeUsers,
@@ -4495,31 +4566,42 @@ userSchema.statics.getUserStats = async function () {
     bannedUsers,
     archivedUsers,
     draftUsers,
+
     emailVerifiedCount,
     phoneVerifiedCount,
     twoFactorEnabledCount,
+    twoFactorDisabledCount,
+    unverifiedUsers,
+
     newUsersToday,
     newUsersThisWeek,
     newUsersThisMonth,
-    weeklyGrowthRate: weeklyGrowthRate.toFixed(2) + '%',
-    monthlyGrowthRate: monthlyGrowthRate.toFixed(2) + '%',
+    weeklyGrowthRate: `${weeklyGrowthRate.toFixed(2)}%`,
+    monthlyGrowthRate: `${monthlyGrowthRate.toFixed(2)}%`,
+
+    currentlyLoggedInUsers,
     activeSessionsCount,
-    averageSessionDurationMs, // Convert to human-readable in frontend, e.g., ms to minutes:seconds
-    usersByRole,
-    usersByDevice,
-    usersByCountry,
-    newsletterSubscribed,
-    newsletterUnsubscribed,
-    recentUsers,
-    usersWithOrders,
-    usersWithoutOrders,
+    avgSessionsPerUser,
+    usersWithMultipleActiveSessions,
+
+    usersLoggedInLast24h,
+    usersLoggedInLast7d,
+    usersLoggedInLast30d,
+    neverLoggedInUsers,
+
     dailyActiveUsers,
     weeklyActiveUsers,
     monthlyActiveUsers,
-    churnedUsers30Days,
-    newVsReturningUsers,
-    totalActiveRole,
-    // Add more as needed, e.g., totalOrders, averageOrderValue, etc.
+
+    inactiveUsers30Days,
+    retentionRate30Days: `${retentionRate30Days}%`,
+    engagementRateMonthly: `${engagementRateMonthly}%`,
+
+    usersByRole,
+    usersByDevice,
+    usersByCountry,
+
+    recentUsers,
   };
 };
 

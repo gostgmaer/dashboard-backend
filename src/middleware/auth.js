@@ -83,18 +83,20 @@ const optionalAuth = async (req, res, next) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+      const decoded = jwt.verify(token, jwtSecret);
       const user = await User.findByIdWithPermissions(decoded.userId);
 
       if (user && user.isActive) {
-        req.user = {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-          permissions: user.permissions,
-          lastLogin: user.lastLogin,
-        };
+     
+        req.user = user;
+        req.userId = user._id;
+        if (req.body) {
+          req.body.created_by = user._id;
+          req.body.updated_by = user._id;
+        }
+
+        req.deviceInfo = deviceInfo;
+        res.locals.user = user;
       }
     } catch (jwtError) {
       // Ignore JWT errors in optional auth
