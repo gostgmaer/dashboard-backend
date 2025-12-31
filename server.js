@@ -38,9 +38,9 @@ async function startServer() {
 
   try {
     /* 1️⃣ Database Connection */
-    console.log('⏳ Connecting to database...');
+    // console.log('⏳ Connecting to database...');
     await connectDB();
-    console.log('✅ Database connected');
+    // console.log('✅ Database connected');
 
     /* 2️⃣ Create HTTP Server */
     server = http.createServer(app);

@@ -111,8 +111,7 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
   while (attempts < retries) {
     try {
       const transporter = createTransporter();
-      await transporter.verify();
-      console.log('✅ Email service is ready');
+      await transporter.verify();-
       metrics.connectionSuccesses++;
       return '✅ Email service connection verified';
       //  return { success: true, message: 'Email service connection verified', metrics };
