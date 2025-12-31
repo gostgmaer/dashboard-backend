@@ -16,11 +16,42 @@ exports.getOrCreateCart = async (req, res, next) => {
     const userId = req.user?._id || null;
     const sessionId = req.sessionID || null;
 
+    /* 1️⃣ Get or create cart */
     const cart = await Cart.getOrCreateCart({ userId, sessionId });
 
+    /* 2️⃣ Populate product data (FORCE price) */
+    await cart.populate('items.product');
+
+    /* 3️⃣ Calculate totals AFTER populate */
+    const totals = cart.calculateTotals();
+
+    /* 4️⃣ Send DTO */
     res.status(200).json({
       success: true,
-      data: cart,
+      data: {
+        cartId: cart._id,
+        status: cart.status,
+
+        totalItems: totals.totalItems,
+        subtotal: totals.subtotal,
+        payableTotal: totals.payableTotal,
+
+        items: cart.items.map((item) => {
+          const price = item.product?.finalPrice || 0;
+          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
+
+          return {
+            productId: item.product._id,
+            name: item.product.name,
+            price,
+            quantity: item.quantity,
+            itemDiscount: item.itemDiscount,
+            subtotal: itemSubtotal,
+            thumbnail: item.product.thumbnail,
+            slug: item.product.slug,
+          };
+        }),
+      },
     });
   } catch (err) {
     next(err);
@@ -117,12 +148,42 @@ exports.removeCartItem = async (req, res, next) => {
 
     await cart.removeItem(productId, userId);
 
+    /* 4️⃣ Populate product data */
+    await cart.populate('items.product');
+
+    /* 5️⃣ Calculate totals AFTER populate */
+    const totals = cart.calculateTotals();
+
     await session.commitTransaction();
     session.endSession();
 
+    /* 6️⃣ SHAPED RESPONSE (DTO) */
     res.status(200).json({
       success: true,
-      data: await cart.populate('items.product'),
+      data: {
+        cartId: cart._id,
+        status: cart.status,
+
+        totalItems: totals.totalItems,
+        subtotal: totals.subtotal,
+        payableTotal: totals.payableTotal,
+
+        items: cart.items.map((item) => {
+          const price = item.product?.finalPrice || 0;
+          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
+
+          return {
+            productId: item.product._id,
+            name: item.product.name,
+            price,
+            quantity: item.quantity.toFixed(2),
+            itemDiscount: item.itemDiscount,
+            subtotal: itemSubtotal.toFixed(2),
+            thumbnail: item.product.thumbnail,
+            slug: item.product.slug,
+          };
+        }),
+      },
     });
   } catch (err) {
     await session.abortTransaction();
@@ -152,13 +213,42 @@ exports.updateCartItem = async (req, res, next) => {
     }
 
     await cart.updateItem({ product: productId, quantity, itemDiscount }, userId);
+/* 4️⃣ Populate product data */
+    await cart.populate('items.product');
+
+    /* 5️⃣ Calculate totals AFTER populate */
+    const totals = cart.calculateTotals();
 
     await session.commitTransaction();
     session.endSession();
 
+    /* 6️⃣ SHAPED RESPONSE (DTO) */
     res.status(200).json({
       success: true,
-      data: await cart.populate('items.product'),
+      data: {
+        cartId: cart._id,
+        status: cart.status,
+
+        totalItems: totals.totalItems,
+        subtotal: totals.subtotal,
+        payableTotal: totals.payableTotal,
+
+        items: cart.items.map((item) => {
+          const price = item.product?.finalPrice || 0;
+          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
+
+          return {
+            productId: item.product._id,
+            name: item.product.name,
+            price,
+            quantity: item.quantity.toFixed(2),
+            itemDiscount: item.itemDiscount,
+            subtotal: itemSubtotal.toFixed(2),
+            thumbnail: item.product.thumbnail,
+            slug: item.product.slug,
+          };
+        }),
+      },
     });
   } catch (err) {
     await session.abortTransaction();
@@ -182,12 +272,42 @@ exports.clearCart = async (req, res, next) => {
 
     await cart.clearCart(userId);
 
+ /* 4️⃣ Populate product data */
+    await cart.populate('items.product');
+
+    /* 5️⃣ Calculate totals AFTER populate */
+    const totals = cart.calculateTotals();
+
     await session.commitTransaction();
     session.endSession();
 
+    /* 6️⃣ SHAPED RESPONSE (DTO) */
     res.status(200).json({
       success: true,
-      data: cart,
+      data: {
+        cartId: cart._id,
+        status: cart.status,
+
+        totalItems: totals.totalItems,
+        subtotal: totals.subtotal,
+        payableTotal: totals.payableTotal,
+
+        items: cart.items.map((item) => {
+          const price = item.product?.finalPrice || 0;
+          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
+
+          return {
+            productId: item.product._id,
+            name: item.product.name,
+            price,
+            quantity: item.quantity.toFixed(2),
+            itemDiscount: item.itemDiscount,
+            subtotal: itemSubtotal.toFixed(2),
+            thumbnail: item.product.thumbnail,
+            slug: item.product.slug,
+          };
+        }),
+      },
     });
   } catch (err) {
     await session.abortTransaction();
