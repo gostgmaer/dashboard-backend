@@ -1,62 +1,50 @@
 /**
- * Application Entry Point (Serverless Compatible)
+ * handler.js
  * ----------------------------------------------------
- * - Loads environment variables
- * - Connects to database (once per cold start)
- * - Creates HTTP + Socket server
- * - Exports a handler function (REQUIRED by serverless)
- * - Node 20 compatible
+ * Serverless entry
+ * - Exports a handler function
+ * - NO server.listen()
+ * - Node 20 safe
  */
 
 require('dotenv').config();
 
 const http = require('http');
 const app = require('./app');
-
 const connectDB = require('./src/config/dbConnact');
 const socketService = require('./src/services/socketService');
 
-/* =========================
-   Internal State
-========================= */
 let server;
 let isInitialized = false;
 
 /* =========================
-   Bootstrap (runs once per cold start)
+   Bootstrap (cold start only)
 ========================= */
 async function bootstrap() {
   if (isInitialized) return;
 
-  try {
-    console.log('⏳ Connecting to database...');
-    await connectDB();
-    console.log('✅ Database connected');
+  console.log('⏳ Connecting to database...');
+  await connectDB();
+  console.log('✅ Database connected');
 
-    server = http.createServer(app);
+  server = http.createServer(app);
 
-    // Initialize sockets only once
-    socketService.initialize(server);
+  // Initialize socket once (note: not supported on Vercel)
+  socketService.initialize(server);
 
-    isInitialized = true;
-    console.log('🚀 Server initialized (serverless mode)');
-  } catch (error) {
-    console.error('❌ Bootstrap failed:', error);
-    throw error;
-  }
+  isInitialized = true;
+  console.log('🚀 Server initialized (serverless)');
 }
 
 /* =========================
-   REQUIRED SERVERLESS EXPORT
+   REQUIRED EXPORT
 ========================= */
 module.exports = async function handler(req, res) {
   try {
     await bootstrap();
-
-    // Forward request to Express
     server.emit('request', req, res);
   } catch (error) {
-    console.error('🔥 Request handling error:', error);
+    console.error('🔥 Handler error:', error);
     res.statusCode = 500;
     res.end('Internal Server Error');
   }
