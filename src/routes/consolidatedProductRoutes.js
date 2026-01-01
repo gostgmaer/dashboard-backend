@@ -172,7 +172,6 @@ router.get('/database-stats',
 );
 // GET /api/products/:identifier - Get single product by ID or slug
 router.get('/:identifier',
-  instanceCheckMiddleware,
   productValidation.identifier,
   ProductController.getProductByIdOrSlug
 );

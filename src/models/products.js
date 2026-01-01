@@ -18,6 +18,7 @@ const productSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     sku: { type: String, required: true, unique: true },
+    slug: { type: String, required: true, unique: true },
     productType: { type: String, enum: ['physical', 'digital', 'service'] },
     categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true }],
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
@@ -249,13 +250,27 @@ productSchema.index({ isFeatured: 1, status: 1 });
 
 // 🔹 Virtual rating stats
 
-productSchema.pre('save', function (next) {
+productSchema.pre('save', async function (next) {
   try {
     const product = this;
 
     // Start with the base price
     let finalPrice = product.basePrice || 0;
-
+    if (!product.isModified('title') && product.slug) {
+      return next();
+    }
+    const baseSlug = slugify(product.title, {
+      lower: true,
+      strict: true,
+      trim: true
+    });
+    let slug = baseSlug;
+    let counter = 1;
+    const ProductModel = product.constructor;
+    while ( await ProductModel.exists({ slug, _id: { $ne: doc._id } })) {
+      slug = `${baseSlug}-${counter++}`;
+    }
+    product.slug = slug;
     // Apply discount if defined
     if (product.discountType && product.discountValue) {
       switch (product.discountType) {
@@ -2749,203 +2764,204 @@ productSchema.statics.generateSchemaReport = function () {
     },
   };
 };
+
+productSchema.statics.generateDatabaseStatistics = async function () {
+  const [totalProducts, statusCounts, productTypeCounts, availabilityCounts, priceStats, stockStats, discountStats, reviewStats, categoryStats, tagStats, bundleStats, featuredStats, ecoFriendlyStats, giftCardStats, preOrderStats, subscriptionStats] = await Promise.all([
+    this.countDocuments({ deletedAt: { $exists: false } }),
+    this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$productType', count: { $sum: 1 } } }]),
+    this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$availability', count: { $sum: 1 } } }]),
+    this.aggregate([
+      { $match: { deletedAt: { $exists: false } } },
+      {
+        $group: {
+          _id: null,
+          avgPrice: { $avg: '$price' },
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' },
+          totalPrice: { $sum: '$price' },
+        },
+      },
+    ]),
+    this.aggregate([
+      { $match: { deletedAt: { $exists: false }, trackInventory: 'yes' } },
+      {
+        $group: {
+          _id: null,
+          totalStock: { $sum: '$stock' },
+          avgStock: { $avg: '$stock' },
+          minStock: { $min: '$stock' },
+          maxStock: { $max: '$stock' },
+          lowStockCount: { $sum: { $cond: [{ $lte: ['$currentStockLevel', '$lowStockLevel'] }, 1, 0] } },
+          outOfStockCount: { $sum: { $cond: [{ $eq: ['$isAvailable', false] }, 1, 0] } },
+        },
+      },
+    ]),
+    this.aggregate([
+      { $match: { deletedAt: { $exists: false }, discount: { $gt: 0 }, discountStartDate: { $lte: new Date() }, discountEndDate: { $gte: new Date() } } },
+      {
+        $group: {
+          _id: null,
+          discountedProducts: { $sum: 1 },
+          avgDiscount: { $avg: '$discount' },
+          maxDiscount: { $max: '$discount' },
+          totalDiscountedValue: { $sum: { $multiply: ['$price', '$discount', 0.01] } },
+        },
+      },
+    ]),
+    this.aggregate([
+      { $match: { deletedAt: { $exists: false } } },
+      { $lookup: { from: 'reviews', localField: 'reviews', foreignField: '_id', as: 'reviewsData' } },
+      {
+        $group: {
+          _id: null,
+          totalReviews: { $sum: { $size: '$reviewsData' } },
+          avgRating: { $avg: { $avg: '$reviewsData.rating' } },
+        },
+      },
+    ]),
+    this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $unwind: '$categories' }, { $group: { _id: '$categories', count: { $sum: 1 } } }, { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'categoryData' } }, { $project: { _id: 0, categoryId: '$_id', categoryName: { $arrayElemAt: ['$categoryData.name', 0] }, count: 1 } }]),
+    this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $unwind: '$tags' }, { $group: { _id: '$tags', count: { $sum: 1 } } }]),
+    this.countDocuments({ productBundle: true, deletedAt: { $exists: false } }),
+    this.countDocuments({ isFeatured: true, deletedAt: { $exists: false } }),
+    this.countDocuments({ ecoFriendly: true, deletedAt: { $exists: false } }),
+    this.countDocuments({ isGiftCard: true, deletedAt: { $exists: false } }),
+    this.countDocuments({ preOrder: true, deletedAt: { $exists: false } }),
+    this.countDocuments({ isSubscription: true, deletedAt: { $exists: false } }),
+  ]);
+
+  return {
+    totalProducts,
+    statusDistribution: statusCounts.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
+    productTypeDistribution: productTypeCounts.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
+    availabilityDistribution: availabilityCounts.reduce((acc, a) => ({ ...acc, [a._id]: a.count }), {}),
+    priceStatistics: priceStats[0]
+      ? {
+          averagePrice: priceStats[0].avgPrice,
+          minPrice: priceStats[0].minPrice,
+          maxPrice: priceStats[0].maxPrice,
+          totalPrice: priceStats[0].totalPrice,
+        }
+      : { averagePrice: 0, minPrice: 0, maxPrice: 0, totalPrice: 0 },
+    stockStatistics: stockStats[0]
+      ? {
+          totalStock: stockStats[0].totalStock,
+          averageStock: stockStats[0].avgStock,
+          minStock: stockStats[0].minStock,
+          maxStock: stockStats[0].maxStock,
+          lowStockCount: stockStats[0].lowStockCount,
+          outOfStockCount: stockStats[0].outOfStockCount,
+        }
+      : { totalStock: 0, averageStock: 0, minStock: 0, maxStock: 0, lowStockCount: 0, outOfStockCount: 0 },
+    discountStatistics: discountStats[0]
+      ? {
+          discountedProducts: discountStats[0].discountedProducts,
+          averageDiscount: discountStats[0].avgDiscount,
+          maxDiscount: discountStats[0].maxDiscount,
+          totalDiscountedValue: discountStats[0].totalDiscountedValue,
+        }
+      : { discountedProducts: 0, averageDiscount: 0, maxDiscount: 0, totalDiscountedValue: 0 },
+    reviewStatistics: reviewStats[0]
+      ? {
+          totalReviews: reviewStats[0].totalReviews,
+          averageRating: reviewStats[0].avgRating || 0,
+        }
+      : { totalReviews: 0, averageRating: 0 },
+    categoryDistribution: categoryStats,
+    tagDistribution: tagStats.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
+    bundleStatistics: { bundleProducts: bundleStats },
+    featuredStatistics: { featuredProducts: featuredStats },
+    ecoFriendlyStatistics: { ecoFriendlyProducts: ecoFriendlyStats },
+    giftCardStatistics: { giftCardProducts: giftCardStats },
+    preOrderStatistics: { preOrderProducts: preOrderStats },
+    subscriptionStatistics: { subscriptionProducts: subscriptionStats },
+  };
+};
+
 (productSchema.statics.advancedFilter = async function (queryParams = {}) {
   try {
-    const params = this._validateAndSanitizeParams(queryParams);
-    const pipeline = this._buildAdvancedPipeline(params);
+    const params = await this._validateAndSanitizeParams(queryParams);
+    const pipeline = await this._buildAdvancedPipeline(params);
 
     // Execute with timeout and memory limits
-    const results = await this.aggregate(pipeline)
-      .maxTimeMS(30000) // 30 second timeout
-      .allowDiskUse(true) // Allow disk usage for large datasets
-      .exec();
+    const results = await this.aggregate(pipeline, {
+      maxTimeMS: 30000,
+      allowDiskUse: true,
+    });
 
     return this._formatFilterResults(results[0], params);
   } catch (error) {
     throw new Error(`Advanced filtering failed: ${error.message}`);
   }
 }),
-  (productSchema.statics.generateDatabaseStatistics = async function () {
-    const [totalProducts, statusCounts, productTypeCounts, availabilityCounts, priceStats, stockStats, discountStats, reviewStats, categoryStats, tagStats, bundleStats, featuredStats, ecoFriendlyStats, giftCardStats, preOrderStats, subscriptionStats] = await Promise.all([
-      this.countDocuments({ deletedAt: { $exists: false } }),
-      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
-      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$productType', count: { $sum: 1 } } }]),
-      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $group: { _id: '$availability', count: { $sum: 1 } } }]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        {
-          $group: {
-            _id: null,
-            avgPrice: { $avg: '$price' },
-            minPrice: { $min: '$price' },
-            maxPrice: { $max: '$price' },
-            totalPrice: { $sum: '$price' },
-          },
-        },
-      ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false }, trackInventory: 'yes' } },
-        {
-          $group: {
-            _id: null,
-            totalStock: { $sum: '$stock' },
-            avgStock: { $avg: '$stock' },
-            minStock: { $min: '$stock' },
-            maxStock: { $max: '$stock' },
-            lowStockCount: { $sum: { $cond: [{ $lte: ['$currentStockLevel', '$lowStockLevel'] }, 1, 0] } },
-            outOfStockCount: { $sum: { $cond: [{ $eq: ['$isAvailable', false] }, 1, 0] } },
-          },
-        },
-      ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false }, discount: { $gt: 0 }, discountStartDate: { $lte: new Date() }, discountEndDate: { $gte: new Date() } } },
-        {
-          $group: {
-            _id: null,
-            discountedProducts: { $sum: 1 },
-            avgDiscount: { $avg: '$discount' },
-            maxDiscount: { $max: '$discount' },
-            totalDiscountedValue: { $sum: { $multiply: ['$price', '$discount', 0.01] } },
-          },
-        },
-      ]),
-      this.aggregate([
-        { $match: { deletedAt: { $exists: false } } },
-        { $lookup: { from: 'reviews', localField: 'reviews', foreignField: '_id', as: 'reviewsData' } },
-        {
-          $group: {
-            _id: null,
-            totalReviews: { $sum: { $size: '$reviewsData' } },
-            avgRating: { $avg: { $avg: '$reviewsData.rating' } },
-          },
-        },
-      ]),
-      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $unwind: '$categories' }, { $group: { _id: '$categories', count: { $sum: 1 } } }, { $lookup: { from: 'categories', localField: '_id', foreignField: '_id', as: 'categoryData' } }, { $project: { _id: 0, categoryId: '$_id', categoryName: { $arrayElemAt: ['$categoryData.name', 0] }, count: 1 } }]),
-      this.aggregate([{ $match: { deletedAt: { $exists: false } } }, { $unwind: '$tags' }, { $group: { _id: '$tags', count: { $sum: 1 } } }]),
-      this.countDocuments({ productBundle: true, deletedAt: { $exists: false } }),
-      this.countDocuments({ isFeatured: true, deletedAt: { $exists: false } }),
-      this.countDocuments({ ecoFriendly: true, deletedAt: { $exists: false } }),
-      this.countDocuments({ isGiftCard: true, deletedAt: { $exists: false } }),
-      this.countDocuments({ preOrder: true, deletedAt: { $exists: false } }),
-      this.countDocuments({ isSubscription: true, deletedAt: { $exists: false } }),
-    ]);
+  (productSchema.statics._validateAndSanitizeParams = async function (params) {
+    const {
+      // Pagination
+      page = 1,
+      limit = 20,
+
+      // Sorting
+      sort,
+
+      // Search
+      search,
+      searchFields,
+      searchMode = 'fuzzy',
+
+      // Filtering
+      filters = {},
+
+      // Advanced options
+      facets = false,
+      aggregations = false,
+      projection,
+      includeInactive = false,
+      includeStats = false,
+
+      // Performance options
+      lean = true,
+      explain = false,
+      timeout = 30000,
+    } = params;
+
+    // Validate and sanitize pagination
+    const validatedPage = Math.max(1, Math.min(parseInt(page) || 1, 10000));
+    const validatedLimit = Math.max(1, Math.min(parseInt(limit) || 20, 1000));
+
+    // Validate sort fields
+    const allowedSortFields = ['title', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice', 'createdAt', 'updatedAt', 'publishDate', 'lastRestocked', 'soldCount', 'views', 'total_view', 'inventory', 'reviews.averageRating', 'reviews.totalReviews', 'analytics.views', 'analytics.clicks', 'analytics.conversions', 'discountValue', 'loyaltyPoints'];
+
+    const validatedSort = await this._parseSort(sort, allowedSortFields);
+
+    // Validate search parameters
+    const validatedSearch = search ? String(search).trim().substring(0, 200) : null;
+    const validatedSearchFields = await this._validateSearchFields(searchFields);
+
+    // Validate and sanitize filters
+    const validatedFilters = await this._validateFilters(filters, includeInactive);
+
+    // Validate projection
+    const validatedProjection = await this._validateProjection(projection);
 
     return {
-      totalProducts,
-      statusDistribution: statusCounts.reduce((acc, s) => ({ ...acc, [s._id]: s.count }), {}),
-      productTypeDistribution: productTypeCounts.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
-      availabilityDistribution: availabilityCounts.reduce((acc, a) => ({ ...acc, [a._id]: a.count }), {}),
-      priceStatistics: priceStats[0]
-        ? {
-            averagePrice: priceStats[0].avgPrice,
-            minPrice: priceStats[0].minPrice,
-            maxPrice: priceStats[0].maxPrice,
-            totalPrice: priceStats[0].totalPrice,
-          }
-        : { averagePrice: 0, minPrice: 0, maxPrice: 0, totalPrice: 0 },
-      stockStatistics: stockStats[0]
-        ? {
-            totalStock: stockStats[0].totalStock,
-            averageStock: stockStats[0].avgStock,
-            minStock: stockStats[0].minStock,
-            maxStock: stockStats[0].maxStock,
-            lowStockCount: stockStats[0].lowStockCount,
-            outOfStockCount: stockStats[0].outOfStockCount,
-          }
-        : { totalStock: 0, averageStock: 0, minStock: 0, maxStock: 0, lowStockCount: 0, outOfStockCount: 0 },
-      discountStatistics: discountStats[0]
-        ? {
-            discountedProducts: discountStats[0].discountedProducts,
-            averageDiscount: discountStats[0].avgDiscount,
-            maxDiscount: discountStats[0].maxDiscount,
-            totalDiscountedValue: discountStats[0].totalDiscountedValue,
-          }
-        : { discountedProducts: 0, averageDiscount: 0, maxDiscount: 0, totalDiscountedValue: 0 },
-      reviewStatistics: reviewStats[0]
-        ? {
-            totalReviews: reviewStats[0].totalReviews,
-            averageRating: reviewStats[0].avgRating || 0,
-          }
-        : { totalReviews: 0, averageRating: 0 },
-      categoryDistribution: categoryStats,
-      tagDistribution: tagStats.reduce((acc, t) => ({ ...acc, [t._id]: t.count }), {}),
-      bundleStatistics: { bundleProducts: bundleStats },
-      featuredStatistics: { featuredProducts: featuredStats },
-      ecoFriendlyStatistics: { ecoFriendlyProducts: ecoFriendlyStats },
-      giftCardStatistics: { giftCardProducts: giftCardStats },
-      preOrderStatistics: { preOrderProducts: preOrderStats },
-      subscriptionStatistics: { subscriptionProducts: subscriptionStats },
+      page: validatedPage,
+      limit: validatedLimit,
+      sort: validatedSort,
+      search: validatedSearch,
+      searchFields: validatedSearchFields,
+      searchMode,
+      filters: validatedFilters,
+      facets: Boolean(facets),
+      aggregations: Boolean(aggregations),
+      projection: validatedProjection,
+      includeInactive: Boolean(includeInactive),
+      includeStats: Boolean(includeStats),
+      lean: Boolean(lean),
+      explain: Boolean(explain),
+      timeout: Math.min(parseInt(timeout) || 30000, 60000),
     };
   });
-
-productSchema.static._validateAndSanitizeParams = async function (params) {
-  const {
-    // Pagination
-    page = 1,
-    limit = 20,
-
-    // Sorting
-    sort,
-
-    // Search
-    search,
-    searchFields,
-    searchMode = 'fuzzy',
-
-    // Filtering
-    filters = {},
-
-    // Advanced options
-    facets = false,
-    aggregations = false,
-    projection,
-    includeInactive = false,
-    includeStats = false,
-
-    // Performance options
-    lean = true,
-    explain = false,
-    timeout = 30000,
-  } = params;
-
-  // Validate and sanitize pagination
-  const validatedPage = Math.max(1, Math.min(parseInt(page) || 1, 10000));
-  const validatedLimit = Math.max(1, Math.min(parseInt(limit) || 20, 1000));
-
-  // Validate sort fields
-  const allowedSortFields = ['title', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice', 'createdAt', 'updatedAt', 'publishDate', 'lastRestocked', 'soldCount', 'views', 'total_view', 'inventory', 'reviews.averageRating', 'reviews.totalReviews', 'analytics.views', 'analytics.clicks', 'analytics.conversions', 'discountValue', 'loyaltyPoints'];
-
-  const validatedSort = this._parseSort(sort, allowedSortFields);
-
-  // Validate search parameters
-  const validatedSearch = search ? String(search).trim().substring(0, 200) : null;
-  const validatedSearchFields = this._validateSearchFields(searchFields);
-
-  // Validate and sanitize filters
-  const validatedFilters = this._validateFilters(filters, includeInactive);
-
-  // Validate projection
-  const validatedProjection = this._validateProjection(projection);
-
-  return {
-    page: validatedPage,
-    limit: validatedLimit,
-    sort: validatedSort,
-    search: validatedSearch,
-    searchFields: validatedSearchFields,
-    searchMode,
-    filters: validatedFilters,
-    facets: Boolean(facets),
-    aggregations: Boolean(aggregations),
-    projection: validatedProjection,
-    includeInactive: Boolean(includeInactive),
-    includeStats: Boolean(includeStats),
-    lean: Boolean(lean),
-    explain: Boolean(explain),
-    timeout: Math.min(parseInt(timeout) || 30000, 60000),
-  };
-};
-productSchema.static._parseSort = async function (sortParam, allowedFields) {
+productSchema.statics._parseSort = async function (sortParam, allowedFields) {
   if (!sortParam) return { createdAt: -1 };
 
   const sortObj = {};
@@ -2971,7 +2987,7 @@ productSchema.static._parseSort = async function (sortParam, allowedFields) {
 
   return Object.keys(sortObj).length > 0 ? sortObj : { createdAt: -1 };
 };
-productSchema.static._validateSearchFields = async function (fields) {
+productSchema.statics._validateSearchFields = async function (fields) {
   // const allowedSearchFields = [
   //   'title', 'shortDescription', 'descriptions', 'tags', 'sku',
   //   'brand', 'manufacturer', 'model', 'features', 'overview',
@@ -2989,7 +3005,7 @@ productSchema.static._validateSearchFields = async function (fields) {
     .filter((f) => DEFAULT_SEARCH_FIELDS.includes(f))
     .slice(0, 10); // Limit to 10 search fields
 };
-productSchema.static._validateFilters = async function (filters, includeInactive) {
+productSchema.statics._validateFilters = async function (filters, includeInactive) {
   if (!filters || typeof filters !== 'object') return {};
 
   const validatedFilters = {};
@@ -3154,7 +3170,7 @@ productSchema.static._validateFilters = async function (filters, includeInactive
 
   return validatedFilters;
 };
-productSchema.static._parseRange = async function (value, min = 0, max = Number.MAX_SAFE_INTEGER) {
+productSchema.statics._parseRange = async function (value, min = 0, max = Number.MAX_SAFE_INTEGER) {
   if (!value) return null;
 
   const range = {};
@@ -3172,7 +3188,7 @@ productSchema.static._parseRange = async function (value, min = 0, max = Number.
 
   return Object.keys(range).length > 0 ? range : null;
 };
-productSchema.static._parseDateRange = async function (value) {
+productSchema.statics._parseDateRange = async function (value) {
   if (!value) return null;
 
   const range = {};
@@ -3194,7 +3210,7 @@ productSchema.static._parseDateRange = async function (value) {
 
   return Object.keys(range).length > 0 ? range : null;
 };
-productSchema.static._validateProjection = async function (projection) {
+productSchema.statics._validateProjection = async function (projection) {
   if (!projection) return null;
 
   const allowedFields = ['_id', 'title', 'sku', 'productType', 'category', 'subcategory', 'vendor', 'manufacturer', 'model', 'shortDescription', 'material', 'color', 'size', 'basePrice', 'salePrice', 'comparePrice', 'retailPrice', 'discount', 'discountType', 'discountValue', 'inventory', 'mainImage', 'images', 'status', 'isAvailable', 'isFeatured', 'trending', 'newArrival', 'bestseller', 'onSale', 'reviews', 'tags', 'brand', 'createdAt', 'updatedAt'];
@@ -3211,7 +3227,7 @@ productSchema.static._validateProjection = async function (projection) {
 
   return Object.keys(projectionObj).length > 0 ? projectionObj : null;
 };
-productSchema.static._buildAdvancedPipeline = async function (params) {
+productSchema.statics._buildAdvancedPipeline = async function (params) {
   const { page, limit, sort, search, searchFields, searchMode, filters, facets, aggregations, projection, includeStats, explain } = params;
 
   const pipeline = [];
@@ -3223,7 +3239,7 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
 
   // 2. Text/fuzzy search stage
   if (search) {
-    const searchStage = this._buildSearchStage(search, searchFields, searchMode);
+    const searchStage = await this._buildSearchStage(search, searchFields, searchMode);
     if (searchStage) {
       pipeline.push(searchStage);
     }
@@ -3398,7 +3414,7 @@ productSchema.static._buildAdvancedPipeline = async function (params) {
 
   return pipeline;
 };
-productSchema.static._buildSearchStage = async function (search, searchFields, searchMode) {
+productSchema.statics._buildSearchStage = async function (search, searchFields, searchMode) {
   const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
 
   const searchConditions = searchFields.map((field) => {
@@ -3464,6 +3480,7 @@ productSchema.statics._formatFilterResults = async function (result, params) {
     ...(stats && { stats }),
   };
 };
+
 productSchema.statics.getCompleteProductDashboardStatistics = async function () {
   try {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);

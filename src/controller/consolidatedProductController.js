@@ -161,36 +161,136 @@ class ProductController {
    */
   static async getProducts(req, res) {
     try {
-      let { page = 1, limit = 10, sort = 'createdAt', order = 'desc', search,  isActive,
-      isArchive, status, productType, category, minPrice, maxPrice, ...otherFilters } = req.query;
+      let {
+        page = 1,
+        limit = 10,
+        sort = 'createdAt',
+        order = 'desc',
+        search,
+        isActive,
+        isArchive,
+        status,
+        productType,
+        category,
+        minPrice,
+        maxPrice,
+        // NEW flags / filters
+        popular,
+        featured,
+        newArrival,
+        bestseller,
+        trending,
+        onSale,
+        inStock,
+        outOfStock,
+        hasDiscount,
+        minRating,
+        maxRating,
+        minSold,
+        maxSold,
+        minViews,
+        maxViews,
+        fromDate,
+        toDate,
+        brands,
+        colors,
+        sizes,
+        gender,
+        ageGroup,
+        material,
+        ...otherFilters
+      } = req.query;
 
       page = Number(page);
       limit = Number(limit);
 
-      // --- Filters ---
+      // --- Base filters ---
       const filters = { deletedAt: { $exists: false } };
 
       if (isArchive === 'true') {
-      filters.isDeleted = true;
-      filters.isActive = false;
-    } else {
-      filters.isDeleted = isArchive === 'true' ? { $in: [true, false] } : false;
-      filters.isActive =
-        isActive === 'false'
-          ? false
-          : true; // default active
-    }
+        filters.isDeleted = true;
+        filters.isActive = false;
+      } else {
+        filters.isDeleted = isArchive === 'true' ? { $in: [true, false] } : false;
+        filters.isActive = isActive === 'false' ? false : true; // default active
+      }
 
       if (status) filters.status = status;
       if (productType) filters.productType = productType;
       if (category) filters.categories = category;
 
+      // --- Price range (use your existing basePrice) ---
       if (minPrice || maxPrice) {
         filters.basePrice = {};
         if (minPrice) filters.basePrice.$gte = Number(minPrice);
         if (maxPrice) filters.basePrice.$lte = Number(maxPrice);
       }
 
+      // --- NEW attribute filters ---
+      // brands = "id1,id2"
+      if (brands) {
+        const list = Array.isArray(brands) ? brands : brands.split(',').filter(Boolean);
+        if (list.length) filters.brand = { $in: list };
+      }
+
+      if (colors) {
+        const list = Array.isArray(colors) ? colors : colors.split(',').filter(Boolean);
+        if (list.length) filters.color = { $in: list };
+      }
+
+      if (sizes) {
+        const list = Array.isArray(sizes) ? sizes : sizes.split(',').filter(Boolean);
+        if (list.length) filters.size = { $in: list };
+      }
+
+      if (gender) filters.gender = gender;
+      if (ageGroup) filters.ageGroup = ageGroup;
+      if (material) filters.material = material;
+
+      // --- Inventory flags ---
+      if (inStock === 'true') {
+        filters.inventory = { $gt: 0 };
+        filters.isAvailable = true;
+      }
+      if (outOfStock === 'true') {
+        filters.inventory = 0;
+      }
+
+      // --- Discount / onSale flags ---
+      if (onSale === 'true') filters.onSale = true;
+      if (hasDiscount === 'true') {
+        filters.discountType = { $ne: 'none' };
+        filters.discountValue = { $gt: 0 };
+      }
+
+      // --- Rating range (if you store reviews.averageRating) ---
+      if (minRating || maxRating) {
+        filters['reviews.averageRating'] = {};
+        if (minRating) filters['reviews.averageRating'].$gte = Number(minRating);
+        if (maxRating) filters['reviews.averageRating'].$lte = Number(maxRating);
+      }
+
+      // --- Sold / views range (for “most sold” sections) ---
+      if (minSold || maxSold) {
+        filters.soldCount = {};
+        if (minSold) filters.soldCount.$gte = Number(minSold);
+        if (maxSold) filters.soldCount.$lte = Number(maxSold);
+      }
+
+      if (minViews || maxViews) {
+        filters.views = {};
+        if (minViews) filters.views.$gte = Number(minViews);
+        if (maxViews) filters.views.$lte = Number(maxViews);
+      }
+
+      // --- Created date range (for new arrivals) ---
+      if (fromDate || toDate) {
+        filters.createdAt = {};
+        if (fromDate) filters.createdAt.$gte = new Date(fromDate);
+        if (toDate) filters.createdAt.$lte = new Date(toDate);
+      }
+
+      // --- Existing dynamic filters (categories, tags, feature flags, etc.) ---
       otherFilters = buildFilters(otherFilters);
 
       for (const key of Object.keys(otherFilters)) {
@@ -225,9 +325,38 @@ class ProductController {
         filters.$or = [{ title: { $regex: search, $options: 'i' } }, { sku: { $regex: search, $options: 'i' } }, { tags: { $regex: search, $options: 'i' } }, { 'descriptions.short': { $regex: search, $options: 'i' } }, { productType: { $regex: search, $options: 'i' } }];
       }
 
-      // --- Sort ---
+      // --- Sort (enhanced with presets) ---
       const sortObj = {};
-      sortObj[sort] = order === 'desc' ? -1 : 1;
+
+      // Preset sorting by flags if provided
+      if (popular === 'true') {
+        // popular = highest sold / views, newest first
+        sortObj.soldCount = -1;
+        sortObj.views = -1;
+        sortObj.createdAt = -1;
+      } else if (featured === 'true') {
+        // feature list: featured first, then newest
+        filters.isFeatured = true;
+        sortObj.isFeatured = -1;
+        sortObj.createdAt = -1;
+      } else if (bestseller === 'true') {
+        filters.bestseller = true;
+        sortObj.soldCount = -1;
+      } else if (trending === 'true') {
+        filters.trending = true;
+        sortObj.views = -1;
+        sortObj.createdAt = -1;
+      } else if (newArrival === 'true') {
+        filters.newArrival = true;
+        sortObj.createdAt = -1;
+      } else if (onSale === 'true') {
+        // already set filters.onSale above, now sort by discount
+        sortObj.discountPercent = -1;
+        sortObj.createdAt = -1;
+      } else {
+        // fallback to your existing generic sort
+        sortObj[sort] = order === 'desc' ? -1 : 1;
+      }
 
       // --- Count total ---
       const total = await Product.countDocuments(filters);
@@ -237,21 +366,19 @@ class ProductController {
         .sort(sortObj)
         .skip((page - 1) * limit)
         .limit(limit)
-        .select('title brand category basePrice status _id slug sku createdAt inventory isFeatured bestSeller finalPrice stockStatus discountPercent isLowStock discountType discount discountValue  salePrice ') // ✅ Only required fields
+        .select('title brand category basePrice status _id slug sku createdAt inventory isFeatured bestSeller finalPrice stockStatus discountPercent isLowStock discountType discount discountValue salePrice views soldCount')
         .populate({ path: 'brand', select: 'name' })
         .populate({ path: 'category', select: 'title' })
-        .lean(); // ✅ Fast, returns plain JS objects
+        .lean();
 
       const products = await query.exec();
 
-      // --- Transform _id → id ---
       const result = products.map((p) => ({
         ...p,
         id: p._id,
         _id: undefined,
       }));
 
-      // --- Response ---
       const response = {
         result,
         pagination: {
@@ -295,21 +422,25 @@ class ProductController {
       const { identifier } = req.params;
       const { populate } = req.query;
 
-      // Validate ObjectId if it looks like one
-      if (mongoose.Types.ObjectId.isValid(identifier) && identifier.length === 24) {
-        // It's likely an ObjectId, validate it
-      }
+      const isObjectId = mongoose.Types.ObjectId.isValid(identifier) && identifier.length === 24;
 
-      // Comprehensive population for single product view
       const defaultPopulate = [
-        { path: 'categories', select: 'name slug description' },
-        { path: 'category', select: 'name slug description' },
+        { path: 'categories', select: 'name slug' },
+        { path: 'category', select: 'name slug' },
         { path: 'brand', select: 'name logo description website' },
-        { path: 'reviews', select: 'rating comment user createdAt', populate: { path: 'user', select: 'name avatar' } },
-        { path: 'relatedProducts', select: 'title mainImage basePrice salePrice status availability' },
-        { path: 'created_by', select: 'name email' },
-        { path: 'updated_by', select: 'name email' },
-        { path: 'bundleContents.product', select: 'title mainImage basePrice salePrice' },
+        {
+          path: 'reviews',
+          select: 'rating comment user createdAt',
+          populate: { path: 'user', select: 'name avatar' },
+        },
+        {
+          path: 'relatedProducts',
+          select: 'title mainImage basePrice salePrice status availability',
+        },
+        {
+          path: 'bundleContents.product',
+          select: 'title mainImage basePrice salePrice',
+        },
       ];
 
       let populateOptions = defaultPopulate;
@@ -318,19 +449,28 @@ class ProductController {
         populateOptions = populateFields.map((field) => ({ path: field.trim() }));
       }
 
-      const product = await Product.findOne({
-        $or: [{ _id: identifier }, { slug: identifier }],
+      // Build query: id OR slug
+      const query = {
         deletedAt: { $exists: false },
-      }).populate(populateOptions);
+      };
+
+      if (isObjectId) {
+        query._id = identifier;
+      } else {
+        query.slug = identifier;
+      }
+
+      const product = await Product.findOne(query).populate(populateOptions);
 
       if (!product) {
         return errorResponse(res, 'Product not found', 404);
       }
 
       // Increment view count
-      await Product.findByIdAndUpdate(product._id, { $inc: { views: 1, 'analytics.views': 1 } });
+      await Product.findByIdAndUpdate(product._id, {
+        $inc: { views: 1, 'analytics.views': 1 },
+      });
 
-      // Calculate additional fields
       const enrichedProduct = {
         ...ProductController.enrichProduct(product),
         ratingStats: product.ratingStatistics,
@@ -338,12 +478,15 @@ class ProductController {
         isExpired: product.isExpired(),
         needsRestock: product.needsRestock(),
       };
-      // Optional: Set custom activity info using middleware helper
-      req.setActivity('viewed product details', {
-        productId: product.id,
-        productName: product.title,
-        category: product.category.name,
-      });
+
+      if (req.setActivity && product.category) {
+        req.setActivity('viewed product details', {
+          productId: product.id,
+          productName: product.title,
+          category: product.category.name,
+        });
+      }
+
       return standardResponse(res, true, enrichedProduct, 'Product retrieved successfully');
     } catch (error) {
       console.error('Failed to fetch product:', error);
