@@ -262,12 +262,12 @@ productSchema.pre('save', async function (next) {
     const baseSlug = slugify(product.title, {
       lower: true,
       strict: true,
-      trim: true
+      trim: true,
     });
     let slug = baseSlug;
     let counter = 1;
     const ProductModel = product.constructor;
-    while ( await ProductModel.exists({ slug, _id: { $ne: doc._id } })) {
+    while (await ProductModel.exists({ slug, _id: { $ne: doc._id } })) {
       slug = `${baseSlug}-${counter++}`;
     }
     product.slug = slug;
@@ -3483,7 +3483,8 @@ productSchema.statics._formatFilterResults = async function (result, params) {
 
 productSchema.statics.getCompleteProductDashboardStatistics = async function () {
   try {
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
       totalProducts,
@@ -3502,56 +3503,116 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       autoRestockCount,
       productsWithSales,
       productsWithoutSales,
-      productsWithDiscounts,
+      productsWithDiscounts, // existing: discountType != 'none'
       productsWithReviews,
       ecoFriendlyCount,
       lowStockProductsCount,
       thisMonthProducts,
-      totalBrands, // New
-      totalCategories, // New
+      totalBrands,
+      totalCategories,
+
+      // --- NEW DISCOUNT / PRICING ANALYTICS ---
+      productsWithActiveDiscountPeriod,
+      productsWithHighDiscountPercent,
+      productsWithSalePriceLowerThanBase,
+      productsWithFinalPriceLowerThanCost,
+      productsWithUpcomingDiscount, // discountStartDate in future
     ] = await Promise.all([
-      Product.countDocuments({}), // Total products
-      Product.countDocuments({ status: 'active', isDeleted: false }),
-      Product.countDocuments({ isDeleted: true }),
-      Product.countDocuments({ status: 'draft' }),
-      Product.countDocuments({ status: 'published' }),
-      Product.countDocuments({ isFeatured: true }),
-      Product.countDocuments({ trending: true }),
-      Product.countDocuments({ newArrival: true }),
-      Product.countDocuments({ bestseller: true }),
-      Product.countDocuments({ onSale: true }),
+      // existing
+      this.countDocuments({}),
+      this.countDocuments({ status: 'active', isDeleted: false }),
+      this.countDocuments({ isDeleted: true }),
+      this.countDocuments({ status: 'draft' }),
+      this.countDocuments({ status: 'published' }),
+      this.countDocuments({ isFeatured: true }),
+      this.countDocuments({ trending: true }),
+      this.countDocuments({ newArrival: true }),
+      this.countDocuments({ bestseller: true }),
+      this.countDocuments({ onSale: true }),
 
-      // Inventory-related counts
-      Product.countDocuments({ inventory: 0, isDeleted: false }),
-      Product.countDocuments({
-        $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] },
+      this.countDocuments({ inventory: 0, isDeleted: false }),
+      this.countDocuments({
+        $expr: {
+          $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }],
+        },
         isDeleted: false,
       }),
-      Product.countDocuments({ $expr: { $gte: ['$inventory', '$lowStockThreshold'] }, isDeleted: false }),
-      Product.countDocuments({ autoRestockEnabled: true }),
-
-      // Sales and discount-related counts
-      Product.countDocuments({ soldCount: { $gt: 0 }, isDeleted: false }),
-      Product.countDocuments({ soldCount: 0, isDeleted: false }),
-      Product.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
-
-      // Engagement and attributes
-      Product.countDocuments({ 'reviews.totalReviews': { $gt: 0 }, isDeleted: false }),
-      Product.countDocuments({ ecoFriendly: true, isDeleted: false }),
-
-      // Enhanced stats
-      Product.countDocuments({
-        $expr: { $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }] },
+      this.countDocuments({
+        $expr: { $gte: ['$inventory', '$lowStockThreshold'] },
         isDeleted: false,
       }),
-      Product.countDocuments({
+      this.countDocuments({ autoRestockEnabled: true }),
+
+      this.countDocuments({ soldCount: { $gt: 0 }, isDeleted: false }),
+      this.countDocuments({ soldCount: 0, isDeleted: false }),
+      this.countDocuments({ discountType: { $ne: 'none' }, isDeleted: false }),
+
+      this.countDocuments({ 'reviews.totalReviews': { $gt: 0 }, isDeleted: false }),
+      this.countDocuments({ ecoFriendly: true, isDeleted: false }),
+
+      this.countDocuments({
+        $expr: {
+          $and: [{ $lt: ['$inventory', '$lowStockThreshold'] }, { $gt: ['$inventory', 0] }],
+        },
+        isDeleted: false,
+      }),
+      this.countDocuments({
         createdAt: { $gte: startOfMonth },
         isDeleted: false,
       }),
 
-      // New additions
-      Brand.countDocuments({}), // Total brands
-      Category.countDocuments({}), // Total categories
+      Brand.countDocuments({}),
+      Category.countDocuments({}),
+
+      // --- NEW: products with currently active discount window ---
+      // discountType != 'none' AND now is between discountStartDate and discountEndDate
+      this.countDocuments({
+        discountType: { $ne: 'none' },
+        isDeleted: false,
+        $or: [
+          {
+            discountStartDate: { $lte: now },
+            discountEndDate: { $gte: now },
+          },
+          {
+            // open-ended discount: start set, no end
+            discountStartDate: { $lte: now },
+            discountEndDate: { $exists: false },
+          },
+        ],
+      }),
+
+      // NEW: heavily discounted products, e.g. >= 30% discountPercent
+      this.countDocuments({
+        isDeleted: false,
+        discountType: { $ne: 'none' },
+        $or: [
+          { discountPercent: { $gte: 30 } }, // if you store discountPercent
+          { discountValue: { $gte: 30 } }, // or use value as threshold
+        ],
+      }),
+
+      // NEW: products where salePrice < basePrice (active price cut)
+      this.countDocuments({
+        isDeleted: false,
+        salePrice: { $gt: 0 },
+        $expr: { $lt: ['$salePrice', '$basePrice'] },
+      }),
+
+      // NEW: products where finalPrice < costPrice (margin risk)
+      this.countDocuments({
+        isDeleted: false,
+        costPrice: { $gt: 0 },
+        finalPrice: { $gt: 0 },
+        $expr: { $lt: ['$finalPrice', '$costPrice'] },
+      }),
+
+      // NEW: upcoming discounts (for scheduling / marketing)
+      this.countDocuments({
+        isDeleted: false,
+        discountType: { $ne: 'none' },
+        discountStartDate: { $gt: now },
+      }),
     ]);
 
     return {
@@ -3576,8 +3637,15 @@ productSchema.statics.getCompleteProductDashboardStatistics = async function () 
       ecoFriendlyCount,
       lowStockProductsCount,
       thisMonthProducts,
-      totalBrands, // New
-      totalCategories, // New
+      totalBrands,
+      totalCategories,
+
+      // new fields
+      productsWithActiveDiscountPeriod,
+      productsWithHighDiscountPercent,
+      productsWithSalePriceLowerThanBase,
+      productsWithFinalPriceLowerThanCost,
+      productsWithUpcomingDiscount,
     };
   } catch (error) {
     console.error('Error fetching product dashboard counts:', error);
