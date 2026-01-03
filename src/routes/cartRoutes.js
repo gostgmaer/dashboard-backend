@@ -127,13 +127,7 @@ router.delete(
 );
 
 // PATCH /api/cart/update/:productId - Update item quantity in cart
-router.patch(
-  '/update/:productId',
-  authMiddleware,
-  instanceCheckMiddleware,
-  cartValidation.updateQuantity,
-  cartController.updateCartItem
-);
+router.patch('/update/:productId', authMiddleware, instanceCheckMiddleware, cartValidation.updateQuantity, cartController.updateCartItem);
 
 // DELETE /api/cart/clear - Clear user's cart
 router.delete(
