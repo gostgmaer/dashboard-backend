@@ -1,0 +1,601 @@
+{
+	"info": {
+		"_postman_id": "1c14011f-90a2-4e3d-9192-c80b90d18444",
+		"name": "Brand API",
+		"description": "Brand management API with public listing, CRUD, bulk operations, images, ratings, and advanced filters",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Public – Brand Listing",
+			"item": [
+				{
+					"name": "Get Paginated Brands",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Active Brands",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/active?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"active"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Featured Brands",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/featured?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"featured"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Brands",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/search?keyword=nike&page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"search"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "nike"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Top Rated Brands",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/top-rated",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"top-rated"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Brands By Country",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/country/USA?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"country",
+								"USA"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Brands By Year Range",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/year-range?startYear=1990&endYear=2020",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"year-range"
+							],
+							"query": [
+								{
+									"key": "startYear",
+									"value": "1990"
+								},
+								{
+									"key": "endYear",
+									"value": "2020"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Brands With Social Media",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/social-media",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"social-media"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Brand By ID or Slug",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Brand CRUD",
+			"item": [
+				{
+					"name": "Create Brand",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Brand",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Brand",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Brand Enhancements",
+			"item": [
+				{
+					"name": "Add Brand Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}/add-image",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}",
+								"add-image"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Brand Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}/remove-image",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}",
+								"remove-image"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Brand Contact",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}/contact",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}",
+								"contact"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Brand Rating",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/{{brandId}}/rating",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"{{brandId}}",
+								"rating"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Update Status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/bulk-status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"bulk-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Feature Toggle",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/bulk-feature",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"bulk-feature"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Soft Delete Brands",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/soft-delete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"soft-delete"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Restore Brands",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/restore",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"restore"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Display Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/display-order",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"display-order"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Product Counts",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/brands/refresh-products",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"refresh-products"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documentation",
+			"item": [
+				{
+					"name": "Get Brand Routes (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/brands/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"brands",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "brandId",
+			"value": ""
+		},
+		{
+			"key": "brandSlug",
+			"value": ""
+		}
+	]
+}

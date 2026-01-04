@@ -1,0 +1,659 @@
+{
+	"info": {
+		"_postman_id": "ebd52832-4264-4f6a-bb6f-0b36f5bac3fa",
+		"name": "Permission API",
+		"description": "Comprehensive Permission Management API (CRUD, Bulk Ops, Search, Categorization)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "CRUD",
+			"item": [
+				{
+					"name": "Create Permission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Permission By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Permission",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Permission",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search & Filters",
+			"item": [
+				{
+					"name": "Active Permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"active"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Inactive Permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/inactive",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"inactive"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/search?keyword=user",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"search"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "user"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search By Name",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/search/name?keyword=user",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"search",
+								"name"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "user"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Permissions By Category",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/category/{{category}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"category",
+								"{{category}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Grouped Permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/grouped",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"grouped"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Create Permissions",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/bulk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"bulk"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Enable Permissions",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/bulk-enable",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"bulk-enable"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Disable Permissions",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/bulk-disable",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"bulk-disable"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Delete Permissions",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/bulk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"bulk"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Permission Management",
+			"item": [
+				{
+					"name": "Enable Permission",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/enable",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"enable"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Disable Permission",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/disable",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"disable"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Rename Permission",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/rename",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"rename"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Description",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/description",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"description"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Category",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/category",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"category"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Active",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/toggle-active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"toggle-active"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Utilities",
+			"item": [
+				{
+					"name": "Check Permission Exists",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/exists/{{permissionName}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"exists",
+								"{{permissionName}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create If Not Exists",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/create-if-not-exists",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"create-if-not-exists"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Permission API Response",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/{{permissionId}}/api-response",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"{{permissionId}}",
+								"api-response"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Docs",
+			"item": [
+				{
+					"name": "Permission API Docs (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/permission/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"permission",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "permissionId",
+			"value": ""
+		},
+		{
+			"key": "permissionName",
+			"value": ""
+		},
+		{
+			"key": "category",
+			"value": ""
+		}
+	]
+}

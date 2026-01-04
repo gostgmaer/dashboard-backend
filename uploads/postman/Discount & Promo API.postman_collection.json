@@ -1,0 +1,355 @@
+{
+	"info": {
+		"_postman_id": "5dc5a4ea-9182-439c-9415-1bb797fcc175",
+		"name": "Discount & Promo API",
+		"description": "Discount rules, promo codes, preview pricing, and checkout integration",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Discount Rules",
+			"item": [
+				{
+					"name": "Create Discount Rule",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/rules",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"rules"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Discount Rule",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/rules/{{ruleId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"rules",
+								"{{ruleId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Discount Rules",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/rules?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"rules"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Discount Rule Active",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/rules/{{ruleId}}/toggle",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"rules",
+								"{{ruleId}}",
+								"toggle"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Discount Rule",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/rules/{{ruleId}}/apply",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"rules",
+								"{{ruleId}}",
+								"apply"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Discount Rule",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/rules/{{ruleId}}/remove",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"rules",
+								"{{ruleId}}",
+								"remove"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Promo Codes",
+			"item": [
+				{
+					"name": "Create Promo Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/promo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"promo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Promo Code",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/promo/{{promoId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"promo",
+								"{{promoId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Promo Code To Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/promo/apply",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"promo",
+								"apply"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Preview & Checkout",
+			"item": [
+				{
+					"name": "Preview Discount Rules Pricing",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/preview/rules",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"preview",
+								"rules"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Checkout With Discounts",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/checkout/discounts",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"checkout",
+								"discounts"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documentation",
+			"item": [
+				{
+					"name": "Get Discount Routes (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/discount/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"discount",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "ruleId",
+			"value": ""
+		},
+		{
+			"key": "promoId",
+			"value": ""
+		},
+		{
+			"key": "cartId",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		}
+	]
+}

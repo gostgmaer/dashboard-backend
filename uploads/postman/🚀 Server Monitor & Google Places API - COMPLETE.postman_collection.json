@@ -1,0 +1,236 @@
+{
+	"info": {
+		"_postman_id": "3a0a8cd0-0bbb-4ff0-adfa-2b37013d242f",
+		"name": "🚀 Server Monitor & Google Places API - COMPLETE",
+		"description": "Enhanced collection with NEW disk/network/dashboard endpoints\n\nBase URL: {{baseUrl}}\nEnvironment vars required:\n• baseUrl\n• googlePlacesApiKey\n• location\n• input",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "📊 SERVER MONITORING",
+			"item": [
+				{
+					"name": "🩺 Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "ℹ️ Server Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/info",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"info"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "💾 Memory Usage",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/memory",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"memory"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "⚡ CPU Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cpu",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cpu"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "💿 Disk Usage 🔥 NEW",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/disk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"disk"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🌐 Network Stats 🔥 NEW",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/network",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"network"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📈 COMPLETE Dashboard 🔥 NEW",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/dashboard",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"dashboard"
+							]
+						},
+						"description": "All metrics in one endpoint!"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🌍 GOOGLE PLACES API",
+			"item": [
+				{
+					"name": "🔍 Autocomplete",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/google-places?input=restaurants in Delhi&country=in&location=28.7041,77.1025&radius=50000",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"google-places"
+							],
+							"query": [
+								{
+									"key": "input",
+									"value": "restaurants in Delhi"
+								},
+								{
+									"key": "country",
+									"value": "in"
+								},
+								{
+									"key": "location",
+									"value": "28.7041,77.1025"
+								},
+								{
+									"key": "radius",
+									"value": "50000"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "📍 Place Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/place-details?place_id=ChIJN1t_tDezDTkRg0",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"place-details"
+							],
+							"query": [
+								{
+									"key": "place_id",
+									"value": "ChIJN1t_tDezDTkRg0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "🏪 Nearby Places",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/nearby-places?location=28.7041,77.1025&radius=5000&type=restaurant",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"nearby-places"
+							],
+							"query": [
+								{
+									"key": "location",
+									"value": "28.7041,77.1025"
+								},
+								{
+									"key": "radius",
+									"value": "5000"
+								},
+								{
+									"key": "type",
+									"value": "restaurant"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/api/public"
+		}
+	]
+}

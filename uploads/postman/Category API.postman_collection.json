@@ -1,0 +1,460 @@
+{
+	"info": {
+		"_postman_id": "ea95ceef-d6a0-4cbe-93e4-b98c7de49f19",
+		"name": "Category API",
+		"description": "Category management API with CRUD, hierarchy, search, stats, and bulk operations",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Category – CRUD",
+			"item": [
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/{{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"{{categoryId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Category",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/{{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"{{categoryId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Category",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/{{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"{{categoryId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Category – Filtering & Search",
+			"item": [
+				{
+					"name": "Get Active Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"active"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Featured Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/featured",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"featured"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/search?keyword=electronics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"search"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "electronics"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category Tree",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/tree",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"tree"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Category – Statistics",
+			"item": [
+				{
+					"name": "Get Category Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Featured Category Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/featured-stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"featured-stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Aggregate Categories By Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/aggregate-status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"aggregate-status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Category – Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Update Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/bulk-status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"bulk-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Import Categories",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/import-bulk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"import-bulk"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Batch Update Display Orders",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/batch-update-display-orders",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"batch-update-display-orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Soft Delete Multiple Categories",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/soft-delete-many",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"soft-delete-many"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documentation",
+			"item": [
+				{
+					"name": "Get Category Routes (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/categories/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"categories",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "categoryId",
+			"value": ""
+		},
+		{
+			"key": "parentCategoryId",
+			"value": ""
+		}
+	]
+}

@@ -1,0 +1,1539 @@
+{
+	"info": {
+		"_postman_id": "9158a7e1-492d-4f55-a83c-dc2b5e8b0ba8",
+		"name": "Auth API Collection",
+		"description": "Complete Postman collection for Authentication & User Security API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Public Endpoints",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"kishor81160+9654845175445@gmail.com\",\r\n  \"username\": \"paupvdsf54v2b\",\r\n  \"password\": \"Pword@1234\",\r\n  \"confirmPassword\": \"Pword@1234\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"identifier\": \"kishor81160+9654845175445@gmail.com\",\r\n    \"password\": \"Pword@1234\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/verify-otp",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"verify-otp"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resend OTP",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/resend-otp",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"resend-otp"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Social Auth Login",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social-auth",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social-auth"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Social Login Redirect",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/:provider",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								":provider"
+							],
+							"variable": [
+								{
+									"key": "provider"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Social Callback",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/:provider/callback",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								":provider",
+								"callback"
+							],
+							"variable": [
+								{
+									"key": "provider"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"email\": \"kishor81160@gmail.com\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/forgot-password",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"forgot-password"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"newPassword\":\"Password@123\",\r\n    \"confirmPassword\":\"Password@123\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/reset-password/:token",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"reset-password",
+								":token"
+							],
+							"variable": [
+								{
+									"key": "token",
+									"value": "173e596e7ed56cfc5af28b2595e4299ea86106d746968d78d91c830146252a9e"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify User",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/verify/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"verify",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Authenticated Endpoints",
+			"item": [
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Permissions",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/permissions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"permissions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout All",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/logout-all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"logout-all"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/refresh-token",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"refresh-token"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"currentPassword\": \"NewStrongPass123!3455\",\r\n  \"newPassword\": \"NewStrongPass123!34555\",\r\n  \"confirmPassword\": \"NewStrongPass123!34555\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/change-password",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"change-password"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Email Verification",
+			"item": [
+				{
+					"name": "Send Email Verification",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/send-email-verification",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"send-email-verification"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Email",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/verify-email/:token",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"verify-email",
+								":token"
+							],
+							"variable": [
+								{
+									"key": "token"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm Email",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/confirm-email",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"confirm-email"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "MFA / OTP",
+			"item": [
+				{
+					"name": "Enable MFA",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/enable",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"enable"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Confirm MFA",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/confirm",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"confirm"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "MFA Status",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle MFA",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/toggle",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"toggle"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Setup OTP",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/setup",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"setup"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Setup",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/setup/verify",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"setup",
+								"verify"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send OTP",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/send",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"send"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resend OTP",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/resend",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"resend"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify OTP",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/verify",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"verify"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Login OTP",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/verify-login-otp",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"verify-login-otp"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Disable OTP",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/mfa/disable",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"mfa",
+								"disable"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sessions & Devices",
+			"item": [
+				{
+					"name": "Get Profile Data",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/profile-data",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"profile-data"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "User Settings",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/account-settng",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"account-settng"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Profile",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Devices",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/devices",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"devices"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Active Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/sessions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"sessions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke Session",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/sessions/revoke",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"sessions",
+								"revoke"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalidate All Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/sessions/invalidate-all",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"sessions",
+								"invalidate-all"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke Token",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/sessions/revoke-token",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"sessions",
+								"revoke-token"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Security",
+			"item": [
+				{
+					"name": "Security Events",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/security/events",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"security",
+								"events"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login History",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/security/login-history",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"security",
+								"login-history"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Security Summary",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/security/summary",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"security",
+								"summary"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Address",
+			"item": [
+				{
+					"name": "Add Address",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/addresses",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"addresses"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Address",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/addresses/:addressId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"addresses",
+								":addressId"
+							],
+							"variable": [
+								{
+									"key": "addressId"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set Default Address (PUT)",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/addresses/default/:addressId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"addresses",
+								"default",
+								":addressId"
+							],
+							"variable": [
+								{
+									"key": "addressId"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set Default Address (PATCH)",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/addresses/default/:addressId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"addresses",
+								"default",
+								":addressId"
+							],
+							"variable": [
+								{
+									"key": "addressId"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Address (PUT)",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/addresses/:addressId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"addresses",
+								":addressId"
+							],
+							"variable": [
+								{
+									"key": "addressId"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Address (PATCH)",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/addresses/:addressId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"addresses",
+								":addressId"
+							],
+							"variable": [
+								{
+									"key": "addressId"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profile & Social",
+			"item": [
+				{
+					"name": "Update Profile",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/profile",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile Picture",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/profile-picture",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"profile-picture"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Email",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/email",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"email"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Phone",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/phone",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"phone"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Link Social Account",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/:provider/link",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								":provider",
+								"link"
+							],
+							"variable": [
+								{
+									"key": "provider"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Callback for Link",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/:provider/link/callback",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								":provider",
+								"link",
+								"callback"
+							],
+							"variable": [
+								{
+									"key": "provider"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Social Account",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/:provider/unlink",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								":provider",
+								"unlink"
+							],
+							"variable": [
+								{
+									"key": "provider"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Linked Accounts",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/accounts",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								"accounts"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Social Status",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/:provider/status",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								":provider",
+								"status"
+							],
+							"variable": [
+								{
+									"key": "provider"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear All Social Links",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/social/clear/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"social",
+								"clear",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Trusted Devices",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/trusted-devices",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"trusted-devices"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Security Logs",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/security-logs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"security-logs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Login History",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/login-history",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"login-history"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Active Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/active-sessions",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"active-sessions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Known Devices",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/known-devices",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"known-devices"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin Analytics",
+			"item": [
+				{
+					"name": "OTP Analytics",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/admin/otp/analytics",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"admin",
+								"otp",
+								"analytics"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Security Report",
+					"request": {
+						"auth": {
+							"type": "bearer"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/admin/security/report",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"auth",
+								"admin",
+								"security",
+								"report"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

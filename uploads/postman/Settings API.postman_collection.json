@@ -1,0 +1,481 @@
+{
+	"info": {
+		"_postman_id": "5fcac8d2-3414-4568-a0ce-61e6f887f036",
+		"name": "Settings API",
+		"description": "Comprehensive Postman collection for Settings API (CRUD, Sections, Toggles, Utilities)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "CRUD",
+			"item": [
+				{
+					"name": "Create Settings",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"siteKey\": \"{{siteKey}}\",\n  \"branding\": {\n    \"logoUrl\": \"https://example.com/logo.png\",\n    \"primaryColor\": \"#ff0000\"\n  },\n  \"currency\": \"USD\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List All Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/setting",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Settings By Site",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Settings By Site",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currency\": \"INR\",\n  \"paymentMethods\": [\"credit_card\", \"paypal\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Settings",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Section Updates",
+			"item": [
+				{
+					"name": "Update Branding",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"logoUrl\": \"https://example.com/new-logo.png\",\n  \"primaryColor\": \"#000000\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/branding",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"branding"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update SEO",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"metaTitle\": \"My Store\",\n  \"metaDescription\": \"Best ecommerce store\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/seo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"seo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Payment Methods",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"methods\": [\"credit_card\", \"paypal\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/payment-methods",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"payment-methods"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Payment Method",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"method\": \"bank_transfer\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/payment-methods",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"payment-methods"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Contact Info",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"support@example.com\",\n  \"phone\": \"+91-9999999999\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/contact-info",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"contact-info"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Toggles & Features",
+			"item": [
+				{
+					"name": "Toggle Maintenance Mode",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"enabled\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/maintenance",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"maintenance"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Live Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"enabled\": false\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/live",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"live"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Feature Flag",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"feature\": \"reviews\",\n  \"enabled\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/feature",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"feature"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Utilities",
+			"item": [
+				{
+					"name": "Get Public Settings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/public",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"public"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Section",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/section/branding",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"section",
+								"branding"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reset All Settings",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/reset",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"reset"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Audit Update",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"changes\": { \"currency\": \"EUR\" },\n  \"auditNote\": \"Updated currency by admin\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/setting/{{siteKey}}/audit-update",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"setting",
+								"{{siteKey}}",
+								"audit-update"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "siteKey",
+			"value": "demo-site"
+		},
+		{
+			"key": "token",
+			"value": "YOUR_JWT_TOKEN"
+		}
+	]
+}

@@ -1,0 +1,451 @@
+{
+	"info": {
+		"_postman_id": "2faf4772-7e20-4534-be62-758f843f73fb",
+		"name": "Roles API",
+		"description": "Comprehensive Role & Permission Management API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Roles - CRUD",
+			"item": [
+				{
+					"name": "Create Role",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Roles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Role By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Role (PUT)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Role",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Role Management",
+			"item": [
+				{
+					"name": "Get Active Roles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"active"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set Default Role",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/default",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"default"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Default Role",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/default",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"default"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clone Role",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/clone",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"clone"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Permissions",
+			"item": [
+				{
+					"name": "Add Permission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}/permission",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}",
+								"permission"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Permission",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}/permission",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}",
+								"permission"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Permission",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}/permission/{{permission}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}",
+								"permission",
+								"{{permission}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sync Permissions",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}/sync-permissions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}",
+								"sync-permissions"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Audit & Utilities",
+			"item": [
+				{
+					"name": "Role Audit Trail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}/audit-trail",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}",
+								"audit-trail"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Role In Use",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/{{roleId}}/in-use",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"{{roleId}}",
+								"in-use"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Export Roles",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/export?format=json",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"export"
+							],
+							"query": [
+								{
+									"key": "format",
+									"value": "json"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Import Roles",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/role/import",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"role",
+								"import"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "roleId",
+			"value": ""
+		},
+		{
+			"key": "permission",
+			"value": ""
+		}
+	]
+}

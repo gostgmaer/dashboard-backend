@@ -1,0 +1,566 @@
+{
+	"info": {
+		"_postman_id": "fe802094-71e8-4c7d-9f51-28fee094a2e5",
+		"name": "Address API",
+		"description": "Comprehensive Address Management API with CRUD, bulk operations, tagging, cloning, merging, search, export, and IDOR protection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Address – CRUD",
+			"item": [
+				{
+					"name": "Create Address",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}",
+							"host": [
+								"{{baseUrl}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All User Addresses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}",
+							"host": [
+								"{{baseUrl}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Address By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Address (PUT)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Partial Update Address (PATCH)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Soft Delete Address",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Address – Management",
+			"item": [
+				{
+					"name": "Set Default Address",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/set-default",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"set-default"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Archive Address",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/archive",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"archive"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Restore Address",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/restore",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"restore"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clone Address",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/clone",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"clone"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Merge Addresses",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/merge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"merge"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Address – Search & Retrieval",
+			"item": [
+				{
+					"name": "Get Default Address",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/default",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"default"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Addresses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/search?keyword=london",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"search"
+							],
+							"query": [
+								{
+									"key": "keyword",
+									"value": "london"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Compare Addresses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId1}}/compare/{{addressId2}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId1}}",
+								"compare",
+								"{{addressId2}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Address History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/history",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"history"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Address – Tags",
+			"item": [
+				{
+					"name": "Add Tag to Address",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/add-tag",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"add-tag"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Tag from Address",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/{{addressId}}/remove-tag",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"{{addressId}}",
+								"remove-tag"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Addresses By Tag",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/by-tag?tag=home",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"by-tag"
+							],
+							"query": [
+								{
+									"key": "tag",
+									"value": "home"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Address – Bulk & Export",
+			"item": [
+				{
+					"name": "Batch Create Addresses",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/batch",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"batch"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/bulk/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"bulk",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Export Addresses",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/export?format=csv",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"export"
+							],
+							"query": [
+								{
+									"key": "format",
+									"value": "csv"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documentation",
+			"item": [
+				{
+					"name": "Get Address Routes (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/addresses"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "addressId",
+			"value": ""
+		},
+		{
+			"key": "addressId1",
+			"value": ""
+		},
+		{
+			"key": "addressId2",
+			"value": ""
+		}
+	]
+}

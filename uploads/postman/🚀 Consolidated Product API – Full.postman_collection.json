@@ -1,0 +1,1148 @@
+{
+	"info": {
+		"_postman_id": "62c65620-b6e9-4ebf-8717-b1725ed56442",
+		"name": "🚀 Consolidated Product API – Full",
+		"description": "All Product API endpoints (CRUD, Bulk, Search, Analytics, Instance, Favorites, Reviews, Taxonomy, Alerts, Downloads)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "📋 CRUD",
+			"item": [
+				{
+					"name": "Get Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Advanced Search",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/all?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"all"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Active Deal Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/active-data",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"active-data"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/database-stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"database-stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get By ID / Slug",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "soft-metal-bacon"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Product",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Test Product\",\n  \"sku\": \"SKU-001\",\n  \"basePrice\": 100,\n  \"productType\": \"physical\",\n  \"category\": \"{{categoryId}}\",\n  \"descriptions\": { \"short\": \"Short\", \"long\": \"Long\" }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Product",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"title\": \"Updated\" }"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Product",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Restore Product",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/restore/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"restore",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Delete",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"ids\": [\"{{productId}}\"], \"permanent\": false }"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/bulk/delete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"bulk",
+								"delete"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Status Update",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"ids\": [\"{{productId}}\"], \"status\": \"active\" }"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/bulk/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"bulk",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Stock Update",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"updates\": [{ \"id\": \"{{productId}}\", \"stock\": 10 }] }"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/bulk/stock",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"bulk",
+								"stock"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔍 Search & Filters",
+			"item": [
+				{
+					"name": "Search",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/search/laptop",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"search",
+								"laptop"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Featured",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/featured",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"featured"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Low Stock",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/low-stock",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"low-stock"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Out of Stock",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/out-of-stock",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"out-of-stock"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "By Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/category/{{categoryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"category",
+								"{{categoryId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "By Tags",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/tags/electronics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"tags",
+								"electronics"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "New Arrivals",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/new-arrivals",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"new-arrivals"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Price Range",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/price-range?minPrice=50&maxPrice=500",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"price-range"
+							],
+							"query": [
+								{
+									"key": "minPrice",
+									"value": "50"
+								},
+								{
+									"key": "maxPrice",
+									"value": "500"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Top Selling",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/top-selling",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"top-selling"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Most Viewed",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/most-viewed",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"most-viewed"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Discounted",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/discounted",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"discounted"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "⚙️ Instance Methods",
+			"item": [
+				{
+					"name": "Final Price",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/price/final?quantity=2",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"price",
+								"final"
+							],
+							"query": [
+								{
+									"key": "quantity",
+									"value": "2"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Stock Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/stock/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"stock",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Out of Stock",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/stock/mark-out",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"stock",
+								"mark-out"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Increment Views",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/views/increment",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"views",
+								"increment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Increment Sold",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/sold/increment",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"sold",
+								"increment"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SEO Data",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/seo",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"seo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Related Products",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/related",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"related"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "⭐ Favorites",
+			"item": [
+				{
+					"name": "Add Favorite",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/favorites/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"favorites",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Favorite",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/favorites/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"favorites",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Favorites",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/favorites",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"favorites"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🧾 Reviews",
+			"item": [
+				{
+					"name": "Add Review",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \"rating\": 5, \"comment\": \"Great\" }"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/reviews/add",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"reviews",
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Approve Review",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/reviews/{{reviewId}}/approve",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"reviews",
+								"{{reviewId}}",
+								"approve"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Review",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/{{productId}}/reviews/{{reviewId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"{{productId}}",
+								"reviews",
+								"{{reviewId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Analytics",
+			"item": [
+				{
+					"name": "Schema Report",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/analytics/schema-report",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"analytics",
+								"schema-report"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Database Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/analytics/database-stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"analytics",
+								"database-stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sales Metrics",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/analytics/sales-metrics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"analytics",
+								"sales-metrics"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Popularity",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "undefined",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/analytics/popularity",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"analytics",
+								"popularity"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📘 Docs",
+			"item": [
+				{
+					"name": "Routes Documentation",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/products/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"products",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "productId",
+			"value": ""
+		},
+		{
+			"key": "categoryId",
+			"value": ""
+		},
+		{
+			"key": "reviewId",
+			"value": ""
+		}
+	]
+}

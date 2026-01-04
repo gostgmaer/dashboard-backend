@@ -1,0 +1,459 @@
+{
+	"info": {
+		"_postman_id": "07f1b983-b291-4327-bd49-5d41bd09538c",
+		"name": "Wishlist API – Consolidated",
+		"description": "Postman collection for Wishlist API (CRUD, Bulk, Analytics, Export, Audit)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "📋 CRUD",
+			"item": [
+				{
+					"name": "Get User Wishlist",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/{{userId}}?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"{{userId}}"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add To Wishlist",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{userId}}\",\n  \"productId\": \"{{productId}}\",\n  \"priority\": \"HIGH\",\n  \"tags\": [\"gift\", \"wishlist\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/wishlist",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Wishlist Item",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notes\": \"Buy during sale\",\n  \"priority\": \"MEDIUM\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Wishlist Item",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "🔍 Special Operations",
+			"item": [
+				{
+					"name": "Approve Wishlist Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/approve/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"approve",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Restore Wishlist Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/restore/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"restore",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Archive Wishlist Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/archive/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"archive",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Product In Wishlist",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/check/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"check",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Wishlist",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/clear/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"clear",
+								"{{userId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📦 Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Add To Wishlist",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{userId}}\",\n  \"productIds\": [\"{{productId}}\"],\n  \"priority\": \"LOW\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/bulk/add",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"bulk",
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Wishlist",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"{{userId}}\",\n  \"productIds\": [\"{{productId}}\"],\n  \"updates\": { \"priority\": \"HIGH\" }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/bulk/update",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"bulk",
+								"update"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📊 Analytics & Audit",
+			"item": [
+				{
+					"name": "Wishlist Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/stats/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"stats",
+								"{{userId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Wishlist Audit Trail",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/audit/{{userId}}/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"audit",
+								"{{userId}}",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📤 Export",
+			"item": [
+				{
+					"name": "Export Wishlist",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/export/{{userId}}?format=json",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"export",
+								"{{userId}}"
+							],
+							"query": [
+								{
+									"key": "format",
+									"value": "json"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Export Featured Wishlist Items",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/wishlist/export/featured/{{userId}}?limit=10&format=csv",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"wishlist",
+								"export",
+								"featured",
+								"{{userId}}"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "format",
+									"value": "csv"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": "YOUR_JWT_TOKEN"
+		},
+		{
+			"key": "userId",
+			"value": "USER_ID"
+		},
+		{
+			"key": "productId",
+			"value": "PRODUCT_ID"
+		}
+	]
+}

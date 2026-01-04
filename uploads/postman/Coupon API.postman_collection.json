@@ -1,0 +1,346 @@
+{
+	"info": {
+		"_postman_id": "a3f8732b-73b8-4fae-9ab1-07525d72e94d",
+		"name": "Coupon API",
+		"description": "Coupon management API with CRUD, bulk operations, status toggling, and product application",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Coupon – CRUD",
+			"item": [
+				{
+					"name": "Add Coupon",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Coupons",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Coupon By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/{{couponId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"{{couponId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Coupon",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/{{couponId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"{{couponId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Coupon",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/{{couponId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"{{couponId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Coupon – Status & Visibility",
+			"item": [
+				{
+					"name": "Get Active Coupons",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"active"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Coupon Status (Show / Hide)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/{{couponId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"{{couponId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Coupon – Bulk Operations",
+			"item": [
+				{
+					"name": "Add Coupons in Bulk",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/bulk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"bulk"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Coupons",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/bulk/update",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"bulk",
+								"update"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Delete Coupons",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/bulk/delete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"bulk",
+								"delete"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Coupon – Application",
+			"item": [
+				{
+					"name": "Apply Coupon To Product",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/apply",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"apply"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documentation",
+			"item": [
+				{
+					"name": "Get Coupon Routes (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/coupons/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"coupons",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "couponId",
+			"value": ""
+		},
+		{
+			"key": "productId",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		}
+	]
+}

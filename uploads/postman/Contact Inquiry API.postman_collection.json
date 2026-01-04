@@ -1,0 +1,285 @@
+{
+	"info": {
+		"_postman_id": "5d83224c-bed9-4a30-9d3f-9dcaa21a1f56",
+		"name": "Contact Inquiry API",
+		"description": "Public contact inquiries + Admin inquiry management, analytics, and actions",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Public Inquiry",
+			"item": [
+				{
+					"name": "Submit Inquiry (Public)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/submit",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"submit"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Inquiry Management",
+			"item": [
+				{
+					"name": "Get All Inquiries",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Inquiry By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/{{inquiryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"{{inquiryId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Inquiries",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/search?query=order&status=open",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"search"
+							],
+							"query": [
+								{
+									"key": "query",
+									"value": "order"
+								},
+								{
+									"key": "status",
+									"value": "open"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get High Priority Inquiries",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/high-priority",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"high-priority"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Analytics",
+			"item": [
+				{
+					"name": "Get Inquiry Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"stats"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Actions",
+			"item": [
+				{
+					"name": "Update Inquiry",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/{{inquiryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"{{inquiryId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Inquiries",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/bulk-update",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"bulk-update"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Contact Client",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/{{inquiryId}}/contact",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"{{inquiryId}}",
+								"contact"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Archive Inquiry",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/inquiry/{{inquiryId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"inquiry",
+								"{{inquiryId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "inquiryId",
+			"value": ""
+		}
+	]
+}

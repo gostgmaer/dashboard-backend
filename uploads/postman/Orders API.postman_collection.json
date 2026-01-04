@@ -1,0 +1,643 @@
+{
+	"info": {
+		"_postman_id": "0dc82f8c-8787-4a94-bcad-8322e0d9f0fa",
+		"name": "Orders API",
+		"description": "Enterprise Orders API (CRUD, Payments, Fulfillment, Returns, Analytics, Fraud, Bulk Ops)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "CRUD",
+			"item": [
+				{
+					"name": "Create Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Order By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Orders (List)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Order",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Order",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Payments & Transactions",
+			"item": [
+				{
+					"name": "Mark As Paid",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/pay",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"pay"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refund Order",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/refund",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"refund"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Refund Orders",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/bulk-refund",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"bulk-refund"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Redeem Loyalty Points",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/redeem-points",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"redeem-points"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Fulfillment & Status",
+			"item": [
+				{
+					"name": "Update Order Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/bulk-status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"bulk-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Tracking Info",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/tracking",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"tracking"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Delivered",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/mark-delivered",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"mark-delivered"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Returns & After Sales",
+			"item": [
+				{
+					"name": "Request Return",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/request-return",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"request-return"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resolve Return",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/resolve-return",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"resolve-return"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Return Requests",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/return-requests",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"return-requests"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Analytics & Reports",
+			"item": [
+				{
+					"name": "Order Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/analytics/stats",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"analytics",
+								"stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Order Trends",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/analytics/trends",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"analytics",
+								"trends"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Revenue By Source",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/analytics/revenue-by-source",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"analytics",
+								"revenue-by-source"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Export Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/export?format=csv",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"export"
+							],
+							"query": [
+								{
+									"key": "format",
+									"value": "csv"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Fraud & Compliance",
+			"item": [
+				{
+					"name": "Fraudulent Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/fraudulent",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"fraudulent"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Compliance Check",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/compliance-check",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"compliance-check"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Flag Order",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/orders/{{orderId}}/flag",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"{{orderId}}",
+								"flag"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Docs",
+			"item": [
+				{
+					"name": "Orders API Docs (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/orders/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"orders",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "orderId",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		},
+		{
+			"key": "productId",
+			"value": ""
+		}
+	]
+}

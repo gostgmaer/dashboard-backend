@@ -1,0 +1,695 @@
+{
+	"info": {
+		"_postman_id": "11b95246-b13d-4858-98f0-1cf7d3c94b1d",
+		"name": "Payments API",
+		"description": "Comprehensive Payments API (User, Admin, Analytics, Bulk Ops, Webhooks)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "User Payments",
+			"item": [
+				{
+					"name": "Create Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Payment Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refund Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}/refund",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}",
+								"refund"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Dispute Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}/dispute",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}",
+								"dispute"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Capture Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}/capture",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}",
+								"capture"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Payment History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}/history",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}",
+								"history"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Risk Score",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/{{paymentId}}/risk-score",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"{{paymentId}}",
+								"risk-score"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin – Listings & Analytics",
+			"item": [
+				{
+					"name": "List Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments?page=1&limit=20",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Payment Analytics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/analytics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"analytics"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Suspicious Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/suspicious",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"suspicious"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Payments Requiring Action",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/requiring-action",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"requiring-action"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Recent Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/recent",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"recent"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Update Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/bulk-update-status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"bulk-update-status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Cancel Payments",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/bulk-cancel",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"bulk-cancel"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Refunds",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/bulk-refunds",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"bulk-refunds"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search & Filters",
+			"item": [
+				{
+					"name": "By Provider Transaction",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/provider-transaction/{{providerTransactionId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"provider-transaction",
+								"{{providerTransactionId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "By Order",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/order/{{orderId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"order",
+								"{{orderId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "By Country",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/country/{{country}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"country",
+								"{{country}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "By Currency",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/currency/{{currency}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"currency",
+								"{{currency}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "By Tag",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/tags/{{tag}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"tags",
+								"{{tag}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Stats",
+			"item": [
+				{
+					"name": "Processing Time Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/stats/processing-time",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"stats",
+								"processing-time"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Refund Rates",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/stats/refund-rates",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"stats",
+								"refund-rates"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Currency Breakdown",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/payments/stats/currency-breakdown",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"stats",
+								"currency-breakdown"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Webhooks (Public)",
+			"item": [
+				{
+					"name": "Generic Webhook",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/payments/webhook",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"webhook"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Docs",
+			"item": [
+				{
+					"name": "Payments API Docs (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/payments/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"payments",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "paymentId",
+			"value": ""
+		},
+		{
+			"key": "orderId",
+			"value": ""
+		},
+		{
+			"key": "providerTransactionId",
+			"value": ""
+		},
+		{
+			"key": "country",
+			"value": "IN"
+		},
+		{
+			"key": "currency",
+			"value": "USD"
+		},
+		{
+			"key": "tag",
+			"value": "refund"
+		}
+	]
+}

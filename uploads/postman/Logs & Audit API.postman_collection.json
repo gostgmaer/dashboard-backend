@@ -1,0 +1,399 @@
+{
+	"info": {
+		"_postman_id": "b6d4fc9c-8ca9-4f7c-b2e2-60442081e2c5",
+		"name": "Logs & Audit API",
+		"description": "Audit Logs API (Who did what, stats, activity tracking, failures, analytics)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Create Logs",
+			"item": [
+				{
+					"name": "Create Custom Log",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Query Logs",
+			"item": [
+				{
+					"name": "Get Logs (Who did what)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs?limit=10&operation=create",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "operation",
+									"value": "create"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Logs By User (Current User)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/user?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"user"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Logs By Date Range",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs?start_date=2024-01-01&end_date=2024-12-31",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs"
+							],
+							"query": [
+								{
+									"key": "start_date",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "end_date",
+									"value": "2024-12-31"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Statistics",
+			"item": [
+				{
+					"name": "Operation Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/stats/operations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"stats",
+								"operations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "User Activity Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/stats/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"stats",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Table Activity Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/stats/tables",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"stats",
+								"tables"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Daily Activity Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/stats/daily?days=7",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"stats",
+								"daily"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "7"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Top Endpoints",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/stats/top-endpoints?limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"stats",
+								"top-endpoints"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Activity Tracking",
+			"item": [
+				{
+					"name": "Activity By Table",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/activity/{{table}}?limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"activity",
+								"{{table}}"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Activity By Table Record",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/activity/{{table}}/{{recordId}}?limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"activity",
+								"{{table}}",
+								"{{recordId}}"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Failures",
+			"item": [
+				{
+					"name": "Failed Requests",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/logs/failed?limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"logs",
+								"failed"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		},
+		{
+			"key": "table",
+			"value": "orders"
+		},
+		{
+			"key": "recordId",
+			"value": ""
+		}
+	]
+}

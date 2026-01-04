@@ -1,0 +1,438 @@
+{
+	"info": {
+		"_postman_id": "5eec8dca-de5b-43f2-81b2-d2af5988e4cf",
+		"name": "Attribute API",
+		"description": "Attribute & Child Attribute management API with CRUD, bulk operations, visibility control, and hierarchy support",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "Attributes – CRUD",
+			"item": [
+				{
+					"name": "Create Attribute",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Attributes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Visible Attributes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/visible",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"visible"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Attribute By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Attribute",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Attribute",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Child Attributes",
+			"item": [
+				{
+					"name": "Add Child Attributes",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}/children",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}",
+								"children"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Child Attribute By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}/children/{{childId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}",
+								"children",
+								"{{childId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Child Attribute",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}/children/{{childId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}",
+								"children",
+								"{{childId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Child Attribute",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}/children/{{childId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}",
+								"children",
+								"{{childId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Status Management",
+			"item": [
+				{
+					"name": "Update Attribute Visibility",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/{{attributeId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"{{attributeId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Child Attribute Visibility",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/children/{{childId}}/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"children",
+								"{{childId}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Bulk Operations",
+			"item": [
+				{
+					"name": "Bulk Add Attributes",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/bulk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"bulk"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Attributes",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/bulk/update",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"bulk",
+								"update"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Delete Attributes",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/bulk/delete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"bulk",
+								"delete"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Documentation",
+			"item": [
+				{
+					"name": "Get Attribute Routes (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/attributes/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"attributes",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "attributeId",
+			"value": ""
+		},
+		{
+			"key": "childId",
+			"value": ""
+		}
+	]
+}

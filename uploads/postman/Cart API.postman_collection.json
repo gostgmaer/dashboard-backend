@@ -1,0 +1,427 @@
+{
+	"info": {
+		"_postman_id": "d0e5510b-8321-449b-9169-390028caa7e6",
+		"name": "Cart API",
+		"description": "Complete Cart API collection (User + Admin operations)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "🛒 User Cart",
+			"item": [
+				{
+					"name": "Get / Create Cart",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Item to Cart",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productId\": \"68ecb0056d7410c79615c434\",\n  \"quantity\": 15\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/add",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"add"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Cart Item Quantity",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"quantity\": 3\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/update/:product",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"update",
+								":product"
+							],
+							"variable": [
+								{
+									"key": "product",
+									"value": "68ecb0056d7410c79615c434"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Item from Cart",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/remove/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"remove",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Cart",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/clear",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"clear"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Discount",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"discountCode\": \"SUMMER10\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/discount",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"discount"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Merge Cart (Guest → User)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cartItems\": [\n    {\n      \"productId\": \"{{productId}}\",\n      \"quantity\": 2\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/merge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"merge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Set Cart Metadata",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"metadata\": {\n    \"source\": \"mobile-app\",\n    \"campaign\": \"diwali-sale\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/metadata",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"metadata"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "👮 Admin Cart",
+			"item": [
+				{
+					"name": "Get Paginated Carts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/paginated?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"paginated"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Abandoned Carts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/abandoned?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"abandoned"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Update Cart Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cartIds\": [\"{{cartId}}\"],\n  \"status\": \"abandoned\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/cart/bulk-update",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"bulk-update"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Cart Analytics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/analytics?startDate=2024-01-01&endDate=2024-12-31",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"analytics"
+							],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "endDate",
+									"value": "2024-12-31"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Product From All Carts",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/product/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"product",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear All Carts",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"all"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "📄 Docs",
+			"item": [
+				{
+					"name": "Get Route Docs (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/cart/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"cart",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/api"
+		},
+		{
+			"key": "token",
+			"value": "JWT_TOKEN_HERE"
+		},
+		{
+			"key": "productId",
+			"value": "64fdxxxxxxxxxxxx"
+		},
+		{
+			"key": "cartId",
+			"value": "64caxxxxxxxxxxxx"
+		}
+	]
+}

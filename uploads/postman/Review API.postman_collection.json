@@ -1,0 +1,674 @@
+{
+	"info": {
+		"_postman_id": "3483df8b-ceb0-42a7-933c-7d5fb18e44aa",
+		"name": "Review API",
+		"description": "Comprehensive Review Management API (CRUD, Moderation, Analytics, Helpful Votes)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17210605"
+	},
+	"item": [
+		{
+			"name": "CRUD",
+			"item": [
+				{
+					"name": "Create Review",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Review By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Review",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Review",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "List & Filters",
+			"item": [
+				{
+					"name": "Reviews By Product",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/product/{{productId}}?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"product",
+								"{{productId}}"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reviews By User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/user/{{userId}}?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"user",
+								"{{userId}}"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reviews By Rating",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/rating/5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"rating",
+								"5"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reviews By Date Range",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/date-range?startDate=2024-01-01&endDate=2024-12-31",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"date-range"
+							],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "endDate",
+									"value": "2024-12-31"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Moderation",
+			"item": [
+				{
+					"name": "Get Reported Reviews",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/reported/all",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"reported",
+								"all"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Report Review",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}/report",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}",
+								"report"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Unreport Review",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}/unreport",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}",
+								"unreport"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Approve Reviews",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/bulk-approve",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"bulk-approve"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Delete Reviews",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/bulk-delete",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"bulk-delete"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Helpful & Images",
+			"item": [
+				{
+					"name": "Mark Review Helpful",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}/helpful",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}",
+								"helpful"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Review Images",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}/clear-images",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}",
+								"clear-images"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Statistics & Analytics",
+			"item": [
+				{
+					"name": "Average Rating",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/stats/average/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"stats",
+								"average",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Rating Breakdown",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/stats/breakdown/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"stats",
+								"breakdown",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Top Rated Reviews",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/stats/top-rated/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"stats",
+								"top-rated",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Most Helpful Reviews",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/stats/most-helpful/{{productId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"stats",
+								"most-helpful",
+								"{{productId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Most Active Reviewers",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/most-active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"most-active"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Top Helpful Reviews",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/top-helpful",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"top-helpful"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Search & Reply",
+			"item": [
+				{
+					"name": "Search Reviews",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/search/query?search=great",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"search",
+								"query"
+							],
+							"query": [
+								{
+									"key": "search",
+									"value": "great"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reply To Review",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/{{reviewId}}/reply",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"{{reviewId}}",
+								"reply"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Docs",
+			"item": [
+				{
+					"name": "Review API Docs (Dev Only)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/review/docs/routes",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"review",
+								"docs",
+								"routes"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api"
+		},
+		{
+			"key": "token",
+			"value": ""
+		},
+		{
+			"key": "reviewId",
+			"value": ""
+		},
+		{
+			"key": "productId",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		}
+	]
+}
