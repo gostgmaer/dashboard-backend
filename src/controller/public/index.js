@@ -1,5 +1,7 @@
-const { standardResponse, errorResponse } = require('../../utils/apiUtils');
+const fs = require('fs');
+const path = require('path');
 
+const { standardResponse, errorResponse } = require('../../utils/apiUtils');
 const { apiCall } = require('../../lib/axiosCall');
 const publicServices = require('../../services/publicservice');
 
@@ -257,6 +259,43 @@ class publicController {
     } catch (error) {
       res.status(500).json({ error: 'Health check failed', details: error.message });
     }
+  }
+   static async getPostmanCollections(req, res) {
+    try {
+    const postmanDir = path.join(process.cwd(), 'uploads', 'postman');
+
+    // Check directory existence
+    if (!fs.existsSync(postmanDir)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Postman folder not found',
+      });
+    }
+
+    // Read files
+    const files = fs.readdirSync(postmanDir);
+
+    // Filter only Postman collection files
+    const collections = files
+      .filter(file => file.endsWith('.postman_collection.json'))
+      .map(file => ({
+        name: file.replace('.postman_collection.json', ''),
+        filename: file,
+        url: `${req.protocol}://${req.get('host')}/upload/postman/${file}`,
+      }));
+
+    res.status(200).json({
+      success: true,
+      total: collections.length,
+      data: collections,
+    });
+  } catch (error) {
+    console.error('Postman collection error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch Postman collections',
+    });
+  }
   }
 
   static async getDashboard(req, res) {

@@ -54,6 +54,7 @@ router.get('/place/photo', googlePlacesValidation.placePhoto, publicController.g
 
 
 router.get('/health', publicController.getHealth);
+router.get('/postman', publicController.getPostmanCollections);
 router.get('/info', publicController.getServerInfo);
 router.get('/memory', publicController.getMemoryUsage);
 router.get('/cpu', publicController.getCpuMetrics);
