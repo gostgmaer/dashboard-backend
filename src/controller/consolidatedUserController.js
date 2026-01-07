@@ -332,8 +332,12 @@ class UserController {
 
       // Build sort object
       const sortObj = {};
-      sortObj[sort] = order === 'desc' ? -1 : 1;
-
+      if (sort === 'fullName') {
+        sortObj.firstName = order === 'desc' ? -1 : 1;
+        sortObj.lastName = order === 'desc' ? -1 : 1;
+      } else {
+        sortObj[sort] = order === 'desc' ? -1 : 1;
+      }
       // Default population for list view
       const defaultPopulate = [
         { path: 'role', select: 'name permissions' },

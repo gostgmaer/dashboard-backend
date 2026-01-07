@@ -1176,7 +1176,6 @@ router.put(
 router.delete(
   '/bulk/delete',
   authMiddleware,
-
   bulkOperationLimiter,
   body('ids').isArray({ min: 1 }).withMessage('User IDs array is required'),
   body('ids.*').isMongoId().withMessage('Invalid user ID in array'),
