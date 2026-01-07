@@ -162,8 +162,8 @@ router.patch(
 // GET /api/users - Get all users with advanced filtering
 router.get(
   '/',
-  // authMiddleware,
-  // authorize('users', 'read'),
+  authMiddleware,
+  authorize('users', 'read'),
   // userValidation.query,
   UserController.getUsers
 );
