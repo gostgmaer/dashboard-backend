@@ -11,7 +11,8 @@ const validateEnvVariables = () => {
   }
 };
 //app config
-const dbUrl = process.env.MONGO_URL;
+const dbUrl = process.env.DATABASE_URL;
+const isSocketingEnabled = process.env.SOCKETING_ENABLED;
 const jwtSecret = process.env.JWT_SECRET;
 const refressSecret = process.env.JWT_REFRESH_SECRET;
 const serverPort = process.env.PORT;
@@ -99,7 +100,6 @@ const azureContainer = process.env.AZURE_CONTAINER || '';
 const azureAccount = process.env.AZURE_ACCOUNT || '';
 const azureAccessKey = process.env.AZURE_ACCESS_KEY || '';
 const azurestorage_conn_string = process.env.AZURE_CONNECTION_STRING || '';
-const maxFileSizeMB = parseInt(process.env.MAX_FILE_SIZE_MB) || 10;
 const allowedFileTypes = process.env.ALLOWED_FILE_TYPES ? process.env.ALLOWED_FILE_TYPES.split(',') : [];
 const virusScanEnabled = process.env.VIRUS_SCAN_ENABLED === 'true' || false;
 const virusScanApiKey = process.env.VIRUS_SCAN_API_KEY || '';
@@ -164,7 +164,8 @@ module.exports = {
   mailchimpList,
   applicaionName,
   paypalMode,
-  host,mailSender,
+  host,
+  mailSender,
   loginPath,
   frontendUrl,
   resetPath,
@@ -192,7 +193,6 @@ module.exports = {
   azureContainer,
   azureAccount,
   azureAccessKey,
-  maxFileSizeMB,
   allowedFileTypes,
   virusScanEnabled,
   virusScanApiKey,
@@ -204,9 +204,15 @@ module.exports = {
   firebasePrivateKey,
   firebaseKeyFile,
   useFirebaseEmulator,
+  isSocketingEnabled,
   firebaseEmulatorHost,
   firebaseEmulatorProtocol,
   firebaseEmulatorAuth,
   firebaseEmulatorStorage,
-  bucketName, localStoragePath, firebaseAuthDomain, firebaseMessagingSenderId, firebaseAppId,azurestorage_conn_string
+  bucketName,
+  localStoragePath,
+  firebaseAuthDomain,
+  firebaseMessagingSenderId,
+  firebaseAppId,
+  azurestorage_conn_string,
 };

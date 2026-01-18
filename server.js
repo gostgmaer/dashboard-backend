@@ -1,51 +1,62 @@
 /**
- * handler.js
+ * server.js
  * ----------------------------------------------------
- * Serverless entry
- * - Exports a handler function
- * - NO server.listen()
+ * Local / PM2 / Docker entry
+ * - Starts HTTP server
+ * - Handles graceful shutdown
  * - Node 20 safe
  */
 
-require('dotenv').config();
+require("dotenv").config();
 
-const http = require('http');
-const app = require('./app');
-const connectDB = require('./src/config/dbConnact');
-const socketService = require('./src/services/socketService');
+const http = require("http");
+const app = require("./app");
+const { isSocketingEnabled } = require("./src/config/setting");
+const connectDB = require("./src/config/dbConnact");
+const socketService = require("./src/services/socketService");
 
-let server;
-let isInitialized = false;
+const PORT = process.env.PORT || 3500;
 
-/* =========================
-   Bootstrap (cold start only)
-========================= */
-async function bootstrap() {
-  if (isInitialized) return;
+async function startServer() {
+  try {
+    console.log("⏳ Connecting to database...");
+    await connectDB();
+    console.log("✅ Database connected");
 
-  console.log('⏳ Connecting to database...');
-  await connectDB();
-  console.log('✅ Database connected');
+    const server = http.createServer(app);
 
-  server = http.createServer(app);
+    // Initialize Socket.IO
+    
+      if (isSocketingEnabled){ socketService.initialize(server)};
 
-  // Initialize socket once (note: not supported on Vercel)
-  socketService.initialize(server);
 
-  isInitialized = true;
-  console.log('🚀 Server initialized (serverless)');
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+    });
+
+    /* =========================
+       Graceful Shutdown
+    ========================= */
+    const shutdown = (signal) => {
+      console.log(`⏳ Received ${signal}. Shutting down...`);
+      server.close(() => {
+        console.log("✅ HTTP server closed");
+        process.exit(0);
+      });
+
+      setTimeout(() => {
+        console.error("❌ Forced shutdown");
+        process.exit(1);
+      }, 10_000);
+    };
+
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  } catch (error) {
+    console.error("❌ Server startup failed:", error);
+    process.exit(1);
+  }
 }
 
-/* =========================
-   REQUIRED EXPORT
-========================= */
-module.exports = async function handler(req, res) {
-  try {
-    await bootstrap();
-    server.emit('request', req, res);
-  } catch (error) {
-    console.error('🔥 Handler error:', error);
-    res.statusCode = 500;
-    res.end('Internal Server Error');
-  }
-};
+startServer();

@@ -11,6 +11,7 @@ require("dotenv").config();
 
 const http = require("http");
 const app = require("./app");
+const { isSocketingEnabled } = require("./src/config/setting");
 const connectDB = require("./src/config/dbConnact");
 const socketService = require("./src/services/socketService");
 
@@ -25,7 +26,9 @@ async function startServer() {
     const server = http.createServer(app);
 
     // Initialize Socket.IO
-    socketService.initialize(server);
+    
+      if (isSocketingEnabled){ socketService.initialize(server)};
+
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

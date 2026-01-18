@@ -15,7 +15,7 @@ const metrics = {
  * Validates required email configuration variables.
  * Skips host/port validation if a service is specified.
  * @param {Object} options - Optional override for configuration.
- * @throws {Error} If required variables are missing. 
+ * @throws {Error} If required variables are missing.
  */
 const validateEmailConfig = (options = {}) => {
   const requiredVars = ['mailUserName', 'emailHost', 'emailPort'];
@@ -111,8 +111,8 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
   while (attempts < retries) {
     try {
       const transporter = createTransporter();
-      await transporter.verify();-
-      metrics.connectionSuccesses++;
+      await transporter.verify();
+      -metrics.connectionSuccesses++;
       return '✅ Email service connection verified';
       //  return { success: true, message: 'Email service connection verified', metrics };
     } catch (error) {
