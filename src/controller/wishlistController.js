@@ -1,418 +1,393 @@
 const Wishlist = require('../models/wishlist');
 const { validationResult } = require('express-validator');
-// const logger = require('../config/logger');
-// const { APIError, formatResponse } = require('../utils/apiUtils');
-// const { validateWishlistInput, validateBulkWishlistInput } = require('../middleware/validators');
-const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
+const { sendSuccess, sendCreated, HTTP_STATUS } = require('../utils/responseHelper');
+const AppError = require('../utils/appError');
+const { catchAsync } = require('../middleware/errorHandler');
+
 // Helper function to check authorization
 const checkAuthorization = (req, userId) => {
   if (!req.user || req.user._id.toString() !== userId.toString()) {
-    throw new APIError('Unauthorized', 403);
+    throw AppError.forbidden('Unauthorized access');
   }
 };
 
 // Controller methods
 const wishlistController = {
   // Add item to wishlist
-  async addToWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId, notes, priority, tags } = req.body;
-      checkAuthorization(req, userId);
-
-      const wishlistItem = await Wishlist.addToWishlist({
-        userId,
-        productId,
-        created_by: req.user._id,
-        notes,
-        priority,
-        tags
-      });
-// Using manual logging with detailed info
-      await ActivityHelper.logCRUD(req, 'WithList', 'Create', {
-        id: wishlistItem._id,
-      });
-      return res.status(201).json(formatResponse('Wishlist item added successfully', wishlistItem.toJSONSafe()));
-    } catch (error) {
-      //logger.error('Error in addToWishlist:', error);
-      next(error);
+  addToWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId, notes, priority, tags } = req.body;
+    checkAuthorization(req, userId);
+
+    const wishlistItem = await Wishlist.addToWishlist({
+      userId,
+      productId,
+      created_by: req.user._id,
+      notes,
+      priority,
+      tags,
+    });
+
+    await ActivityHelper.logCRUD(req, 'WithList', 'Create', { id: wishlistItem._id });
+
+    return sendCreated(res, {
+      data: wishlistItem.toJSONSafe(),
+      message: 'Wishlist item added successfully',
+    });
+  }),
 
   // Approve pending wishlist item
-  async approveWishlistItem(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.body;
-      checkAuthorization(req, userId); // Additional check for admin role could be added
-
-      const wishlistItem = await Wishlist.approveWishlistItem({
-        userId,
-        productId,
-        approvedBy: req.user._id
-      });
-
-      if (!wishlistItem) {
-        throw new APIError('Wishlist item not found or not pending', 404);
-      }
-
-      return res.status(200).json(formatResponse('Wishlist item approved successfully', wishlistItem.toJSONSafe()));
-    } catch (error) {
-      //logger.error('Error in approveWishlistItem:', error);
-      next(error);
+  approveWishlistItem: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId } = req.body;
+    checkAuthorization(req, userId);
+
+    const wishlistItem = await Wishlist.approveWishlistItem({
+      userId,
+      productId,
+      approvedBy: req.user._id,
+    });
+
+    if (!wishlistItem) {
+      throw AppError.notFound('Wishlist item not found or not pending');
+    }
+
+    return sendSuccess(res, {
+      data: wishlistItem.toJSONSafe(),
+      message: 'Wishlist item approved successfully',
+    });
+  }),
 
   // Remove item from wishlist
-  async removeFromWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.params;
-      checkAuthorization(req, userId);
-
-      const wishlistItem = await Wishlist.removeFromWishlist({
-        userId,
-        productId,
-        removedBy: req.user._id
-      });
-
-      if (!wishlistItem) {
-        throw new APIError('Wishlist item not found', 404);
-      }
-
-      // Using manual logging with detailed info
-      await ActivityHelper.logCRUD(req, 'WithList', 'Create', {
-        id: wishlistItem._id,
-      });
-
-      return res.status(200).json(formatResponse('Wishlist item removed successfully', wishlistItem.toJSONSafe()));
-    } catch (error) {
-      //logger.error('Error in removeFromWishlist:', error);
-      next(error);
+  removeFromWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId } = req.params;
+    checkAuthorization(req, userId);
+
+    const wishlistItem = await Wishlist.removeFromWishlist({
+      userId,
+      productId,
+      removedBy: req.user._id,
+    });
+
+    if (!wishlistItem) {
+      throw AppError.notFound('Wishlist item not found');
+    }
+
+    await ActivityHelper.logCRUD(req, 'WithList', 'Delete', { id: wishlistItem._id });
+
+    return sendSuccess(res, {
+      data: wishlistItem.toJSONSafe(),
+      message: 'Wishlist item removed successfully',
+    });
+  }),
 
   // Restore deleted wishlist item
-  async restoreWishlistItem(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.body;
-      checkAuthorization(req, userId);
-
-      const wishlistItem = await Wishlist.restoreWishlistItem({
-        userId,
-        productId,
-        restoredBy: req.user._id
-      });
-
-      if (!wishlistItem) {
-        throw new APIError('Wishlist item not found or not deleted', 404);
-      }
-
-      return res.status(200).json(formatResponse('Wishlist item restored successfully', wishlistItem.toJSONSafe()));
-    } catch (error) {
-      //logger.error('Error in restoreWishlistItem:', error);
-      next(error);
+  restoreWishlistItem: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId } = req.body;
+    checkAuthorization(req, userId);
+
+    const wishlistItem = await Wishlist.restoreWishlistItem({
+      userId,
+      productId,
+      restoredBy: req.user._id,
+    });
+
+    if (!wishlistItem) {
+      throw AppError.notFound('Wishlist item not found or not deleted');
+    }
+
+    return sendSuccess(res, {
+      data: wishlistItem.toJSONSafe(),
+      message: 'Wishlist item restored successfully',
+    });
+  }),
 
   // Get user's wishlist with filtering
-  async getUserWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId } = req.params;
-      const { page, limit, sort, priority, status, search, tags } = req.query;
-      checkAuthorization(req, userId);
-
-      const wishlist = await Wishlist.getUserWishlist({
-        userId,
-        page: parseInt(page) || 1,
-        limit: parseInt(limit) || 10,
-        sort: sort || '-createdAt',
-        priority,
-        status: status ? status.split(',') : ['ACTIVE', 'PENDING'],
-        search,
-        tags: tags ? tags.split(',') : undefined
-      });
-
-      return res.status(200).json(formatResponse('Wishlist retrieved successfully', wishlist));
-    } catch (error) {
-      //logger.error('Error in getUserWishlist:', error);
-      next(error);
+  getUserWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId } = req.params;
+    const { page, limit, sort, priority, status, search, tags } = req.query;
+    checkAuthorization(req, userId);
+
+    const wishlist = await Wishlist.getUserWishlist({
+      userId,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 10,
+      sort: sort || '-createdAt',
+      priority,
+      status: status ? status.split(',') : ['ACTIVE', 'PENDING'],
+      search,
+      tags: tags ? tags.split(',') : undefined,
+    });
+
+    return sendSuccess(res, {
+      data: wishlist,
+      message: 'Wishlist retrieved successfully',
+    });
+  }),
 
   // Check if product is in wishlist
-  async isInWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.params;
-      checkAuthorization(req, userId);
-
-      const exists = await Wishlist.isInWishlist({ userId, productId });
-
-      return res.status(200).json(formatResponse('Wishlist check completed', { isInWishlist: exists }));
-    } catch (error) {
-      //logger.error('Error in isInWishlist:', error);
-      next(error);
+  isInWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId } = req.params;
+    checkAuthorization(req, userId);
+
+    const exists = await Wishlist.isInWishlist({ userId, productId });
+
+    return sendSuccess(res, {
+      data: { isInWishlist: exists },
+      message: 'Wishlist check completed',
+    });
+  }),
 
   // Clear wishlist
-  async clearWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId } = req.params;
-      checkAuthorization(req, userId);
-
-      const result = await Wishlist.clearWishlist(userId, req.user._id);
-
-      return res.status(200).json(formatResponse('Wishlist cleared successfully', { affected: result.nModified }));
-    } catch (error) {
-      //logger.error('Error in clearWishlist:', error);
-      next(error);
+  clearWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId } = req.params;
+    checkAuthorization(req, userId);
+
+    const result = await Wishlist.clearWishlist(userId, req.user._id);
+
+    return sendSuccess(res, {
+      data: { affected: result.nModified },
+      message: 'Wishlist cleared successfully',
+    });
+  }),
 
   // Get wishlist statistics
-  async getWishlistStats(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId } = req.params;
-      checkAuthorization(req, userId);
-
-      const stats = await Wishlist.getWishlistStats(userId);
-
-      return res.status(200).json(formatResponse('Wishlist statistics retrieved successfully', stats));
-    } catch (error) {
-      //logger.error('Error in getWishlistStats:', error);
-      next(error);
+  getWishlistStats: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId } = req.params;
+    checkAuthorization(req, userId);
+
+    const stats = await Wishlist.getWishlistStats(userId);
+
+    return sendSuccess(res, {
+      data: stats,
+      message: 'Wishlist statistics retrieved successfully',
+    });
+  }),
 
   // Bulk add to wishlist
-  async bulkAddToWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productIds, priority, tags } = req.body;
-      checkAuthorization(req, userId);
-
-      const result = await Wishlist.bulkAddToWishlist({
-        userId,
-        productIds,
-        created_by: req.user._id,
-        priority,
-        tags
-      });
-
-      return res.status(201).json(formatResponse('Bulk add to wishlist successful', result));
-    } catch (error) {
-      //logger.error('Error in bulkAddToWishlist:', error);
-      next(error);
+  bulkAddToWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productIds, priority, tags } = req.body;
+    checkAuthorization(req, userId);
+
+    const result = await Wishlist.bulkAddToWishlist({
+      userId,
+      productIds,
+      created_by: req.user._id,
+      priority,
+      tags,
+    });
+
+    return sendCreated(res, {
+      data: result,
+      message: 'Bulk add to wishlist successful',
+    });
+  }),
 
   // Bulk update wishlist items
-  async bulkUpdateWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productIds, updates } = req.body;
-      checkAuthorization(req, userId);
-
-      const result = await Wishlist.bulkUpdateWishlist({
-        userId,
-        productIds,
-        updates,
-        updated_by: req.user._id
-      });
-
-      return res.status(200).json(formatResponse('Bulk update wishlist successful', result));
-    } catch (error) {
-      //logger.error('Error in bulkUpdateWishlist:', error);
-      next(error);
+  bulkUpdateWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productIds, updates } = req.body;
+    checkAuthorization(req, userId);
+
+    const result = await Wishlist.bulkUpdateWishlist({
+      userId,
+      productIds,
+      updates,
+      updated_by: req.user._id,
+    });
+
+    return sendSuccess(res, {
+      data: result,
+      message: 'Bulk update wishlist successful',
+    });
+  }),
 
   // Export wishlist
-  async exportWishlist(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId } = req.params;
-      const { format, fields } = req.query;
-      checkAuthorization(req, userId);
-
-      const exportedData = await Wishlist.exportWishlist({
-        userId,
-        format,
-        fields: fields ? fields.split(',') : undefined
-      });
-
-      if (format === 'csv') {
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${exportedData.filename}`);
-        return res.status(200).send(exportedData.content);
-      }
-
-      return res.status(200).json(formatResponse('Wishlist exported successfully', exportedData));
-    } catch (error) {
-      //logger.error('Error in exportWishlist:', error);
-      next(error);
+  exportWishlist: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId } = req.params;
+    const { format, fields } = req.query;
+    checkAuthorization(req, userId);
+
+    const exportedData = await Wishlist.exportWishlist({
+      userId,
+      format,
+      fields: fields ? fields.split(',') : undefined,
+    });
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=${exportedData.filename}`);
+      return res.status(HTTP_STATUS.OK).send(exportedData.content);
+    }
+
+    return sendSuccess(res, {
+      data: exportedData,
+      message: 'Wishlist exported successfully',
+    });
+  }),
 
   // Export featured items
-  async exportFeaturedItems(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId } = req.params;
-      const { limit, format } = req.query;
-      checkAuthorization(req, userId);
-
-      const exportedData = await Wishlist.exportFeaturedItems({
-        userId,
-        limit: parseInt(limit) || 10,
-        format
-      });
-
-      if (format === 'csv') {
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${exportedData.filename}`);
-        return res.status(200).send(exportedData.content);
-      }
-
-      return res.status(200).json(formatResponse('Featured items exported successfully', exportedData));
-    } catch (error) {
-      //logger.error('Error in exportFeaturedItems:', error);
-      next(error);
+  exportFeaturedItems: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId } = req.params;
+    const { limit, format } = req.query;
+    checkAuthorization(req, userId);
+
+    const exportedData = await Wishlist.exportFeaturedItems({
+      userId,
+      limit: parseInt(limit) || 10,
+      format,
+    });
+
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=${exportedData.filename}`);
+      return res.status(HTTP_STATUS.OK).send(exportedData.content);
+    }
+
+    return sendSuccess(res, {
+      data: exportedData,
+      message: 'Featured items exported successfully',
+    });
+  }),
 
   // Get audit trail
-  async getAuditTrail(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.params;
-      checkAuthorization(req, userId);
-
-      const auditTrail = await Wishlist.getAuditTrail({ userId, productId });
-
-      return res.status(200).json(formatResponse('Audit trail retrieved successfully', auditTrail));
-    } catch (error) {
-      //logger.error('Error in getAuditTrail:', error);
-      next(error);
+  getAuditTrail: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId } = req.params;
+    checkAuthorization(req, userId);
+
+    const auditTrail = await Wishlist.getAuditTrail({ userId, productId });
+
+    return sendSuccess(res, {
+      data: auditTrail,
+      message: 'Audit trail retrieved successfully',
+    });
+  }),
 
   // Update wishlist item
-  async updateWishlistItem(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.params;
-      const { notes, priority, tags } = req.body;
-      checkAuthorization(req, userId);
-
-      const wishlistItem = await Wishlist.findOne({ user: userId, product: productId, status: { $in: ['ACTIVE', 'PENDING'] } });
-      if (!wishlistItem) {
-        throw new APIError('Wishlist item not found', 404);
-      }
-
-      const updatedItem = await wishlistItem.updateItem({
-        notes,
-        priority,
-        tags,
-        updated_by: req.user._id
-      });
-// Using manual logging with detailed info
-      await ActivityHelper.logCRUD(req, 'WithList', 'Update', {
-        id: wishlistItem._id,
-      });
-      return res.status(200).json(formatResponse('Wishlist item updated successfully', updatedItem.toJSONSafe()));
-    } catch (error) {
-      //logger.error('Error in updateWishlistItem:', error);
-      next(error);
+  updateWishlistItem: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  },
+
+    const { userId, productId } = req.params;
+    const { notes, priority, tags } = req.body;
+    checkAuthorization(req, userId);
+
+    const wishlistItem = await Wishlist.findOne({
+      user: userId,
+      product: productId,
+      status: { $in: ['ACTIVE', 'PENDING'] },
+    });
+
+    if (!wishlistItem) {
+      throw AppError.notFound('Wishlist item not found');
+    }
+
+    const updatedItem = await wishlistItem.updateItem({
+      notes,
+      priority,
+      tags,
+      updated_by: req.user._id,
+    });
+
+    await ActivityHelper.logCRUD(req, 'WithList', 'Update', { id: wishlistItem._id });
+
+    return sendSuccess(res, {
+      data: updatedItem.toJSONSafe(),
+      message: 'Wishlist item updated successfully',
+    });
+  }),
 
   // Archive wishlist item
-  async archiveWishlistItem(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        throw new APIError('Validation failed', 400, errors.array());
-      }
-
-      const { userId, productId } = req.params;
-      checkAuthorization(req, userId);
-
-      const wishlistItem = await Wishlist.findOne({ user: userId, product: productId, status: { $in: ['ACTIVE', 'PENDING'] } });
-      if (!wishlistItem) {
-        throw new APIError('Wishlist item not found', 404);
-      }
-
-      const archivedItem = await wishlistItem.archive(req.user._id);
-
-      return res.status(200).json(formatResponse('Wishlist item archived successfully', archivedItem.toJSONSafe()));
-    } catch (error) {
-      //logger.error('Error in archiveWishlistItem:', error);
-      next(error);
+  archiveWishlistItem: catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  }
+
+    const { userId, productId } = req.params;
+    checkAuthorization(req, userId);
+
+    const wishlistItem = await Wishlist.findOne({
+      user: userId,
+      product: productId,
+      status: { $in: ['ACTIVE', 'PENDING'] },
+    });
+
+    if (!wishlistItem) {
+      throw AppError.notFound('Wishlist item not found');
+    }
+
+    const archivedItem = await wishlistItem.archive(req.user._id);
+
+    return sendSuccess(res, {
+      data: archivedItem.toJSONSafe(),
+      message: 'Wishlist item archived successfully',
+    });
+  }),
 };
 
 module.exports = wishlistController;

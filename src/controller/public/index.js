@@ -1,21 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 
-const { standardResponse, errorResponse } = require('../../utils/apiUtils');
 const { apiCall } = require('../../lib/axiosCall');
 const publicServices = require('../../services/publicservice');
+const { sendSuccess, HTTP_STATUS } = require('../../utils/responseHelper');
+const AppError = require('../../utils/appError');
+const { catchAsync } = require('../../middleware/errorHandler');
 
 class publicController {
-  static async getGooglePlaces(req, res) {
+  static getGooglePlaces = catchAsync(async (req, res) => {
     const input = req.query.input;
-
     const country = (req.query.country || 'in').toLowerCase();
-    const location = req.query.location; // ex: '28.7041,77.1025'
-    const radius = req.query.radius || 50000; // optional radius for location biasing
+    const location = req.query.location;
+    const radius = req.query.radius || 50000;
     const language = req.query.language || 'en';
 
     if (!input || typeof input !== 'string' || !input.trim()) {
-      return errorResponse(res, 'Missing or invalid input parameter', 400);
+      throw AppError.badRequest('Missing or invalid input parameter');
     }
 
     const params = {
@@ -37,48 +38,44 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
+    if (result.error) {
+      throw AppError.internal(result.message || 'Google Places API error');
+    }
+
     const filteredPredictions = (result.data.predictions || []).map(({ description, place_id, types }) => ({
       description,
       place_id,
       types,
     }));
-    if (result.error) {
-      return errorResponse(res, result.message || 'Google Places API error', 502, result);
-    }
 
-    return standardResponse(res, true, filteredPredictions || [], 'Google Place API successful!', 200);
-  }
+    return sendSuccess(res, { data: filteredPredictions, message: 'Google Place API successful' });
+  });
 
-  static async getPlaceDetails(req, res) {
+  static getPlaceDetails = catchAsync(async (req, res) => {
     const place_id = req.query.place_id;
 
     if (!place_id || typeof place_id !== 'string' || !place_id.trim()) {
-      return errorResponse(res, 'Missing or invalid place_id parameter', 400);
+      throw AppError.badRequest('Missing or invalid place_id parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/details/json';
     const options = {
       method: 'GET',
-      params: {
-        place_id,
-        key: process.env.GOOGLE_PLACES_API_KEY,
-        // fields: 'address_components,formatted_address,geometry,name,place_id,types,photos,rating,user_ratings_total,website,url',
-      },
+      params: { place_id, key: process.env.GOOGLE_PLACES_API_KEY },
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Google Place Details API error', 502, result);
+      throw AppError.internal(result.message || 'Google Place Details API error');
     }
 
-    return standardResponse(res, true, result.data.result, 'Google Place Details API successful!', 200);
-  }
+    return sendSuccess(res, { data: result.data.result, message: 'Google Place Details API successful' });
+  });
 
-  static async getNearbyPlaces(req, res) {
+  static getNearbyPlaces = catchAsync(async (req, res) => {
     const { location, radius, type } = req.query;
     if (!location || !radius) {
-      return errorResponse(res, 'Missing location or radius parameter', 400);
+      throw AppError.badRequest('Missing location or radius parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
@@ -88,18 +85,17 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Nearby Search API error', 502, result);
+      throw AppError.internal(result.message || 'Nearby Search API error');
     }
 
-    return standardResponse(res, true, result.data.results || [], 'Nearby Places API successful!', 200);
-  }
+    return sendSuccess(res, { data: result.data.results || [], message: 'Nearby Places API successful' });
+  });
 
-  static async getTextSearch(req, res) {
+  static getTextSearch = catchAsync(async (req, res) => {
     const { query, location, radius } = req.query;
     if (!query) {
-      return errorResponse(res, 'Missing query parameter', 400);
+      throw AppError.badRequest('Missing query parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
@@ -109,18 +105,17 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Text Search API error', 502, result);
+      throw AppError.internal(result.message || 'Text Search API error');
     }
 
-    return standardResponse(res, true, result.data.results || [], 'Text Search API successful!', 200);
-  }
+    return sendSuccess(res, { data: result.data.results || [], message: 'Text Search API successful' });
+  });
 
-  static async findPlaceFromText(req, res) {
+  static findPlaceFromText = catchAsync(async (req, res) => {
     const { input, inputtype = 'textquery' } = req.query;
     if (!input) {
-      return errorResponse(res, 'Missing input parameter', 400);
+      throw AppError.badRequest('Missing input parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json';
@@ -135,18 +130,17 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Find Place From Text API error', 502, result);
+      throw AppError.internal(result.message || 'Find Place From Text API error');
     }
 
-    return standardResponse(res, true, result.data.candidates || [], 'Find Place From Text API successful!', 200);
-  }
+    return sendSuccess(res, { data: result.data.candidates || [], message: 'Find Place From Text API successful' });
+  });
 
-  static async getPlacePhoto(req, res) {
+  static getPlacePhoto = catchAsync(async (req, res) => {
     const { photoreference, maxwidth = 400, maxheight } = req.query;
     if (!photoreference) {
-      return errorResponse(res, 'Missing photoreference parameter', 400);
+      throw AppError.badRequest('Missing photoreference parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/photo';
@@ -160,13 +154,13 @@ class publicController {
       params.append('maxheight', maxheight);
     }
 
-    // Redirect client to the photo URL (recommended)
     return res.redirect(`${url}?${params.toString()}`);
-  }
-  static async getQueryAutocomplete(req, res) {
+  });
+
+  static getQueryAutocomplete = catchAsync(async (req, res) => {
     const input = req.query.input;
     if (!input || typeof input !== 'string' || !input.trim()) {
-      return errorResponse(res, 'Missing or invalid input parameter', 400);
+      throw AppError.badRequest('Missing or invalid input parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/queryautocomplete/json';
@@ -176,17 +170,17 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Query Autocomplete API error', 502, result);
+      throw AppError.internal(result.message || 'Query Autocomplete API error');
     }
 
-    return standardResponse(res, true, result.data.predictions || [], 'Query Autocomplete API successful!', 200);
-  }
-  static async addPlace(req, res) {
+    return sendSuccess(res, { data: result.data.predictions || [], message: 'Query Autocomplete API successful' });
+  });
+
+  static addPlace = catchAsync(async (req, res) => {
     const placeData = req.body;
     if (!placeData || typeof placeData !== 'object') {
-      return errorResponse(res, 'Missing or invalid place data', 400);
+      throw AppError.badRequest('Missing or invalid place data');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/add/json';
@@ -197,17 +191,17 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Add Place API error', 502, result);
+      throw AppError.internal(result.message || 'Add Place API error');
     }
 
-    return standardResponse(res, true, result.data, 'Place added successfully!', 200);
-  }
-  static async deletePlace(req, res) {
+    return sendSuccess(res, { data: result.data, message: 'Place added successfully' });
+  });
+
+  static deletePlace = catchAsync(async (req, res) => {
     const { place_id } = req.body;
     if (!place_id) {
-      return errorResponse(res, 'Missing place_id parameter', 400);
+      throw AppError.badRequest('Missing place_id parameter');
     }
 
     const url = 'https://maps.googleapis.com/maps/api/place/delete/json';
@@ -218,135 +212,75 @@ class publicController {
     };
 
     const result = await apiCall(url, options);
-
     if (result.error) {
-      return errorResponse(res, result.message || 'Delete Place API error', 502, result);
+      throw AppError.internal(result.message || 'Delete Place API error');
     }
 
-    return standardResponse(res, true, result.data, 'Place deleted successfully!', 200);
-  }
-  static async getMemoryUsage(req, res) {
-    try {
-      const memoryData = await publicServices.getMemoryUsage();
-      res.status(200).json(memoryData);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to retrieve memory usage', details: error.message });
-    }
-  }
+    return sendSuccess(res, { data: result.data, message: 'Place deleted successfully' });
+  });
 
-  static async getCpuMetrics(req, res) {
-    try {
-      const cpuData = await publicServices.getCpuMetrics();
-      res.status(200).json(cpuData);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to retrieve CPU metrics', details: error.message });
-    }
-  }
+  static getMemoryUsage = catchAsync(async (req, res) => {
+    const memoryData = await publicServices.getMemoryUsage();
+    return sendSuccess(res, { data: memoryData, message: 'Memory usage retrieved successfully' });
+  });
 
-  static async getServerInfo(req, res) {
-    try {
-      const serverInfo = await publicServices.getServerInfo();
-      res.status(200).json(serverInfo);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to retrieve server info', details: error.message });
-    }
-  }
+  static getCpuMetrics = catchAsync(async (req, res) => {
+    const cpuData = await publicServices.getCpuMetrics();
+    return sendSuccess(res, { data: cpuData, message: 'CPU metrics retrieved successfully' });
+  });
 
-  static async getHealth(req, res) {
-    try {
-      const health = await publicServices.getHealthStatus();
-      res.status(health.status === 'healthy' ? 200 : 503).json(health);
-    } catch (error) {
-      res.status(500).json({ error: 'Health check failed', details: error.message });
-    }
-  }
-   static async getPostmanCollections(req, res) {
-    try {
+  static getServerInfo = catchAsync(async (req, res) => {
+    const serverInfo = await publicServices.getServerInfo();
+    return sendSuccess(res, { data: serverInfo, message: 'Server info retrieved successfully' });
+  });
+
+  static getHealth = catchAsync(async (req, res) => {
+    const health = await publicServices.getHealthStatus();
+    return sendSuccess(res, { data: health, message: health.status === 'healthy' ? 'System healthy' : 'System unhealthy' }, health.status === 'healthy' ? HTTP_STATUS.OK : HTTP_STATUS.SERVICE_UNAVAILABLE);
+  });
+
+  static getPostmanCollections = catchAsync(async (req, res) => {
     const postmanDir = path.join(process.cwd(), 'uploads', 'postman');
 
-    // Check directory existence
     if (!fs.existsSync(postmanDir)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Postman folder not found',
-      });
+      throw AppError.notFound('Postman folder not found');
     }
 
-    // Read files
     const files = fs.readdirSync(postmanDir);
-
-    // Filter only Postman collection files
     const collections = files
-      .filter(file => file.endsWith('.postman_collection.json'))
-      .map(file => ({
+      .filter((file) => file.endsWith('.postman_collection.json'))
+      .map((file) => ({
         name: file.replace('.postman_collection.json', ''),
         filename: file,
         url: `${req.protocol}://${req.get('host')}/upload/postman/${file}`,
       }));
 
-    res.status(200).json({
-      success: true,
-      total: collections.length,
-      data: collections,
+    return sendSuccess(res, { data: { total: collections.length, collections }, message: 'Postman collections retrieved successfully' });
+  });
+
+  static getDashboard = catchAsync(async (req, res) => {
+    const [memory, cpu, server] = await Promise.all([publicServices.getMemoryUsage(), publicServices.getCpuMetrics(), publicServices.getServerInfo()]);
+
+    return sendSuccess(res, {
+      data: { ...server, memory: memory.process, cpu: cpu.loadAverage, status: 'healthy' },
+      message: 'Dashboard retrieved successfully',
     });
-  } catch (error) {
-    console.error('Postman collection error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch Postman collections',
-    });
-  }
-  }
+  });
 
-  static async getDashboard(req, res) {
-    try {
-      const [memory, cpu, server] = await Promise.all([publicServices.getMemoryUsage(), publicServices.getCpuMetrics(), publicServices.getServerInfo()]);
-
-      res.status(200).json({
-        ...server,
-        memory: memory.process,
-        cpu: cpu.loadAverage,
-        status: 'healthy',
-      });
-    } catch (error) {
-      res.status(500).json({ error: 'Dashboard generation failed', details: error.message });
-    }
-  }
-
-  static async getDiskUsage(req, res) {
-  try {
+  static getDiskUsage = catchAsync(async (req, res) => {
     const diskData = await publicServices.getDiskUsage();
-    return standardResponse(res, true, diskData, 'Disk usage retrieved successfully!', 200);
-  } catch (error) {
-    return errorResponse(res, 'Failed to retrieve disk usage', 500);
-  }
-}
+    return sendSuccess(res, { data: diskData, message: 'Disk usage retrieved successfully' });
+  });
 
-static async getNetworkStats(req, res) {
-  try {
+  static getNetworkStats = catchAsync(async (req, res) => {
     const networkData = await publicServices.getNetworkStats();
-    return standardResponse(res, true, networkData, 'Network stats retrieved successfully!', 200);
-  } catch (error) {
-    return errorResponse(res, 'Failed to retrieve network stats', 500);
-  }
-}
- static async getApiStatus(req, res){
-  try {
-    const data = await publicServices.getApiStatus();
+    return sendSuccess(res, { data: networkData, message: 'Network stats retrieved successfully' });
+  });
 
-    res.status(200).json({
-      success: true,
-      message: "API is healthy and running",
-      data
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch server info",
-      error: error.message
-    });
-  }
- }
+  static getApiStatus = catchAsync(async (req, res) => {
+    const data = await publicServices.getApiStatus();
+    return sendSuccess(res, { data, message: 'API is healthy and running' });
+  });
 }
 
 module.exports = publicController;

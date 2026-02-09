@@ -1,64 +1,54 @@
 const Cart = require('../../models/cart');
 const Product = require('../../models/products');
-// const logger = require('../../config/logger');
 const mongoose = require('mongoose');
-const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
+const { sendSuccess, sendCreated, HTTP_STATUS } = require('../../utils/responseHelper');
+const AppError = require('../../utils/appError');
+const { catchAsync } = require('../../middleware/errorHandler');
+
 // Manual validation helper
 const isValidMongoId = (id) => mongoose.Types.ObjectId.isValid(id);
-const isValidQuantity = (quantity) => Number.isInteger(quantity) && quantity > 0;
-const isValidDiscount = (discount) => typeof discount === 'number' && discount >= 0 && discount <= 100;
 const isValidStatus = (status) => ['active', 'abandoned', 'converted', 'expired'].includes(status);
 
+// Helper function to format cart response
+const formatCartResponse = (cart, totals) => ({
+  cartId: cart._id,
+  status: cart.status,
+  totalItems: totals.totalItems,
+  subtotal: totals.subtotal,
+  payableTotal: totals.payableTotal,
+  items: cart.items.map((item) => {
+    const price = item.product?.finalPrice || 0;
+    const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
+    return {
+      productId: item.product._id,
+      name: item.product.name,
+      price,
+      quantity: item.quantity,
+      itemDiscount: item.itemDiscount,
+      subtotal: itemSubtotal,
+      thumbnail: item.product.thumbnail,
+      slug: item.product.slug,
+    };
+  }),
+});
+
+// Get or create cart
+exports.getOrCreateCart = catchAsync(async (req, res) => {
+  const userId = req.user?._id || null;
+  const sessionId = req.sessionID || null;
+
+  const cart = await Cart.getOrCreateCart({ userId, sessionId });
+  await cart.populate('items.product');
+  const totals = cart.calculateTotals();
+
+  return sendSuccess(res, {
+    data: formatCartResponse(cart, totals),
+    message: 'Cart retrieved successfully',
+  });
+});
+
 // Add item to cart
-
-exports.getOrCreateCart = async (req, res, next) => {
-  try {
-    const userId = req.user?._id || null;
-    const sessionId = req.sessionID || null;
-
-    /* 1️⃣ Get or create cart */
-    const cart = await Cart.getOrCreateCart({ userId, sessionId });
-
-    /* 2️⃣ Populate product data (FORCE price) */
-    await cart.populate('items.product');
-
-    /* 3️⃣ Calculate totals AFTER populate */
-    const totals = cart.calculateTotals();
-
-    /* 4️⃣ Send DTO */
-    res.status(200).json({
-      success: true,
-      data: {
-        cartId: cart._id,
-        status: cart.status,
-
-        totalItems: totals.totalItems,
-        subtotal: totals.subtotal,
-        payableTotal: totals.payableTotal,
-
-        items: cart.items.map((item) => {
-          const price = item.product?.finalPrice || 0;
-          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
-
-          return {
-            productId: item.product._id,
-            name: item.product.name,
-            price,
-            quantity: item.quantity,
-            itemDiscount: item.itemDiscount,
-            subtotal: itemSubtotal,
-            thumbnail: item.product.thumbnail,
-            slug: item.product.slug,
-          };
-        }),
-      },
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.addItemToCart = async (req, res, next) => {
+exports.addItemToCart = catchAsync(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -66,72 +56,37 @@ exports.addItemToCart = async (req, res, next) => {
     const { productId, quantity = 1, itemDiscount = 0 } = req.body;
     const userId = req.user._id;
 
-    /* 1️⃣ Reserve inventory */
+    // Reserve inventory
     const product = await Product.findOneAndUpdate({ _id: productId, inventory: { $gte: quantity } }, { $inc: { inventory: -quantity } }, { new: true, session });
 
     if (!product) {
-      throw new Error('Insufficient inventory');
+      throw AppError.badRequest('Insufficient inventory');
     }
 
-    /* 2️⃣ Get or create cart */
+    // Get or create cart
     const cart = await Cart.getOrCreateCart({ userId });
 
-    /* 3️⃣ Add item (NO PRICE STORED) */
-    await cart.addItem(
-      {
-        product: productId,
-        quantity,
-        itemDiscount,
-      },
-      userId
-    );
-
-    /* 4️⃣ Populate product data */
+    // Add item
+    await cart.addItem({ product: productId, quantity, itemDiscount }, userId);
     await cart.populate('items.product');
-
-    /* 5️⃣ Calculate totals AFTER populate */
     const totals = cart.calculateTotals();
 
     await session.commitTransaction();
     session.endSession();
 
-    /* 6️⃣ SHAPED RESPONSE (DTO) */
-    res.status(200).json({
-      success: true,
-      data: {
-        cartId: cart._id,
-        status: cart.status,
-
-        totalItems: totals.totalItems,
-        subtotal: totals.subtotal,
-        payableTotal: totals.payableTotal,
-
-        items: cart.items.map((item) => {
-          const price = item.product?.finalPrice || 0;
-          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
-
-          return {
-            productId: item.product._id,
-            name: item.product.name,
-            price,
-            quantity: item.quantity.toFixed(2),
-            itemDiscount: item.itemDiscount,
-            subtotal: itemSubtotal.toFixed(2),
-            thumbnail: item.product.thumbnail,
-            slug: item.product.slug,
-          };
-        }),
-      },
+    return sendSuccess(res, {
+      data: formatCartResponse(cart, totals),
+      message: 'Item added to cart',
     });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    next(err);
+    throw err;
   }
-};
+});
 
 // Remove item from cart
-exports.removeCartItem = async (req, res, next) => {
+exports.removeCartItem = catchAsync(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -142,57 +97,31 @@ exports.removeCartItem = async (req, res, next) => {
     const cart = await Cart.getActiveCartByUser(userId);
     const item = cart.items.find((i) => i.product.toString() === productId);
 
-    if (!item) throw new Error('Item not found');
+    if (!item) {
+      throw AppError.notFound('Item not found in cart');
+    }
 
     await Product.updateOne({ _id: productId }, { $inc: { inventory: item.quantity } }, { session });
-
     await cart.removeItem(productId, userId);
-
-    /* 4️⃣ Populate product data */
     await cart.populate('items.product');
-
-    /* 5️⃣ Calculate totals AFTER populate */
     const totals = cart.calculateTotals();
 
     await session.commitTransaction();
     session.endSession();
 
-    /* 6️⃣ SHAPED RESPONSE (DTO) */
-    res.status(200).json({
-      success: true,
-      data: {
-        cartId: cart._id,
-        status: cart.status,
-
-        totalItems: totals.totalItems,
-        subtotal: totals.subtotal,
-        payableTotal: totals.payableTotal,
-
-        items: cart.items.map((item) => {
-          const price = item.product?.finalPrice || 0;
-          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
-
-          return {
-            productId: item.product._id,
-            name: item.product.name,
-            price,
-            quantity: item.quantity.toFixed(2),
-            itemDiscount: item.itemDiscount,
-            subtotal: itemSubtotal.toFixed(2),
-            thumbnail: item.product.thumbnail,
-            slug: item.product.slug,
-          };
-        }),
-      },
+    return sendSuccess(res, {
+      data: formatCartResponse(cart, totals),
+      message: 'Item removed from cart',
     });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    next(err);
+    throw err;
   }
-};
+});
 
-exports.updateCartItem = async (req, res, next) => {
+// Update cart item
+exports.updateCartItem = catchAsync(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -203,62 +132,39 @@ exports.updateCartItem = async (req, res, next) => {
     const cart = await Cart.getActiveCartByUser(userId);
     const item = cart.items.find((i) => i.product.toString() === productId);
 
-    if (!item) throw new Error('Item not found');
+    if (!item) {
+      throw AppError.notFound('Item not found in cart');
+    }
 
     const diff = quantity - item.quantity;
 
     if (diff !== 0) {
       const product = await Product.findOneAndUpdate({ _id: productId, inventory: { $gte: diff } }, { $inc: { inventory: -diff } }, { new: true, session });
-      if (!product) throw new Error('Insufficient inventory');
+      if (!product) {
+        throw AppError.badRequest('Insufficient inventory');
+      }
     }
 
     await cart.updateItem({ product: productId, quantity, itemDiscount }, userId);
-/* 4️⃣ Populate product data */
     await cart.populate('items.product');
-
-    /* 5️⃣ Calculate totals AFTER populate */
     const totals = cart.calculateTotals();
 
     await session.commitTransaction();
     session.endSession();
 
-    /* 6️⃣ SHAPED RESPONSE (DTO) */
-    res.status(200).json({
-      success: true,
-      data: {
-        cartId: cart._id,
-        status: cart.status,
-
-        totalItems: totals.totalItems,
-        subtotal: totals.subtotal,
-        payableTotal: totals.payableTotal,
-
-        items: cart.items.map((item) => {
-          const price = item.product?.finalPrice || 0;
-          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
-
-          return {
-            productId: item.product._id,
-            name: item.product.name,
-            price,
-            quantity: item.quantity.toFixed(2),
-            itemDiscount: item.itemDiscount,
-            subtotal: itemSubtotal.toFixed(2),
-            thumbnail: item.product.thumbnail,
-            slug: item.product.slug,
-          };
-        }),
-      },
+    return sendSuccess(res, {
+      data: formatCartResponse(cart, totals),
+      message: 'Cart item updated',
     });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    next(err);
+    throw err;
   }
-};
+});
 
 // Clear cart
-exports.clearCart = async (req, res, next) => {
+exports.clearCart = catchAsync(async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -271,284 +177,194 @@ exports.clearCart = async (req, res, next) => {
     }
 
     await cart.clearCart(userId);
-
- /* 4️⃣ Populate product data */
     await cart.populate('items.product');
-
-    /* 5️⃣ Calculate totals AFTER populate */
     const totals = cart.calculateTotals();
 
     await session.commitTransaction();
     session.endSession();
 
-    /* 6️⃣ SHAPED RESPONSE (DTO) */
-    res.status(200).json({
-      success: true,
-      data: {
-        cartId: cart._id,
-        status: cart.status,
-
-        totalItems: totals.totalItems,
-        subtotal: totals.subtotal,
-        payableTotal: totals.payableTotal,
-
-        items: cart.items.map((item) => {
-          const price = item.product?.finalPrice || 0;
-          const itemSubtotal = (price - (price * item.itemDiscount) / 100) * item.quantity;
-
-          return {
-            productId: item.product._id,
-            name: item.product.name,
-            price,
-            quantity: item.quantity.toFixed(2),
-            itemDiscount: item.itemDiscount,
-            subtotal: itemSubtotal.toFixed(2),
-            thumbnail: item.product.thumbnail,
-            slug: item.product.slug,
-          };
-        }),
-      },
+    return sendSuccess(res, {
+      data: formatCartResponse(cart, totals),
+      message: 'Cart cleared successfully',
     });
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    next(err);
+    throw err;
   }
-};
+});
+
 // Get cart by user
-exports.getCart = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const cart = await Cart.getCartByUser(userId);
-    res.status(200).json({
-      success: true,
-      data: cart,
-      message: 'Cart retrieved successfully',
-    });
-  } catch (error) {
-    //logger.error(`Get cart error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getCart = catchAsync(async (req, res) => {
+  const userId = req.user._id;
+  const cart = await Cart.getCartByUser(userId);
+  return sendSuccess(res, {
+    data: cart,
+    message: 'Cart retrieved successfully',
+  });
+});
 
 // Apply cart discount
-exports.applyCartDiscount = async (req, res, next) => {
-  try {
-    const { discount } = req.body;
-    const userId = req.user._id;
+exports.applyCartDiscount = catchAsync(async (req, res) => {
+  const { discount } = req.body;
+  const userId = req.user._id;
 
-    const cart = await Cart.getActiveCartByUser(userId);
-    cart.cartDiscount = discount;
-    cart.updated_by = userId;
+  const cart = await Cart.getActiveCartByUser(userId);
+  cart.cartDiscount = discount;
+  cart.updated_by = userId;
+  await cart.save();
 
-    await cart.save();
+  return sendSuccess(res, {
+    data: cart,
+    message: 'Cart discount applied',
+  });
+});
 
-    res.status(200).json({
-      success: true,
-      data: cart,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-exports.convertCart = async (req, res, next) => {
-  try {
-    const userId = req.user._id;
+// Convert cart
+exports.convertCart = catchAsync(async (req, res) => {
+  const userId = req.user._id;
 
-    const cart = await Cart.getActiveCartByUser(userId);
-    cart.status = 'converted';
-    cart.updated_by = userId;
+  const cart = await Cart.getActiveCartByUser(userId);
+  cart.status = 'converted';
+  cart.updated_by = userId;
+  await cart.save();
 
-    await cart.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Cart converted successfully',
-      data: cart,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
+  return sendSuccess(res, {
+    data: cart,
+    message: 'Cart converted successfully',
+  });
+});
 
 // Merge cart
-exports.mergeCart = async (req, res) => {
-  try {
-    const { otherCartId } = req.body;
-    const userId = req.user._id;
+exports.mergeCart = catchAsync(async (req, res) => {
+  const { otherCartId } = req.body;
+  const userId = req.user._id;
 
-    if (!isValidMongoId(otherCartId)) {
-      return res.status(400).json({ success: false, message: 'Invalid cart ID' });
-    }
-
-    const cart = await Cart.getCartByUser(userId);
-    const otherCart = await Cart.findById(otherCartId);
-    if (!otherCart) {
-      return res.status(404).json({ success: false, message: 'Other cart not found' });
-    }
-
-    await cart.mergeCart(otherCart, userId);
-    res.status(200).json({
-      success: true,
-      data: cart,
-      message: 'Carts merged successfully',
-    });
-  } catch (error) {
-    //logger.error(`Merge cart error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  if (!isValidMongoId(otherCartId)) {
+    throw AppError.badRequest('Invalid cart ID');
   }
-};
+
+  const cart = await Cart.getCartByUser(userId);
+  const otherCart = await Cart.findById(otherCartId);
+  if (!otherCart) {
+    throw AppError.notFound('Other cart not found');
+  }
+
+  await cart.mergeCart(otherCart, userId);
+  return sendSuccess(res, {
+    data: cart,
+    message: 'Carts merged successfully',
+  });
+});
 
 // Set cart metadata
-exports.setMetadata = async (req, res) => {
-  try {
-    const { key, value } = req.body;
-    const userId = req.user._id;
+exports.setMetadata = catchAsync(async (req, res) => {
+  const { key, value } = req.body;
+  const userId = req.user._id;
 
-    if (!key || typeof key !== 'string' || !value || typeof value !== 'string') {
-      return res.status(400).json({ success: false, message: 'Metadata key and value must be non-empty strings' });
-    }
-
-    const cart = await Cart.getCartByUser(userId);
-    await cart.setMetadata(key, value, userId);
-    res.status(200).json({
-      success: true,
-      data: cart,
-      message: 'Metadata updated successfully',
-    });
-  } catch (error) {
-    //logger.error(`Set metadata error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  if (!key || typeof key !== 'string' || !value || typeof value !== 'string') {
+    throw AppError.badRequest('Metadata key and value must be non-empty strings');
   }
-};
+
+  const cart = await Cart.getCartByUser(userId);
+  await cart.setMetadata(key, value, userId);
+  return sendSuccess(res, {
+    data: cart,
+    message: 'Metadata updated successfully',
+  });
+});
 
 // Admin: Get paginated carts
-exports.getPaginatedCarts = async (req, res) => {
-  try {
-    const { page = 1, limit = 10, status } = req.query;
-    if (status && !isValidStatus(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
-    }
-
-    const result = await Cart.getPaginatedCarts({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      status,
-    });
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'Carts retrieved successfully',
-    });
-  } catch (error) {
-    //logger.error(`Get paginated carts error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+exports.getPaginatedCarts = catchAsync(async (req, res) => {
+  const { page = 1, limit = 10, status } = req.query;
+  if (status && !isValidStatus(status)) {
+    throw AppError.badRequest('Invalid status');
   }
-};
+
+  const result = await Cart.getPaginatedCarts({
+    page: parseInt(page),
+    limit: parseInt(limit),
+    status,
+  });
+  return sendSuccess(res, {
+    data: result,
+    message: 'Carts retrieved successfully',
+  });
+});
 
 // Admin: Get abandoned carts
-exports.getAbandonedCarts = async (req, res) => {
-  try {
-    const { days = 7, page = 1, limit = 10 } = req.query;
-    const result = await Cart.getAbandonedCarts({
-      days: parseInt(days),
-      page: parseInt(page),
-      limit: parseInt(limit),
-    });
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'Abandoned carts retrieved successfully',
-    });
-  } catch (error) {
-    //logger.error(`Get abandoned carts error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getAbandonedCarts = catchAsync(async (req, res) => {
+  const { days = 7, page = 1, limit = 10 } = req.query;
+  const result = await Cart.getAbandonedCarts({
+    days: parseInt(days),
+    page: parseInt(page),
+    limit: parseInt(limit),
+  });
+  return sendSuccess(res, {
+    data: result,
+    message: 'Abandoned carts retrieved successfully',
+  });
+});
 
 // Admin: Bulk update cart status
-exports.bulkUpdateCartStatus = async (req, res) => {
-  try {
-    const { userIds, status } = req.body;
+exports.bulkUpdateCartStatus = catchAsync(async (req, res) => {
+  const { userIds, status } = req.body;
 
-    if (!Array.isArray(userIds) || !userIds.every(isValidMongoId)) {
-      return res.status(400).json({ success: false, message: 'User IDs must be a valid array of MongoDB IDs' });
-    }
-    if (!isValidStatus(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
-    }
-
-    const result = await Cart.bulkUpdateCartStatus(userIds, status);
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'Cart statuses updated successfully',
-    });
-  } catch (error) {
-    //logger.error(`Bulk update cart status error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+  if (!Array.isArray(userIds) || !userIds.every(isValidMongoId)) {
+    throw AppError.badRequest('User IDs must be a valid array of MongoDB IDs');
   }
-};
+  if (!isValidStatus(status)) {
+    throw AppError.badRequest('Invalid status');
+  }
+
+  const result = await Cart.bulkUpdateCartStatus(userIds, status);
+  return sendSuccess(res, {
+    data: result,
+    message: 'Cart statuses updated successfully',
+  });
+});
 
 // Admin: Get cart analytics
-exports.getCartAnalytics = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    if (!startDate || !endDate || isNaN(new Date(startDate)) || isNaN(new Date(endDate))) {
-      return res.status(400).json({ success: false, message: 'Valid startDate and endDate are required' });
-    }
-
-    const result = await Cart.getCartAnalytics({
-      startDate: new Date(startDate),
-      endDate: new Date(endDate),
-    });
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'Cart analytics retrieved successfully',
-    });
-  } catch (error) {
-    //logger.error(`Cart analytics error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+exports.getCartAnalytics = catchAsync(async (req, res) => {
+  const { startDate, endDate } = req.query;
+  if (!startDate || !endDate || isNaN(new Date(startDate)) || isNaN(new Date(endDate))) {
+    throw AppError.badRequest('Valid startDate and endDate are required');
   }
-};
+
+  const result = await Cart.getCartAnalytics({
+    startDate: new Date(startDate),
+    endDate: new Date(endDate),
+  });
+  return sendSuccess(res, {
+    data: result,
+    message: 'Cart analytics retrieved successfully',
+  });
+});
 
 // Admin: Remove product from all carts
-exports.removeProductFromAllCarts = async (req, res) => {
-  try {
-    const { productId } = req.params;
-    if (!isValidMongoId(productId)) {
-      return res.status(400).json({ success: false, message: 'Invalid product ID' });
-    }
-
-    const result = await Cart.removeProductFromAllCarts(productId);
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'Product removed from all carts successfully',
-    });
-  } catch (error) {
-    //logger.error(`Remove product from all carts error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+exports.removeProductFromAllCarts = catchAsync(async (req, res) => {
+  const { productId } = req.params;
+  if (!isValidMongoId(productId)) {
+    throw AppError.badRequest('Invalid product ID');
   }
-};
+
+  const result = await Cart.removeProductFromAllCarts(productId);
+  return sendSuccess(res, {
+    data: result,
+    message: 'Product removed from all carts successfully',
+  });
+});
 
 // Admin: Clear all carts
-exports.clearAllCarts = async (req, res) => {
-  try {
-    const { status } = req.query;
-    if (status && !isValidStatus(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
-    }
-
-    const result = await Cart.clearAllCarts(status);
-    res.status(200).json({
-      success: true,
-      data: result,
-      message: 'All carts cleared successfully',
-    });
-  } catch (error) {
-    //logger.error(`Clear all carts error: ${error.message}`);
-    res.status(500).json({ success: false, message: error.message });
+exports.clearAllCarts = catchAsync(async (req, res) => {
+  const { status } = req.query;
+  if (status && !isValidStatus(status)) {
+    throw AppError.badRequest('Invalid status');
   }
-};
+
+  const result = await Cart.clearAllCarts(status);
+  return sendSuccess(res, {
+    data: result,
+    message: 'All carts cleared successfully',
+  });
+});

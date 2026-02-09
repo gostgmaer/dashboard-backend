@@ -3,6 +3,8 @@ const User = require('../models/user');
 const { jwtSecret } = require('../config/setting');
 const { errorResponse } = require('../utils/apiUtils');
 const DeviceDetector = require('../services/deviceDetector');
+const LoggerService = require('../services/logger');
+const AppError = require('../utils/appError');
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -10,14 +12,14 @@ const authMiddleware = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return   errorResponse(res, 'Access denied. No token provided', 401)
+      return errorResponse(res, 'Access denied. No token provided', 401);
     }
 
     // Extract token
     const token = authHeader?.replace('Bearer ', '') || req.cookies?.token;
 
     if (!token) {
-     return  errorResponse(res, 'Access denied. Invalid token format', 401);
+      return errorResponse(res, 'Access denied. Invalid token format', 401);
     }
 
     // Verify token
@@ -26,11 +28,11 @@ const authMiddleware = async (req, res, next) => {
       decoded = jwt.verify(token, jwtSecret);
     } catch (jwtError) {
       if (jwtError.name === 'TokenExpiredError') {
-      return   errorResponse(res, 'Access denied. Token expired', 401)
+        return errorResponse(res, 'Access denied. Token expired', 401);
       } else if (jwtError.name === 'JsonWebTokenError') {
-       return  errorResponse(res, 'Access denied. Invalid token', 401)
+        return errorResponse(res, 'Access denied. Invalid token', 401);
       } else {
-       return  errorResponse(res, 'Access denied. Token verification failed', 401)
+        return errorResponse(res, 'Access denied. Token verification failed', 401);
       }
     }
 
@@ -38,11 +40,20 @@ const authMiddleware = async (req, res, next) => {
     const user = await User.findByIdWithPermissions(decoded.userId);
 
     if (!user) {
-      errorResponse(res, 'Access denied. User not found', 401)
+      return errorResponse(res, 'Access denied. User not found', 401);
     }
 
     if (!user.isActive) {
-     errorResponse(res, 'Access denied. Account inactive', 401)
+      return errorResponse(res, 'Access denied. Account inactive', 401);
+    }
+
+    // Check if user is blocked or deleted
+    if (user.isBlocked) {
+      return errorResponse(res, 'Access denied. Account blocked', 403);
+    }
+
+    if (user.isDeleted) {
+      return errorResponse(res, 'Access denied. Account deleted', 403);
     }
 
     // Attach user data to request object
@@ -58,8 +69,8 @@ const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
- return    errorResponse(res, 'Internal server error during authentication', 500)
+    LoggerService.error('Token verification error:', { error, userId: req.userId });
+    return errorResponse(res, 'Internal server error during authentication', 500);
   }
 };
 
@@ -87,7 +98,7 @@ const optionalAuth = async (req, res, next) => {
       const user = await User.findByIdWithPermissions(decoded.userId);
 
       if (user && user.isActive) {
-     
+
         req.user = user;
         req.userId = user._id;
         if (req.body) {
@@ -104,7 +115,7 @@ const optionalAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error('Optional authentication error:', error);
+    LoggerService.error('Optional authentication error:', { error });
     next(); // Continue even if there's an error
   }
 };

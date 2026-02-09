@@ -2,6 +2,7 @@
 
 const mongoose = require('mongoose');
 const { dbUrl, enviroment } = require('./setting');
+const LoggerService = require('../services/logger');
 require('dotenv').config();
 
 const options = {
@@ -57,30 +58,30 @@ const connectDB = async () => {
     }
 
     mongoose.connection.on('connected', () => {
-      console.log('✅ Database connected successfully');
+      LoggerService.info('Database connected successfully');
     });
 
     mongoose.connection.on('error', (err) => {
-      console.error('🚨 MongoDB connection error:', err);
+      LoggerService.error('MongoDB connection error:', { error: err });
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected');
+      LoggerService.warn('MongoDB disconnected');
     });
 
     // Capture termination signals and close connection gracefully
     const gracefulExit = () => {
       mongoose.connection.close(() => {
-        console.log('🛑 MongoDB connection closed through app termination');
+        LoggerService.info('MongoDB connection closed through app termination');
         process.exit(0);
       });
     };
     process.on('SIGINT', gracefulExit);
     process.on('SIGTERM', gracefulExit);
 
-    await mongoose.connect(dbUrl, {});
+    await mongoose.connect(dbUrl, options);
   } catch (error) {
-    console.error('🚨 MongoDB connection error:', error);
+    LoggerService.error('MongoDB connection error:', { error });
     process.exit(1);
   }
 };

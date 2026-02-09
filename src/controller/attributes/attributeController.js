@@ -1,458 +1,213 @@
-const Attribute = require("../../models/Attribute");
-const Product = require("../../models/products");
-const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
+const Attribute = require('../../models/Attribute');
+const Product = require('../../models/products');
+const { sendSuccess, sendCreated, HTTP_STATUS } = require('../../utils/responseHelper');
+const AppError = require('../../utils/appError');
+const { catchAsync } = require('../../middleware/errorHandler');
+
 /**
  * Handle product attribute updates/cleanup when attribute or child attribute values change or are deleted.
- * @param {String} attributeId - ID of the attribute
- * @param {String|Array} childIds - ID(s) of child attribute(s) (variants)
- * @param {String} mode - optional mode indicator, e.g. 'multi' for multiple childIds
  */
 async function handleProductAttribute(attributeId, childIds, mode = 'single') {
   try {
     if (!attributeId) throw new Error('Attribute ID is required');
 
-    // Normalize childIds to array
     const ids = Array.isArray(childIds) ? childIds : [childIds];
 
-    // Find products containing the attribute with these child attribute values
-    // Assuming products have attributes stored like { attributeId: X, variantId: Y }
     const products = await Product.find({
       'attributes.attributeId': attributeId,
       'attributes.variantId': { $in: ids },
     });
 
     for (const product of products) {
-      // Filter out attribute variants matching the deleted childIds
       product.attributes = product.attributes.filter(
-        attr => !(attr.attributeId.toString() === attributeId.toString() && ids.includes(attr.variantId.toString()))
+        (attr) => !(attr.attributeId.toString() === attributeId.toString() && ids.includes(attr.variantId.toString()))
       );
-
-      // Save updated product
       await product.save();
     }
   } catch (error) {
     console.error('Error in handleProductAttribute:', error.message);
-    // Optionally rethrow or handle error accordingly
   }
 }
 
+const addAttribute = catchAsync(async (req, res) => {
+  const newAttribute = new Attribute(req.body);
+  await newAttribute.save();
+  return sendCreated(res, { message: 'Attribute added successfully' });
+});
 
-
-const addAttribute = async (req, res) => {
-  try {
-    const newAttribute = new Attribute(req.body);
-    await newAttribute.save();
-    res.send({
-      message: "Attribute Added Successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: `Error occur when adding attribute ${err.message}`,
-    });
+const addChildAttributes = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const attribute = await Attribute.findById(id);
+  if (!attribute) {
+    throw AppError.notFound('Attribute not found');
   }
-};
-// add child attributes
-const addChildAttributes = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const attribute = await Attribute.findById(id);
-    await Attribute.updateOne(
-      { _id: attribute._id },
-      { $push: { variants: req.body } }
-    );
-    res.send({
-      message: "Attribute Value Added Successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+  await Attribute.updateOne({ _id: attribute._id }, { $push: { variants: req.body } });
+  return sendSuccess(res, { message: 'Attribute value added successfully' });
+});
 
-const addAllAttributes = async (req, res) => {
-  try {
-    await Attribute.deleteMany();
-    await Attribute.insertMany(req.body);
-    res.send({
-      message: "Added all attributes successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+const addAllAttributes = catchAsync(async (req, res) => {
+  await Attribute.deleteMany();
+  await Attribute.insertMany(req.body);
+  return sendSuccess(res, { message: 'Added all attributes successfully' });
+});
 
-const getAllAttributes = async (req, res) => {
-  try {
-    const { type, option, option1 } = req.query;
-    const attributes = await Attribute.find({
-      $or: [{ type: type }, { $or: [{ option: option }, { option: option1 }] }],
-    });
-    res.send(attributes);
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+const getAllAttributes = catchAsync(async (req, res) => {
+  const { type, option, option1 } = req.query;
+  const attributes = await Attribute.find({
+    $or: [{ type: type }, { $or: [{ option: option }, { option: option1 }] }],
+  });
+  return sendSuccess(res, { data: attributes, message: 'Attributes retrieved' });
+});
 
-const getShowingAttributes = async (req, res) => {
-  try {
-    // console.log('attributes')
-    const attributes = await Attribute.aggregate([
-      {
-        $match: {
-          status: "show",
-          "variants.status": "show",
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          status: 1,
-          title: 1,
-          name: 1,
-          option: 1,
-          createdAt: 1,
-          updateAt: 1,
-          variants: {
-            $filter: {
-              input: "$variants",
-              cond: {
-                $eq: ["$$this.status", "show"],
-              },
-            },
+const getShowingAttributes = catchAsync(async (req, res) => {
+  const attributes = await Attribute.aggregate([
+    { $match: { status: 'show', 'variants.status': 'show' } },
+    {
+      $project: {
+        _id: 1,
+        status: 1,
+        title: 1,
+        name: 1,
+        option: 1,
+        createdAt: 1,
+        updateAt: 1,
+        variants: {
+          $filter: {
+            input: '$variants',
+            cond: { $eq: ['$$this.status', 'show'] },
           },
         },
       },
-    ]);
-    res.send(attributes);
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+    },
+  ]);
+  return sendSuccess(res, { data: attributes, message: 'Showing attributes retrieved' });
+});
+
+const getShowingAttributesTest = catchAsync(async (req, res) => {
+  const attributes = await Attribute.find({ status: 'show' });
+  return sendSuccess(res, { data: attributes, message: 'Showing attributes retrieved' });
+});
+
+const updateManyAttribute = catchAsync(async (req, res) => {
+  await Attribute.updateMany({ _id: { $in: req.body.ids } }, { $set: { option: req.body.option, status: req.body.status } }, { multi: true });
+  return sendSuccess(res, { message: 'Attributes update successfully' });
+});
+
+const getAttributeById = catchAsync(async (req, res) => {
+  const attribute = await Attribute.findById(req.params.id);
+  if (!attribute) {
+    throw AppError.notFound('Attribute not found');
   }
-};
+  return sendSuccess(res, { data: attribute, message: 'Attribute retrieved' });
+});
 
-const getShowingAttributesTest = async (req, res) => {
-  try {
-    const attributes = await Attribute.find({ status: "show" });
-    res.send(attributes);
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+const getChildAttributeById = catchAsync(async (req, res) => {
+  const { id, ids } = req.params;
+  const attribute = await Attribute.findOne({ _id: id });
+  if (!attribute) {
+    throw AppError.notFound('Attribute not found');
   }
-};
-// update many attribute
-const updateManyAttribute = async (req, res) => {
-  try {
-    await Attribute.updateMany(
-      { _id: { $in: req.body.ids } },
-      {
-        $set: {
-          option: req.body.option,
-          status: req.body.status,
-        },
-      },
-      {
-        multi: true,
-      }
-    );
 
-    res.send({
-      message: "Attributes update successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+  const childAttribute = attribute.variants.find((attr) => attr._id == ids);
+  if (!childAttribute) {
+    throw AppError.notFound('Child attribute not found');
   }
-};
+  return sendSuccess(res, { data: childAttribute, message: 'Child attribute retrieved' });
+});
 
-const getAttributeById = async (req, res) => {
-  try {
-    const attribute = await Attribute.findById(req.params.id);
-
-    // console.log(attribute);
-
-    res.send(attribute);
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+const updateAttributes = catchAsync(async (req, res) => {
+  const attribute = await Attribute.findById(req.params.id);
+  if (!attribute) {
+    throw AppError.notFound('Attribute not found');
   }
-};
 
-const getChildAttributeById = async (req, res) => {
-  try {
-    const { id, ids } = req.params;
+  attribute.title = { ...attribute.title, ...req.body.title };
+  attribute.name = { ...attribute.name, ...req.body.name };
+  attribute._id = req.params.id;
+  attribute.option = req.body.option;
+  attribute.type = req.body.type;
+  await attribute.save();
+  return sendSuccess(res, { message: 'Attribute updated successfully' });
+});
 
-    const attribute = await Attribute.findOne({
-      _id: id,
-    });
+const updateChildAttributes = catchAsync(async (req, res) => {
+  const { attributeId, childId } = req.params;
 
-    const childAttribute = attribute.variants.find((attr) => {
-      return attr._id == ids;
-    });
+  let attribute = await Attribute.findOne({ _id: attributeId, 'variants._id': childId });
 
-    res.send(childAttribute);
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+  if (attribute) {
+    const att = attribute.variants.find((v) => v._id.toString() === childId);
+    const name = { ...att.name, ...req.body.name };
+
+    await Attribute.updateOne({ _id: attributeId, 'variants._id': childId }, { $set: { 'variants.$.name': name, 'variants.$.status': req.body.status } });
   }
-};
 
-const updateAttributes = async (req, res) => {
-  try {
-    const attribute = await Attribute.findById(req.params.id);
-    if (attribute) {
-      attribute.title = { ...attribute.title, ...req.body.title };
-      attribute.name = { ...attribute.name, ...req.body.name };
-      attribute._id = req.params.id;
-      //attribute.title = req.body.title;
-      // attribute.name = req.body.name;
-      attribute.option = req.body.option;
-      attribute.type = req.body.type;
-      // attribute.variants = req.body.variants;
-    }
-    await attribute.save();
-    res.send({
-      message: "Attribute updated successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+  return sendSuccess(res, { message: 'Attribute value updated successfully' });
+});
+
+const updateManyChildAttribute = catchAsync(async (req, res) => {
+  const childIdAttribute = await Attribute.findById(req.body.currentId);
+  if (!childIdAttribute) {
+    throw AppError.notFound('Attribute not found');
   }
-};
 
-// update child attributes
-const updateChildAttributes = async (req, res) => {
-  try {
-    const { attributeId, childId } = req.params;
+  const final = childIdAttribute.variants.filter((value) => req.body.ids.find((value1) => value1 == value._id));
 
-    let attribute = await Attribute.findOne({
-      _id: attributeId,
-      "variants._id": childId,
-    });
+  const updateStatusAttribute = final.map((value) => {
+    value.status = req.body.status;
+    return value;
+  });
 
-    if (attribute) {
-      const att = attribute.variants.find((v) => v._id.toString() === childId);
-
-      const name = {
-        ...att.name,
-        ...req.body.name,
-      };
-
-      await Attribute.updateOne(
-        { _id: attributeId, "variants._id": childId },
-        {
-          $set: {
-            "variants.$.name": name,
-            "variants.$.status": req.body.status,
-          },
-        }
-      );
-    }
-
-    res.send({
-      message: "Attribute Value Updated Successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+  let totalVariants = [];
+  if (req.body.changeId) {
+    const groupIdAttribute = await Attribute.findById(req.body.changeId);
+    totalVariants = [...groupIdAttribute.variants, ...updateStatusAttribute];
   }
-};
 
-// update many attribute
-const updateManyChildAttribute = async (req, res) => {
-  try {
-    // select attribute value
-    const childIdAttribute = await Attribute.findById(req.body.currentId);
-
-    const final = childIdAttribute.variants.filter((value) =>
-      req.body.ids.find((value1) => value1 == value._id)
-    );
-
-    const updateStatusAttribute = final.map((value) => {
-      value.status = req.body.status;
-      return value;
-    });
-
-    // group attribute
-    let totalVariants = [];
-    if (req.body.changeId) {
-      const groupIdAttribute = await Attribute.findById(req.body.changeId);
-      totalVariants = [...groupIdAttribute.variants, ...updateStatusAttribute];
-    }
-
-    if (totalVariants.length === 0) {
-      await Attribute.updateOne(
-        { _id: req.body.currentId },
-        {
-          $set: {
-            variants: childIdAttribute.variants,
-          },
-        },
-        {
-          multi: true,
-        }
-      );
-    } else {
-      await Attribute.updateOne(
-        { _id: req.body.changeId },
-        {
-          $set: {
-            variants: totalVariants,
-          },
-        },
-        {
-          multi: true,
-        }
-      );
-
-      await Attribute.updateOne(
-        { _id: req.body.currentId },
-        {
-          $pull: { variants: { _id: req.body.ids } },
-        },
-        {
-          multi: true,
-        }
-      );
-    }
-
-    res.send({
-      message: "Attribute Values update successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
+  if (totalVariants.length === 0) {
+    await Attribute.updateOne({ _id: req.body.currentId }, { $set: { variants: childIdAttribute.variants } }, { multi: true });
+  } else {
+    await Attribute.updateOne({ _id: req.body.changeId }, { $set: { variants: totalVariants } }, { multi: true });
+    await Attribute.updateOne({ _id: req.body.currentId }, { $pull: { variants: { _id: req.body.ids } } }, { multi: true });
   }
-};
 
-const updateStatus = async (req, res) => {
-  try {
-    const newStatus = req.body.status;
-    await Attribute.updateOne(
-      { _id: req.params.id },
-      {
-        $set: {
-          status: newStatus,
-        },
-      }
-    );
-    res.status(200).send({
-      message: `Attribute ${
-        newStatus === "show" ? "Published" : "Un-Published"
-      } Successfully!`,
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+  return sendSuccess(res, { message: 'Attribute values update successfully' });
+});
 
-const updateChildStatus = async (req, res) => {
-  try {
-    const newStatus = req.body.status;
+const updateStatus = catchAsync(async (req, res) => {
+  const newStatus = req.body.status;
+  await Attribute.updateOne({ _id: req.params.id }, { $set: { status: newStatus } });
+  return sendSuccess(res, { message: `Attribute ${newStatus === 'show' ? 'Published' : 'Un-Published'} Successfully` });
+});
 
-    await Attribute.updateOne(
-      { "variants._id": req.params.id },
-      {
-        $set: {
-          "variants.$.status": newStatus,
-        },
-      }
-    );
-    res.status(200).send({
-      message: `Attribute Value ${
-        newStatus === "show" ? "Published" : "Un-Published"
-      } Successfully!`,
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+const updateChildStatus = catchAsync(async (req, res) => {
+  const newStatus = req.body.status;
+  await Attribute.updateOne({ 'variants._id': req.params.id }, { $set: { 'variants.$.status': newStatus } });
+  return sendSuccess(res, { message: `Attribute Value ${newStatus === 'show' ? 'Published' : 'Un-Published'} Successfully` });
+});
 
-const deleteAttribute = async (req, res) => {
-  try {
-    await Attribute.deleteOne({ _id: req.params.id });
-    res.send({
-      message: "Attribute Deleted Successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
-// delete child attribute
-const deleteChildAttribute = async (req, res) => {
-  try {
-    const { attributeId, childId } = req.params;
+const deleteAttribute = catchAsync(async (req, res) => {
+  await Attribute.deleteOne({ _id: req.params.id });
+  return sendSuccess(res, { message: 'Attribute deleted successfully' });
+});
 
-    await Attribute.updateOne(
-      { _id: attributeId },
-      { $pull: { variants: { _id: childId } } }
-    );
+const deleteChildAttribute = catchAsync(async (req, res) => {
+  const { attributeId, childId } = req.params;
+  await Attribute.updateOne({ _id: attributeId }, { $pull: { variants: { _id: childId } } });
+  await handleProductAttribute(attributeId, childId);
+  return sendSuccess(res, { message: 'Attribute value deleted successfully' });
+});
 
-    await handleProductAttribute(attributeId, childId);
-    res.send({
-      message: "Attribute Value Deleted Successfully!",
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+const deleteManyAttribute = catchAsync(async (req, res) => {
+  await Attribute.deleteMany({ _id: req.body.ids });
+  return sendSuccess(res, { message: 'Attributes delete successfully' });
+});
 
-const deleteManyAttribute = async (req, res) => {
-  try {
-    await Attribute.deleteMany({ _id: req.body.ids });
-    // console.log('delete many attribute');
-    res.send({
-      message: `Attributes Delete Successfully!`,
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
-
-const deleteManyChildAttribute = async (req, res) => {
-  try {
-    await Attribute.updateOne(
-      { _id: req.body.id },
-      {
-        $pull: { variants: { _id: req.body.ids } },
-      },
-      {
-        multi: true,
-      }
-    );
-
-    await handleProductAttribute(req.body.id, req.body.ids, "multi");
-    res.send({
-      message: `Attribute Values Delete Successfully!`,
-    });
-  } catch (err) {
-    res.status(500).send({
-      message: err.message,
-    });
-  }
-};
+const deleteManyChildAttribute = catchAsync(async (req, res) => {
+  await Attribute.updateOne({ _id: req.body.id }, { $pull: { variants: { _id: req.body.ids } } }, { multi: true });
+  await handleProductAttribute(req.body.id, req.body.ids, 'multi');
+  return sendSuccess(res, { message: 'Attribute values delete successfully' });
+});
 
 module.exports = {
   addAttribute,

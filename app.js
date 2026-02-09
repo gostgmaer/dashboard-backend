@@ -9,7 +9,9 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const helmet = require('helmet');
+const compressionMiddleware = require('./src/middleware/compression.middleware');
 const session = require('express-session');
+const { sanitizeInput, sanitizeMongoQuery } = require('./src/middleware/sanitization');
 /* =========================
    Core Services & Middleware
 ========================= */
@@ -18,6 +20,9 @@ const DeviceDetector = require('./src/services/deviceDetector');
 const socketService = require('./src/services/socketService');
 const notificationService = require('./src/services/NotificationService');
 const { verifyEmailConnection } = require('./src/email');
+const { initializeCache, closeCache } = require('./src/config/cache');
+const { notFound, globalErrorHandler } = require('./src/middleware/errorHandler');
+const { sendSuccess, HTTP_STATUS } = require('./src/utils/responseHelper');
 
 /* =========================
    Routes
@@ -59,30 +64,98 @@ const app = express();
 /* =========================
    Global Middleware
 ========================= */
-app.use(helmet());
-app.use(cors());
+
+// Security headers
+app.use(helmet({
+   contentSecurityPolicy: {
+      directives: {
+         defaultSrc: ["'self'"],
+         styleSrc: ["'self'", "'unsafe-inline'"],
+         scriptSrc: ["'self'"],
+         imgSrc: ["'self'", 'data:', 'https:'],
+      },
+   },
+   hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+   },
+}));
+
+// CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+   : ['http://localhost:3000', 'http://localhost:3001'];
+
+app.use(cors({
+   origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+         callback(null, true);
+      } else {
+         callback(new Error('Not allowed by CORS'));
+      }
+   },
+   credentials: true,
+   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
+
+// Compression
+app.use(compressionMiddleware);
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Input sanitization (after body parsing, before routes)
+app.use(sanitizeInput);
+app.use(sanitizeMongoQuery);
+
 app.use(LoggerService.expressRequestLogger());
+
+/* =========================
+   Session Configuration
+========================= */
+app.use(
+   session({
+      name: 'sid',
+      secret: process.env.SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+         httpOnly: true,
+         secure: process.env.NODE_ENV === 'production',
+         sameSite: 'strict',
+         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      },
+   })
+);
 
 /* =========================
    Client Hints + Device Info
 ========================= */
 app.use((req, res, next) => {
-  res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
-  res.setHeader('Critical-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+   res.setHeader('Accept-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
+   res.setHeader('Critical-CH', 'Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Model, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness');
 
-  req.deviceInfo = DeviceDetector.detectDevice(req);
-  next();
+   req.deviceInfo = DeviceDetector.detectDevice(req);
+   next();
 });
 
 /* =========================
    Startup Tasks
 ========================= */
+// Initialize services
 verifyEmailConnection().then(console.log);
+initializeCache().then(() => console.log('Cache initialization complete'));
 notificationService.socketService = socketService;
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+   console.log('⏳ SIGTERM received, closing connections...');
+   await closeCache();
+});
 
 /* =========================
    Static Files
@@ -93,11 +166,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
    Helper
 ========================= */
 const safeRoute = (name, route) => {
-  if (!route || typeof route !== 'function') {
-    console.error(`❌ Route "${name}" is not a valid router`);
-    return (_req, res) => res.status(500).json({ success: false, message: 'Route misconfigured' });
-  }
-  return route;
+   if (!route || typeof route !== 'function') {
+      console.error(`❌ Route "${name}" is not a valid router`);
+      return (_req, res) => res.status(500).json({ success: false, message: 'Route misconfigured' });
+   }
+   return route;
 };
 
 /* =========================
@@ -135,45 +208,24 @@ app.use('/api', safeRoute('Public', publicRoutes));
    Root Health Check
 ========================= */
 app.get('/', (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: '🚀 Application is running successfully',
-    environment: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-  });
+   sendSuccess(res, {
+      message: '🚀 Application is running successfully',
+      statusCode: HTTP_STATUS.OK,
+      data: {
+         environment: process.env.NODE_ENV || 'development',
+         timestamp: new Date().toISOString(),
+      },
+   });
 });
-app.use(
-  session({
-    name: 'sid',
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: true,
-    cookie: {
-      httpOnly: true,
-      secure: false,
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    },
-  })
-);
+
 /* =========================
    404 Handler
 ========================= */
-app.use((_req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Endpoint not found',
-  });
-});
+app.use(notFound);
 
 /* =========================
    Global Error Handler
 ========================= */
-app.use((err, _req, res, _next) => {
-  console.error('🔥 Unhandled Error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-  });
-});
+app.use(globalErrorHandler);
 
 module.exports = app;

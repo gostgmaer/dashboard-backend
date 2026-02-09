@@ -1,482 +1,232 @@
 const { FilterOptions } = require('../../utils/helper');
 const Permission = require('../../models/permission');
+const { sendSuccess, sendCreated, HTTP_STATUS } = require('../../utils/responseHelper');
+const AppError = require('../../utils/appError');
+const { catchAsync } = require('../../middleware/errorHandler');
 
-const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // ===== CREATE =====
-const createPermission = async (req, res) => {
-  try {
-    const { name, description, category, isDefault, isActive, action, created_by } = req.body;
+const createPermission = catchAsync(async (req, res) => {
+  const { name, action } = req.body;
 
-    // Basic validation for required fields
-    if (!name || !action) {
-      return res.status(400).json({
-        success: false,
-        message: "'name' and 'action' are required fields.",
-        error: 'VALIDATION_ERROR'
-      });
-    }
-    const permission = await Permission.createPermission(req.body);
-
-    return res.status(201).json({
-      success: true,
-      message: 'Permission created successfully',
-      data: permission
-    });
-  } catch (error) {
-    console.error('Create permission error:', error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to create permission',
-      error: error.code || 'INTERNAL_SERVER_ERROR'
-    });
+  if (!name || !action) {
+    throw AppError.badRequest("'name' and 'action' are required fields");
   }
-};
+
+  const permission = await Permission.createPermission(req.body);
+  return sendCreated(res, { data: permission, message: 'Permission created successfully' });
+});
 
 // ===== GET ALL (with filters) =====
-const getPermissions = async (req, res) => {
-  try {
-    const filterquery = FilterOptions(req.query, Permission);
-    const data = await Permission.find(filterquery.query, '-__v', filterquery.options);
-    const total = await Permission.countDocuments(filterquery.query);
+const getPermissions = catchAsync(async (req, res) => {
+  const filterquery = FilterOptions(req.query, Permission);
+  const data = await Permission.find(filterquery.query, '-__v', filterquery.options);
+  const total = await Permission.countDocuments(filterquery.query);
 
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: data,
-      total,
-      message: 'Permissions retrieved successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      statusCode: 500,
-      status: 'Internal Server Error',
-      results: null,
-      message: error.message,
-    });
-  }
-};
+  return sendSuccess(res, { data: { results: data, total }, message: 'Permissions retrieved successfully' });
+});
 
-const getAllPermissions = async (req, res) => {
-  try {
-    // Extract parameters from query or body (support both GET query and POST body)
-    const {
-      filter = {},
-      page = 1,
-      limit = 10,
-      sort = "createdAt",
-      order = "desc",
-      isDeleted = false,
-      // sort = 'createdAt:desc',
-      selectFields = null,
-      search = null,
-    } = req.method === 'GET' ? req.query : req.body;
+const getAllPermissions = catchAsync(async (req, res) => {
+  const { filter = {}, page = 1, limit = 10, sort = 'createdAt', order = 'desc', isDeleted = false, selectFields = null, search = null } = req.method === 'GET' ? req.query : req.body;
 
-    // const sortkey = (sort && order) ? `${sort}:${sortDesc == 'false' ? 'asc' : 'desc'}` : 'createdAt:desc'
-    const sortkey = {};
-    sortkey[sort] = order === 'desc' ? -1 : 1;
-    // const sortkey   = order === 'desc' ? -1 : 1;
-    // Parse JSON fields if they come as strings in query params
-    const parsedFilter = typeof filter === 'string' ? JSON.parse(filter) : filter;
-    const parsedSelectFields = typeof selectFields === 'string'
-      ? selectFields.split(',').map(f => f.trim())
-      : selectFields;
+  const sortkey = {};
+  sortkey[sort] = order === 'desc' ? -1 : 1;
 
-    // Call the model static method
-    const data = await Permission.getAll({
-      filter: parsedFilter,
-      page: parseInt(page, 10),
-      limit: parseInt(limit, 10),
-      sort: sortkey,
-      isDeleted,
-      selectFields: parsedSelectFields,
-      search,
-    });
+  const parsedFilter = typeof filter === 'string' ? JSON.parse(filter) : filter;
+  const parsedSelectFields = typeof selectFields === 'string' ? selectFields.split(',').map((f) => f.trim()) : selectFields;
 
-   return standardResponse(res, true, data, 'Permissions retrieved successfully', 200);
-  } catch (error) {
-    console.error('Error fetching permissions:', error);
-    res.status(400).json({ error: error.message || 'Failed to fetch permissions' });
-  }
-};
+  const data = await Permission.getAll({
+    filter: parsedFilter,
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10),
+    sort: sortkey,
+    isDeleted,
+    selectFields: parsedSelectFields,
+    search,
+  });
 
+  return sendSuccess(res, { data, message: 'Permissions retrieved successfully' });
+});
 
-const getGroupedPermissions = async (req, res) => {
-  console.log(req);
-
-  try {
-    const data = await Permission.getPermissionsGroupedByCategoryAndAction();
-    res.status(200).json({ data, success: true });
-  } catch (error) {
-    console.error('Error fetching grouped permissions:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-};
+const getGroupedPermissions = catchAsync(async (req, res) => {
+  const data = await Permission.getPermissionsGroupedByCategoryAndAction();
+  return sendSuccess(res, { data, message: 'Grouped permissions retrieved' });
+});
 
 // ===== GET SINGLE =====
-const getSinglePermission = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) {
-      return res.status(404).json({
-        statusCode: 404,
-        status: 'Not Found',
-        results: null,
-        message: 'Permission not found',
-      });
-    }
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: permission,
-      message: 'Permission retrieved successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      statusCode: 500,
-      status: 'Internal Server Error',
-      results: null,
-      message: error.message,
-    });
+const getSinglePermission = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  return sendSuccess(res, { data: permission, message: 'Permission retrieved successfully' });
+});
 
 // ===== UPDATE =====
-const updatePermission = async (req, res) => {
-  try {
-    const { id } = req.params;
+const updatePermission = catchAsync(async (req, res) => {
+  const { id } = req.params;
+  const updatedPermission = await Permission.updatePermissionById(id, req.body);
 
-    const updatedPermission = await Permission.updatePermissionById(id, req.body);
-
-    if (!updatedPermission) {
-      return res.status(404).json({
-        success: false,
-        message: 'Permission not found',
-        error: 'NOT_FOUND'
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Permission updated successfully',
-      data: updatedPermission
-    });
-  } catch (error) {
-    console.error('Update permission error:', error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to update permission',
-      error: error.code || 'INTERNAL_SERVER_ERROR'
-    });
+  if (!updatedPermission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+
+  return sendSuccess(res, { data: updatedPermission, message: 'Permission updated successfully' });
+});
 
 // ===== SOFT DELETE =====
-const deletePermission = async (req, res) => {
-  try {
-    const deleted = await Permission.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
-    if (!deleted) {
-      return res.status(404).json({
-        statusCode: 404,
-        status: 'Not Found',
-        results: null,
-        message: 'Permission not found',
-      });
-    }
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      message: 'Permission deleted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      statusCode: 500,
-      status: 'Internal Server Error',
-      results: null,
-      message: error.message,
-    });
+const deletePermission = catchAsync(async (req, res) => {
+  const deleted = await Permission.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+  if (!deleted) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  return sendSuccess(res, { message: 'Permission deleted successfully' });
+});
 
 // Get all active permissions
-const getActivePermissions = async (req, res) => {
-  try {
-    const data = await Permission.getActivePermissions();
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: data,
-      message: 'Active permissions retrieved successfully',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const getActivePermissions = catchAsync(async (req, res) => {
+  const data = await Permission.getActivePermissions();
+  return sendSuccess(res, { data, message: 'Active permissions retrieved successfully' });
+});
 
 // Search permissions by name only
-const searchPermissionsByName = async (req, res) => {
-  try {
-    const keyword = req.query.q || '';
-    const data = await Permission.searchPermissions(keyword);
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: data,
-      message: 'Permissions search by name completed',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const searchPermissionsByName = catchAsync(async (req, res) => {
+  const keyword = req.query.q || '';
+  const data = await Permission.searchPermissions(keyword);
+  return sendSuccess(res, { data, message: 'Permissions search by name completed' });
+});
 
 // Search permissions by name or description
-const searchPermissions = async (req, res) => {
-  try {
-    const keyword = req.query.q || '';
-    const data = await Permission.search(keyword);
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: data,
-      message: 'Permissions search completed',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const searchPermissions = catchAsync(async (req, res) => {
+  const keyword = req.query.q || '';
+  const data = await Permission.search(keyword);
+  return sendSuccess(res, { data, message: 'Permissions search completed' });
+});
 
 // Bulk create permissions
-const bulkCreatePermissions = async (req, res) => {
-  try {
-    const inserted = await Permission.addManyPermissions(req.body.permissions);
-    res.status(201).json({
-      statusCode: 201,
-      status: 'Created',
-      results: inserted,
-      message: 'Permissions created successfully',
-    });
-  } catch (error) {
-    res.status(400).json({ statusCode: 400, status: 'Bad Request', message: error.message });
-  }
-};
+const bulkCreatePermissions = catchAsync(async (req, res) => {
+  const inserted = await Permission.addManyPermissions(req.body.permissions);
+  return sendCreated(res, { data: inserted, message: 'Permissions created successfully' });
+});
 
 // Get permissions by category
-const getPermissionsByCategory = async (req, res) => {
-  try {
-    const data = await Permission.getByCategory(req.params.category);
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: data,
-      message: 'Permissions by category retrieved successfully',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const getPermissionsByCategory = catchAsync(async (req, res) => {
+  const data = await Permission.getByCategory(req.params.category);
+  return sendSuccess(res, { data, message: 'Permissions by category retrieved successfully' });
+});
 
 // Get inactive permissions
-const getInactivePermissions = async (req, res) => {
-  try {
-    const data = await Permission.getInactivePermissions();
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: data,
-      message: 'Inactive permissions retrieved successfully',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const getInactivePermissions = catchAsync(async (req, res) => {
+  const data = await Permission.getInactivePermissions();
+  return sendSuccess(res, { data, message: 'Inactive permissions retrieved successfully' });
+});
 
 // Bulk enable
-const bulkEnablePermissions = async (req, res) => {
-  try {
-    await Permission.bulkEnable(req.body.ids);
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permissions enabled successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const bulkEnablePermissions = catchAsync(async (req, res) => {
+  await Permission.bulkEnable(req.body.ids);
+  return sendSuccess(res, { message: 'Permissions enabled successfully' });
+});
 
 // Bulk disable
-const bulkDisablePermissions = async (req, res) => {
-  try {
-    await Permission.bulkDisable(req.body.ids);
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permissions disabled successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const bulkDisablePermissions = catchAsync(async (req, res) => {
+  await Permission.bulkDisable(req.body.ids);
+  return sendSuccess(res, { message: 'Permissions disabled successfully' });
+});
 
 // Bulk delete
-const bulkDeletePermissions = async (req, res) => {
-  try {
-    await Permission.bulkDelete(req.body.ids);
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permissions deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const bulkDeletePermissions = catchAsync(async (req, res) => {
+  await Permission.bulkDelete(req.body.ids);
+  return sendSuccess(res, { message: 'Permissions deleted successfully' });
+});
 
 // Check if exists by name
-const checkPermissionExists = async (req, res) => {
-  try {
-    const exists = await Permission.existsByName(req.params.name);
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      exists,
-      message: exists ? 'Permission exists' : 'Permission does not exist',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
-  }
-};
+const checkPermissionExists = catchAsync(async (req, res) => {
+  const exists = await Permission.existsByName(req.params.name);
+  return sendSuccess(res, { data: { exists }, message: exists ? 'Permission exists' : 'Permission does not exist' });
+});
 
 // Create if not exists
-const createIfNotExists = async (req, res) => {
-  try {
-    const { name, description, category } = req.body;
-    const permission = await Permission.createIfNotExists(name, description, category);
-    res.status(201).json({
-      statusCode: 201,
-      status: 'Created',
-      results: permission,
-      message: 'Permission ensured successfully',
-    });
-  } catch (error) {
-    res.status(400).json({ statusCode: 400, status: 'Bad Request', message: error.message });
-  }
-};
+const createIfNotExists = catchAsync(async (req, res) => {
+  const { name, description, category } = req.body;
+  const permission = await Permission.createIfNotExists(name, description, category);
+  return sendCreated(res, { data: permission, message: 'Permission ensured successfully' });
+});
 
 // Grouped by category
-const getPermissionsGrouped = async (req, res) => {
-  try {
-    const grouped = await Permission.getGroupedByCategory();
-    standardResponse(
-      res,
-      true,
-      grouped,
-      'Permissions grouped by category retrieved successfully',
-      200
-    );
-
-  } catch (error) {
-    errorResponse(
-      res,
-      error.message || 'Failed to retrieve grouped permissions',
-      500
-    );
-  }
-};
+const getPermissionsGrouped = catchAsync(async (req, res) => {
+  const grouped = await Permission.getGroupedByCategory();
+  return sendSuccess(res, { data: grouped, message: 'Permissions grouped by category retrieved successfully' });
+});
 
 // ===== INSTANCE METHOD WRAPPERS =====
 
 // Disable a permission
-const disablePermission = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) return res.status(404).json({ statusCode: 404, status: 'Not Found', message: 'Permission not found' });
-    await permission.disable();
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permission disabled successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const disablePermission = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  await permission.disable();
+  return sendSuccess(res, { message: 'Permission disabled successfully' });
+});
 
 // Enable a permission
-const enablePermission = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) return res.status(404).json({ statusCode: 404, status: 'Not Found', message: 'Permission not found' });
-    await permission.enable();
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permission enabled successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const enablePermission = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  await permission.enable();
+  return sendSuccess(res, { message: 'Permission enabled successfully' });
+});
 
 // Rename a permission
-const renamePermission = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) return res.status(404).json({ statusCode: 404, status: 'Not Found', message: 'Permission not found' });
-    await permission.rename(req.body.newName);
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permission renamed successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const renamePermission = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  await permission.rename(req.body.newName);
+  return sendSuccess(res, { message: 'Permission renamed successfully' });
+});
 
 // Update description
-const updatePermissionDescription = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) return res.status(404).json({ statusCode: 404, status: 'Not Found', message: 'Permission not found' });
-    await permission.updateDescription(req.body.description);
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permission description updated successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const updatePermissionDescription = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  await permission.updateDescription(req.body.description);
+  return sendSuccess(res, { message: 'Permission description updated successfully' });
+});
 
 // Change category
-const changePermissionCategory = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) return res.status(404).json({ statusCode: 404, status: 'Not Found', message: 'Permission not found' });
-    await permission.changeCategory(req.body.category);
-    res.status(200).json({ statusCode: 200, status: 'OK', message: 'Permission category changed successfully' });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const changePermissionCategory = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  await permission.changeCategory(req.body.category);
+  return sendSuccess(res, { message: 'Permission category changed successfully' });
+});
 
 // Toggle active/inactive
-const togglePermissionActive = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) {
-      return res.status(404).json({
-        statusCode: 404,
-        status: 'Not Found',
-        message: 'Permission not found',
-      });
-    }
-    const newState = await permission.toggleActive();
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      isActive: newState,
-      message: `Permission ${newState ? 'enabled' : 'disabled'} successfully`,
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const togglePermissionActive = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  const newState = await permission.toggleActive();
+  return sendSuccess(res, { data: { isActive: newState }, message: `Permission ${newState ? 'enabled' : 'disabled'} successfully` });
+});
 
 // Format for API response
-const getPermissionAPIResponse = async (req, res) => {
-  try {
-    const permission = await Permission.findById(req.params.id);
-    if (!permission) {
-      return res.status(404).json({
-        statusCode: 404,
-        status: 'Not Found',
-        message: 'Permission not found',
-      });
-    }
-    res.status(200).json({
-      statusCode: 200,
-      status: 'OK',
-      results: permission.toAPIResponse(),
-      message: 'Permission API response formatted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({ statusCode: 500, status: 'Internal Server Error', message: error.message });
+const getPermissionAPIResponse = catchAsync(async (req, res) => {
+  const permission = await Permission.findById(req.params.id);
+  if (!permission) {
+    throw AppError.notFound('Permission not found');
   }
-};
+  return sendSuccess(res, { data: permission.toAPIResponse(), message: 'Permission API response formatted successfully' });
+});
 
 module.exports = {
   createPermission,
@@ -492,7 +242,8 @@ module.exports = {
   getPermissions,
   getSinglePermission,
   updatePermission,
-  getPermissionAPIResponse, getGroupedPermissions,
+  getPermissionAPIResponse,
+  getGroupedPermissions,
   deletePermission,
   togglePermissionActive,
   bulkCreatePermissions,
@@ -502,5 +253,6 @@ module.exports = {
   getPermissionsGrouped,
   searchPermissions,
   getActivePermissions,
-  changePermissionCategory, getAllPermissions
+  changePermissionCategory,
+  getAllPermissions,
 };

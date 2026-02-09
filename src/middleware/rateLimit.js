@@ -42,24 +42,14 @@ const rateLimit = (options = {}) => {
         rateLimiter.duration = Math.floor(adjustedWindow / 1000);
       }
 
-      // Check rate limit (use original User.checkRateLimit if available, else in-memory)
-      let rateLimitResult;
-      if (typeof User?.checkRateLimit === 'function') {
-        rateLimitResult = await User.checkRateLimit(
-          identifier,
-          config.action,
-          config.maxAttempts,
-          adjustedWindow
-        );
-      } else {
-        rateLimitResult = await rateLimiter.consume(identifier);
-        rateLimitResult = {
-          allowed: rateLimitResult.remainingPoints > 0,
-          attempts: config.maxAttempts - rateLimitResult.remainingPoints,
-          resetTime: new Date(Date.now() + adjustedWindow),
-          blockExpires: rateLimitResult.msBeforeNext
-        };
-      }
+      // Check rate limit using in-memory rate limiter
+      const consumeResult = await rateLimiter.consume(identifier);
+      const rateLimitResult = {
+        allowed: consumeResult.remainingPoints > 0,
+        attempts: config.maxAttempts - consumeResult.remainingPoints,
+        resetTime: new Date(Date.now() + adjustedWindow),
+        blockExpires: consumeResult.msBeforeNext
+      };
 
       // Set rate limit headers
       res.set({

@@ -1,143 +1,135 @@
 const Component = require('../models/components');
-const { standardResponse,errorResponse } = require('../utils/apiUtils');
+const { sendSuccess, sendCreated, HTTP_STATUS } = require('../utils/responseHelper');
+const AppError = require('../utils/appError');
+const { catchAsync } = require('../middleware/errorHandler');
 
 class ComponentController {
-  static async createComponent(req, res) {
-    try {
-      const component = await Component.createComponent(req.body);
-      return standardResponse(res, true, component, 'Component created successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
+  static createComponent = catchAsync(async (req, res) => {
+    const component = await Component.createComponent(req.body);
+    return sendCreated(res, {
+      data: component,
+      message: 'Component created successfully',
+    });
+  });
 
-  static async getComponents(req, res) {
-    try {
-      const components = await Component.getComponents(req.query);
-      return standardResponse(res, true, components, 'Components retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
+  static getComponents = catchAsync(async (req, res) => {
+    const components = await Component.getComponents(req.query);
+    return sendSuccess(res, {
+      data: components,
+      message: 'Components retrieved successfully',
+    });
+  });
 
-  static async getComponentById(req, res) {
-    try {
-      const component = await Component.getComponentById(req.params.id);
-      if (!component)
-        return errorResponse(res, 'Component not found', 404, null);
-      return standardResponse(res, true, component, 'Component retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
+  static getComponentById = catchAsync(async (req, res) => {
+    const component = await Component.getComponentById(req.params.id);
+    if (!component) {
+      throw AppError.notFound('Component not found');
     }
-  }
+    return sendSuccess(res, {
+      data: component,
+      message: 'Component retrieved successfully',
+    });
+  });
 
-  static async updateComponent(req, res) {
-    try {
-      const component = await Component.updateComponent(req.params.id, req.body);
-      if (!component)
-        return errorResponse(res, 'Component not found', 404, null);
-      return standardResponse(res, true, component, 'Component updated successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
+  static updateComponent = catchAsync(async (req, res) => {
+    const component = await Component.updateComponent(req.params.id, req.body);
+    if (!component) {
+      throw AppError.notFound('Component not found');
     }
-  }
+    return sendSuccess(res, {
+      data: component,
+      message: 'Component updated successfully',
+    });
+  });
 
-  static async deleteComponent(req, res) {
-    try {
-      const result = await Component.deleteComponent(req.params.id);
-      if (!result)
-        return errorResponse(res, 'Component not found', 404, null);
-      return standardResponse(res, true, {}, 'Component deleted successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
+  static deleteComponent = catchAsync(async (req, res) => {
+    const result = await Component.deleteComponent(req.params.id);
+    if (!result) {
+      throw AppError.notFound('Component not found');
     }
-  }
+    return sendSuccess(res, {
+      message: 'Component deleted successfully',
+    });
+  });
 
-  static async getComponentsByType(req, res) {
-    try {
-      const components = await Component.getComponentsByType(req.params.type);
-      return standardResponse(res, true, components, 'Components retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
+  static getComponentsByType = catchAsync(async (req, res) => {
+    const components = await Component.getComponentsByType(req.params.type);
+    return sendSuccess(res, {
+      data: components,
+      message: 'Components retrieved successfully',
+    });
+  });
 
-  static async getRecentlyAdded(req, res) {
-    try {
-      const days = parseInt(req.query.days) || 7;
-      const components = await Component.getRecentlyAdded(days);
-      return standardResponse(res, true, components, 'Recently added components retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
+  static getRecentlyAdded = catchAsync(async (req, res) => {
+    const days = parseInt(req.query.days) || 7;
+    const components = await Component.getRecentlyAdded(days);
+    return sendSuccess(res, {
+      data: components,
+      message: 'Recently added components retrieved successfully',
+    });
+  });
 
-  static async brandStats(req, res) {
-    try {
-      const stats = await Component.brandStats();
-      return standardResponse(res, true, stats, 'Brand statistics retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
+  static brandStats = catchAsync(async (req, res) => {
+    const stats = await Component.brandStats();
+    return sendSuccess(res, {
+      data: stats,
+      message: 'Brand statistics retrieved successfully',
+    });
+  });
 
-  static async getTopPriced(req, res) {
-    try {
-      const limit = parseInt(req.query.limit) || 10;
-      const components = await Component.getTopPriced(limit);
-      return standardResponse(res, true, components, 'Top priced components retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
+  static getTopPriced = catchAsync(async (req, res) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const components = await Component.getTopPriced(limit);
+    return sendSuccess(res, {
+      data: components,
+      message: 'Top priced components retrieved successfully',
+    });
+  });
 
-  static async getLowestPriced(req, res) {
-    try {
-      const limit = parseInt(req.query.limit) || 10;
-      const components = await Component.getLowestPriced(limit);
-      return standardResponse(res, true, components, 'Lowest priced components retrieved successfully');
-    } catch (err) {
-      return errorResponse(res, err.message, 500, err);
-    }
-  }
-   static async bulkDelete(req, res) {
-    try {
-      const { ids } = req.body;
-      if (!Array.isArray(ids) || !ids.length) {
-        return res.status(400).json({ success: false, message: 'ids must be a non-empty array' });
-      }
-      const result = await Component.deleteMany({ _id: { $in: ids } });
-      return res.json({ success: true, message: `${result.deletedCount} components deleted` });
-    } catch (err) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
-  }
+  static getLowestPriced = catchAsync(async (req, res) => {
+    const limit = parseInt(req.query.limit) || 10;
+    const components = await Component.getLowestPriced(limit);
+    return sendSuccess(res, {
+      data: components,
+      message: 'Lowest priced components retrieved successfully',
+    });
+  });
 
-  static async bulkUpdate(req, res) {
-    try {
-      const { updates } = req.body;
-      // updates should be array of { id, data }
-      if (!Array.isArray(updates)) {
-        return res.status(400).json({ success: false, message: 'updates must be an array' });
-      }
-      const promises = updates.map(u => Component.findByIdAndUpdate(u.id, u.data, { new: true }));
-      const updated = await Promise.all(promises);
-      return res.json({ success: true, message: 'Bulk update successful', data: updated });
-    } catch (err) {
-      return res.status(500).json({ success: false, message: err.message });
+  static bulkDelete = catchAsync(async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || !ids.length) {
+      throw AppError.badRequest('ids must be a non-empty array');
     }
-  }
-  static async bulkImport(req, res) {
-    try {
-      if (!Array.isArray(req.body.components)) {
-        return res.status(400).json({ success: false, message: 'components must be an array' });
-      }
-      const created = await Component.insertMany(req.body.components, { ordered: false });
-      return res.json({ success: true, message: 'Bulk import successful', data: created });
-    } catch (err) {
-      return res.status(500).json({ success: false, message: err.message });
+    const result = await Component.deleteMany({ _id: { $in: ids } });
+    return sendSuccess(res, {
+      data: { deletedCount: result.deletedCount },
+      message: `${result.deletedCount} components deleted`,
+    });
+  });
+
+  static bulkUpdate = catchAsync(async (req, res) => {
+    const { updates } = req.body;
+    if (!Array.isArray(updates)) {
+      throw AppError.badRequest('updates must be an array');
     }
-  }
+    const promises = updates.map((u) => Component.findByIdAndUpdate(u.id, u.data, { new: true }));
+    const updated = await Promise.all(promises);
+    return sendSuccess(res, {
+      data: updated,
+      message: 'Bulk update successful',
+    });
+  });
+
+  static bulkImport = catchAsync(async (req, res) => {
+    if (!Array.isArray(req.body.components)) {
+      throw AppError.badRequest('components must be an array');
+    }
+    const created = await Component.insertMany(req.body.components, { ordered: false });
+    return sendSuccess(res, {
+      data: created,
+      message: 'Bulk import successful',
+    });
+  });
 }
 
 module.exports = ComponentController;

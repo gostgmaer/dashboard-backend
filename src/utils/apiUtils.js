@@ -1,4 +1,27 @@
+/**
+ * API Utilities
+ * This file now re-exports standardized response functions from responseHelper.js
+ * 
+ * @deprecated Import directly from '../utils/responseHelper' instead
+ */
 
+// Import standardized response functions
+const {
+  sendSuccess,
+  sendError,
+  sendPaginated,
+  sendCreated,
+  sendNoContent,
+  HTTP_STATUS,
+  ERROR_CODES,
+  standardResponse,
+  errorResponse,
+} = require('./responseHelper');
+
+/**
+ * Custom API Error class
+ * Extends Error with statusCode and details
+ */
 class APIError extends Error {
   constructor(message, statusCode = 500, details = null) {
     super(message);
@@ -9,6 +32,10 @@ class APIError extends Error {
   }
 }
 
+/**
+ * Legacy format response helper
+ * @deprecated Use sendSuccess from responseHelper instead
+ */
 const formatResponse = (message, results = null) => {
   return {
     success: true,
@@ -17,32 +44,18 @@ const formatResponse = (message, results = null) => {
   };
 };
 
-// responseUtils.js
-
-function standardResponse(res, success, data, message, statusCode = 200, meta = {}) {
-  return res.status(statusCode).json({
-    success,
-    status: statusCode,
-    data,
-    message,
-    ...meta,
-  });
-}
-
-function errorResponse(res, message, statusCode = 500, error = null) {
-  return res.status(statusCode).json({
-    success: false,
-    status: statusCode,
-    message,
-    error: process.env.NODE_ENV === "development" ? error : undefined,
-  });
-}
-
-
-
-
 module.exports = {
-  standardResponse,errorResponse,
+  // Re-export from responseHelper for backward compatibility
+  sendSuccess,
+  sendError,
+  sendPaginated,
+  sendCreated,
+  sendNoContent,
+  HTTP_STATUS,
+  ERROR_CODES,
+  standardResponse,
+  errorResponse,
+  // Local utilities
   APIError,
   formatResponse,
 };

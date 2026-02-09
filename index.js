@@ -9,44 +9,50 @@
 
 require("dotenv").config();
 
+const validateEnv = require("./src/config/validateEnv");
+
+// Validate environment variables before starting server
+validateEnv();
+
 const http = require("http");
 const app = require("./app");
 const { isSocketingEnabled } = require("./src/config/setting");
 const connectDB = require("./src/config/dbConnact");
 const socketService = require("./src/services/socketService");
+const LoggerService = require("./src/services/logger");
 
 const PORT = process.env.PORT || 3500;
 
 async function startServer() {
   try {
-    console.log("⏳ Connecting to database...");
+    LoggerService.info('Connecting to database...');
     await connectDB();
-    console.log("✅ Database connected");
+    LoggerService.info('Database connected');
 
     const server = http.createServer(app);
 
     // Initialize Socket.IO
-    
-      if (isSocketingEnabled){ socketService.initialize(server)};
+
+    if (isSocketingEnabled) { socketService.initialize(server) };
 
 
     server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      LoggerService.info(`Server running on port ${PORT}`);
+      LoggerService.info(`Environment: ${process.env.NODE_ENV || "development"}`);
     });
 
     /* =========================
        Graceful Shutdown
     ========================= */
     const shutdown = (signal) => {
-      console.log(`⏳ Received ${signal}. Shutting down...`);
+      LoggerService.info(`Received ${signal}. Shutting down...`);
       server.close(() => {
-        console.log("✅ HTTP server closed");
+        LoggerService.info('HTTP server closed');
         process.exit(0);
       });
 
       setTimeout(() => {
-        console.error("❌ Forced shutdown");
+        LoggerService.error('Forced shutdown');
         process.exit(1);
       }, 10_000);
     };
@@ -54,7 +60,7 @@ async function startServer() {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
   } catch (error) {
-    console.error("❌ Server startup failed:", error);
+    LoggerService.error('Server startup failed:', { error });
     process.exit(1);
   }
 }

@@ -1,208 +1,194 @@
 // controllers/masterController.js
 const MasterService = require('../services/masterDatahelper');
 const { validationResult } = require('express-validator');
-const AppError = require('../utils/appError'); // Assuming you have a standard error class
-const { standardResponse, errorResponse } = require('../utils/apiUtils');
+const AppError = require('../utils/appError');
+const { sendSuccess, sendCreated, sendPaginated, HTTP_STATUS } = require('../utils/responseHelper');
+const { catchAsync } = require('../middleware/errorHandler');
 
 class MasterController {
   // CREATE - Single master record
-  async create(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return next(new AppError(400, 'Validation failed', errors.array()));
-      }
-
-      const payload = req.body;
-      const userId = req.user?.id || null;
-
-      await MasterService.create(payload, userId);
-
-      standardResponse(res, true, null, `Master Record Created SuccessFull!`, 201);
-    } catch (error) {
-      errorResponse(res, error.message, error.statusCode || 500);
+  create = catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  }
+
+    const payload = req.body;
+    const userId = req.user?.id || null;
+
+    await MasterService.create(payload, userId);
+
+    return sendCreated(res, {
+      message: 'Master record created successfully',
+    });
+  });
 
   // BULK UPSERT - Multiple records with upsert logic
-  async bulkUpsert(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return next(new AppError(400, 'Validation failed', errors.array()));
-      }
-
-      const list = req.body;
-      const userId = req.user?.id || null;
-
-      const result = await MasterService.bulkUpsert(list, userId);
-
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
+  bulkUpsert = catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  }
+
+    const list = req.body;
+    const userId = req.user?.id || null;
+
+    const result = await MasterService.bulkUpsert(list, userId);
+
+    return sendSuccess(res, {
+      data: result,
+      message: 'Bulk upsert completed successfully',
+    });
+  });
 
   // GET BY ID or CODE
-  async getByIdOrCode(req, res, next) {
-    try {
-      const { idOrCode, fields } = req.params;
+  getByIdOrCode = catchAsync(async (req, res) => {
+    const { idOrCode, fields } = req.params;
 
-      if (!idOrCode) {
-        return next(new AppError(400, 'idOrCode is required'));
-      }
-
-      const doc = await MasterService.getByIdOrCode(idOrCode, fields);
-
-      if (!doc) {
-        return next(new AppError(404, 'Master record not found'));
-      }
-
-      res.status(200).json({
-        success: true,
-        data: doc,
-      });
-    } catch (error) {
-      next(error);
+    if (!idOrCode) {
+      throw AppError.badRequest('idOrCode is required');
     }
-  }
+
+    const doc = await MasterService.getByIdOrCode(idOrCode, fields);
+
+    if (!doc) {
+      throw AppError.notFound('Master record not found');
+    }
+
+    return sendSuccess(res, {
+      data: doc,
+      message: 'Master record retrieved successfully',
+    });
+  });
 
   // GET LIST with pagination and filters
-  async getList(req, res, next) {
-    try {
-      const { page = 1, limit = 20, sortBy = 'sortOrder', sortOrder = 'asc', search, type, tenantId, domain, isActive, isArchive, fields } = req.query;
+  getList = catchAsync(async (req, res) => {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = 'sortOrder',
+      sortOrder = 'asc',
+      search,
+      type,
+      tenantId,
+      domain,
+      isActive,
+      isArchive,
+      fields,
+    } = req.query;
 
-      const result = await MasterService.getList({
-        page: parseInt(page),
-        limit: parseInt(limit),
-        sortBy,
-        sortOrder,
-        search: search || '',
-        type,
-        tenantId,
-        domain,
-        isActive: isArchive === 'true' ? false : isActive === 'false' ? false : true,
-        includeDeleted: isArchive === 'true',
-        fields,
-      });
+    const result = await MasterService.getList({
+      page: parseInt(page),
+      limit: parseInt(limit),
+      sortBy,
+      sortOrder,
+      search: search || '',
+      type,
+      tenantId,
+      domain,
+      isActive: isArchive === 'true' ? false : isActive === 'false' ? false : true,
+      includeDeleted: isArchive === 'true',
+      fields,
+    });
 
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-  async getMastersGroupedByType(req, res, next) {
-    try {
-      const { tenantId, domain, includeInactive, includeDeleted, fields, limitPerType = '1000' } = req.query;
+    return sendSuccess(res, {
+      data: result,
+      message: 'Master records retrieved successfully',
+    });
+  });
 
-      const tenantIdHeader = req.headers['x-tenant-id'] || tenantId;
+  // GET MASTERS GROUPED BY TYPE
+  getMastersGroupedByType = catchAsync(async (req, res) => {
+    const { tenantId, domain, includeInactive, includeDeleted, fields, limitPerType = '1000' } = req.query;
 
-      const result = await MasterService.getGroupedByType({
-        tenantId: tenantIdHeader,
-        domain,
-        includeInactive: includeInactive === 'true',
-        includeDeleted: includeDeleted === 'true',
-        fields,
-        limitPerType: parseInt(limitPerType),
-      });
+    const tenantIdHeader = req.headers['x-tenant-id'] || tenantId;
 
-      standardResponse(res, true, result, `Master Record Created SuccessFul!`, 200);
-    } catch (err) {
-      console.error('getMastersGroupedByType error', err);
-      res.status(500).json({ message: 'Server error' });
-    }
-  }
+    const result = await MasterService.getGroupedByType({
+      tenantId: tenantIdHeader,
+      domain,
+      includeInactive: includeInactive === 'true',
+      includeDeleted: includeDeleted === 'true',
+      fields,
+      limitPerType: parseInt(limitPerType),
+    });
+
+    return sendSuccess(res, {
+      data: result,
+      message: 'Masters grouped by type retrieved successfully',
+    });
+  });
+
   // UPDATE BY ID
-  async updateById(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return next(new AppError(400, 'Validation failed', errors.array()));
-      }
-
-      const { id } = req.params;
-      const payload = req.body;
-
-      const doc = await MasterService.updateById(id, payload, req.user);
-
-      if (!doc) {
-        return next(new AppError(404, 'Master record not found'));
-      }
-      standardResponse(res, true, null, `Master Record Update Successfull!`, 200);
-    } catch (error) {
-      next(error);
+  updateById = catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  }
+
+    const { id } = req.params;
+    const payload = req.body;
+
+    const doc = await MasterService.updateById(id, payload, req.user);
+
+    if (!doc) {
+      throw AppError.notFound('Master record not found');
+    }
+
+    return sendSuccess(res, {
+      message: 'Master record updated successfully',
+    });
+  });
 
   // SOFT DELETE BY ID
-  async softDeleteById(req, res, next) {
-    try {
-      const { id } = req.params;
+  softDeleteById = catchAsync(async (req, res) => {
+    const { id } = req.params;
 
-      const doc = await MasterService.softDeleteById(id);
+    const doc = await MasterService.softDeleteById(id);
 
-      if (!doc) {
-        return next(new AppError(404, 'Master record not found'));
-      }
-
-      res.status(200).json({
-        success: true,
-        message: 'Record soft deleted successfully',
-      });
-    } catch (error) {
-      next(error);
+    if (!doc) {
+      throw AppError.notFound('Master record not found');
     }
-  }
+
+    return sendSuccess(res, {
+      message: 'Record soft deleted successfully',
+    });
+  });
 
   // BULK DELETE BY IDs
-  async bulkDeleteByIds(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return next(new AppError(400, 'Validation failed', errors.array()));
-      }
-
-      const ids = req.body.ids;
-
-      const result = await MasterService.bulkDeleteByIds(ids);
-
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
+  bulkDeleteByIds = catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  }
+
+    const ids = req.body.ids;
+
+    const result = await MasterService.bulkDeleteByIds(ids);
+
+    return sendSuccess(res, {
+      data: result,
+      message: 'Bulk delete completed successfully',
+    });
+  });
 
   // BULK UPDATE BY TYPE (Utility endpoint)
-  async bulkUpdateByType(req, res, next) {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return next(new AppError(400, 'Validation failed', errors.array()));
-      }
-
-      const { type } = req.params;
-      const update = req.body;
-      const tenantId = req.query.tenantId;
-
-      const result = await MasterService.bulkUpdateByType(type, update, tenantId);
-
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
+  bulkUpdateByType = catchAsync(async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw AppError.validation('Validation failed', errors.array());
     }
-  }
+
+    const { type } = req.params;
+    const update = req.body;
+    const tenantId = req.query.tenantId;
+
+    const result = await MasterService.bulkUpdateByType(type, update, tenantId);
+
+    return sendSuccess(res, {
+      data: result,
+      message: 'Bulk update by type completed successfully',
+    });
+  });
 }
 
 module.exports = new MasterController();

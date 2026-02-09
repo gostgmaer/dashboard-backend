@@ -1,781 +1,423 @@
 const Setting = require('../models/settingsModel');
 const { validationResult } = require('express-validator');
-const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
+const { sendSuccess, HTTP_STATUS } = require('../utils/responseHelper');
+const AppError = require('../utils/appError');
+const { catchAsync } = require('../middleware/errorHandler');
+
 // Settings Controller with all possible methods covering model statics and instance methods
 
 const settingController = {
-
     // Basic Settings Operations
-    async getSettings(req, res) {
-        try {
-            const settings = await Setting.getSettings();
-            res.status(200).json({
-                success: true,
-                data: settings
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    getSettings: catchAsync(async (req, res) => {
+        const settings = await Setting.getSettings();
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Settings retrieved successfully',
+        });
+    }),
 
-    async getSettingsSafe(req, res) {
-        try {
-            const settings = await Setting.findOne().lean();
-            if (settings) {
-                const safeSetting = new Setting(settings);
-                const safeData = safeSetting.toJSONSafe();
-                res.status(200).json({
-                    success: true,
-                    data: safeData
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    getSettingsSafe: catchAsync(async (req, res) => {
+        const settings = await Setting.findOne().lean();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        const safeSetting = new Setting(settings);
+        const safeData = safeSetting.toJSONSafe();
+        return sendSuccess(res, {
+            data: safeData,
+            message: 'Settings retrieved successfully',
+        });
+    }),
 
-    async updateSettings(req, res) {
-        try {
-            const errors = validationResult(req);
-            if (!errors.isEmpty()) {
-                return res.status(400).json({
-                    success: false,
-                    errors: errors.array()
-                });
-            }
-
-            const updated_by = req.user?.id || 'system';
-            const settings = await Setting.updateSettings(req.body, updated_by);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Settings updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    updateSettings: catchAsync(async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            throw AppError.validation('Validation failed', errors.array());
         }
-    },
+
+        const updated_by = req.user?.id || 'system';
+        const settings = await Setting.updateSettings(req.body, updated_by);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Settings updated successfully',
+        });
+    }),
 
     // Maintenance and Live Status Operations
-    async toggleMaintenanceMode(req, res) {
-        try {
-            const { status } = req.body;
-            const settings = await Setting.toggleMaintenanceMode(status);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: `Maintenance mode ${status ? 'enabled' : 'disabled'}`
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    toggleMaintenanceMode: catchAsync(async (req, res) => {
+        const { status } = req.body;
+        const settings = await Setting.toggleMaintenanceMode(status);
+        return sendSuccess(res, {
+            data: settings,
+            message: `Maintenance mode ${status ? 'enabled' : 'disabled'}`,
+        });
+    }),
 
-    async toggleLiveStatus(req, res) {
-        try {
-            const { status } = req.body;
-            const settings = await Setting.toggleLiveStatus(status);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: `Site status set to ${status ? 'live' : 'offline'}`
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    toggleLiveStatus: catchAsync(async (req, res) => {
+        const { status } = req.body;
+        const settings = await Setting.toggleLiveStatus(status);
+        return sendSuccess(res, {
+            data: settings,
+            message: `Site status set to ${status ? 'live' : 'offline'}`,
+        });
+    }),
 
-    async isMaintenanceMode(req, res) {
-        try {
-            const settings = await Setting.findOne();
-            const isInMaintenance = settings ? settings.isInMaintenance() : false;
-            res.status(200).json({
-                success: true,
-                data: { isMaintenanceMode: isInMaintenance }
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    isMaintenanceMode: catchAsync(async (req, res) => {
+        const settings = await Setting.findOne();
+        const isInMaintenance = settings ? settings.isInMaintenance() : false;
+        return sendSuccess(res, {
+            data: { isMaintenanceMode: isInMaintenance },
+            message: 'Maintenance mode status retrieved',
+        });
+    }),
 
-    async isStoreLive(req, res) {
-        try {
-            const settings = await Setting.findOne();
-            const isLive = settings ? settings.isStoreLive() : false;
-            res.status(200).json({
-                success: true,
-                data: { isStoreLive: isLive }
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    isStoreLive: catchAsync(async (req, res) => {
+        const settings = await Setting.findOne();
+        const isLive = settings ? settings.isStoreLive() : false;
+        return sendSuccess(res, {
+            data: { isStoreLive: isLive },
+            message: 'Store live status retrieved',
+        });
+    }),
 
     // Branding Operations
-    async updateBranding(req, res) {
-        try {
-            const settings = await Setting.updateBranding(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Branding updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateBranding: catchAsync(async (req, res) => {
+        const settings = await Setting.updateBranding(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Branding updated successfully',
+        });
+    }),
 
     // SEO Operations
-    async updateSEO(req, res) {
-        try {
-            const settings = await Setting.updateSEO(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'SEO settings updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateSEO: catchAsync(async (req, res) => {
+        const settings = await Setting.updateSEO(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'SEO settings updated successfully',
+        });
+    }),
 
     // Payment Operations
-    async updatePaymentMethods(req, res) {
-        try {
-            const { methods } = req.body;
-            const settings = await Setting.updatePaymentMethods(methods);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Payment methods updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updatePaymentMethods: catchAsync(async (req, res) => {
+        const { methods } = req.body;
+        const settings = await Setting.updatePaymentMethods(methods);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Payment methods updated successfully',
+        });
+    }),
 
-    async getActivePaymentMethods(req, res) {
-        try {
-            const methods = await Setting.getActivePaymentMethods();
-            res.status(200).json({
-                success: true,
-                data: methods
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    getActivePaymentMethods: catchAsync(async (req, res) => {
+        const methods = await Setting.getActivePaymentMethods();
+        return sendSuccess(res, {
+            data: methods,
+            message: 'Active payment methods retrieved',
+        });
+    }),
 
     // Contact Information Operations
-    async updateContactInfo(req, res) {
-        try {
-            const settings = await Setting.updateContactInfo(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Contact information updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateContactInfo: catchAsync(async (req, res) => {
+        const settings = await Setting.updateContactInfo(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Contact information updated successfully',
+        });
+    }),
 
     // Shipping Operations
-    async updateShippingOptions(req, res) {
-        try {
-            const { options } = req.body;
-            const settings = await Setting.updateShippingOptions(options);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Shipping options updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateShippingOptions: catchAsync(async (req, res) => {
+        const { options } = req.body;
+        const settings = await Setting.updateShippingOptions(options);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Shipping options updated successfully',
+        });
+    }),
 
-    async updateOrderLimits(req, res) {
-        try {
-            const { minOrderAmount, maxOrderAmount } = req.body;
-            const settings = await Setting.updateOrderLimits(minOrderAmount, maxOrderAmount);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Order limits updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateOrderLimits: catchAsync(async (req, res) => {
+        const { minOrderAmount, maxOrderAmount } = req.body;
+        const settings = await Setting.updateOrderLimits(minOrderAmount, maxOrderAmount);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Order limits updated successfully',
+        });
+    }),
 
     // Email Operations
-    async updateEmailTemplates(req, res) {
-        try {
-            const settings = await Setting.updateEmailTemplates(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Email templates updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateEmailTemplates: catchAsync(async (req, res) => {
+        const settings = await Setting.updateEmailTemplates(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Email templates updated successfully',
+        });
+    }),
 
     // Analytics Operations
-    async updateAnalytics(req, res) {
-        try {
-            const settings = await Setting.updateAnalytics(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Analytics settings updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateAnalytics: catchAsync(async (req, res) => {
+        const settings = await Setting.updateAnalytics(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Analytics settings updated successfully',
+        });
+    }),
 
     // Currency and Tax Operations
-    async updateCurrencyAndTax(req, res) {
-        try {
-            const { currency, currencySymbol, taxRate } = req.body;
-            const settings = await Setting.updateCurrencyAndTax(currency, currencySymbol, taxRate);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Currency and tax settings updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateCurrencyAndTax: catchAsync(async (req, res) => {
+        const { currency, currencySymbol, taxRate } = req.body;
+        const settings = await Setting.updateCurrencyAndTax(currency, currencySymbol, taxRate);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Currency and tax settings updated successfully',
+        });
+    }),
 
     // Loyalty Program Operations
-    async updateLoyaltyProgram(req, res) {
-        try {
-            const settings = await Setting.updateLoyaltyProgram(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Loyalty program updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateLoyaltyProgram: catchAsync(async (req, res) => {
+        const settings = await Setting.updateLoyaltyProgram(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Loyalty program updated successfully',
+        });
+    }),
 
     // Policies Operations
-    async updatePolicies(req, res) {
-        try {
-            const settings = await Setting.updatePolicies(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Policies updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updatePolicies: catchAsync(async (req, res) => {
+        const settings = await Setting.updatePolicies(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Policies updated successfully',
+        });
+    }),
 
-    async clearPolicies(req, res) {
-        try {
-            const settings = await Setting.clearPolicies();
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'All policies cleared successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    clearPolicies: catchAsync(async (req, res) => {
+        const settings = await Setting.clearPolicies();
+        return sendSuccess(res, {
+            data: settings,
+            message: 'All policies cleared successfully',
+        });
+    }),
 
     // Featured Categories Operations
-    async updateFeaturedCategories(req, res) {
-        try {
-            const { categoryIds } = req.body;
-            const settings = await Setting.updateFeaturedCategories(categoryIds);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Featured categories updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    updateFeaturedCategories: catchAsync(async (req, res) => {
+        const { categoryIds } = req.body;
+        const settings = await Setting.updateFeaturedCategories(categoryIds);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Featured categories updated successfully',
+        });
+    }),
 
-    async addFeaturedCategory(req, res) {
-        try {
-            const { categoryId } = req.params;
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.addFeaturedCategory(categoryId);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: 'Category added to featured list'
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    addFeaturedCategory: catchAsync(async (req, res) => {
+        const { categoryId } = req.params;
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.addFeaturedCategory(categoryId);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Category added to featured list',
+        });
+    }),
 
-    async removeFeaturedCategory(req, res) {
-        try {
-            const { categoryId } = req.params;
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.removeFeaturedCategory(categoryId);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: 'Category removed from featured list'
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    removeFeaturedCategory: catchAsync(async (req, res) => {
+        const { categoryId } = req.params;
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.removeFeaturedCategory(categoryId);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Category removed from featured list',
+        });
+    }),
 
     // Social Media Operations
-    async updateSocialLink(req, res) {
-        try {
-            const { platform } = req.params;
-            const { url } = req.body;
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.updateSocialLink(platform, url);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: `${platform} link updated successfully`
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    updateSocialLink: catchAsync(async (req, res) => {
+        const { platform } = req.params;
+        const { url } = req.body;
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.updateSocialLink(platform, url);
+        return sendSuccess(res, {
+            data: settings,
+            message: `${platform} link updated successfully`,
+        });
+    }),
 
     // Security Operations
-    async resetSecuritySettings(req, res) {
-        try {
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.resetSecuritySettings();
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: 'Security settings reset to defaults'
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    resetSecuritySettings: catchAsync(async (req, res) => {
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.resetSecuritySettings();
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Security settings reset to defaults',
+        });
+    }),
 
-    async enableTwoFactorAuth(req, res) {
-        try {
-            const { enabled } = req.body;
-            const settings = await Setting.enableTwoFactorAuth(enabled);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: `Two-factor authentication ${enabled ? 'enabled' : 'disabled'}`
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    enableTwoFactorAuth: catchAsync(async (req, res) => {
+        const { enabled } = req.body;
+        const settings = await Setting.enableTwoFactorAuth(enabled);
+        return sendSuccess(res, {
+            data: settings,
+            message: `Two-factor authentication ${enabled ? 'enabled' : 'disabled'}`,
+        });
+    }),
 
-    async addAllowedIPRange(req, res) {
-        try {
-            const { ipRange } = req.body;
-            const settings = await Setting.addAllowedIPRange(ipRange);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'IP range added to allowed list'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    addAllowedIPRange: catchAsync(async (req, res) => {
+        const { ipRange } = req.body;
+        const settings = await Setting.addAllowedIPRange(ipRange);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'IP range added to allowed list',
+        });
+    }),
 
-    async removeAllowedIPRange(req, res) {
-        try {
-            const { ipRange } = req.body;
-            const settings = await Setting.removeAllowedIPRange(ipRange);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'IP range removed from allowed list'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    removeAllowedIPRange: catchAsync(async (req, res) => {
+        const { ipRange } = req.body;
+        const settings = await Setting.removeAllowedIPRange(ipRange);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'IP range removed from allowed list',
+        });
+    }),
 
     // UI/UX Operations
-    async setDarkModeForAllUsers(req, res) {
-        try {
-            const { enabled } = req.body;
-            await Setting.setDarkModeForAllUsers(enabled);
-            res.status(200).json({
-                success: true,
-                message: `Dark mode ${enabled ? 'enabled' : 'disabled'} for all users`
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    setDarkModeForAllUsers: catchAsync(async (req, res) => {
+        const { enabled } = req.body;
+        await Setting.setDarkModeForAllUsers(enabled);
+        return sendSuccess(res, {
+            message: `Dark mode ${enabled ? 'enabled' : 'disabled'} for all users`,
+        });
+    }),
 
-    async getDefaultLanguage(req, res) {
-        try {
-            const language = await Setting.getDefaultLanguage();
-            res.status(200).json({
-                success: true,
-                data: { defaultLanguage: language }
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    getDefaultLanguage: catchAsync(async (req, res) => {
+        const language = await Setting.getDefaultLanguage();
+        return sendSuccess(res, {
+            data: { defaultLanguage: language },
+            message: 'Default language retrieved',
+        });
+    }),
 
-    async setDefaultLanguage(req, res) {
-        try {
-            const { langCode } = req.body;
-            const settings = await Setting.setDefaultLanguage(langCode);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Default language updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    setDefaultLanguage: catchAsync(async (req, res) => {
+        const { langCode } = req.body;
+        const settings = await Setting.setDefaultLanguage(langCode);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Default language updated successfully',
+        });
+    }),
 
     // Notification Operations
-    async enablePushNotificationsForAllUsers(req, res) {
-        try {
-            const { enabled } = req.body;
-            await Setting.enablePushNotificationsForAllUsers(enabled);
-            res.status(200).json({
-                success: true,
-                message: `Push notifications ${enabled ? 'enabled' : 'disabled'} for all users`
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    enablePushNotificationsForAllUsers: catchAsync(async (req, res) => {
+        const { enabled } = req.body;
+        await Setting.enablePushNotificationsForAllUsers(enabled);
+        return sendSuccess(res, {
+            message: `Push notifications ${enabled ? 'enabled' : 'disabled'} for all users`,
+        });
+    }),
 
     // Advanced Operations
-    async deepMergeUpdate(req, res) {
-        try {
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.deepMergeUpdate(req.body);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: 'Settings deep merged successfully'
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    deepMergeUpdate: catchAsync(async (req, res) => {
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.deepMergeUpdate(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Settings deep merged successfully',
+        });
+    }),
 
-    async toggleFlag(req, res) {
-        try {
-            const { path } = req.body;
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.toggleFlag(path);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: `Flag at ${path} toggled successfully`
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    toggleFlag: catchAsync(async (req, res) => {
+        const { path } = req.body;
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.toggleFlag(path);
+        return sendSuccess(res, {
+            data: settings,
+            message: `Flag at ${path} toggled successfully`,
+        });
+    }),
 
-    async appendToArray(req, res) {
-        try {
-            const { path, value } = req.body;
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.appendToArray(path, value);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: `Value appended to ${path} successfully`
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    appendToArray: catchAsync(async (req, res) => {
+        const { path, value } = req.body;
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.appendToArray(path, value);
+        return sendSuccess(res, {
+            data: settings,
+            message: `Value appended to ${path} successfully`,
+        });
+    }),
 
-    async removeFromArray(req, res) {
-        try {
-            const { path, value } = req.body;
-            const settings = await Setting.findOne();
-            if (settings) {
-                await settings.removeFromArray(path, value);
-                res.status(200).json({
-                    success: true,
-                    data: settings,
-                    message: `Value removed from ${path} successfully`
-                });
-            } else {
-                res.status(404).json({
-                    success: false,
-                    message: 'Settings not found'
-                });
-            }
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
+    removeFromArray: catchAsync(async (req, res) => {
+        const { path, value } = req.body;
+        const settings = await Setting.findOne();
+        if (!settings) {
+            throw AppError.notFound('Settings not found');
         }
-    },
+        await settings.removeFromArray(path, value);
+        return sendSuccess(res, {
+            data: settings,
+            message: `Value removed from ${path} successfully`,
+        });
+    }),
 
-    async bulkUpdateFields(req, res) {
-        try {
-            const settings = await Setting.bulkUpdateFields(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Bulk fields updated successfully'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    bulkUpdateFields: catchAsync(async (req, res) => {
+        const settings = await Setting.bulkUpdateFields(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Bulk fields updated successfully',
+        });
+    }),
 
-    async findByPartialFields(req, res) {
-        try {
-            const settings = await Setting.findByPartialFields(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    findByPartialFields: catchAsync(async (req, res) => {
+        const settings = await Setting.findByPartialFields(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Settings found',
+        });
+    }),
 
-    async auditUpdate(req, res) {
-        try {
-            const user = req.user?.username || req.user?.email || 'unknown';
-            const settings = await Setting.auditUpdate(req.body, user);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Settings updated with audit trail'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    auditUpdate: catchAsync(async (req, res) => {
+        const user = req.user?.username || req.user?.email || 'unknown';
+        const settings = await Setting.auditUpdate(req.body, user);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Settings updated with audit trail',
+        });
+    }),
 
     // Reset Operations
-    async resetToDefaults(req, res) {
-        try {
-            const settings = await Setting.resetToDefaults(req.body);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Settings reset to default values'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    },
+    resetToDefaults: catchAsync(async (req, res) => {
+        const settings = await Setting.resetToDefaults(req.body);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Settings reset to default values',
+        });
+    }),
 
-    async resetSectionsToDefaults(req, res) {
-        try {
-            const { sections } = req.body;
-            const settings = await Setting.resetSectionsToDefaults(sections);
-            res.status(200).json({
-                success: true,
-                data: settings,
-                message: 'Selected sections reset to defaults'
-            });
-        } catch (error) {
-            res.status(500).json({
-                success: false,
-                message: error.message
-            });
-        }
-    }
+    resetSectionsToDefaults: catchAsync(async (req, res) => {
+        const { sections } = req.body;
+        const settings = await Setting.resetSectionsToDefaults(sections);
+        return sendSuccess(res, {
+            data: settings,
+            message: 'Selected sections reset to defaults',
+        });
+    }),
 };
 
 module.exports = settingController;

@@ -9,19 +9,7 @@ const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
-const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
-// const { welcomeEmailTemplate } = require('../email/emailTemplates');
-const { sendEmail } = require('../email');
-const { checkPasswordStrength } = require('../utils/security');
-const otpService = require('../services/otpService');
-const { emailVerificationTemplate, welcomeEmailTemplate, passwordResetRequestTemplate } = require('../email/emailTemplate');
-const NotificationMiddleware = require('../middleware/notificationMiddleware');
-const { jwtSecret } = require('../config/setting');
-const ActivityHelper = require('../services/activityHelpers');
-const passport = require('passport');
-const socialAccountControllers = require('./social-account-controllers');
-const { isSupportedProvider } = require('../services/socialProvider');
-// const { sendMessage } = require('../kafka/producer');
+const { sendSuccess, sendCreated, sendError, HTTP_STATUS, standardResponse, errorResponse } = require('../utils/responseHelper');
 
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -191,11 +179,11 @@ class authController {
       //   data: user,
       // });
       // Send welcome email
-       await sendEmail(welcomeEmailTemplate, user);
+      await sendEmail(welcomeEmailTemplate, user);
 
       res.locals.createdUser = user;
       await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-      await NotificationMiddleware.onUserCreate(req, res, () => {});
+      await NotificationMiddleware.onUserCreate(req, res, () => { });
 
       return standardResponse(
         res,
@@ -496,7 +484,7 @@ class authController {
         loginMethod: 'password',
         tokenGenerated: true,
       });
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -515,7 +503,7 @@ class authController {
       );
     } catch (error) {
       console.error('Login error:', error);
-      NotificationMiddleware.onLoginFailed(req, res, () => {});
+      NotificationMiddleware.onLoginFailed(req, res, () => { });
       return errorResponse(res, error.message, 500, error.message);
     }
   }
@@ -524,7 +512,7 @@ class authController {
       const { identifier, profileData, deviceTrust = false, provider, providerId, email, name, profile } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
       if (!provider || !providerId) {
-        return res.status(400).json({ success: false, message: 'Missing required fields' });
+        return errorResponse(res, 'Missing required fields', 400);
       }
       const { user, isNewUser } = await User.verifyAndLinkUser({ provider, providerId, email: identifier, name: profile.name, profile });
 
@@ -543,7 +531,7 @@ class authController {
         loginMethod: 'Social',
         tokenGenerated: true,
       });
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -575,7 +563,7 @@ class authController {
     try {
       const { provider, accessToken, code, email, identityToken } = req.body;
       if (!isSupportedProvider(provider)) {
-        return res.status(400).json({ success: false, message: 'Invalid social provider.' });
+        return errorResponse(res, 'Invalid social provider.', 400);
       }
 
       let profile;
@@ -605,11 +593,11 @@ class authController {
           profile = await socialAccountControllers.validateDiscordToken(accessToken);
           break;
         default:
-          return res.status(400).json({ success: false, message: 'Unsupported provider.' });
+          return errorResponse(res, 'Unsupported provider.', 400);
       }
 
       if (!profile || !(profile.id || profile.sub)) {
-        return res.status(400).json({ success: false, message: 'Failed to retrieve social profile.' });
+        return errorResponse(res, 'Failed to retrieve social profile.', 400);
       }
 
       const providerId = profile.id || profile.sub;
@@ -666,9 +654,7 @@ class authController {
       // Log security event
       await user.logSecurityEvent(isNewUser ? 'social_registration' : 'social_login', `${isNewUser ? 'New user registered' : 'User logged in'} via ${provider}`, 'low', { ...deviceInfo, provider, isNewUser });
 
-      res.status(200).json({
-        success: true,
-        message: `${isNewUser ? 'Account created and logged in' : 'Logged in'} successfully via ${provider}`,
+      return sendSuccess(res, {
         data: {
           user: {
             id: user._id,
@@ -685,13 +671,10 @@ class authController {
           isNewUser,
           provider,
         },
+        message: `${isNewUser ? 'Account created and logged in' : 'Logged in'} successfully via ${provider}`,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Social login failed',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed',
-      });
+      return errorResponse(res, 'Social login failed', 500, error.message);
     }
   }
 
@@ -706,16 +689,12 @@ class authController {
 
       const result = await user.completeTOTPSetup(token);
 
-      res.status(200).json({
-        success: true,
+      return sendSuccess(res, {
+        data: { backupCodes: result.backupCodes },
         message: result.message,
-        backupCodes: result.backupCodes,
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return errorResponse(res, error.message, 400);
     }
   }
 
@@ -759,7 +738,7 @@ class authController {
       if (deviceTrust) {
         await user.trustDevice(deviceInfo.deviceId);
       }
-      NotificationMiddleware.onLoginSuccess(req, res, () => {});
+      NotificationMiddleware.onLoginSuccess(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -792,7 +771,7 @@ class authController {
     try {
       const { tempToken, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-    } catch (error) {}
+    } catch (error) { }
   }
   /**
    * MFA verification - Step 2
@@ -802,28 +781,19 @@ class authController {
       const { userId, mfaCode, tempToken } = req.body;
 
       if (!userId || !mfaCode) {
-        return res.status(400).json({
-          success: false,
-          message: 'User ID and MFA code are required',
-        });
+        return errorResponse(res, 'User ID and MFA code are required', 400);
       }
 
       const user = await User.findById(userId);
       if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found',
-        });
+        return errorResponse(res, 'User not found', 404);
       }
 
       // Verify MFA code
       const isValid = await user.verifyOTP(mfaCode, 'login', req.deviceInfo);
 
       if (!isValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid or expired MFA code',
-        });
+        return errorResponse(res, 'Invalid or expired MFA code', 400);
       }
 
       // Complete authentication
@@ -831,9 +801,7 @@ class authController {
       await user.registerDevice(req.deviceInfo);
       await user.updateLastLogin();
 
-      res.status(200).json({
-        success: true,
-        message: 'Authentication successful',
+      return sendSuccess(res, {
         data: {
           user: {
             id: user._id,
@@ -845,12 +813,10 @@ class authController {
           },
           tokens,
         },
+        message: 'Authentication successful',
       });
     } catch (error) {
-      res.status(401).json({
-        success: false,
-        message: error.message,
-      });
+      return errorResponse(res, error.message, 401);
     }
   }
 
@@ -960,20 +926,16 @@ class authController {
           break;
       }
 
-      res.status(200).json({
-        success: true,
-        message: `OTP sent via ${type}`,
+      return sendSuccess(res, {
         data: {
           type,
           expiresAt: otpResult.expiresAt,
           sent: sendResult?.success || false,
         },
+        message: `OTP sent via ${type}`,
       });
     } catch (error) {
-      res.status(400).json({
-        success: false,
-        message: error.message,
-      });
+      return errorResponse(res, error.message, 400);
     }
   }
 
@@ -984,15 +946,15 @@ class authController {
     try {
       // Validate input
       const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+      if (!errors.isEmpty()) return errorResponse(res, 'Validation failed', 400);
 
       const { method, purpose, code } = req.body;
       const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      if (!userId) return errorResponse(res, 'Unauthorized', 401);
 
       // Find user
       const user = await User.findById(userId);
-      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+      if (!user) return errorResponse(res, 'User not found', 404);
 
       // Verify OTP
       const deviceInfo = {
@@ -1004,19 +966,21 @@ class authController {
       const result = await user.verifyOTPForPurpose(code, method, purpose, deviceInfo);
 
       if (!result.success) {
-        return res.status(400).json({ success: false, message: result.error, locked: result.locked || false });
+        return errorResponse(res, result.error, 400);
       }
 
-      res.json({
-        success: true,
-        method: result.method,
-        purpose: result.purpose,
-        usedBackup: result.usedBackup || false,
-        extraData: result.extraData || {},
+      return sendSuccess(res, {
+        data: {
+          method: result.method,
+          purpose: result.purpose,
+          usedBackup: result.usedBackup || false,
+          extraData: result.extraData || {},
+        },
+        message: 'OTP verified successfully',
       });
     } catch (err) {
       console.error('Verify OTP error:', err);
-      res.status(500).json({ success: false, message: 'Internal server error' });
+      return errorResponse(res, 'Internal server error', 500);
     }
   }
 
@@ -1059,7 +1023,7 @@ class authController {
         loginMethod: 'password',
         tokenGenerated: true,
       });
-      NotificationMiddleware.onPasswordChange(req, res, () => {});
+      NotificationMiddleware.onPasswordChange(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -1275,7 +1239,7 @@ class authController {
       await user.revokeAllTokens('password_reset');
       await user.save();
       await user.logSecurityEvent('password_reset_completed', 'Password reset completed', 'high', deviceInfo);
-      NotificationMiddleware.onPasswordResetDual(req, res, () => {});
+      NotificationMiddleware.onPasswordResetDual(req, res, () => { });
       return standardResponse(
         res,
         true,
@@ -1460,7 +1424,7 @@ class authController {
 
       if (result) {
         await user.logSecurityEvent('email_verified', 'Email address verified', 'low', deviceInfo);
-        NotificationMiddleware.onEmailVerified(req, res, () => {});
+        NotificationMiddleware.onEmailVerified(req, res, () => { });
         return standardResponse(
           res,
           true,
@@ -1785,7 +1749,7 @@ class authController {
     try {
       await req.user.updateProfile(req.body);
       res.locals.changes = req.body;
-      NotificationMiddleware.onUserUpdate(req, res, () => {});
+      NotificationMiddleware.onUserUpdate(req, res, () => { });
       await ActivityHelper.logCRUD(req, 'User', 'update', {
         id: req.user._id,
         role: req.user.role.name,
@@ -1812,7 +1776,7 @@ class authController {
       }
 
       const profilePicture = await req.user.updateProfilePicture(req.body);
-      NotificationMiddleware.onUserUpdate(req, res, () => {});
+      NotificationMiddleware.onUserUpdate(req, res, () => { });
       return standardResponse(res, true, { profilePicture }, 'Profile picture updated successfully');
     } catch (error) {
       console.error('Update profile picture error:', error);
@@ -2757,7 +2721,7 @@ class authController {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
       });
-      NotificationMiddleware.onTwoFactorEnabled(req, res, () => {});
+      NotificationMiddleware.onTwoFactorEnabled(req, res, () => { });
       return res.status(200).json({
         success: true,
         message: result.message,
@@ -3014,7 +2978,7 @@ class authController {
         ipAddress: req.ip,
         userAgent: req.get('User-Agent'),
       });
-      NotificationMiddleware.onTwoFactorDisabled(req, res, () => {});
+      NotificationMiddleware.onTwoFactorDisabled(req, res, () => { });
       return res.status(200).json({
         success: true,
         message: 'OTP has been disabled for your account',
@@ -3287,11 +3251,11 @@ class authController {
         hasProvider,
         accountInfo: socialAccount
           ? {
-              provider: socialAccount.provider,
-              email: socialAccount.email,
-              verified: socialAccount.verified,
-              connectedAt: socialAccount.connectedAt,
-            }
+            provider: socialAccount.provider,
+            email: socialAccount.email,
+            verified: socialAccount.verified,
+            connectedAt: socialAccount.connectedAt,
+          }
           : null,
       });
     } catch (error) {

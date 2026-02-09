@@ -1,161 +1,121 @@
 /**
- * Custom Error class for application-specific errors
+ * Global Error Handler Middleware
+ * Unified error handling for Express application
  */
-class AppError extends Error {
-  constructor(statusCode, message, isOperational = true) {
-    super(message);
-    this.statusCode = statusCode;
-    this.isOperational = isOperational;
-    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
 
-    // Capture stack trace
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
+const AppError = require('../utils/appError');
+const { sendError, HTTP_STATUS, ERROR_CODES } = require('../utils/responseHelper');
 
 /**
- * Factory function to create AppError instances
+ * Async error wrapper - wraps async route handlers to catch errors
  */
-const createError = (statusCode, message, isOperational = true) => new AppError(statusCode, message, isOperational);
-
-/**
- * Global error handling middleware for Express
- */
-const globalErrorHandler = (err, req, res, next) => {
-  err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
-
-  // Log error (in production, use proper logging service)
-  console.error('Error:', {
-    message: err.message,
-    stack: err.stack,
-    statusCode: err.statusCode,
-    url: req.url,
-    method: req.method,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
-    user: req.user ? { id: req.user.id, username: req.user.username } : null,
-    timestamp: new Date().toISOString()
-  });
-
-  if (process.env.NODE_ENV === 'development') {
-    sendErrorDev(err, res);
-  } else {
-    sendErrorProd(err, res);
-  }
+const catchAsync = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
 
 /**
- * Send detailed error response for development
+ * Handle MongoDB validation errors
  */
-const sendErrorDev = (err, res) => {
-  res.status(err.statusCode).json({
-    success: false,
-    error: {
-      status: err.status,
-      message: err.message,
-      stack: err.stack,
-      statusCode: err.statusCode
-    }
-  });
+const handleMongoValidationError = (err) => {
+  const errors = Object.values(err.errors).map((error) => ({
+    field: error.path,
+    message: error.message,
+  }));
+  const error = AppError.validation('Validation failed', errors);
+  return error;
 };
 
 /**
- * Send production-safe error response
+ * Handle MongoDB duplicate key error
  */
-const sendErrorProd = (err, res) => {
-  if (err.isOperational) {
-    res.status(err.statusCode).json({ success: false, message: err.message });
-  } else {
-    res.status(500).json({ success: false, message: 'Something went wrong. Please try again later.' });
-  }
+const handleMongoDuplicateError = (err) => {
+  const field = Object.keys(err.keyValue)[0];
+  const value = err.keyValue[field];
+  return AppError.conflict(`Duplicate value for '${field}': ${value}`);
 };
 
 /**
- * Handle specific MongoDB/Mongoose errors
+ * Handle MongoDB CastError
  */
-const handleMongoError = (err) => {
-  if (err.name === 'ValidationError') {
-    const errors = Object.values(err.errors).map(error => error.message);
-    const message = `Invalid input data: ${errors.join(', ')}`;
-    return new AppError(400, message);
-  }
-
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyValue)[0];
-    const value = err.keyValue[field];
-    const message = `Duplicate value for ${field}: ${value}. Please use another value.`;
-    return new AppError(400, message);
-  }
-
-  if (err.name === 'CastError') {
-    const message = `Invalid ${err.path}: ${err.value}`;
-    return new AppError(400, message);
-  }
-
-  return err;
+const handleMongoCastError = (err) => {
+  return AppError.badRequest(`Invalid ${err.path}: ${err.value}`);
 };
 
 /**
  * Handle JWT errors
  */
-const handleJWTError = (err) => {
-  if (err.name === 'JsonWebTokenError') {
-    return new AppError(401, 'Invalid token. Please log in again.');
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    return new AppError(401, 'Your token has expired. Please log in again.');
-  }
-
-  return err;
+const handleJWTError = () => {
+  const error = new AppError(HTTP_STATUS.UNAUTHORIZED, 'Invalid token. Please log in again.', ERROR_CODES.INVALID_TOKEN);
+  return error;
 };
 
 /**
- * Async error wrapper to catch errors in route handlers
+ * Handle JWT expiry errors
  */
-const catchAsync = (fn) => (req, res, next) => {
-  fn(req, res, next).catch(next);
+const handleJWTExpiredError = () => {
+  const error = new AppError(HTTP_STATUS.UNAUTHORIZED, 'Your token has expired. Please log in again.', ERROR_CODES.TOKEN_EXPIRED);
+  return error;
 };
 
 /**
- * Middleware for handling 404 errors
+ * 404 Not Found middleware
  */
 const notFound = (req, res, next) => {
-  const message = `Route ${req.originalUrl} not found on this server`;
-  next(createError(404, message));
+  next(AppError.notFound(`Route ${req.originalUrl} not found`));
 };
 
 /**
- * Validation error helper
+ * Global error handler middleware
  */
-const validationError = (field, message) => {
-  return new AppError(400, `Validation failed for ${field}: ${message}`);
-};
+const globalErrorHandler = (err, req, res, _next) => {
+  // Default values
+  let error = { ...err };
+  error.message = err.message;
+  error.statusCode = err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
+  error.code = err.code || ERROR_CODES.INTERNAL_ERROR;
 
-/**
- * Authorization error helper
- */
-const authorizationError = (message = 'Not authorized to access this resource') => {
-  return new AppError(403, message);
-};
+  // Handle specific error types
+  if (err.name === 'ValidationError') {
+    error = handleMongoValidationError(err);
+  }
+  if (err.code === 11000) {
+    error = handleMongoDuplicateError(err);
+  }
+  if (err.name === 'CastError') {
+    error = handleMongoCastError(err);
+  }
+  if (err.name === 'JsonWebTokenError') {
+    error = handleJWTError();
+  }
+  if (err.name === 'TokenExpiredError') {
+    error = handleJWTExpiredError();
+  }
 
-/**
- * Authentication error helper
- */
-const authenticationError = (message = 'Authentication required') => {
-  return new AppError(401, message);
+  // Log error
+  console.error('🔥 Error:', {
+    message: error.message,
+    statusCode: error.statusCode,
+    code: error.code,
+    url: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+    user: req.user ? { id: req.user.id } : null,
+    timestamp: new Date().toISOString(),
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  });
+
+  // Send response
+  return sendError(res, {
+    message: error.isOperational ? error.message : 'Something went wrong. Please try again later.',
+    statusCode: error.statusCode,
+    code: error.code,
+    details: process.env.NODE_ENV === 'development' ? err.stack : null,
+    errors: error.validationErrors || null,
+  });
 };
 
 module.exports = {
-  AppError,
-  createError,
-  globalErrorHandler,
-  handleMongoError,
-  handleJWTError,
   catchAsync,
   notFound,
-  validationError,
-  authorizationError,
-  authenticationError,
+  globalErrorHandler,
 };
