@@ -110,16 +110,6 @@ const sendPaginated = (res, { data, page, limit, total, message = 'Data retrieve
         data,
         message,
         statusCode: HTTP_STATUS.OK,
-        meta: {
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages,
-                hasNextPage: page < totalPages,
-                hasPrevPage: page > 1,
-            },
-        },
     });
 };
 

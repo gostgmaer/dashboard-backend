@@ -84,18 +84,26 @@ class InquiryController {
 
     const inquiries = await Inquiry.paginate(query, options);
 
-    return sendPaginated(res, {
-      data: inquiries.docs.map((doc) => doc.toAPIResponse()),
-      message: 'Inquiries retrieved successfully',
-      meta: {
-        pagination: {
-          total: inquiries.total,
-          pages: inquiries.pages,
-          page: inquiries.page,
-          limit: inquiries.limit,
+    return sendPaginated(res,{
+    "success": true,
+    "status": 200,
+    "data": {
+        "result": inquiries.docs.map(doc => doc.toAPIResponse()),
+        "pagination": {
+            "page": inquiries.page,
+            "totalPages": inquiries.pages,
+            "total": inquiries.total,
+            "hasNext": inquiries.hasNext,
+            "hasPrev": inquiries.hasPrev,
+            "limit": inquiries.limit
         },
-      },
-    });
+        "filters": {
+            "applied": 0,
+            "search": null
+        }
+    },
+    "message": "Inquiries retrieved successfully"
+} );
   });
 
   // GET BY ID - Single inquiry details
