@@ -1,4 +1,4 @@
-const ContactInquiry = require('../models/Inquiry');
+const Inquiry = require('../models/Inquiry');
 const { sendEmail } = require('../email');
 const { logActivity } = require('../services/activityLogService');
 const { NEW_INQUIRY_CLIENT, NEW_INQUIRY_ADMIN } = require('../email/contactInquiry');
@@ -10,20 +10,45 @@ const { catchAsync } = require('../middleware/errorHandler');
 // CONTACT INQUIRY CONTROLLERS
 // ===============================
 
-class ContactInquiryController {
+class InquiryController {
   // CREATE - Submit new inquiry
   static createInquiry = catchAsync(async (req, res) => {
+    // support both old nested shape and the current flat schema
     const inquiryData = {
-      client: req.body.client,
-      projectDetails: req.body.projectDetails,
-      message: req.body.message,
-      preferences: req.body.preferences,
+      name: req.body.name || req.body.client?.name,
+      email: req.body.email || req.body.client?.email,
+      phone: req.body.phone || req.body.client?.phone,
+      company: req.body.company || req.body.client?.companyName,
+      website: req.body.website || req.body.client?.websiteUrl,
+      projectType: req.body.projectType || req.body.projectDetails?.servicesInterested?.[0],
+      budget: req.body.budget || req.body.projectDetails?.budgetRange,
+      timeline: req.body.timeline || req.body.projectDetails?.timelinePreference,
+      description: req.body.description || req.body.message?.body,
+      requirements: req.body.requirements || req.body.preferences?.requirements,
+      attachments: req.body.attachments,
+      preferredContactMethod: req.body.preferredContactMethod || req.body.preferences?.preferredContactMethod,
+      source: req.body.source,
+      referrer: req.body.referrer,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
     };
-    const inquiry = new ContactInquiry(inquiryData);
+
+    const inquiry = new Inquiry(inquiryData);
     await inquiry.save();
     const d = inquiry.toAPIResponse();
-    await sendEmail(NEW_INQUIRY_CLIENT, { ...d.client, ...d.message, ...d.projectDetails, ...d, inquiry: inquiry.toAPIResponse() });
-    await sendEmail(NEW_INQUIRY_ADMIN, { ...d.client, ...d.message, ...d.projectDetails, ...d, inquiry: inquiry.toAPIResponse(), email: 'kishor81160@gmail.com' });
+
+    // reconstruct nested payload for existing email templates
+    const emailPayload = {
+      inquiry: d,
+      client: d.client,
+      projectDetails: d.projectDetails,
+      message: d.message,
+      preferences: d.preferences,
+      admin: d.admin,
+    };
+
+    await sendEmail(NEW_INQUIRY_CLIENT, emailPayload);
+    await sendEmail(NEW_INQUIRY_ADMIN, { ...emailPayload, email: 'kishor81160@gmail.com' });
 
     return sendCreated(res, {
       data: inquiry.toAPIResponse(),
@@ -35,31 +60,31 @@ class ContactInquiryController {
   static getAllInquiries = catchAsync(async (req, res) => {
     const { page = 1, limit = 20, status, priority, search, service, assignedTo, sort = 'createdAt', order = 'desc' } = req.query;
 
-    const query = {};
+    const query = { isDeleted: false };
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
       sort: { [sort]: order === 'desc' ? -1 : 1 },
-      populate: [],
     };
 
     // Build dynamic query
     if (status) query.status = status;
-    if (priority) query['admin.priority'] = priority;
-    if (assignedTo) query['admin.assignedTo'] = assignedTo;
-    if (service) query['projectDetails.servicesInterested'] = service;
+    if (priority) query.priority = priority;
+    if (assignedTo) query.assignedTo = assignedTo;
+    if (service) query.projectType = service;
 
     if (search) {
       query.$or = [
-        { 'client.name': { $regex: search, $options: 'i' } },
-        { 'client.email': { $regex: search, $options: 'i' } },
-        { 'message.body': { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { company: { $regex: search, $options: 'i' } },
       ];
     }
 
-    const inquiries = await ContactInquiry.paginate(query, options);
+    const inquiries = await Inquiry.paginate(query, options);
 
-    return sendSuccess(res, {
+    return sendPaginated(res, {
       data: inquiries.docs.map((doc) => doc.toAPIResponse()),
       message: 'Inquiries retrieved successfully',
       meta: {
@@ -75,7 +100,7 @@ class ContactInquiryController {
 
   // GET BY ID - Single inquiry details
   static getInquiryById = catchAsync(async (req, res) => {
-    const inquiry = await ContactInquiry.findById(req.params.id);
+    const inquiry = await Inquiry.findById(req.params.id);
     if (!inquiry) {
       throw AppError.notFound('Inquiry not found');
     }
@@ -91,11 +116,11 @@ class ContactInquiryController {
     const updates = {};
 
     if (req.body.status) updates.status = req.body.status;
-    if (req.body.priority !== undefined) updates['admin.priority'] = req.body.priority;
-    if (req.body.internalNotes !== undefined) updates['admin.internalNotes'] = req.body.internalNotes;
-    if (req.body.assignedTo !== undefined) updates['admin.assignedTo'] = req.body.assignedTo;
+    if (req.body.priority !== undefined) updates.priority = req.body.priority;
+    if (req.body.internalNotes !== undefined) updates.internalNotes = req.body.internalNotes;
+    if (req.body.assignedTo !== undefined) updates.assignedTo = req.body.assignedTo;
 
-    const inquiry = await ContactInquiry.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true, runValidators: true });
+    const inquiry = await Inquiry.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true, runValidators: true });
 
     if (!inquiry) {
       throw AppError.notFound('Inquiry not found');
@@ -123,11 +148,12 @@ class ContactInquiryController {
       throw AppError.badRequest('Inquiry IDs array is required');
     }
 
-    const updates = { status };
-    if (priority) updates['admin.priority'] = priority;
-    if (assignedTo) updates['admin.assignedTo'] = assignedTo;
+    const updates = {};
+    if (status !== undefined) updates.status = status;
+    if (priority !== undefined) updates.priority = priority;
+    if (assignedTo !== undefined) updates.assignedTo = assignedTo;
 
-    const result = await ContactInquiry.bulkUpdateStatus(ids, updates);
+    const result = await Inquiry.bulkUpdateStatus(ids, updates);
 
     return sendSuccess(res, {
       data: result,
@@ -137,7 +163,7 @@ class ContactInquiryController {
 
   // SEARCH - Advanced search
   static searchInquiries = catchAsync(async (req, res) => {
-    const result = await ContactInquiry.searchInquiries(req.query);
+    const result = await Inquiry.searchInquiries(req.query);
 
     return sendSuccess(res, {
       data: result.map((doc) => doc.toAPIResponse()),
@@ -148,19 +174,19 @@ class ContactInquiryController {
 
   // DASHBOARD STATS - Analytics overview
   static getDashboardStats = catchAsync(async (req, res) => {
-    const stats = await ContactInquiry.getDashboardStats();
+    const stats = await Inquiry.getDashboardStats();
 
     // Additional stats
-    const highPriorityCount = await ContactInquiry.countDocuments({
-      'admin.priority': 'High',
-      status: { $in: ['New', 'Contacted'] },
+    const highPriorityCount = await Inquiry.countDocuments({
+      priority: 'high',
+      status: { $in: ['new', 'contacted'] },
     });
 
     return sendSuccess(res, {
       data: {
         stats,
         highPriorityCount,
-        totalInquiries: await ContactInquiry.estimatedDocumentCount(),
+        totalInquiries: await Inquiry.estimatedDocumentCount(),
       },
       message: 'Dashboard stats retrieved successfully',
     });
@@ -169,7 +195,7 @@ class ContactInquiryController {
   // HIGH PRIORITY - Get urgent inquiries
   static getHighPriority = catchAsync(async (req, res) => {
     const days = parseInt(req.query.days) || 7;
-    const inquiries = await ContactInquiry.getHighPriority(days);
+    const inquiries = await Inquiry.getHighPriority(days);
 
     return sendSuccess(res, {
       data: inquiries.map((doc) => doc.toAPIResponse()),
@@ -180,7 +206,7 @@ class ContactInquiryController {
 
   // CONTACT CLIENT - Send response to client
   static contactClient = catchAsync(async (req, res) => {
-    const inquiry = await ContactInquiry.findById(req.params.id);
+    const inquiry = await Inquiry.findById(req.params.id);
     if (!inquiry) {
       throw AppError.notFound('Inquiry not found');
     }
@@ -188,10 +214,10 @@ class ContactInquiryController {
     const { method = 'email', message } = req.body;
 
     let sent = false;
-    if (method === 'email' && inquiry.client.email) {
+    if (method === 'email' && inquiry.email) {
       await sendEmail({
-        to: inquiry.client.email,
-        subject: `Re: ${inquiry.message.subject}`,
+        to: inquiry.email,
+        subject: `Re: ${inquiry.description || ''}`,
         body: message,
       });
       sent = true;
@@ -209,12 +235,13 @@ class ContactInquiryController {
 
   // DELETE - Soft delete (archive)
   static archiveInquiry = catchAsync(async (req, res) => {
-    const inquiry = await ContactInquiry.findByIdAndUpdate(
+    const inquiry = await Inquiry.findByIdAndUpdate(
       req.params.id,
       {
-        status: 'Closed',
-        'admin.priority': 'Low',
+        status: 'closed',
+        priority: 'low',
         deletedAt: new Date(),
+        isDeleted: true,
       },
       { new: true }
     );
@@ -229,4 +256,4 @@ class ContactInquiryController {
   });
 }
 
-module.exports = ContactInquiryController;
+module.exports = InquiryController;

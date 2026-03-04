@@ -10,7 +10,8 @@ const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
 const { sendSuccess, sendCreated, sendError, HTTP_STATUS, standardResponse, errorResponse } = require('../utils/responseHelper');
-
+const NotificationMiddleware = require('../middleware/notificationMiddleware');
+const ActivityHelper = require('../services/activityHelpers');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
  * 
@@ -3400,10 +3401,10 @@ class authController {
       }
 
       const addresses = await req.user.setDefaultAddress(addressId);
-      await ActivityHelper.logCRUD(req, 'addresses', 'update', {
-        id: addresses._id,
-        status: addresses.status,
-      });
+      // await ActivityHelper.logCRUD(req, 'addresses', 'update', {
+      //   id: addresses._id,
+      //   status: addresses.status,
+      // });
       return standardResponse(res, true, addresses, 'Default address set');
     } catch (error) {
       console.error('Set default address error:', error);

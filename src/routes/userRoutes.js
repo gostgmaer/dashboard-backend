@@ -7,6 +7,7 @@ const authorize = require('../middleware/authorize'); // Assuming authorize is e
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
 const User = require('../models/user');
+const authController = require('../controller/authenticationController');
 /**
  * 🚀 CONSOLIDATED USER ROUTES
  *
@@ -209,7 +210,7 @@ router.delete('/:id', authMiddleware, authorize('users', 'delete'), instanceChec
 // ========================================
 
 // POST /api/users/authentication/login - User login
-router.post('/authentication/login', userValidation.auth, UserController.login);
+router.post('/authentication/login', authController.login);
 
 // PUT /api/users/:id/authentication/change-password - Change password
 router.put(

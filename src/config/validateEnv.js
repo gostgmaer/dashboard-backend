@@ -23,6 +23,11 @@ const optionalEnvVars = {
  * Warns about missing optional variables
  */
 const validateEnv = () => {
+    // Allow DATABASE_URL as a fallback for MONGODB_URI
+    if (!process.env.MONGODB_URI && process.env.DATABASE_URL) {
+        process.env.MONGODB_URI = process.env.DATABASE_URL;
+    }
+
     const missing = [];
     const warnings = [];
 

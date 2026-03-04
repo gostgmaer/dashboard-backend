@@ -1,306 +1,509 @@
 const mongoose = require('mongoose');
-const { Schema } = mongoose;
 
-const contactInquirySchema = new Schema(
-  {
-    // --- 1. THE LEAD (Client Info) ---
-    client: {
-      name: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-      email: {
-        type: String,
-        required: true,
-        lowercase: true,
-        trim: true,
-        match: [/\S+@\S+\.\S+/, 'Invalid email format'],
-      },
-      phone: { type: String, trim: true },
-      companyName: { type: String, trim: true },
-      websiteUrl: { type: String, trim: true },
-      socialHandle: { type: String, trim: true },
-    },
+// A simple counter collection used for auto-incrementing sequences
+const counterSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  seq: { type: Number, default: 0 }
+});
 
-    // --- 2. THE PROJECT (Scope & Details) ---
-    projectDetails: {
-      servicesInterested: [
-        {
-          type: String,
-          // enum: ['Web Design', 'Development', 'SEO', 'Consulting', 'Maintenance'],
-        },
-      ],
-      budgetRange: {
-        type: String,
-        default: 'Not sure',
-      },
-      timelinePreference: {
-        type: String,
-        default: 'Flexible',
-      },
-      attachments: [
-        {
-          fileName: String,
-          fileUrl: String,
-        },
-      ],
-    },
+// we create the model here so it can be reused by other modules if needed
+const Counter = mongoose.model('Counter', counterSchema);
 
-    // --- 3. THE MESSAGE ---
-    message: {
-      subject: { type: String, default: 'New Inquiry' },
-      body: { type: String, required: true },
-    },
-
-    // --- 4. COMPLIANCE & PREFERENCES ---
-    preferences: {
-      preferredContactMethod: {
-        type: String,
-        enum: ['Email', 'Phone', 'WhatsApp'],
-        default: 'Email',
-      },
-      newsletterOptIn: { type: Boolean, default: false },
-      privacyConsent: { type: Boolean, required: true },
-    },
-
-    // --- 5. INTERNAL ADMIN USE (Hidden from Client) ---
-    admin: {
-      priority: {
-        type: String,
-        enum: ['Low', 'Medium', 'High', 'Junk'],
-        default: 'Medium',
-      },
-      internalNotes: { type: String },
-      assignedTo: { type: String },
-    },
-
-    status: {
-      type: String,
-      enum: ['New', 'Contacted', 'Proposal Sent', 'Negotiating', 'Closed', 'Lost'],
-      default: 'New',
-    },
+const inquirySchema = new mongoose.Schema({
+  // Contact Information
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true,
+    maxlength: [100, 'Name cannot exceed 100 characters']
   },
-  {
-    timestamps: true,
+  email: {
+    type: String,
+    required: [true, 'Email is required'],
+    lowercase: true,
+    trim: true,
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
+  phone: {
+    type: String,
+    trim: true,
+    maxlength: [20, 'Phone number cannot exceed 20 characters']
+  },
+  company: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Company name cannot exceed 100 characters']
+  },
+  website: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Website URL cannot exceed 200 characters']
+  },
+
+  // Project Details
+  projectType: {
+    type: String,
+    enum: {
+      values: ['website', 'webapp', 'mobile', 'ecommerce', 'redesign', 'maintenance', 'consulting', 'other'],
+      message: '{VALUE} is not a valid project type'
+    },
+    required: [true, 'Project type is required']
+  },
+  budget: {
+    type: String,
+    enum: {
+      values: ['under-5k', '5k-10k', '10k-25k', '25k-50k', '50k-100k', 'over-100k', 'not-sure'],
+      message: '{VALUE} is not a valid budget range'
+    },
+    required: [true, 'Budget is required']
+  },
+  timeline: {
+    type: String,
+    enum: {
+      values: ['asap', '1-month', '2-3months', '3-6months', '6months+', 'flexible'],
+      message: '{VALUE} is not a valid timeline'
+    },
+    required: [true, 'Timeline is required']
+  },
+  description: {
+    type: String,
+    required: [true, 'Description is required'],
+    maxlength: [5000, 'Description cannot exceed 5000 characters']
+  },
+  requirements: [{
+    type: String,
+    trim: true
+  }],
+  attachments: [{
+    filename: String,
+    url: String,
+    size: Number,
+    uploadedAt: { type: Date, default: Date.now }
+  }],
+
+  // Optional contact preferences
+  preferredContactMethod: {
+    type: String,
+    enum: ['email', 'phone', 'any'],
+    default: 'email'
+  },
+
+  // Sequential identifier for tracking inquiries
+  inquiryNumber: {
+    type: Number,
+    unique: true,
+    index: true
+  },
+
+  // Status & Assignment
+  status: {
+    type: String,
+    enum: {
+      values: ['new', 'reviewing', 'contacted', 'quoted', 'negotiating', 'accepted', 'rejected', 'completed', 'cancelled'],
+      message: '{VALUE} is not a valid status'
+    },
+    default: 'new'
+  },
+  priority: {
+    type: String,
+    enum: {
+      values: ['low', 'medium', 'high', 'urgent'],
+      message: '{VALUE} is not a valid priority'
+    },
+    default: 'medium'
+  },
+  assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+
+  // internal notes stored by admins
+  internalNotes: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+
+  // Quoting
+  quotedAmount: {
+    type: Number,
+    min: 0
+  },
+  quotedCurrency: {
+    type: String,
+    default: 'USD',
+    maxlength: 3
+  },
+  quotedAt: {
+    type: Date
+  },
+  quotedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin'
+  },
+
+  // Notes and History
+  notes: [{
+    content: {
+      type: String,
+      required: true,
+      maxlength: 2000
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    isInternal: {
+      type: Boolean,
+      default: true
+    }
+  }],
+
+  // Status History for tracking changes
+  statusHistory: [{
+    status: String,
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin'
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    },
+    note: String
+  }],
+
+  // Follow-up
+  nextFollowUp: {
+    type: Date
+  },
+  lastContactedAt: {
+    type: Date
+  },
+
+  // Metadata
+  ipAddress: {
+    type: String
+  },
+  userAgent: {
+    type: String
+  },
+  source: {
+    type: String,
+    enum: ['website', 'referral', 'social', 'email', 'phone', 'other'],
+    default: 'website'
+  },
+  referrer: {
+    type: String
+  },
+
+  // Soft delete
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date
   }
-);
-
-// ================================
-// VIRTUALS
-// ===============================
-
-// Virtual for full client identifier
-contactInquirySchema.virtual('client.fullIdentifier').get(function () {
-  return `${this.client.name} <${this.client.email}>`;
+}, {
+  timestamps: true
 });
 
-// Virtual for services count
-contactInquirySchema.virtual('servicesCount').get(function () {
-  return this.projectDetails.servicesInterested?.length || 0;
+// Indexes
+inquirySchema.index({ status: 1 });
+inquirySchema.index({ priority: 1 });
+inquirySchema.index({ projectType: 1 });
+inquirySchema.index({ createdAt: -1 });
+inquirySchema.index({ assignedTo: 1 });
+inquirySchema.index({ email: 1 });
+inquirySchema.index({ isDeleted: 1 });
+inquirySchema.index({ nextFollowUp: 1 });
+
+// Text search
+inquirySchema.index({
+  name: 'text',
+  email: 'text',
+  company: 'text',
+  description: 'text'
+}, {
+  name: 'InquiryTextIndex'
 });
 
-// Virtual for hasAttachments
-contactInquirySchema.virtual('hasAttachments').get(function () {
-  return !!(this.projectDetails.attachments?.length > 0);
-});
+// Auto-set priority based on budget and assign a sequential inquiry number
+inquirySchema.pre('save', async function (next) {
+  if (this.isNew) {
+    // --- sequential number logic ------------------------------------------------
+    try {
+      const counter = await Counter.findOneAndUpdate(
+        { name: 'inquiry' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+      );
+      this.inquiryNumber = counter.seq;
+    } catch (err) {
+      return next(err);
+    }
 
-// Virtual for contactInfo summary
-contactInquirySchema.virtual('contactSummary').get(function () {
-  const methods = [];
-  if (this.client.email) methods.push('Email');
-  if (this.client.phone) methods.push('Phone');
-  if (this.preferences.preferredContactMethod) methods.push(this.preferences.preferredContactMethod);
-  return methods.join(', ') || 'No contact info';
-});
+    // --- priority logic ---------------------------------------------------------
+    const highBudgets = ['50k-100k', 'over-100k'];
+    const mediumBudgets = ['25k-50k', '10k-25k'];
 
-// Virtual for age in days
-contactInquirySchema.virtual('ageInDays').get(function () {
-  if (!this.createdAt) return 0;
-  const diffTime = Math.abs(Date.now() - new Date(this.createdAt));
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-});
+    if (highBudgets.includes(this.budget)) {
+      this.priority = 'high';
+    } else if (mediumBudgets.includes(this.budget)) {
+      this.priority = 'medium';
+    }
 
-// ================================
-// PRE-SAVE MIDDLEWARES (Document)
-// ===============================
-
-contactInquirySchema.pre('save', function (next) {
-  // Normalize phone number (remove spaces, dashes)
-  if (this.client.phone) {
-    this.client.phone = this.client.phone.replace(/[\s\-\(\)]/g, '');
-  }
-
-  // Generate a unique inquiry ID if not present
-  if (!this.inquiryId) {
-    this.inquiryId = `INQ-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-  }
-
-  // Auto-set high priority for premium services or urgent timelines
-  if (!this.admin.priority || this.admin.priority === 'Medium') {
-    const highPriorityServices = ['Development', 'SEO'];
-    const urgentTimeline = this.projectDetails.timelinePreference === 'ASAP';
-
-    if (this.projectDetails.servicesInterested?.some((s) => highPriorityServices.includes(s)) || urgentTimeline) {
-      this.admin.priority = 'High';
+    // ASAP timeline increases priority
+    if (this.timeline === 'asap' && this.priority !== 'urgent') {
+      this.priority = this.priority === 'high' ? 'urgent' : 'high';
     }
   }
-
-  // Ensure privacyConsent is true for new documents
-  if (this.isNew && !this.preferences.privacyConsent) {
-    const err = new Error('Privacy consent is required');
-    err.name = 'ValidationError';
-    return next(err);
-  }
-
-  
+  next();
 });
 
-// Pre-save: Clean up empty arrays/objects
-contactInquirySchema.pre('save', function (next) {
-  // Remove empty servicesInterested array
-  if (this.projectDetails.servicesInterested?.length === 0) {
-    this.projectDetails.servicesInterested = undefined;
-  }
-
-  // Remove empty attachments array
-  if (this.projectDetails.attachments?.length === 0) {
-    this.projectDetails.attachments = undefined;
-  }
-
-  // Trim all string fields recursively
-  this.trimAllStrings();
-  
-});
-
-// ================================
-// POST-SAVE MIDDLEWARES
-// ===============================
-
-contactInquirySchema.post('save', function (doc) {
-  console.log(`New inquiry saved: ${doc.client.fullIdentifier} [${doc.status}]`);
-});
-
-// ================================
-// STATIC METHODS
-// ===============================
-
-// Find inquiries by client email (exact match)
-contactInquirySchema.statics.findByClientEmail = function (email) {
-  return this.find({ 'client.email': email.toLowerCase() }).sort({ createdAt: -1 });
+// Change status with history tracking
+inquirySchema.methods.changeStatus = async function (newStatus, adminId, note = '') {
+  this.statusHistory.push({
+    status: this.status,
+    changedBy: adminId,
+    changedAt: new Date(),
+    note
+  });
+  this.status = newStatus;
+  return this.save();
 };
 
-// Get dashboard stats
-contactInquirySchema.statics.getDashboardStats = function () {
+// Add note
+inquirySchema.methods.addNote = async function (content, adminId, isInternal = true) {
+  this.notes.push({
+    content,
+    createdBy: adminId,
+    createdAt: new Date(),
+    isInternal
+  });
+  return this.save();
+};
+
+// Set quote
+inquirySchema.methods.setQuote = async function (amount, currency, adminId) {
+  this.quotedAmount = amount;
+  this.quotedCurrency = currency;
+  this.quotedAt = new Date();
+  this.quotedBy = adminId;
+  this.status = 'quoted';
+  return this.save();
+};
+
+// Assign to admin
+inquirySchema.methods.assignTo = async function (adminId, assignedByAdminId) {
+  this.assignedTo = adminId;
+  this.statusHistory.push({
+    status: `assigned to ${adminId}`,
+    changedBy: assignedByAdminId,
+    changedAt: new Date()
+  });
+  if (this.status === 'new') {
+    this.status = 'reviewing';
+  }
+  return this.save();
+};
+
+// Soft delete
+inquirySchema.methods.softDelete = async function () {
+  this.isDeleted = true;
+  this.deletedAt = new Date();
+  return this.save();
+};
+
+// Static: find active inquiries
+inquirySchema.statics.findActive = function (filter = {}) {
+  return this.find({ ...filter, isDeleted: false });
+};
+
+// Static: find due for follow-up
+inquirySchema.statics.findDueForFollowUp = function () {
+  return this.find({
+    isDeleted: false,
+    nextFollowUp: { $lte: new Date() },
+    status: { $nin: ['completed', 'cancelled', 'rejected'] }
+  });
+};
+
+// Static: count by status
+inquirySchema.statics.countByStatus = async function () {
   return this.aggregate([
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-        avgAge: { $avg: { $divide: [{ $subtract: ['$$NOW', '$createdAt'] }, 1000 * 60 * 60 * 24] } },
-      },
-    },
-    { $sort: { _id: 1 } },
+    { $match: { isDeleted: false } },
+    { $group: { _id: '$status', count: { $sum: 1 } } }
   ]);
 };
 
-// Search inquiries by multiple criteria
-contactInquirySchema.statics.searchInquiries = function (query = {}) {
-  const searchQuery = {};
-
-  if (query.clientName) {
-    searchQuery['client.name'] = { $regex: query.clientName, $options: 'i' };
-  }
-
-  if (query.email) {
-    searchQuery['client.email'] = { $regex: query.email, $options: 'i' };
-  }
-
-  if (query.status) {
-    searchQuery.status = query.status;
-  }
-
-  if (query.service) {
-    searchQuery['projectDetails.servicesInterested'] = service;
-  }
-
-  if (query.minPriority) {
-    searchQuery['admin.priority'] = { $gte: query.minPriority };
-  }
-
-  return this.find(searchQuery)
-    .sort({ createdAt: query.sort === 'newest' ? -1 : 1 })
-    .limit(query.limit || 50);
-};
-
-// Bulk update status
-contactInquirySchema.statics.bulkUpdateStatus = async function (inquiryIds, newStatus, assignedTo = null) {
-  const update = { status: newStatus };
-  if (assignedTo) update['admin.assignedTo'] = assignedTo;
-
-  return this.updateMany({ _id: { $in: inquiryIds } }, { $set: update });
-};
-
-// Get high priority inquiries
-contactInquirySchema.statics.getHighPriority = function (days = 7) {
-  const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  return this.find({
-    'admin.priority': { $in: ['High'] },
-    status: { $in: ['New', 'Contacted'] },
-    createdAt: { $gte: cutoffDate },
-  }).sort({ createdAt: -1 });
-};
-
-// ================================
-// QUERY HELPERS (INSTANCE METHODS)
-// ===============================
-
-// Custom trim method for all strings
-contactInquirySchema.methods.trimAllStrings = function () {
-  const trimRecursively = (obj) => {
-    if (typeof obj === 'string') {
-      return obj.trim();
-    }
-    if (Array.isArray(obj)) {
-      return obj.map(trimRecursively);
-    }
-    if (obj && typeof obj === 'object') {
-      const trimmed = {};
-      for (const [key, value] of Object.entries(obj)) {
-        trimmed[key] = trimRecursively(value);
-      }
-      return trimmed;
-    }
-    return obj;
+// Virtuals for backward compatibility with older controller/email shape
+inquirySchema.virtual('client').get(function () {
+  return {
+    name: this.name,
+    email: this.email,
+    phone: this.phone,
+    companyName: this.company,
+    websiteUrl: this.website,
   };
+});
 
-  // Apply to client, projectDetails, message, preferences, admin
-  // ['client', 'projectDetails', 'message', 'preferences', 'admin'].forEach((section) => {
-  //   if (this[section]) {
-  //     this[section] = trimRecursively(this[section]);
-  //   }
-  // });
+inquirySchema.virtual('projectDetails').get(function () {
+  return {
+    servicesInterested: this.projectType ? [this.projectType] : [],
+    budgetRange: this.budget,
+    timelinePreference: this.timeline,
+  };
+});
+
+inquirySchema.virtual('message').get(function () {
+  return {
+    subject: '',
+    body: this.description,
+  };
+});
+
+inquirySchema.virtual('preferences').get(function () {
+  return {
+    preferredContactMethod: this.preferredContactMethod,
+  };
+});
+
+inquirySchema.virtual('admin').get(function () {
+  return {
+    priority: this.priority,
+    assignedTo: this.assignedTo,
+    internalNotes: this.internalNotes,
+  };
+});
+
+// Instance helper to produce a cleaned API response
+inquirySchema.methods.toAPIResponse = function () {
+  const obj = this.toObject({ virtuals: true });
+  delete obj.__v;
+  if (obj.isDeleted) delete obj.isDeleted;
+  return obj;
 };
 
-// Format for API response (hide admin fields)
-contactInquirySchema.methods.toAPIResponse = function () {
-  const { admin, ...publicData } = this.toObject();
-  publicData.client.fullIdentifier = this.client.fullIdentifier;
-  publicData.servicesCount = this.servicesCount;
-  publicData.hasAttachments = this.hasAttachments;
-  publicData.ageInDays = this.ageInDays;
-  return publicData;
+// Flexible search helper used by controller
+inquirySchema.statics.searchInquiries = function (params = {}) {
+  const {
+    search,
+    status,
+    priority,
+    service,
+    assignedTo,
+    projectType,
+  } = params;
+
+  const query = { isDeleted: false };
+  if (status) query.status = status;
+  if (priority) query.priority = priority;
+  if (assignedTo) query.assignedTo = assignedTo;
+  if (service) query.projectType = service;
+  if (projectType) query.projectType = projectType;
+
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { company: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  return this.find(query);
 };
 
-// ================================
-// INDEXES
-// ===============================
+// Bulk update helper
+inquirySchema.statics.bulkUpdateStatus = function (ids, updates) {
+  return this.updateMany({ _id: { $in: ids } }, { $set: updates });
+};
 
-contactInquirySchema.index({ 'client.email': 1 });
-contactInquirySchema.index({ status: 1 });
-contactInquirySchema.index({ 'admin.priority': 1 });
-contactInquirySchema.index({ 'admin.assignedTo': 1 });
-contactInquirySchema.index({ createdAt: -1 });
-contactInquirySchema.index({ 'projectDetails.servicesInterested': 1 });
+// Dashboard statistics
+inquirySchema.statics.getDashboardStats = async function () {
+  const match = { isDeleted: false };
+  const [byStatus, byPriority] = await Promise.all([
+    this.aggregate([{ $match: match }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    this.aggregate([{ $match: match }, { $group: { _id: '$priority', count: { $sum: 1 } } }]),
+  ]);
+  return { byStatus, byPriority };
+};
 
-module.exports = mongoose.model('Inquiry', contactInquirySchema);
+// High priority inquiries over the last N days
+inquirySchema.statics.getHighPriority = function (days = 7) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  return this.find({
+    isDeleted: false,
+    priority: { $in: ['high', 'urgent'] },
+    createdAt: { $gte: cutoff },
+  });
+};
+
+// Generic pagination helper (used by controller)
+inquirySchema.statics.paginate = async function (query = {}, options = {}) {
+  const page = parseInt(options.page, 10) || 1;
+  const limit = parseInt(options.limit, 10) || 20;
+  const sort = options.sort || { createdAt: -1 };
+  const skip = (page - 1) * limit;
+  const [docs, total] = await Promise.all([
+    this.find(query).sort(sort).skip(skip).limit(limit),
+    this.countDocuments(query),
+  ]);
+  return {
+    docs,
+    total,
+    page,
+    pages: Math.ceil(total / limit),
+    limit,
+  };
+};
+
+// helper for API responses
+inquirySchema.methods.toAPIResponse = function () {
+  const obj = this.toObject({ virtuals: true });
+  delete obj.__v;
+  if (obj.isDeleted) delete obj.isDeleted;
+  return obj;
+};
+
+// search with filters and optional text
+inquirySchema.statics.searchInquiries = function (params = {}) {
+  const {
+    search,
+    status,
+    priority,
+    service,
+    assignedTo,
+    projectType,
+  } = params;
+
+  const query = { isDeleted: false };
+  if (status) query.status = status;
+  if (priority) query.priority = priority;
+  if (assignedTo) query.assignedTo = assignedTo;
+  if (service) query.projectType = service;
+  if (projectType) query.projectType = projectType;
+
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } },
+      { company: { $regex: search, $options: 'i' } },
+      { description: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  return this.find(query);
+};
+
+const Inquiry = mongoose.model('Inquiry', inquirySchema);
+
+module.exports = Inquiry;

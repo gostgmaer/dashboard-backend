@@ -126,6 +126,43 @@ class LoggerService {
 
     return await logEntry.save();
   }
-}
 
-module.exports = LoggerService;
+  // Simple convenience logging methods used by startup scripts
+    static info(message, meta) {
+      try {
+        if (meta) console.info('INFO:', message, meta);
+        else console.info('INFO:', message);
+      } catch (e) {
+        // swallow logging errors
+      }
+    }
+
+    static warn(message, meta) {
+      try {
+        if (meta) console.warn('WARN:', message, meta);
+        else console.warn('WARN:', message);
+      } catch (e) {}
+    }
+
+    static error(message, meta) {
+      try {
+        if (meta && meta.error && meta.error.stack) {
+          console.error('ERROR:', message, meta.error.stack);
+        } else if (meta) {
+          console.error('ERROR:', message, meta);
+        } else {
+          console.error('ERROR:', message);
+        }
+      } catch (e) {}
+    }
+
+    static debug(message, meta) {
+      try {
+        if (process.env.NODE_ENV === 'production') return;
+        if (meta) console.debug('DEBUG:', message, meta);
+        else console.debug('DEBUG:', message);
+      } catch (e) {}
+    }
+  }
+
+  module.exports = LoggerService;
