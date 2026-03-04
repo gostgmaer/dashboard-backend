@@ -42,51 +42,19 @@ const ERROR_CODES = {
  * @param {number} options.statusCode - HTTP status code (default: 200)
  * @param {Object} options.meta - Additional metadata (optional)
  */
-const sendSuccess = (res, { data = null, message = 'Success', statusCode = HTTP_STATUS.OK, meta = null, filters = null } = {}) => {
-    // normalize to the requested response shape
+const sendSuccess = (res, { data = null, message = 'Success', statusCode = HTTP_STATUS.OK, meta = null } = {}) => {
     const response = {
         success: true,
-        status: statusCode,
+        statusCode,
         message,
-        data: {
-            result: null,
-            pagination: null,
-            filters: null,
-        },
     };
 
-    // populate result
     if (data !== null) {
-        // if caller already passed an object with result, use it directly
-        if (typeof data === 'object' && data.hasOwnProperty('result')) {
-            response.data = { ...response.data, ...data };
-        } else {
-            response.data.result = data;
-        }
-    } else {
-        response.data.result = null;
+        response.data = data;
     }
 
-    // populate pagination from meta if provided
-    if (meta && meta.pagination) {
-        const p = meta.pagination;
-        response.data.pagination = {
-            page: p.page || 1,
-            totalPages: p.totalPages || Math.ceil((p.total || 0) / (p.limit || 1)),
-            total: p.total || 0,
-            hasNext: p.hasNextPage !== undefined ? p.hasNextPage : (p.page && p.limit ? p.page < Math.ceil((p.total || 0) / p.limit) : false),
-            hasPrev: p.hasPrevPage !== undefined ? p.hasPrevPage : (p.page ? p.page > 1 : false),
-            limit: p.limit || (p.page && p.total ? Math.ceil((p.total || 0) / (p.totalPages || 1)) : null),
-        };
-    }
-
-    // allow callers to directly supply filters or compute from provided filters arg
-    if (filters) {
-        response.data.filters = filters;
-    } else if (meta && meta.filters) {
-        response.data.filters = meta.filters;
-    } else {
-        response.data.filters = { applied: 0, search: null };
+    if (meta !== null) {
+        response.meta = meta;
     }
 
     return res.status(statusCode).json(response);
@@ -105,17 +73,19 @@ const sendSuccess = (res, { data = null, message = 'Success', statusCode = HTTP_
 const sendError = (res, { message = 'Internal server error', statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR, code = ERROR_CODES.INTERNAL_ERROR, details = null, errors = null } = {}) => {
     const response = {
         success: false,
-        status: statusCode,
+        statusCode,
         message,
         error: {
             code,
         },
     };
 
+    // Include validation errors if present
     if (errors !== null) {
         response.error.errors = errors;
     }
 
+    // Include details only in development
     if (details !== null && process.env.NODE_ENV === 'development') {
         response.error.details = details;
     }
@@ -133,11 +103,11 @@ const sendError = (res, { message = 'Internal server error', statusCode = HTTP_S
  * @param {number} options.total - Total items count
  * @param {string} options.message - Success message
  */
-const sendPaginated = (res, { data = [], page = 1, limit = 20, total = 0, message = 'Data retrieved successfully', filters = null } = {}) => {
-    const totalPages = Math.ceil(total / limit) || 0;
+const sendPaginated = (res, { data, page, limit, total, message = 'Data retrieved successfully' }) => {
+    const totalPages = Math.ceil(total / limit);
 
     return sendSuccess(res, {
-        data: { result: data },
+        data,
         message,
         statusCode: HTTP_STATUS.OK,
         meta: {
@@ -149,7 +119,6 @@ const sendPaginated = (res, { data = [], page = 1, limit = 20, total = 0, messag
                 hasNextPage: page < totalPages,
                 hasPrevPage: page > 1,
             },
-            filters: filters || { applied: 0, search: null },
         },
     });
 };
