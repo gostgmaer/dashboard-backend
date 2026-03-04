@@ -13911,6 +13911,112 @@ const KPI_THRESHOLD_BREACHED = ({ username, kpiName, currentValue, threshold, di
   };
 };
 
+// -----------------------------------------------------------------------------
+// Project proposal email with attachment and download button
+// -----------------------------------------------------------------------------
+const PROJECT_PROPOSAL_EMAIL = ({
+  clientName,
+  projectName,
+  proposalUrl,
+  proposalNumber,
+  issueDate,
+  validUntil,
+  companyName = 'Your Company',
+  contactEmail = 'support@yourcompany.com',
+  contactPhone = '',
+  attachmentName = 'proposal.pdf',
+  message = '',
+  baseUrl = appUrl
+}) => {
+  const downloadLink = proposalUrl || '#';
+
+  return {
+    subject: `📄 Proposal #${proposalNumber || ''} for ${projectName}`,
+    html: buildEmailHTML({
+      preheader: `Your project proposal for ${projectName} is ready`,
+      title: 'Project Proposal',
+      headerBg: '#2563eb',
+      headerText: 'Proposal Ready',
+      bodyHTML: `
+        <p style="margin:0 0 16px 0;">
+          Hello <strong>${clientName || 'Valued Client'}</strong>,
+        </p>
+
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          Thank you for the opportunity to collaborate with us on 
+          <strong>${projectName}</strong>. We have prepared a detailed proposal 
+          outlining the scope, timeline, and estimated investment for this project.
+        </p>
+
+        <div style="background:#f9fafb;padding:16px;border-radius:8px;margin:20px 0;">
+          <p style="margin:4px 0;"><strong>Proposal Number:</strong> ${proposalNumber || 'N/A'}</p>
+          <p style="margin:4px 0;"><strong>Project:</strong> ${projectName}</p>
+          <p style="margin:4px 0;"><strong>Issue Date:</strong> ${issueDate || 'N/A'}</p>
+          <p style="margin:4px 0;"><strong>Valid Until:</strong> ${validUntil || 'N/A'}</p>
+        </div>
+
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          ${
+            message ||
+            'Please review the attached proposal document which includes project deliverables, timeline, and pricing structure.'
+          }
+        </p>
+
+        <div style="text-align:center;margin:28px 0;">
+          <a href="${downloadLink}"
+             style="display:inline-block;padding:14px 26px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;"
+             target="_blank" rel="noopener">
+            Download Full Proposal
+          </a>
+        </div>
+
+        <p style="margin:16px 0;color:#4b5563;">
+          If you have any questions or would like to discuss adjustments to the scope or timeline, 
+          please feel free to reach out. We would also be happy to schedule a call to walk you through the proposal.
+        </p>
+
+        <p style="margin:16px 0;color:#4b5563;">
+          <strong>Next Steps:</strong>
+        </p>
+
+        <ul style="color:#4b5563;padding-left:20px;">
+          <li>Review the attached proposal document</li>
+          <li>Share your feedback or requested modifications</li>
+          <li>Confirm approval so we can initiate the project kickoff</li>
+        </ul>
+
+        <p style="margin:20px 0;color:#4b5563;">
+          You may also access the proposal using the link below:
+        </p>
+
+        <p style="word-break:break-all;">
+          <a href="${downloadLink}" style="color:#2563eb;text-decoration:none;">
+            ${downloadLink}
+          </a>
+        </p>
+
+        <p style="margin:24px 0 0 0;color:#4b5563;">
+          We appreciate your time and look forward to the possibility of working together.
+        </p>
+
+        <p style="margin:20px 0 0 0;color:#4b5563;">
+          Best regards,<br/>
+          <strong>${companyName}</strong><br/>
+          ${contactEmail ? `Email: ${contactEmail}<br/>` : ''}
+          ${contactPhone ? `Phone: ${contactPhone}` : ''}
+        </p>
+      `,
+      footerNote: `Proposal ${proposalNumber || ''} • ${projectName}`
+    }),
+    attachments: [
+      {
+        filename: attachmentName,
+        path: downloadLink
+      }
+    ]
+  };
+};
+
 // =====================================================================================
 // 📤 MODULE EXPORTS
 // =====================================================================================
@@ -14269,5 +14375,5 @@ module.exports = {
   socialLoginConnectionAlertAdminTemplate,
   accountMergeRequestReceivedAdminTemplate,
   highRiskAccountActivityAlertAdminTemplate,
-  accountRecoveryRequestReceivedAdminTemplate,
+  accountRecoveryRequestReceivedAdminTemplate,PROJECT_PROPOSAL_EMAIL
 };
