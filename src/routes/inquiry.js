@@ -19,6 +19,7 @@ router.patch('/:id', authMiddleware, InquiryController.updateInquiry);
 router.put('/bulk-update', authMiddleware, InquiryController.bulkUpdateInquiries);
 router.patch('/bulk-update', authMiddleware, InquiryController.bulkUpdateInquiries);
 router.post('/:id/contact', authMiddleware, InquiryController.contactClient);
+router.post('/send-proposal', authMiddleware, InquiryController.sendProposal);
 router.delete('/:id', authMiddleware, InquiryController.archiveInquiry);
 
 module.exports = { InquiryRoutes: router };

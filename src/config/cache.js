@@ -13,6 +13,12 @@ let isConnected = false;
  */
 const initializeCache = async () => {
     try {
+        // Skip Redis if not enabled
+        if (!process.env.REDIS_ENABLED || process.env.REDIS_ENABLED === 'false') {
+            console.warn('⚠️ Redis disabled (REDIS_ENABLED not set). Caching disabled.');
+            return null;
+        }
+
         // Skip Redis if not configured
         if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
             console.warn('⚠️ Redis not configured. Caching disabled.');

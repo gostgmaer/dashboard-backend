@@ -99,7 +99,7 @@ const inquirySchema = new mongoose.Schema({
   status: {
     type: String,
     enum: {
-      values: ['new', 'reviewing', 'contacted', 'quoted', 'negotiating', 'accepted', 'rejected', 'completed', 'cancelled'],
+      values: ['new', 'reviewing', 'contacted', 'quoted', 'proposal-sent', 'negotiating', 'accepted', 'rejected', 'completed', 'cancelled'],
       message: '{VALUE} is not a valid status'
     },
     default: 'new'
@@ -186,6 +186,20 @@ const inquirySchema = new mongoose.Schema({
     type: Date
   },
 
+  // Proposal Management
+  proposalUrl: {
+    type: String,
+    trim: true
+  },
+  proposalSentAt: {
+    type: Date
+  },
+  proposalTemplateName: {
+    type: String,
+    default: 'static_basic',
+    trim: true
+  },
+
   // Metadata
   ipAddress: {
     type: String
@@ -235,7 +249,7 @@ inquirySchema.index({
 });
 
 // Auto-set priority based on budget and assign a sequential inquiry number
-inquirySchema.pre('save', async function (next) {
+inquirySchema.pre('save', async function () {
   if (this.isNew) {
     // --- sequential number logic ------------------------------------------------
     try {
@@ -246,7 +260,7 @@ inquirySchema.pre('save', async function (next) {
       );
       this.inquiryNumber = counter.seq;
     } catch (err) {
-      return next(err);
+      throw err;
     }
 
     // --- priority logic ---------------------------------------------------------
@@ -264,7 +278,6 @@ inquirySchema.pre('save', async function (next) {
       this.priority = this.priority === 'high' ? 'urgent' : 'high';
     }
   }
-  next();
 });
 
 // Change status with history tracking
