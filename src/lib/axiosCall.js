@@ -1,10 +1,11 @@
 // apiClient.js
 const axios = require('axios');
+const { app } = require('../config/setting');
 
 // Create a global axios instance with default config, easily overridden per-call
 const instance = axios.create({
   timeout: 10000, // Default timeout
-  baseURL: process.env.BASE_API_URL || '', // Optional default base URL
+  baseURL: app.baseApiUrl || '', // Optional default base URL
   headers: {
     'Content-Type': 'application/json',
     // Add any global headers here

@@ -5,6 +5,7 @@ const twilio = require('twilio');
 const { sendEmail } = require('../email');
 const { otpEmailTemplate } = require('../email/emailTemplate');
 const User = require('../models/user');
+const { otp: otpConfig, services } = require('../config/setting');
 /**
  * 🔐 ENTERPRISE OTP SERVICE
  *
@@ -20,37 +21,37 @@ const User = require('../models/user');
 class OTPService {
   constructor() {
     this.config = {
-      enabled: process.env.ENABLE_OTP_VERIFICATION === 'true',
-      defaultMethod: process.env.DEFAULT_OTP_METHOD || 'totp',
+      enabled: otpConfig.enabled,
+      defaultMethod: otpConfig.defaultMethod,
       allowFallback: false, // enforce single method only
-      expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '5'),
-      maxAttempts: parseInt(process.env.OTP_MAX_ATTEMPTS || '3'),
+      expiryMinutes: otpConfig.expiryMinutes,
+      maxAttempts: otpConfig.maxAttempts,
       rateLimit: {
-        window: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute in milliseconds
-        maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '5'), // Max 5 requests per window
+        window: otpConfig.rateLimit.windowMs,
+        maxRequests: otpConfig.rateLimit.maxRequests,
       },
       totp: {
-        secretLength: parseInt(process.env.TOTP_SECRET_LENGTH || '32'),
-        window: parseInt(process.env.TOTP_WINDOW || '1'),
-        step: parseInt(process.env.TOTP_STEP || '30'),
-        appName: process.env.TOTP_APP_NAME || 'YourApp',
-        issuer: process.env.TOTP_ISSUER || 'YourCompany',
+        secretLength: otpConfig.totp.secretLength,
+        window: otpConfig.totp.window,
+        step: otpConfig.totp.step,
+        appName: otpConfig.totp.appName,
+        issuer: otpConfig.totp.issuer,
       },
       email: {
-        length: parseInt(process.env.EMAIL_OTP_LENGTH || '6'),
-        template: process.env.EMAIL_OTP_TEMPLATE || 'otp_verification',
-        sender: process.env.EMAIL_SENDER || 'noreply@yourapp.com',
+        length: otpConfig.emailOtp.length,
+        template: otpConfig.emailOtp.template,
+        sender: otpConfig.emailOtp.sender,
       },
       sms: {
-        length: parseInt(process.env.SMS_OTP_LENGTH || '6'),
-        provider: process.env.SMS_PROVIDER || 'twilio',
+        length: otpConfig.smsOtp.length,
+        provider: otpConfig.smsOtp.provider,
       },
     };
 
     this.preferredMethod = this.config.defaultMethod;
 
-    if (this.config.sms.provider === 'twilio' && process.env.TWILIO_ACCOUNT_SID) {
-      this.twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    if (this.config.sms.provider === 'twilio' && services.twilio.accountSid) {
+      this.twilioClient = twilio(services.twilio.accountSid, services.twilio.authToken);
     }
 
     this.rateLimitStore = new Map();
@@ -350,7 +351,7 @@ class OTPService {
 
       const smsResult = await this.twilioClient.messages.create({
         body: message,
-        from: process.env.TWILIO_PHONE_NUMBER,
+        from: services.twilio.phoneNumber,
         to: user.phoneNumber,
       });
 

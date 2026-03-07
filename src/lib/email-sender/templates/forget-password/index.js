@@ -1,3 +1,5 @@
+const { services } = require('../../../../config/setting');
+
 const forgetPasswordEmailBody = (option) => {
   return `
 <html
@@ -217,7 +219,7 @@ const forgetPasswordEmailBody = (option) => {
                               reset your password</p>
 
                             <a
-                            href=${process.env.STORE_URL}/user/forget-password/${option.token}
+                            href=${services.storeUrl}/user/forget-password/${option.token}
                               style="background:#22c55e;color:white;border:1px solid #22c55e; padding: 10px 15px; border-radius: 4px; text-decoration:none;"
                             >Reset Password </a>
 

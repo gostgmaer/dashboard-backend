@@ -1,5 +1,7 @@
 
 // utils/errorHandler.js
+const { app } = require('../../config/setting');
+
 class AppError extends Error {
   constructor(message, statusCode, errors = null) {
     super(message);
@@ -109,9 +111,9 @@ const globalErrorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
-  if (process.env.NODE_ENV === 'development') {
+  if (app.environment === 'development') {
     sendErrorDev(err, req, res);
-  } else if (process.env.NODE_ENV === 'production') {
+  } else if (app.environment === 'production') {
     let error = { ...err };
     error.message = err.message;
 

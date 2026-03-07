@@ -1,4 +1,5 @@
 const mime = require('mime-types');
+const { storage } = require('../../config/setting');
 // const logger = require('../utils/logger');
 
 const validateFile = (req, res, next) => {
@@ -12,10 +13,8 @@ const validateFile = (req, res, next) => {
       });
     }
 
-    const maxSize = parseInt(process.env.MAX_FILE_SIZE) || 10485760;
-    const allowedMimeTypes = process.env.ALLOWED_MIME_TYPES ? 
-      process.env.ALLOWED_MIME_TYPES.split(',') : 
-      ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    const maxSize = storage.maxFileSize;
+    const allowedMimeTypes = storage.allowedMimeTypes;
 
     for (const file of files) {
       // Check file size

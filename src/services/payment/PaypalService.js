@@ -2,15 +2,16 @@
 // services/PaypalService.js
 const axios = require('axios');
 const crypto = require('crypto');
+const { payment, business } = require('../../config/setting');
 
 class PaypalService {
     constructor() {
-        this.baseURL = process.env.PAYPAL_MODE === 'live' 
+        this.baseURL = payment.paypal.mode === 'live' 
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
-        this.clientId = process.env.PAYPAL_CLIENT_ID;
-        this.clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-        this.webhookId = process.env.PAYPAL_WEBHOOK_ID;
+        this.clientId = payment.paypal.clientId;
+        this.clientSecret = payment.paypal.clientSecret;
+        this.webhookId = payment.paypal.webhookId;
     }
 
     async getAccessToken() {
@@ -51,7 +52,7 @@ class PaypalService {
                 application_context: {
                     return_url: paymentData.returnUrl,
                     cancel_url: paymentData.cancelUrl,
-                    brand_name: process.env.BRAND_NAME || 'Your Store',
+                    brand_name: business.brandName,
                     user_action: 'PAY_NOW'
                 }
             };

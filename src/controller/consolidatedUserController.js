@@ -7,6 +7,7 @@ const csv = require('csv-parser');
 const { Parser } = require('json2csv');
 const fs = require('fs');
 const crypto = require('crypto');
+const { app, otp } = require('../config/setting');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 const { welcomeEmailTemplate } = require('../email/emailTemplates');
 const { sendEmail } = require('../email');
@@ -116,7 +117,7 @@ class UserController {
       success: false,
       status: statusCode,
       message,
-      error: process.env.NODE_ENV === 'development' ? error : undefined,
+      error: app.environment === 'development' ? error : undefined,
     });
   }
 
@@ -663,7 +664,7 @@ class UserController {
       // Check if MFA is required
       if (authResult.requiresMFA) {
         // Generate and send OTP
-        const otpResult = await user.generateOTP(process.env.DEFAULT_OTP_TYPE || 'email', 'login', req.deviceInfo);
+        const otpResult = await user.generateOTP(otp.defaultMethod || 'email', 'login', req.deviceInfo);
 
         return res.status(200).json({
           success: true,
@@ -860,7 +861,7 @@ class UserController {
    */
   async generateOTP(req, res) {
     try {
-      const { type = process.env.DEFAULT_OTP_TYPE || 'email', purpose = 'login' } = req.body;
+      const { type = otp.defaultMethod || 'email', purpose = 'login' } = req.body;
       const user = req.user;
 
       const otpResult = await user.generateOTP(type, purpose, req.deviceInfo);

@@ -3,6 +3,8 @@
  * Standard response format for all API endpoints
  */
 
+const { app } = require('../config/setting');
+
 // HTTP Status Codes
 const HTTP_STATUS = {
     OK: 200,
@@ -86,7 +88,7 @@ const sendError = (res, { message = 'Internal server error', statusCode = HTTP_S
     }
 
     // Include details only in development
-    if (details !== null && process.env.NODE_ENV === 'development') {
+    if (details !== null && app.environment === 'development') {
         response.error.details = details;
     }
 

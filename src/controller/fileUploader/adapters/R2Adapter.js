@@ -30,21 +30,21 @@ class R2Adapter extends StorageAdapter {
     }
 
     // Ensure endpoint includes https://
-    const endpoint = process.env.R2_ENDPOINT.startsWith("http")
-      ? process.env.R2_ENDPOINT
-      : `https://${process.env.R2_ENDPOINT}`;
+    const endpoint = storage.r2.endpoint.startsWith("http")
+      ? storage.r2.endpoint
+      : `https://${storage.r2.endpoint}`;
 
     this.s3Client = new S3Client({
       region: "auto",
       endpoint,
       credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY,
-        secretAccessKey: process.env.R2_SECRET,
+        accessKeyId: storage.r2.accessKey,
+        secretAccessKey: storage.r2.secretKey,
       },
       forcePathStyle: true,
     });
 
-    this.bucket = process.env.R2_BUCKET;
+    this.bucket = storage.r2.bucket;
   }
 
   // --- Utility function to ensure metadata values are strings ---
@@ -75,7 +75,7 @@ class R2Adapter extends StorageAdapter {
 
       const result = await this.s3Client.send(command);
       //logger.info(`✅ File uploaded to R2: ${destinationPath}`);
-  const publicUrl = `${process.env.R2_PUBLIC_DOMAIN}/${this.bucket}/${destinationPath}`;
+  const publicUrl = `${storage.r2.publicDomain}/${this.bucket}/${destinationPath}`;
 
       return {
         success: true,
@@ -107,7 +107,7 @@ class R2Adapter extends StorageAdapter {
         success: true,
         path: destinationPath,
         etag: result.ETag,
-        location: `${process.env.R2_ENDPOINT}/${this.bucket}/${destinationPath}`,
+        location: `${storage.r2.endpoint}/${this.bucket}/${destinationPath}`,
       };
     } catch (error) {
       //logger.error("❌ R2 stream upload error:", error);
@@ -140,7 +140,7 @@ class R2Adapter extends StorageAdapter {
       });
 
       const expiry =
-        options.expiry || parseInt(process.env.SIGNED_URL_EXPIRY) || 3600;
+        options.expiry || storage.signedUrlExpiry;
       const signedUrl = await getSignedUrl(this.s3Client, command, {
         expiresIn: expiry,
       });

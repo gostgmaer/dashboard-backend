@@ -6,6 +6,7 @@ const publicServices = require('../../services/publicservice');
 const { sendSuccess, HTTP_STATUS } = require('../../utils/responseHelper');
 const AppError = require('../../utils/appError');
 const { catchAsync } = require('../../middleware/errorHandler');
+const { services } = require('../../config/setting');
 
 class publicController {
   static getGooglePlaces = catchAsync(async (req, res) => {
@@ -22,7 +23,7 @@ class publicController {
     const params = {
       input,
       components: `country:${country}`,
-      key: process.env.GOOGLE_PLACES_API_KEY,
+      key: services.google.placesApiKey,
       language,
     };
 
@@ -34,7 +35,7 @@ class publicController {
     const url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
     const options = {
       method: 'GET',
-      params: { input, key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { input, key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);
@@ -61,7 +62,7 @@ class publicController {
     const url = 'https://maps.googleapis.com/maps/api/place/details/json';
     const options = {
       method: 'GET',
-      params: { place_id, key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { place_id, key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);
@@ -81,7 +82,7 @@ class publicController {
     const url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
     const options = {
       method: 'GET',
-      params: { location, radius, type, key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { location, radius, type, key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);
@@ -101,7 +102,7 @@ class publicController {
     const url = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
     const options = {
       method: 'GET',
-      params: { query, location, radius, key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { query, location, radius, key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);
@@ -125,7 +126,7 @@ class publicController {
         input,
         inputtype,
         fields: 'place_id,name,formatted_address,geometry',
-        key: process.env.GOOGLE_PLACES_API_KEY,
+        key: services.google.placesApiKey,
       },
     };
 
@@ -147,7 +148,7 @@ class publicController {
     const params = new URLSearchParams({
       photoreference,
       maxwidth,
-      key: process.env.GOOGLE_PLACES_API_KEY,
+      key: services.google.placesApiKey,
     });
 
     if (maxheight) {
@@ -166,7 +167,7 @@ class publicController {
     const url = 'https://maps.googleapis.com/maps/api/place/queryautocomplete/json';
     const options = {
       method: 'GET',
-      params: { input, key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { input, key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);
@@ -187,7 +188,7 @@ class publicController {
     const options = {
       method: 'POST',
       data: placeData,
-      params: { key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);
@@ -208,7 +209,7 @@ class publicController {
     const options = {
       method: 'POST',
       data: { place_id },
-      params: { key: process.env.GOOGLE_PLACES_API_KEY },
+      params: { key: services.google.placesApiKey },
     };
 
     const result = await apiCall(url, options);

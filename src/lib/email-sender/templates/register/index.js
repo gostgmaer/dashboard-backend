@@ -1,3 +1,5 @@
+const { services } = require('../../../../config/setting');
+
 const customerRegisterBody = (option) => {
   return `
 <html
@@ -211,7 +213,7 @@ const customerRegisterBody = (option) => {
 
         <p style="margin-bottom:20px;">Click this link for active your account</p></p>
 
-                             <a href=${process.env.STORE_URL}/user/email-verification/${option.token} style="background:#22c55e;color:white;border:1px solid #22c55e; padding: 10px 15px; border-radius: 4px; text-decoration:none;">Verify Account</a>
+                             <a href=${services.storeUrl}/user/email-verification/${option.token} style="background:#22c55e;color:white;border:1px solid #22c55e; padding: 10px 15px; border-radius: 4px; text-decoration:none;">Verify Account</a>
 
                             <p style="margin-top: 35px;">If you did not initiate
                               this request, please contact us immediately at

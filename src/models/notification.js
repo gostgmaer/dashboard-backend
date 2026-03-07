@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('./user');
 const { Schema } = mongoose;
+const { notifications } = require('../config/setting');
 
 const notificationTypeGroups = {
   // ==============================
@@ -652,10 +653,10 @@ notificationSchema.post('save', async function (doc, next) {
       } catch (e) {}
     }
     // Webhook notification for integration
-    if (process.env.NOTIFICATION_WEBHOOK_URL) {
+    if (notifications.webhookUrl) {
       try {
         const WebhookService = require('../services/WebhookService');
-        await WebhookService.sendWebhook(process.env.NOTIFICATION_WEBHOOK_URL, {
+        await WebhookService.sendWebhook(notifications.webhookUrl, {
           event: doc.isNew ? 'notification.created' : 'notification.updated',
           notification: {
             id: doc._id,

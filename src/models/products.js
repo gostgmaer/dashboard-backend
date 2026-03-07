@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Brand = require('./brands');
 const Category = require('./categories');
+const { app, business, services } = require('../config/setting');
 
 const variantSchema = new mongoose.Schema({
   sku: { type: String },
@@ -933,13 +934,13 @@ productSchema.methods.generateStructuredData = function () {
     image: this.mainImage ? [this.mainImage] : [],
     offers: {
       '@type': 'Offer',
-      url: `${process.env.SITE_URL}/products/${this.seo_info?.slug}`,
-      priceCurrency: process.env.CURRENCY || 'USD',
+      url: `${app.siteUrl}/products/${this.seo_info?.slug}`,
+      priceCurrency: business.currency || 'USD',
       price: this.salePrice || this.basePrice,
       availability: this.isAvailable ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
       seller: {
         '@type': 'Organization',
-        name: process.env.COMPANY_NAME || 'Your Store',
+        name: business.companyName || 'Your Store',
       },
     },
   };
@@ -1508,7 +1509,7 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
     title: this.title,
     description: this.shortDescription || this.metaDescription,
     price: this.getFinalPrice(),
-    currency: process.env.CURRENCY || 'USD',
+    currency: business.currency || 'USD',
     availability: this.isAvailable ? 'in stock' : 'out of stock',
     condition: 'new',
     brand: this.brandName,
@@ -1540,7 +1541,7 @@ productSchema.methods.exportForPlatform = function (platform = 'general', option
     case 'facebook':
       return {
         ...baseData,
-        product_catalog_id: process.env.FB_CATALOG_ID,
+        product_catalog_id: services.facebook.catalogId,
         inventory: this.inventory,
         sale_price: this.salePrice ? `${this.salePrice} ${baseData.currency}` : undefined,
         sale_price_effective_date: this.discountStartDate && this.discountEndDate ? `${this.discountStartDate.toISOString()}/${this.discountEndDate.toISOString()}` : undefined,
@@ -1712,10 +1713,10 @@ productSchema.methods.exportForFeed = function (format = 'google') {
     id: this._id,
     title: this.title,
     description: this.shortDescription,
-    link: `${process.env.SITE_URL}/products/${this.seo_info.slug}`,
+    link: `${app.siteUrl}/products/${this.seo_info.slug}`,
     image_link: this.mainImage,
     availability: this.isAvailable ? 'in stock' : 'out of stock',
-    price: `${this.getFinalPrice()} ${process.env.CURRENCY || 'USD'}`,
+    price: `${this.getFinalPrice()} ${business.currency || 'USD'}`,
     brand: this.brandName,
     condition: 'new',
     gtin: this.productUPCEAN,
@@ -1733,7 +1734,7 @@ productSchema.methods.exportForFeed = function (format = 'google') {
   if (format === 'facebook') {
     return {
       ...baseData,
-      product_catalog_id: process.env.FB_CATALOG_ID,
+      product_catalog_id: services.facebook.catalogId,
       category: this.categoryName,
     };
   }

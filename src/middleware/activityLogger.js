@@ -1,5 +1,6 @@
 // middleware/activityLogger.js
 const activityLogService = require('../services/activityLogService');
+const { app } = require('../config/setting');
 
 /**
  * Global activity logging middleware
@@ -109,7 +110,7 @@ function errorActivityLogger(err, req, res, next) {
       additionalData: {
         error: {
           message: err.message,
-          stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+          stack: app.environment === 'development' ? err.stack : undefined,
           code: err.code,
           status: err.status || err.statusCode,
         },

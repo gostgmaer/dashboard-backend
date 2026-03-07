@@ -1,11 +1,12 @@
 
 // services/StripeService.js
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { payment } = require('../../config/setting');
+const stripe = require('stripe')(payment.stripe.secretKey);
 const crypto = require('crypto');
 
 class StripeService {
     constructor() {
-        this.webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        this.webhookSecret = payment.stripe.webhookSecret;
     }
 
     async createPayment(paymentData) {

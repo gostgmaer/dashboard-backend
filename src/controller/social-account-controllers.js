@@ -3,13 +3,20 @@ const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const passport = require('passport');
 const User = require('../models/user');
+const { app, services, client } = require('../config/setting');
 // const { logger } = require('../utils/logger');
 const { sendEmail } = require('../services/emailService');
 // const { getDeviceInfo } = require('../utils/deviceUtils');
 const DeviceDetector = require('../services/deviceDetector');
 const { isSupportedProvider } = require('../services/socialProvider');
 // Environment configuration
-const { GOOGLE_CLIENT_ID, FACEBOOK_APP_ID, TWITTER_API_KEY, GITHUB_CLIENT_ID, JWT_SECRET, FRONTEND_URL = 'http://localhost:3000' } = process.env;
+const { GOOGLE_CLIENT_ID, FACEBOOK_APP_ID, TWITTER_API_KEY, GITHUB_CLIENT_ID, FRONTEND_URL = 'http://localhost:3000' } = {
+  GOOGLE_CLIENT_ID: services.google.clientId,
+  FACEBOOK_APP_ID: services.facebook.appId,
+  TWITTER_API_KEY: services.twitter.apiKey,
+  GITHUB_CLIENT_ID: services.github.clientId,
+  FRONTEND_URL: client.url
+};
 
 // Initialize OAuth clients
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
@@ -276,7 +283,7 @@ class SocialAccountController {
       res.status(500).json({
         success: false,
         message: 'Social login failed',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Authentication failed',
+        error: app.environment === 'development' ? error.message : 'Authentication failed',
       });
     }
   }
@@ -434,7 +441,7 @@ class SocialAccountController {
       // Or use Twitter OAuth 2.0 with Bearer tokens for simpler validation
 
       const OAuth = require('oauth').OAuth;
-      const oauth = new OAuth('https://api.twitter.com/oauth/request_token', 'https://api.twitter.com/oauth/access_token', TWITTER_API_KEY, process.env.TWITTER_API_SECRET, '1.0A', null, 'HMAC-SHA1');
+      const oauth = new OAuth('https://api.twitter.com/oauth/request_token', 'https://api.twitter.com/oauth/access_token', TWITTER_API_KEY, services.twitter.apiSecret, '1.0A', null, 'HMAC-SHA1');
 
       return new Promise((resolve, reject) => {
         oauth.get('https://api.twitter.com/1.1/account/verify_credentials.json?include_email=true', accessToken, accessTokenSecret, (error, data) => {
@@ -514,7 +521,7 @@ class SocialAccountController {
       const publicKey = await importJWK(jwk, 'RS256');
       await jwtVerify(identityToken, publicKey, {
         issuer: 'https://appleid.apple.com',
-        audience: process.env.APPLE_CLIENT_ID,
+        audience: services.apple.clientId,
       });
 
       const payload = decodeJwt(identityToken);

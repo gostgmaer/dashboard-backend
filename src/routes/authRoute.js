@@ -3,6 +3,7 @@ const authRoute = express.Router();
 const authController = require('../controller/authenticationController');
 const { authMiddleware } = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
+const { app } = require('../config/setting');
 const rateLimit = require('express-rate-limit');
 const authAccess = require('../middleware/access');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
@@ -185,7 +186,7 @@ authRoute.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    error: app.environment === 'development' ? err.stack : undefined,
   });
 });
 

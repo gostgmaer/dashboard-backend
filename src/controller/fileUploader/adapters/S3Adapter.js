@@ -1,27 +1,29 @@
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, CopyObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const StorageAdapter = require('./StorageAdapter');
+const { storage } = require('../../../config/setting');
 
 class S3Adapter extends StorageAdapter {
   constructor() {
     super();
     
     const s3Config = {
-      region: process.env.S3_REGION,
+      region: storage.s3.region,
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID,
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
+        accessKeyId: storage.s3.accessKey,
+        secretAccessKey: storage.s3.secretKey
       }
     };
     
     // For local development with MinIO
-    if (process.env.S3_ENDPOINT) {
-      s3Config.endpoint = process.env.S3_ENDPOINT;
+    const s3Endpoint = process.env.S3_ENDPOINT; // Keep this for local dev flexibility
+    if (s3Endpoint) {
+      s3Config.endpoint = s3Endpoint;
       s3Config.forcePathStyle = true;
     }
     
     this.s3Client = new S3Client(s3Config);
-    this.bucket = process.env.S3_BUCKET;
+    this.bucket = storage.s3.bucket;
   }
 
   async uploadBuffer(buffer, destinationPath, options = {}) {
@@ -41,7 +43,7 @@ class S3Adapter extends StorageAdapter {
         success: true,
         path: destinationPath,
         etag: result.ETag,
-        location: `https://${this.bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${destinationPath}`
+        location: `https://${this.bucket}.s3.${storage.s3.region}.amazonaws.com/${destinationPath}`
       };
     } catch (error) {
       //logger.error('S3 upload error:', error);
@@ -66,7 +68,7 @@ class S3Adapter extends StorageAdapter {
         success: true,
         path: destinationPath,
         etag: result.ETag,
-        location: `https://${this.bucket}.s3.${process.env.S3_REGION}.amazonaws.com/${destinationPath}`
+        location: `https://${this.bucket}.s3.${storage.s3.region}.amazonaws.com/${destinationPath}`
       };
     } catch (error) {
       //logger.error('S3 stream upload error:', error);
@@ -96,7 +98,7 @@ class S3Adapter extends StorageAdapter {
         Key: destinationPath
       });
 
-      const expiry = options.expiry || parseInt(process.env.SIGNED_URL_EXPIRY) || 3600;
+      const expiry = options.expiry || storage.signedUrlExpiry;
       const signedUrl = await getSignedUrl(this.s3Client, command, { expiresIn: expiry });
       
       return signedUrl;

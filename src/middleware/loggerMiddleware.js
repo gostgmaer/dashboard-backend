@@ -3,6 +3,7 @@ const Log = require('../models/logs');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const { jwt: jwtConfig } = require('../config/setting');
 require('dotenv').config();
 
 // Parse user agent for device metadata
@@ -69,7 +70,7 @@ async function loggerMiddleware(req, res, next) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = jwt.verify(token, jwtConfig.secret);
       const user = await User.findOne({ email: decoded.email }).lean();
       if (user) {
         userId = user._id;

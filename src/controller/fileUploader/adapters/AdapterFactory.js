@@ -2,11 +2,12 @@ const S3Adapter = require("./S3Adapter");
 const GCSAdapter = require("./GCSAdapter");
 const AzureAdapter = require("./AzureAdapter");
 const R2Adapter = require("./R2Adapter");
+const { storage } = require('../../../config/setting');
 
 
 class AdapterFactory {
   static createAdapter(provider = null) {
-    const storageProvider = provider || process.env.STORAGE_PROVIDER;
+    const storageProvider = provider || storage.type;
 
     if (!storageProvider) {
       throw new Error("STORAGE_PROVIDER environment variable is required");
@@ -15,9 +16,9 @@ class AdapterFactory {
     switch (storageProvider.toLowerCase()) {
       case "s3":
         if (
-          !process.env.S3_ACCESS_KEY_ID ||
-          !process.env.S3_SECRET_ACCESS_KEY ||
-          !process.env.S3_BUCKET
+          !storage.s3.accessKey ||
+          !storage.s3.secretKey ||
+          !storage.s3.bucket
         ) {
           throw new Error("Missing required S3 environment variables");
         }
@@ -25,7 +26,7 @@ class AdapterFactory {
         return new S3Adapter();
 
       case "gcs":
-        if (!process.env.GCS_BUCKET) {
+        if (!storage.gcs.bucket) {
           throw new Error("Missing required GCS environment variables");
         }
         //logger.info("Initializing Google Cloud Storage adapter");
@@ -33,8 +34,8 @@ class AdapterFactory {
 
       case "azure":
         if (
-          !process.env.AZURE_CONNECTION_STRING ||
-          !process.env.AZURE_CONTAINER
+          !storage.azure.connectionString ||
+          !storage.azure.container
         ) {
           throw new Error("Missing required Azure environment variables");
         }

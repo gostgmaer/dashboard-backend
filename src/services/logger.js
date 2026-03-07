@@ -1,5 +1,6 @@
 const useragent = require("useragent");
 const ActivityLog = require("../models/logEntry");
+const { app } = require('../config/setting');
 
 // Logger Service
 class LoggerService {
@@ -158,7 +159,7 @@ class LoggerService {
 
     static debug(message, meta) {
       try {
-        if (process.env.NODE_ENV === 'production') return;
+        if (app.environment === 'production') return;
         if (meta) console.debug('DEBUG:', message, meta);
         else console.debug('DEBUG:', message);
       } catch (e) {}

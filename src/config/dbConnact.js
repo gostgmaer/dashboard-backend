@@ -1,20 +1,20 @@
 // src/config/db.js
 
 const mongoose = require('mongoose');
-const { dbUrl, enviroment } = require('./setting');
+const { database, app } = require('./setting');
 const LoggerService = require('../services/logger');
 require('dotenv').config();
 
 const options = {
   // Connection pool
-  maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE) || 20, // increase pool size
-  minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE) || 2, // ensure warm connections
-  maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME) || 30000, // close idle sockets
+  maxPoolSize: database.maxPoolSize,
+  minPoolSize: database.minPoolSize,
+  maxIdleTimeMS: database.maxIdleTimeMS,
 
   // Timeouts
-  serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT) || 5000,
-  socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT) || 45000,
-  connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT) || 10000,
+  serverSelectionTimeoutMS: database.serverSelectionTimeoutMS,
+  socketTimeoutMS: database.socketTimeoutMS,
+  connectTimeoutMS: database.connectTimeoutMS,
 
   // Buffering
   bufferCommands: false,
@@ -37,23 +37,22 @@ const options = {
   },
 
   // TLS/SSL if needed
-  // tls: process.env.DB_TLS === "true" || false,
-  // tlsAllowInvalidCertificates:
-  //   process.env.DB_TLS_ALLOW_INVALID_CERTS === "true" || false,
+  tls: database.tls,
+  tlsAllowInvalidCertificates: database.tlsAllowInvalidCerts,
 
   // Monitoring
-  heartbeatFrequencyMS: parseInt(process.env.DB_HEARTBEAT) || 10000,
+  heartbeatFrequencyMS: database.heartbeatFrequencyMS,
   serverMonitoringMode: 'auto',
 
   // Index build behavior
-  autoIndex: enviroment === 'development', // disable in production for performance
+  autoIndex: app.environment === 'development', // disable in production for performance
   autoCreate: true,
 };
 
 const connectDB = async () => {
   try {
     // Enable mongoose debug mode for detailed query logs (optional)
-    if (enviroment === 'development') {
+    if (app.environment === 'development') {
       mongoose.set('debug', false);
     }
 
@@ -79,7 +78,7 @@ const connectDB = async () => {
     process.on('SIGINT', gracefulExit);
     process.on('SIGTERM', gracefulExit);
 
-    await mongoose.connect(dbUrl, options);
+    await mongoose.connect(database.url, options);
   } catch (error) {
     LoggerService.error('MongoDB connection error:', { error });
     process.exit(1);

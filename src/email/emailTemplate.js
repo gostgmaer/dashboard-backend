@@ -13911,6 +13911,355 @@ const KPI_THRESHOLD_BREACHED = ({ username, kpiName, currentValue, threshold, di
   };
 };
 
+// =====================================================================================
+// 🎯 LEAD & CONTACT MICROSERVICE EMAIL TEMPLATES (5 Templates)
+// =====================================================================================
+
+/**
+ * LEAD_RECEIVED Email Template
+ * Sent when: A new lead/contact inquiry is submitted (auto-reply to the lead)
+ */
+const LEAD_RECEIVED = ({
+  firstName,
+  lastName,
+  leadNumber,
+  subject,
+  projectType,
+  budget,
+  timeline,
+  companyName = 'Our Team',
+  supportEmail = 'support@yourcompany.com',
+  baseUrl = appUrl,
+}) => {
+  return {
+    subject: `✅ We received your inquiry – #${leadNumber || 'New'}`,
+    html: buildEmailHTML({
+      preheader: `Thank you for reaching out, ${firstName}! We'll be in touch shortly.`,
+      title: 'Inquiry Received',
+      headerBg: '#2563eb',
+      headerText: '📬 Inquiry Received',
+      bodyHTML: `
+        <p style="margin:0 0 16px 0;">
+          Hello <strong>${firstName || 'there'}${lastName ? ' ' + lastName : ''}</strong>,
+        </p>
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          Thank you for contacting us! We have received your inquiry and our team will review it shortly.
+          You can expect to hear back from us within <strong>1–2 business days</strong>.
+        </p>
+
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:24px 0;padding:20px;background:#f0f9ff;border-left:4px solid #2563eb;border-radius:4px;">
+          <tr><td style="font-size:14px;line-height:22px;">
+            <strong style="color:#1e40af;">Inquiry Reference:</strong> <span style="font-weight:700;color:#2563eb;">#${leadNumber || 'Pending'}</span><br/>
+            ${subject ? `<strong>Subject:</strong> ${subject}<br/>` : ''}
+            ${projectType ? `<strong>Project Type:</strong> ${projectType}<br/>` : ''}
+            ${budget ? `<strong>Budget:</strong> ${budget}<br/>` : ''}
+            ${timeline ? `<strong>Timeline:</strong> ${timeline}<br/>` : ''}
+          </td></tr>
+        </table>
+
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          Please keep your reference number handy for any future correspondence. 
+          If you have urgent questions, feel free to reach us at 
+          <a href="mailto:${supportEmail}" style="color:#2563eb;">${supportEmail}</a>.
+        </p>
+
+        <p style="margin:0;color:#4b5563;">
+          Warm regards,<br/>
+          <strong>${companyName}</strong>
+        </p>
+      `,
+      ctaButton: {
+        url: `${baseUrl}/contact`,
+        text: 'Visit Our Website',
+        color: '#2563eb',
+      },
+      footerNote: `Inquiry #${leadNumber || 'New'} — Thank you for reaching out.`,
+    }),
+    attachments: [],
+  };
+};
+
+/**
+ * LEAD_ADMIN_NOTIFICATION Email Template
+ * Sent when: A new lead is submitted — notifies the admin/sales team
+ */
+const LEAD_ADMIN_NOTIFICATION = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  phone,
+  company,
+  subject,
+  message,
+  projectType,
+  budget,
+  timeline,
+  source,
+  priority,
+  score,
+  ipAddress,
+  submittedAt,
+  reviewUrl,
+  assignedTo,
+}) => {
+  const priorityColor = priority === 'urgent' ? '#dc2626' : priority === 'high' ? '#f59e0b' : priority === 'medium' ? '#2563eb' : '#10b981';
+
+  return {
+    subject: `🔔 New Lead #${leadNumber || 'New'}: ${firstName || ''} ${lastName || ''} — ${priority ? priority.toUpperCase() : 'MEDIUM'} Priority`,
+    html: buildEmailHTML({
+      preheader: `New lead from ${firstName} ${lastName} — ${company || 'Individual'}. Priority: ${priority || 'medium'}.`,
+      title: 'New Lead Notification',
+      headerBg: priorityColor,
+      headerText: `🔔 New Lead — ${priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Medium'} Priority`,
+      bodyHTML: `
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          A new lead has been submitted and is ready for follow-up.
+        </p>
+
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;border-collapse:collapse;">
+          <tr style="background:#f9fafb;">
+            <td colspan="2" style="padding:10px 16px;font-weight:700;color:#111827;font-size:14px;border-bottom:2px solid #e5e7eb;">
+              👤 Contact Information
+            </td>
+          </tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;width:40%;border-bottom:1px solid #f3f4f6;">Name</td><td style="padding:8px 16px;font-size:13px;color:#111827;font-weight:600;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || 'N/A'}</a></td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Phone</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${phone || 'Not provided'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Company</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${company || 'Not provided'}</td></tr>
+          <tr>
+            <td colspan="2" style="padding:10px 16px;font-weight:700;color:#111827;font-size:14px;border-bottom:2px solid #e5e7eb;border-top:8px solid #f3f4f6;">
+              📋 Lead Details
+            </td>
+          </tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#2563eb;border-bottom:1px solid #f3f4f6;">#${leadNumber || 'Pending'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Subject</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${subject || 'N/A'}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Project Type</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${projectType || 'Not specified'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Budget</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${budget || 'Not specified'}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Timeline</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${timeline || 'Not specified'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Priority</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:${priorityColor};text-transform:uppercase;border-bottom:1px solid #f3f4f6;">${priority || 'medium'}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead Score</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#111827;border-bottom:1px solid #f3f4f6;">${score !== undefined ? score + '/100' : 'N/A'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Source</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${source || 'website'}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Assigned To</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${assignedTo || 'Unassigned'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Submitted At</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${submittedAt ? new Date(submittedAt).toLocaleString() : new Date().toLocaleString()}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;">IP Address</td><td style="padding:8px 16px;font-size:13px;color:#111827;">${ipAddress || 'N/A'}</td></tr>
+        </table>
+
+        ${message ? `
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;padding:16px;background:#f9fafb;border-radius:8px;border-left:3px solid #d1d5db;">
+          <tr><td>
+            <strong style="font-size:13px;color:#374151;">Message:</strong>
+            <p style="margin:8px 0 0 0;font-size:13px;color:#4b5563;line-height:1.6;">${message}</p>
+          </td></tr>
+        </table>
+        ` : ''}
+      `,
+      ctaButton: reviewUrl ? {
+        url: reviewUrl,
+        text: 'Review Lead',
+        color: priorityColor,
+      } : null,
+      footerNote: `Lead #${leadNumber || 'New'} — Internal admin notification. Do not forward.`,
+    }),
+    attachments: [],
+  };
+};
+
+/**
+ * LEAD_CONTACT_REPLY Email Template
+ * Sent when: An agent sends a follow-up message to a lead
+ */
+const LEAD_CONTACT_REPLY = ({
+  firstName,
+  lastName,
+  leadNumber,
+  subject,
+  message,
+  agentName,
+  agentEmail,
+  agentTitle,
+  companyName = 'Our Team',
+  replyUrl,
+}) => {
+  return {
+    subject: subject || `Re: Your inquiry #${leadNumber || ''} — ${companyName}`,
+    html: buildEmailHTML({
+      preheader: `${agentName || 'Our team'} has sent you a reply regarding your inquiry.`,
+      title: 'Reply to Your Inquiry',
+      headerBg: '#0f766e',
+      headerText: '💬 Reply to Your Inquiry',
+      bodyHTML: `
+        <p style="margin:0 0 16px 0;">
+          Hello <strong>${firstName || 'there'}${lastName ? ' ' + lastName : ''}</strong>,
+        </p>
+
+        ${leadNumber ? `
+        <p style="margin:0 0 12px 0;font-size:13px;color:#6b7280;">
+          Re: Inquiry <strong style="color:#0f766e;">#${leadNumber}</strong>
+        </p>
+        ` : ''}
+
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;padding:20px;background:#f0fdfa;border-left:4px solid #0f766e;border-radius:4px;">
+          <tr><td style="font-size:14px;line-height:22px;color:#134e4a;">
+            ${message || 'Thank you for your interest. We will be in touch shortly.'}
+          </td></tr>
+        </table>
+
+        ${agentName ? `
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:24px 0 0 0;padding:16px;background:#f9fafb;border-radius:8px;">
+          <tr><td style="font-size:13px;color:#374151;line-height:20px;">
+            <strong>${agentName}</strong><br/>
+            ${agentTitle ? `<span style="color:#6b7280;">${agentTitle}</span><br/>` : ''}
+            <strong>${companyName}</strong><br/>
+            ${agentEmail ? `<a href="mailto:${agentEmail}" style="color:#0f766e;">${agentEmail}</a>` : ''}
+          </td></tr>
+        </table>
+        ` : ''}
+      `,
+      ctaButton: replyUrl ? {
+        url: replyUrl,
+        text: 'Reply to This Message',
+        color: '#0f766e',
+      } : null,
+      footerNote: `Inquiry #${leadNumber || ''} — ${companyName}`,
+    }),
+    attachments: [],
+  };
+};
+
+/**
+ * LEAD_STATUS_CHANGED Email Template
+ * Sent when: A lead's status changes — notifies the lead (e.g., Won / Qualified)
+ */
+const LEAD_STATUS_CHANGED = ({
+  firstName,
+  lastName,
+  leadNumber,
+  oldStatus,
+  newStatus,
+  note,
+  agentName,
+  companyName = 'Our Team',
+  ctaUrl,
+  ctaText,
+}) => {
+  const isPositive = ['won', 'qualified', 'proposal_sent'].includes((newStatus || '').toLowerCase());
+  const headerBg = isPositive ? '#16a34a' : newStatus === 'lost' ? '#dc2626' : '#2563eb';
+  const statusLabel = (newStatus || 'updated').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+  return {
+    subject: `📋 Update on your inquiry #${leadNumber || ''} — Status: ${statusLabel}`,
+    html: buildEmailHTML({
+      preheader: `Your inquiry status has been updated to: ${statusLabel}.`,
+      title: 'Inquiry Status Update',
+      headerBg,
+      headerText: `📋 Inquiry Status Update`,
+      bodyHTML: `
+        <p style="margin:0 0 16px 0;">
+          Hello <strong>${firstName || 'there'}${lastName ? ' ' + lastName : ''}</strong>,
+        </p>
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          We wanted to update you on the status of your inquiry 
+          <strong style="color:${headerBg};">#${leadNumber || ''}</strong>.
+        </p>
+
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:24px 0;padding:20px;background:#f9fafb;border-radius:8px;text-align:center;">
+          <tr><td>
+            ${oldStatus ? `<p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">Previous Status: <span style="text-decoration:line-through;">${oldStatus.replace(/_/g, ' ')}</span></p>` : ''}
+            <p style="margin:0;font-size:22px;font-weight:700;color:${headerBg};">
+              ${statusLabel}
+            </p>
+          </td></tr>
+        </table>
+
+        ${note ? `
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;padding:16px;background:#f0f9ff;border-left:4px solid ${headerBg};border-radius:4px;">
+          <tr><td style="font-size:14px;line-height:22px;color:#1e40af;">
+            ${note}
+          </td></tr>
+        </table>
+        ` : ''}
+
+        <p style="margin:0 0 0 0;color:#4b5563;">
+          ${isPositive ? 'We look forward to working with you!' : 'Thank you for your time and interest.'}<br/>
+          ${agentName ? `<br/>Best regards,<br/><strong>${agentName}</strong><br/><strong>${companyName}</strong>` : `<br/><strong>${companyName}</strong>`}
+        </p>
+      `,
+      ctaButton: ctaUrl ? { url: ctaUrl, text: ctaText || 'View Details', color: headerBg } : null,
+      footerNote: `Inquiry #${leadNumber || ''} — ${companyName}`,
+    }),
+    attachments: [],
+  };
+};
+
+/**
+ * LEAD_FOLLOW_UP_REMINDER Email Template
+ * Sent when: An agent has a follow-up task due for a lead (internal reminder)
+ */
+const LEAD_FOLLOW_UP_REMINDER = ({
+  agentName,
+  leadNumber,
+  leadFirstName,
+  leadLastName,
+  leadEmail,
+  leadCompany,
+  priority,
+  followUpDate,
+  daysSinceLastContact,
+  notes,
+  reviewUrl,
+}) => {
+  const priorityColor = priority === 'urgent' ? '#dc2626' : priority === 'high' ? '#f59e0b' : '#2563eb';
+
+  return {
+    subject: `⏰ Follow-up Reminder: ${leadFirstName || ''} ${leadLastName || ''} — Lead #${leadNumber || ''}`,
+    html: buildEmailHTML({
+      preheader: `You have a follow-up due for lead #${leadNumber} — ${leadFirstName} ${leadLastName || ''}.`,
+      title: 'Follow-Up Reminder',
+      headerBg: priorityColor,
+      headerText: '⏰ Follow-Up Reminder',
+      bodyHTML: `
+        <p style="margin:0 0 16px 0;">
+          Hello <strong>${agentName || 'Team'}</strong>,
+        </p>
+        <p style="margin:0 0 16px 0;color:#4b5563;">
+          This is a reminder that you have a follow-up due for the following lead.
+        </p>
+
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;border-collapse:collapse;">
+          <tr style="background:#f9fafb;">
+            <td colspan="2" style="padding:10px 16px;font-weight:700;color:#111827;font-size:14px;border-bottom:2px solid #e5e7eb;">
+              Lead Details
+            </td>
+          </tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;width:40%;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:${priorityColor};border-bottom:1px solid #f3f4f6;">#${leadNumber || 'N/A'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Name</td><td style="padding:8px 16px;font-size:13px;color:#111827;font-weight:600;border-bottom:1px solid #f3f4f6;">${leadFirstName || ''} ${leadLastName || ''}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${leadEmail}" style="color:#2563eb;">${leadEmail || 'N/A'}</a></td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Company</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${leadCompany || 'Individual'}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Priority</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:${priorityColor};text-transform:uppercase;border-bottom:1px solid #f3f4f6;">${priority || 'medium'}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Follow-up Date</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${followUpDate ? new Date(followUpDate).toLocaleDateString() : 'Today'}</td></tr>
+          <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;">Last Contacted</td><td style="padding:8px 16px;font-size:13px;color:#111827;">${daysSinceLastContact !== undefined ? daysSinceLastContact + ' days ago' : 'Not yet contacted'}</td></tr>
+        </table>
+
+        ${notes ? `
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:0 0 24px 0;padding:16px;background:#fffbeb;border-left:4px solid #f59e0b;border-radius:4px;">
+          <tr><td style="font-size:13px;color:#92400e;line-height:1.6;">
+            <strong>Notes:</strong><br/>${notes}
+          </td></tr>
+        </table>
+        ` : ''}
+      `,
+      ctaButton: reviewUrl ? {
+        url: reviewUrl,
+        text: 'Open Lead',
+        color: priorityColor,
+      } : null,
+      footerNote: `Internal reminder — Lead #${leadNumber || ''} • Do not forward.`,
+    }),
+    attachments: [],
+  };
+};
+
 // -----------------------------------------------------------------------------
 // Project proposal email with attachment and download button
 // -----------------------------------------------------------------------------
@@ -14016,6 +14365,392 @@ const PROJECT_PROPOSAL_EMAIL = ({
     ]
   };
 };
+
+// =====================================================================================
+// 🏆 PROPOSAL & CONTRACT LIFECYCLE TEMPLATES
+
+/**
+ * LEAD_PROPOSAL_ACCEPTED — Sent to the lead when they accept a proposal
+ */
+const LEAD_PROPOSAL_ACCEPTED = ({
+  firstName,
+  leadNumber,
+  projectName,
+  quotedAmount,
+  quotedCurrency = 'USD',
+  agentName,
+  nextStep,
+  companyName = 'Your Company',
+}) => ({
+  subject: `🎉 Proposal Accepted — ${projectName || `Lead #${leadNumber}`}`,
+  html: buildEmailHTML({
+    preheader: `Great news! Your acceptance of the proposal for ${projectName} has been confirmed.`,
+    title: 'Proposal Accepted',
+    headerBg: '#16a34a',
+    headerText: '✅ Proposal Accepted',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;">Hello <strong>${firstName || 'Valued Client'}</strong>,</p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Thank you! We have received your acceptance of the proposal for <strong>${projectName}</strong>.
+        We are excited to move forward with you.
+      </p>
+      ${quotedAmount ? `
+      <div style="background:#f0fdf4;padding:16px;border-radius:8px;margin:20px 0;border-left:4px solid #16a34a;">
+        <p style="margin:4px 0;"><strong>Lead Reference:</strong> #${leadNumber || 'N/A'}</p>
+        <p style="margin:4px 0;"><strong>Project:</strong> ${projectName}</p>
+        <p style="margin:4px 0;"><strong>Agreed Amount:</strong> ${quotedCurrency} ${Number(quotedAmount).toLocaleString()}</p>
+      </div>` : ''}
+      ${nextStep ? `<p style="margin:16px 0;color:#4b5563;"><strong>Next Step:</strong> ${nextStep}</p>` : ''}
+      <p style="margin:20px 0 0 0;color:#4b5563;">Best regards,<br/><strong>${agentName || companyName}</strong></p>
+    `,
+    footerNote: `Lead #${leadNumber || ''} • ${companyName}`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_ADMIN_PROPOSAL_ACCEPTED — Sent to admin team when a lead accepts a proposal
+ */
+const LEAD_ADMIN_PROPOSAL_ACCEPTED = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  company,
+  projectName,
+  quotedAmount,
+  quotedCurrency = 'USD',
+  reviewUrl,
+}) => ({
+  subject: `✅ Proposal Accepted — #${leadNumber} ${firstName || ''} ${lastName || ''}`,
+  html: buildEmailHTML({
+    preheader: `${firstName} ${lastName || ''} has accepted the proposal for ${projectName}.`,
+    title: 'Proposal Accepted — Admin Alert',
+    headerBg: '#16a34a',
+    headerText: '✅ Proposal Accepted',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;color:#4b5563;">A lead has accepted the proposal. Review and send the contract.</p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px 0;">
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#16a34a;border-bottom:1px solid #f3f4f6;">#${leadNumber}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || ''}</a></td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Company</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${company || 'N/A'}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Project</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${projectName || 'N/A'}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;">Agreed Amount</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#16a34a;">${quotedCurrency} ${quotedAmount ? Number(quotedAmount).toLocaleString() : 'N/A'}</td></tr>
+      </table>
+    `,
+    ctaButton: reviewUrl ? { url: reviewUrl, text: 'Open Lead & Send Contract', color: '#16a34a' } : null,
+    footerNote: `Admin alert — Lead #${leadNumber || ''} accepted proposal.`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_PROPOSAL_DECLINED_ACK — Sent to the lead acknowledging they declined; keeps door open
+ */
+const LEAD_PROPOSAL_DECLINED_ACK = ({
+  firstName,
+  leadNumber,
+  projectName,
+  agentName,
+  companyName = 'Your Company',
+  supportEmail,
+}) => ({
+  subject: `Re: Proposal for ${projectName || `Lead #${leadNumber}`}`,
+  html: buildEmailHTML({
+    preheader: `Thank you for your feedback on the proposal for ${projectName}.`,
+    title: 'Thank You for Your Feedback',
+    headerBg: '#6b7280',
+    headerText: 'Thank You for Your Feedback',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;">Hello <strong>${firstName || 'Valued Client'}</strong>,</p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Thank you for taking the time to review our proposal for <strong>${projectName}</strong>.
+        We appreciate your candid response.
+      </p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        If any aspect of the proposal — pricing, scope, or timeline — was not a fit, 
+        we would be happy to revisit and tailor a revised proposal to better meet your needs.
+      </p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Please feel free to reach out at any time. We remain available to explore how we can 
+        support your goals.
+      </p>
+      ${supportEmail ? `<p style="margin:20px 0 0 0;color:#4b5563;">Contact us: <a href="mailto:${supportEmail}" style="color:#2563eb;">${supportEmail}</a></p>` : ''}
+      <p style="margin:20px 0 0 0;color:#4b5563;">Best regards,<br/><strong>${agentName || companyName}</strong></p>
+    `,
+    footerNote: `Lead #${leadNumber || ''} • ${companyName}`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_ADMIN_PROPOSAL_DECLINED — Sent to admin team when a lead declines a proposal
+ */
+const LEAD_ADMIN_PROPOSAL_DECLINED = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  company,
+  declinedReason,
+  reviewUrl,
+}) => ({
+  subject: `❌ Proposal Declined — #${leadNumber} ${firstName || ''} ${lastName || ''}`,
+  html: buildEmailHTML({
+    preheader: `${firstName} ${lastName || ''} has declined the proposal.`,
+    title: 'Proposal Declined — Admin Alert',
+    headerBg: '#dc2626',
+    headerText: '❌ Proposal Declined',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;color:#4b5563;">A lead has declined the proposal. Consider revising and resending.</p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px 0;">
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#dc2626;border-bottom:1px solid #f3f4f6;">#${leadNumber}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || ''}</a></td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Company</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${company || 'N/A'}</td></tr>
+        ${declinedReason ? `
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;vertical-align:top;">Decline Reason</td><td style="padding:8px 16px;font-size:13px;color:#111827;font-style:italic;">${declinedReason}</td></tr>
+        ` : ''}
+      </table>
+    `,
+    ctaButton: reviewUrl ? { url: reviewUrl, text: 'Review Lead', color: '#dc2626' } : null,
+    footerNote: `Admin alert — Lead #${leadNumber || ''} declined proposal.`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_PROPOSAL_EXPIRING — Alert sent to admin/agent when proposal is expiring soon
+ */
+const LEAD_PROPOSAL_EXPIRING = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  proposalNumber,
+  validUntil,
+  daysRemaining,
+  reviewUrl,
+}) => ({
+  subject: `⚠️ Proposal Expiring in ${daysRemaining} Day${daysRemaining === 1 ? '' : 's'} — #${leadNumber}`,
+  html: buildEmailHTML({
+    preheader: `Proposal ${proposalNumber} for ${firstName} ${lastName || ''} expires in ${daysRemaining} day(s).`,
+    title: 'Proposal Expiring Soon',
+    headerBg: '#f59e0b',
+    headerText: '⚠️ Proposal Expiring Soon',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        The following proposal is expiring in <strong>${daysRemaining} day${daysRemaining === 1 ? '' : 's'}</strong>. 
+        Reach out to the lead to follow up.
+      </p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px 0;">
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#f59e0b;border-bottom:1px solid #f3f4f6;">#${leadNumber}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || ''}</a></td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Proposal #</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${proposalNumber || 'N/A'}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;">Expires</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#dc2626;">${validUntil ? new Date(validUntil).toLocaleDateString() : 'N/A'}</td></tr>
+      </table>
+    `,
+    ctaButton: reviewUrl ? { url: reviewUrl, text: 'Follow Up Now', color: '#f59e0b' } : null,
+    footerNote: `Automated expiry alert — Lead #${leadNumber || ''}`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_PROPOSAL_EXPIRED — Sent to admin when a proposal has passed its validity date
+ */
+const LEAD_PROPOSAL_EXPIRED = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  proposalNumber,
+  expiredAt,
+  reviewUrl,
+}) => ({
+  subject: `🕐 Proposal Expired — #${leadNumber} ${firstName || ''} ${lastName || ''}`,
+  html: buildEmailHTML({
+    preheader: `Proposal ${proposalNumber} for ${firstName} ${lastName || ''} has expired without response.`,
+    title: 'Proposal Expired',
+    headerBg: '#6b7280',
+    headerText: '🕐 Proposal Expired',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        The following proposal has expired without a response from the lead.
+        Consider sending a revised proposal or marking the lead as lost.
+      </p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px 0;">
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#6b7280;border-bottom:1px solid #f3f4f6;">#${leadNumber}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || ''}</a></td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Proposal #</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${proposalNumber || 'N/A'}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;">Expired At</td><td style="padding:8px 16px;font-size:13px;color:#dc2626;">${expiredAt ? new Date(expiredAt).toLocaleString() : 'N/A'}</td></tr>
+      </table>
+    `,
+    ctaButton: reviewUrl ? { url: reviewUrl, text: 'Review Lead', color: '#6b7280' } : null,
+    footerNote: `Automated expiry notice — Lead #${leadNumber || ''}`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_CONTRACT_SENT — Sent to the lead when a contract is sent for signing
+ */
+const LEAD_CONTRACT_SENT = ({
+  firstName,
+  leadNumber,
+  projectName,
+  contractUrl,
+  agentName,
+  companyName = 'Your Company',
+  message,
+}) => ({
+  subject: `📝 Contract Ready for Signing — ${projectName || `Project #${leadNumber}`}`,
+  html: buildEmailHTML({
+    preheader: `Your contract for ${projectName} is ready to review and sign.`,
+    title: 'Contract Ready',
+    headerBg: '#7c3aed',
+    headerText: '📝 Contract Ready for Signing',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;">Hello <strong>${firstName || 'Valued Client'}</strong>,</p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Following your acceptance of our proposal for <strong>${projectName}</strong>,
+        we have prepared the contract for your review and signature.
+      </p>
+      ${message ? `<p style="margin:0 0 16px 0;color:#4b5563;">${message}</p>` : ''}
+      <div style="text-align:center;margin:28px 0;">
+        <a href="${contractUrl || '#'}" style="display:inline-block;padding:14px 26px;background:#7c3aed;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;" target="_blank" rel="noopener">
+          Review & Sign Contract
+        </a>
+      </div>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Please review all terms carefully. If you have any questions or need clarifications, 
+        do not hesitate to reach out before signing.
+      </p>
+      <p style="margin:20px 0 0 0;color:#4b5563;">Best regards,<br/><strong>${agentName || companyName}</strong></p>
+    `,
+    footerNote: `Lead #${leadNumber || ''} • ${companyName}`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_CONTRACT_SIGNED — Sent to the lead/admin when the contract is signed
+ */
+const LEAD_CONTRACT_SIGNED = ({
+  firstName,
+  leadNumber,
+  projectName,
+  contractSignedAt,
+  agentName,
+  companyName = 'Your Company',
+}) => ({
+  subject: `✅ Contract Signed — ${projectName || `Project #${leadNumber}`}`,
+  html: buildEmailHTML({
+    preheader: `The contract for ${projectName} has been signed. Welcome aboard!`,
+    title: 'Contract Signed',
+    headerBg: '#16a34a',
+    headerText: '✅ Contract Signed — Welcome Aboard!',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;">Hello <strong>${firstName || 'Valued Client'}</strong>,</p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Excellent news! The contract for <strong>${projectName}</strong> has been signed 
+        ${contractSignedAt ? `on <strong>${new Date(contractSignedAt).toLocaleDateString()}</strong>` : ''}.
+        We are officially ready to begin.
+      </p>
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        Our team will be in touch shortly to schedule the project kickoff and walk you through the next steps.
+        We look forward to delivering exceptional results for you.
+      </p>
+      <p style="margin:20px 0 0 0;color:#4b5563;">Best regards,<br/><strong>${agentName || companyName}</strong></p>
+    `,
+    footerNote: `Lead #${leadNumber || ''} • ${companyName} — Contract signed`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_WON_NOTIFICATION — Sent to admin/team when a lead is marked as Won
+ */
+const LEAD_WON_NOTIFICATION = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  company,
+  projectName,
+  quotedAmount,
+  quotedCurrency = 'USD',
+  closedAt,
+  agentName,
+  reviewUrl,
+}) => ({
+  subject: `🏆 Deal Won — #${leadNumber} ${firstName || ''} ${lastName || ''}`,
+  html: buildEmailHTML({
+    preheader: `Deal closed! ${firstName} ${lastName || ''} from ${company || 'the client'} is now Won.`,
+    title: 'Deal Won — Admin Notification',
+    headerBg: '#15803d',
+    headerText: '🏆 Deal Won!',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;color:#4b5563;">Great work, team! A new deal has been closed.</p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px 0;">
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#15803d;border-bottom:1px solid #f3f4f6;">#${leadNumber}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Client</td><td style="padding:8px 16px;font-size:13px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || ''}</a></td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Company</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${company || 'N/A'}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Project</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${projectName || 'N/A'}</td></tr>
+        ${quotedAmount ? `<tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Revenue</td><td style="padding:8px 16px;font-size:14px;font-weight:700;color:#15803d;border-bottom:1px solid #f3f4f6;">${quotedCurrency} ${Number(quotedAmount).toLocaleString()}</td></tr>` : ''}
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Closed By</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${agentName || 'N/A'}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;">Closed At</td><td style="padding:8px 16px;font-size:13px;color:#111827;">${closedAt ? new Date(closedAt).toLocaleString() : 'N/A'}</td></tr>
+      </table>
+    `,
+    ctaButton: reviewUrl ? { url: reviewUrl, text: 'View Lead Record', color: '#15803d' } : null,
+    footerNote: `Admin alert — Deal won on Lead #${leadNumber || ''}`,
+  }),
+  attachments: [],
+});
+
+/**
+ * LEAD_LOST_NOTIFICATION — Sent to admin/team when a lead is marked as Lost
+ */
+const LEAD_LOST_NOTIFICATION = ({
+  leadNumber,
+  firstName,
+  lastName,
+  email,
+  company,
+  lostReason,
+  agentName,
+  reviewUrl,
+}) => ({
+  subject: `😔 Lead Lost — #${leadNumber} ${firstName || ''} ${lastName || ''}`,
+  html: buildEmailHTML({
+    preheader: `Lead #${leadNumber} from ${firstName} ${lastName || ''} has been marked as lost.`,
+    title: 'Lead Lost — Admin Notification',
+    headerBg: '#6b7280',
+    headerText: '😔 Lead Marked as Lost',
+    bodyHTML: `
+      <p style="margin:0 0 16px 0;color:#4b5563;">
+        The following lead has been marked as lost. Review the reason and consider future re-engagement.
+      </p>
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse:collapse;margin:0 0 24px 0;">
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Reference</td><td style="padding:8px 16px;font-size:13px;font-weight:700;color:#6b7280;border-bottom:1px solid #f3f4f6;">#${leadNumber}</td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Lead</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${firstName || ''} ${lastName || ''}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Email</td><td style="padding:8px 16px;font-size:13px;border-bottom:1px solid #f3f4f6;"><a href="mailto:${email}" style="color:#2563eb;">${email || ''}</a></td></tr>
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Company</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${company || 'N/A'}</td></tr>
+        <tr><td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;">Closed By</td><td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${agentName || 'N/A'}</td></tr>
+        ${lostReason ? `
+        <tr style="background:#f9fafb;"><td style="padding:8px 16px;font-size:13px;color:#6b7280;vertical-align:top;">Lost Reason</td><td style="padding:8px 16px;font-size:13px;color:#111827;font-style:italic;">${lostReason}</td></tr>
+        ` : ''}
+      </table>
+    `,
+    ctaButton: reviewUrl ? { url: reviewUrl, text: 'View Lead Record', color: '#6b7280' } : null,
+    footerNote: `Admin alert — Lead #${leadNumber || ''} marked lost`,
+  }),
+  attachments: [],
+});
 
 // =====================================================================================
 // 📤 MODULE EXPORTS
@@ -14375,5 +15110,25 @@ module.exports = {
   socialLoginConnectionAlertAdminTemplate,
   accountMergeRequestReceivedAdminTemplate,
   highRiskAccountActivityAlertAdminTemplate,
-  accountRecoveryRequestReceivedAdminTemplate,PROJECT_PROPOSAL_EMAIL
+  accountRecoveryRequestReceivedAdminTemplate,
+  PROJECT_PROPOSAL_EMAIL,
+
+  // Lead & Contact Microservice templates
+  LEAD_RECEIVED,
+  LEAD_ADMIN_NOTIFICATION,
+  LEAD_CONTACT_REPLY,
+  LEAD_STATUS_CHANGED,
+  LEAD_FOLLOW_UP_REMINDER,
+
+  // Lead proposal lifecycle templates
+  LEAD_PROPOSAL_ACCEPTED,
+  LEAD_ADMIN_PROPOSAL_ACCEPTED,
+  LEAD_PROPOSAL_DECLINED_ACK,
+  LEAD_ADMIN_PROPOSAL_DECLINED,
+  LEAD_PROPOSAL_EXPIRING,
+  LEAD_PROPOSAL_EXPIRED,
+  LEAD_CONTRACT_SENT,
+  LEAD_CONTRACT_SIGNED,
+  LEAD_WON_NOTIFICATION,
+  LEAD_LOST_NOTIFICATION,
 };

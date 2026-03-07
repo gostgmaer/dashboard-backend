@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { storage } = require('../config/setting');
 
 const attachmentSchema = new mongoose.Schema(
   {
@@ -143,7 +144,7 @@ attachmentSchema.methods.generateSignedUrl = async function (expirySeconds = 360
     case "azure":
       // Implement Azure Blob Storage SAS token generation
       // Example: const { BlobServiceClient } = require('@azure/storage-blob');
-      // const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_CONNECTION_STRING);
+      // const blobServiceClient = BlobServiceClient.fromConnectionString(storage.azure.connectionString);
       // const containerClient = blobServiceClient.getContainerClient(this.bucketName);
       // const blobClient = containerClient.getBlobClient(this.storagePath);
       // signedUrl = await blobClient.generateSasUrl({ expiresOn: new Date(Date.now() + expirySeconds * 1000) });

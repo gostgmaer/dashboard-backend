@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
+const { email } = require('../config/setting');
 
 // Metrics store for monitoring
 let metrics = {
@@ -12,13 +13,17 @@ let metrics = {
 
 // Validate required environment variables
 const validateEnvVariables = (options = {}) => {
-  const requiredVars = ['EMAIL_USER', 'EMAIL_HOST', 'EMAIL_PORT'];
   if (options.service && !options.host && !options.port) {
     return; // Service-based providers (e.g., 'sendgrid') may not need host/port
   }
-  const missingVars = requiredVars.filter((varName) => !process.env[varName] && !options[varName.toLowerCase()]);
+  const requiredVars = [
+    { name: 'EMAIL_USER', value: email.user },
+    { name: 'EMAIL_HOST', value: email.host },
+    { name: 'EMAIL_PORT', value: email.port }
+  ];
+  const missingVars = requiredVars.filter((v) => !v.value && !options[v.name.toLowerCase().replace('email_', '')]);
   if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    throw new Error(`Missing required email configuration: ${missingVars.map(v => v.name).join(', ')}`);
   }
 };
 
@@ -28,50 +33,50 @@ const createTransporter = (options = {}) => {
 
   const config = {
     // Use service if specified (e.g., 'gmail', 'sendgrid'), otherwise custom SMTP
-    ...(options.service || process.env.EMAIL_SERVICE ? { service: options.service || process.env.EMAIL_SERVICE } : {}),
-    host: options.host || process.env.EMAIL_HOST,
-    port: parseInt(options.port || process.env.EMAIL_PORT) || 587,
-    secure: options.secure || process.env.EMAIL_SECURE === 'true' || false,
+    ...(options.service || email.service ? { service: options.service || email.service } : {}),
+    host: options.host || email.host,
+    port: parseInt(options.port || email.port) || 587,
+    secure: options.secure !== undefined ? options.secure : email.secure,
     auth: {
-      user: options.user || process.env.EMAIL_USER,
-      pass: options.pass || process.env.EMAIL_PASS,
+      user: options.user || email.user,
+      pass: options.pass || email.password,
     },
     // Connection pooling
-    pool: process.env.EMAIL_POOL === 'true' || true,
-    maxConnections: parseInt(process.env.EMAIL_MAX_CONNECTIONS) || 5,
-    maxMessages: parseInt(process.env.EMAIL_MAX_MESSAGES) || 100,
+    pool: email.pool,
+    maxConnections: email.maxConnections || 5,
+    maxMessages: email.maxMessages || 100,
     // Rate limiting
-    rateLimit: parseInt(process.env.EMAIL_RATE_LIMIT) || 100,
-    rateDelta: parseInt(process.env.EMAIL_RATE_DELTA) || 60000,
+    rateLimit: email.rateLimit || 100,
+    rateDelta: email.rateDelta || 60000,
     // Timeout settings
-    connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT) || 10000,
-    greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT) || 10000,
+    connectionTimeout: email.connectionTimeout || 10000,
+    greetingTimeout: email.greetingTimeout || 10000,
     // TLS settings
     tls: {
-      rejectUnauthorized: process.env.EMAIL_TLS_REJECT_UNAUTHORIZED !== 'false',
-      minVersion: process.env.EMAIL_TLS_MIN_VERSION || 'TLSv1.2',
+      rejectUnauthorized: email.tlsRejectUnauthorized,
+      minVersion: email.tlsMinVersion || 'TLSv1.2',
     },
-    logger: process.env.EMAIL_DEBUG === 'true' ? console : false,
-    debug: process.env.EMAIL_DEBUG === 'true' || false,
+    logger: email.debug ? console : false,
+    debug: email.debug || false,
   };
 
   // OAuth2 support for providers that support it
-  if (process.env.OAUTH2_CLIENT_ID && process.env.OAUTH2_CLIENT_SECRET && process.env.OAUTH2_REFRESH_TOKEN) {
+  if (email.oauth2ClientId && email.oauth2ClientSecret && email.oauth2RefreshToken) {
     config.auth = {
       type: 'OAuth2',
-      user: options.user || process.env.EMAIL_USER,
-      clientId: process.env.OAUTH2_CLIENT_ID,
-      clientSecret: process.env.OAUTH2_CLIENT_SECRET,
-      refreshToken: process.env.OAUTH2_REFRESH_TOKEN,
+      user: options.user || email.user,
+      clientId: email.oauth2ClientId,
+      clientSecret: email.oauth2ClientSecret,
+      refreshToken: email.oauth2RefreshToken,
       accessToken: async () => {
         try {
           const oauth2Client = new OAuth2Client(
-            process.env.OAUTH2_CLIENT_ID,
-            process.env.OAUTH2_CLIENT_SECRET,
-            process.env.OAUTH2_REDIRECT_URI || 'https://developers.google.com/oauthplayground'
+            email.oauth2ClientId,
+            email.oauth2ClientSecret,
+            email.oauth2RedirectUri || 'https://developers.google.com/oauthplayground'
           );
           oauth2Client.setCredentials({
-            refresh_token: process.env.OAUTH2_REFRESH_TOKEN,
+            refresh_token: email.oauth2RefreshToken,
           });
           const { token } = await oauth2Client.getAccessToken();
           return token;
@@ -87,19 +92,19 @@ const createTransporter = (options = {}) => {
 
 // Create fallback transporter
 const createFallbackTransporter = () => {
-  if (!process.env.FALLBACK_EMAIL_HOST && !process.env.FALLBACK_EMAIL_SERVICE) return null;
+  if (!email.fallback.host && !email.fallback.service) return null;
   return createTransporter({
-    service: process.env.FALLBACK_EMAIL_SERVICE,
-    host: process.env.FALLBACK_EMAIL_HOST,
-    port: process.env.FALLBACK_EMAIL_PORT,
-    secure: process.env.FALLBACK_EMAIL_SECURE === 'true',
-    user: process.env.FALLBACK_EMAIL_USER,
-    pass: process.env.FALLBACK_EMAIL_PASS,
+    service: email.fallback.service,
+    host: email.fallback.host,
+    port: email.fallback.port,
+    secure: email.fallback.secure,
+    user: email.fallback.user,
+    pass: email.fallback.password,
   });
 };
 
 // Verify email connection with exponential backoff
-const verifyEmailConnection = async (retries = parseInt(process.env.EMAIL_VERIFY_RETRIES) || 3, baseDelay = parseInt(process.env.EMAIL_VERIFY_DELAY) || 2000) => {
+const verifyEmailConnection = async (retries = email.verifyRetries || 3, baseDelay = email.verifyDelay || 2000) => {
   let attempts = 0;
   metrics.connectionAttempts++;
 
@@ -159,13 +164,13 @@ const sendEmail = async (EmailTemplate, data) => {
 
     // Email options with custom headers
     const mailOptions = {
-      from: data.sender || `"Your App Name" <${process.env.EMAIL_USER}>`,
+      from: data.sender || `"${email.senderName}" <${email.user}>`,
       to: data.email,
       subject,
       html,
       attachments,
       headers: {
-        'X-Email-Service': process.env.EMAIL_SERVICE || 'CustomSMTP',
+        'X-Email-Service': email.service || 'CustomSMTP',
         'X-Message-ID': `msg-${Date.now()}-${Math.random().toString(36).substring(2)}`,
         ...(data.customHeaders || {}),
       },

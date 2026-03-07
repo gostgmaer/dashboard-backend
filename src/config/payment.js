@@ -1,14 +1,16 @@
 
 // config/payment.js
+const { payment } = require('./setting');
+
 const paymentConfig = {
     // Gateway configurations
     gateways: {
         paypal: {
-            enabled: process.env.PAYPAL_ENABLED === 'true',
-            mode: process.env.PAYPAL_MODE || 'sandbox',
-            clientId: process.env.PAYPAL_CLIENT_ID,
-            clientSecret: process.env.PAYPAL_CLIENT_SECRET,
-            webhookId: process.env.PAYPAL_WEBHOOK_ID,
+            enabled: payment.paypal.enabled,
+            mode: payment.paypal.mode,
+            clientId: payment.paypal.clientId,
+            clientSecret: payment.paypal.clientSecret,
+            webhookId: payment.paypal.webhookId,
             supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD'],
             limits: {
                 min: 0.01,
@@ -16,10 +18,10 @@ const paymentConfig = {
             }
         },
         razorpay: {
-            enabled: process.env.RAZORPAY_ENABLED === 'true',
-            keyId: process.env.RAZORPAY_KEY_ID,
-            keySecret: process.env.RAZORPAY_KEY_SECRET,
-            webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+            enabled: payment.razorpay.enabled,
+            keyId: payment.razorpay.publicKey,
+            keySecret: payment.razorpay.secretKey,
+            webhookSecret: payment.razorpay.webhookSecret,
             supportedCurrencies: ['INR'],
             limits: {
                 min: 1,
@@ -27,10 +29,10 @@ const paymentConfig = {
             }
         },
         stripe: {
-            enabled: process.env.STRIPE_ENABLED === 'true',
-            secretKey: process.env.STRIPE_SECRET_KEY,
-            publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
-            webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+            enabled: payment.stripe.enabled,
+            secretKey: payment.stripe.secretKey,
+            publishableKey: payment.stripe.publicKey,
+            webhookSecret: payment.stripe.webhookSecret,
             supportedCurrencies: ['USD', 'EUR', 'GBP', 'INR', 'CAD', 'AUD'],
             limits: {
                 min: 0.50,
@@ -48,7 +50,7 @@ const paymentConfig = {
         refundTimeout: 7 * 24 * 60 * 60 * 1000, // 7 days
 
         // Security settings
-        encryptionKey: process.env.PAYMENT_ENCRYPTION_KEY,
+        encryptionKey: payment.encryptionKey,
         sessionTimeout: 15 * 60 * 1000, // 15 minutes
 
         // Webhook settings

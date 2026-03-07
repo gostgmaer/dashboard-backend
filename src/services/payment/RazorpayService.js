@@ -2,14 +2,15 @@
 // services/RazorpayService.js
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const { payment } = require('../../config/setting');
 
 class RazorpayService {
     constructor() {
         this.razorpay = new Razorpay({
-            key_id: process.env.RAZORPAY_KEY_ID,
-            key_secret: process.env.RAZORPAY_KEY_SECRET
+            key_id: payment.razorpay.publicKey,
+            key_secret: payment.razorpay.secretKey
         });
-        this.webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        this.webhookSecret = payment.razorpay.webhookSecret;
     }
 
     async createPayment(paymentData) {
@@ -127,7 +128,7 @@ class RazorpayService {
             const body = `\${orderId}|\${paymentId}`;
 
             const expectedSignature = crypto
-                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+                .createHmac('sha256', payment.razorpay.secretKey)
                 .update(body)
                 .digest('hex');
 

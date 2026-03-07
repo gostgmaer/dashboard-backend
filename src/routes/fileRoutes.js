@@ -5,20 +5,19 @@ const { uploadFiles, getFiles, getFileById, downloadFile, updateFileMetadata, re
 const { authMiddleware } = require('../middleware/auth');
 const validateFile = require('../controller/fileUploader/validateFile');
 const { validateUpload, validateUpdate, validateQuery } = require('../controller/fileUploader/validation');
+const { storage } = require('../config/setting');
 
 const router = express.Router();
 
 // Multer configuration for file uploads
-const storage = multer.memoryStorage();
+const multerStorage = multer.memoryStorage();
 const upload = multer({
-  storage,
+  storage: multerStorage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760, // 10MB default
+    fileSize: storage.maxFileSize,
   },
   fileFilter: (req, file, cb) => {
-    const allowedMimeTypes = process.env.ALLOWED_MIME_TYPES ? process.env.ALLOWED_MIME_TYPES.split(',') : ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    if (storage.allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error(`File type ${file.mimetype} not allowed`), false);
@@ -28,8 +27,8 @@ const upload = multer({
 
 // Rate limiting for uploads
 const uploadLimiter = rateLimit({
-  windowMs: parseInt(process.env.UPLOAD_RATE_WINDOW) || 900000, // 15 minutes
-  max: parseInt(process.env.UPLOAD_RATE_LIMIT) || 10,
+  windowMs: storage.uploadRateWindow,
+  max: storage.uploadRateLimit,
   message: {
     success: false,
     message: 'Too many upload requests, please try again later',

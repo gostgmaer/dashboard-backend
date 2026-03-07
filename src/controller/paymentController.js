@@ -5,6 +5,7 @@ const { APIError, formatResponse, standardResponse, errorResponse } = require('.
 const mongoose = require('mongoose');
 const csvWriter = require('csv-writer').createObjectCsvWriter; // For export, install: npm i csv-writer
 const fs = require('fs');
+const { client } = require('../config/setting');
 
 // Validation Functions
 const createPaymentValidator = [body('orderId').isMongoId().withMessage('Invalid order ID'), body('amount').isFloat({ min: 0 }).toFloat().withMessage('Amount must be a positive number'), body('currency').isIn(['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD']).withMessage('Invalid currency'), body('paymentMethod').isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'), body('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'), body('metadata').optional().isObject().withMessage('Metadata must be an object'), body('billingAddress').optional().isObject().withMessage('Billing address must be an object'), body('billingAddress.country').optional().isString().withMessage('Country must be a string')];
@@ -200,8 +201,8 @@ class PaymentController {
       paymentId,
       amount,
       currency: payment.currency,
-      returnUrl: returnUrl || `${process.env.FRONTEND_URL}/payment/success`,
-      cancelUrl: cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
+      returnUrl: returnUrl || `${client.url}/payment/success`,
+      cancelUrl: cancelUrl || `${client.url}/payment/cancel`,
       description: `Payment for Order #${order.orderNumber || orderId}`,
       customerEmail: req.user?.email,
     };
@@ -439,8 +440,8 @@ class PaymentController {
       paymentId: payment.paymentId,
       amount: payment.amount,
       currency: payment.currency,
-      returnUrl: `${process.env.FRONTEND_URL}/payment/success`,
-      cancelUrl: `${process.env.FRONTEND_URL}/payment/cancel`,
+      returnUrl: `${client.url}/payment/success`,
+      cancelUrl: `${client.url}/payment/cancel`,
       description: `Retry Payment for Order #${order.orderNumber || payment.orderId}`,
       customerEmail: req.user?.email,
     };

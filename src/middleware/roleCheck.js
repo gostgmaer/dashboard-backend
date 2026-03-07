@@ -1,3 +1,5 @@
+const { app } = require('../config/setting');
+
 const roleMiddleware = (allowedRoles = []) => {
     return (req, res, next) => {
         try {
@@ -17,7 +19,7 @@ const roleMiddleware = (allowedRoles = []) => {
             return res.status(500).json({
                 success: false,
                 message: 'Role verification failed',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                error: app.environment === 'development' ? error.message : undefined
             });
         }
     };

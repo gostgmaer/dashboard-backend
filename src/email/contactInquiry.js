@@ -1,7 +1,7 @@
-const { host } = require('../config/setting');
+const { app } = require('../config/setting');
 
 // emails/contactInquiry.js
-const appUrl = process.env.APP_URL || 'https://yourapp.com';
+const appUrl = app.url;
 
 // ================================
 // HTML BUILDER FUNCTION (INLINE)

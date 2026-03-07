@@ -1,11 +1,12 @@
 const { BlobServiceClient } = require('@azure/storage-blob');
 const StorageAdapter = require('./StorageAdapter');
+const { storage } = require('../../../config/setting');
 
 class AzureAdapter extends StorageAdapter {
   constructor() {
     super();
-    this.blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_CONNECTION_STRING);
-    this.containerName = process.env.AZURE_CONTAINER;
+    this.blobServiceClient = BlobServiceClient.fromConnectionString(storage.azure.connectionString);
+    this.containerName = storage.azure.container;
     this.containerClient = this.blobServiceClient.getContainerClient(this.containerName);
   }
 
@@ -76,7 +77,7 @@ class AzureAdapter extends StorageAdapter {
   async getSignedUrl(destinationPath, options = {}) {
     try {
       const blobClient = this.containerClient.getBlobClient(destinationPath);
-      const expiry = options.expiry || parseInt(process.env.SIGNED_URL_EXPIRY) || 3600;
+      const expiry = options.expiry || storage.signedUrlExpiry;
       
       const expiresOn = new Date();
       expiresOn.setSeconds(expiresOn.getSeconds() + expiry);

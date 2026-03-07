@@ -4,6 +4,7 @@ const router = express.Router();
 const Log = require('../models/logs');
 const { getLocation } = require('../middleware/loggerMiddleware');
 const { authMiddleware } = require('../middleware/auth');
+const { jwt } = require('../config/setting');
 
 // Map endpoints to table names (moved to model, but referenced here for routes)
 const tableEndpointMap = {
@@ -42,7 +43,7 @@ router.post('/', async (req, res) => {
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       try {
-        const decoded = require('jsonwebtoken').verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = require('jsonwebtoken').verify(token, jwt.secret);
         const user = await mongoose.model('User').findOne({ email: decoded.email }).lean();
         if (user) {
           finalUserId = finalUserId || user._id;

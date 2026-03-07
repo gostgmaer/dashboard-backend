@@ -82,9 +82,12 @@ app.use(helmet({
    },
 }));
 
+// Import settings
+const { security, session: sessionConfig, app: appConfig } = require('./src/config/setting');
+
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+const allowedOrigins = security.allowedOrigins.length > 0 
+   ? security.allowedOrigins 
    : ['http://localhost:3000', 'http://localhost:3001'];
 
 app.use(cors({
@@ -120,12 +123,12 @@ app.use(LoggerService.expressRequestLogger());
 app.use(
    session({
       name: 'sid',
-      secret: process.env.SESSION_SECRET,
+      secret: sessionConfig.secret,
       resave: false,
       saveUninitialized: false,
       cookie: {
          httpOnly: true,
-         secure: process.env.NODE_ENV === 'production',
+         secure: appConfig.environment === 'production',
          sameSite: 'strict',
          maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       },
@@ -212,7 +215,7 @@ app.get('/', (_req, res) => {
       message: '🚀 Application is running successfully',
       statusCode: HTTP_STATUS.OK,
       data: {
-         environment: process.env.NODE_ENV || 'development',
+         environment: appConfig.environment,
          timestamp: new Date().toISOString(),
       },
    });

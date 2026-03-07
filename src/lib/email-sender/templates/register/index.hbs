@@ -1,3 +1,5 @@
+const { services } = require('../../../../config/setting');
+
 const customerRegisterBody = (option) => { return `
 <html
   xmlns="http://www.w3.org/1999/xhtml"
@@ -217,7 +219,7 @@ const customerRegisterBody = (option) => { return `
                                 active your account</p></p>
 
                             <a
-                              href="${process.env.STORE_URL}"
+                              href="${services.storeUrl}"
                               customer
                               email-verification
                               ${token}

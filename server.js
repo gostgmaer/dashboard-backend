@@ -11,11 +11,11 @@ require("dotenv").config();
 
 const http = require("http");
 const app = require("./app");
-const { isSocketingEnabled } = require("./src/config/setting");
+const { app: appConfig, features } = require("./src/config/setting");
 const connectDB = require("./src/config/dbConnact");
 const socketService = require("./src/services/socketService");
 
-const PORT = process.env.PORT || 3500;
+const PORT = appConfig.port;
 
 async function startServer() {
   try {
@@ -27,12 +27,12 @@ async function startServer() {
 
     // Initialize Socket.IO
     
-      if (isSocketingEnabled){ socketService.initialize(server)};
+      if (features.socketingEnabled){ socketService.initialize(server)};
 
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`🌍 Environment: ${appConfig.environment}`);
     });
 
     /* =========================

@@ -1,19 +1,20 @@
 const { Storage } = require('@google-cloud/storage');
 const StorageAdapter = require('./StorageAdapter');
+const { storage: storageConfig } = require('../../../config/setting');
 
 class GCSAdapter extends StorageAdapter {
   constructor() {
     super();
     const storageOptions = {
-      projectId: process.env.GCS_PROJECT_ID
+      projectId: storageConfig.gcs.projectId
     };
     
-    if (process.env.GCS_KEYFILE) {
-      storageOptions.keyFilename = process.env.GCS_KEYFILE;
+    if (storageConfig.gcs.keyFile) {
+      storageOptions.keyFilename = storageConfig.gcs.keyFile;
     }
     
     this.storage = new Storage(storageOptions);
-    this.bucket = this.storage.bucket(process.env.GCS_BUCKET);
+    this.bucket = this.storage.bucket(storageConfig.gcs.bucket);
   }
 
   async uploadBuffer(buffer, destinationPath, options = {}) {
@@ -38,7 +39,7 @@ class GCSAdapter extends StorageAdapter {
           resolve({
             success: true,
             path: destinationPath,
-            location: `gs://${process.env.GCS_BUCKET}/${destinationPath}`
+            location: `gs://${storageConfig.gcs.bucket}/${destinationPath}`
           });
         });
 
@@ -72,7 +73,7 @@ class GCSAdapter extends StorageAdapter {
           resolve({
             success: true,
             path: destinationPath,
-            location: `gs://${process.env.GCS_BUCKET}/${destinationPath}`
+            location: `gs://${storageConfig.gcs.bucket}/${destinationPath}`
           });
         });
 
@@ -99,7 +100,7 @@ class GCSAdapter extends StorageAdapter {
   async getSignedUrl(destinationPath, options = {}) {
     try {
       const file = this.bucket.file(destinationPath);
-      const expiry = options.expiry || parseInt(process.env.SIGNED_URL_EXPIRY) || 3600;
+      const expiry = options.expiry || storageConfig.signedUrlExpiry;
       
       const [signedUrl] = await file.getSignedUrl({
         action: 'read',

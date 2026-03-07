@@ -1,15 +1,16 @@
 const nodemailer = require("nodemailer");
 const rateLimit = require("express-rate-limit");
+const { email } = require('../../config/setting');
 
 const sendEmail = (body, res, message) => {
   const transporter = nodemailer.createTransport({
-    host: process.env.HOST,
-    service: process.env.SERVICE, //comment this line if you use custom server/domain
-    port: process.env.EMAIL_PORT,
-    secure: true,
+    host: email.host,
+    service: email.service, //comment this line if you use custom server/domain
+    port: email.port,
+    secure: email.secure,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      user: email.user,
+      pass: email.password,
     },
 
     //comment out this one if you usi custom server/domain

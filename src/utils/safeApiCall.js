@@ -1,6 +1,7 @@
 
 // utils/safeApiCall.js
 const TransactionLog = require('../models/TransactionLog');
+const { app } = require('../config/setting');
 
 /**
  * Wrapper function for API calls with comprehensive error handling
@@ -23,7 +24,7 @@ const safeApiCall = (fn) => {
             res.status(errorResponse.status).json({
                 success: false,
                 message: errorResponse.message,
-                ...(process.env.NODE_ENV === 'development' && { 
+                ...(app.environment === 'development' && { 
                     stack: error.stack 
                 })
             });
@@ -103,7 +104,7 @@ const handleError = (error) => {
     // Default server error
     return {
         status: 500,
-        message: process.env.NODE_ENV === 'production' 
+        message: app.environment === 'production' 
             ? 'Internal server error' 
             : error.message
     };

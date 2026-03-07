@@ -5,6 +5,7 @@
 
 const AppError = require('../utils/appError');
 const { sendError, HTTP_STATUS, ERROR_CODES } = require('../utils/responseHelper');
+const { app } = require('../config/setting');
 
 /**
  * Async error wrapper - wraps async route handlers to catch errors
@@ -101,7 +102,7 @@ const globalErrorHandler = (err, req, res, _next) => {
     ip: req.ip,
     user: req.user ? { id: req.user.id } : null,
     timestamp: new Date().toISOString(),
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(app.environment === 'development' && { stack: err.stack }),
   });
 
   // Send response
@@ -109,7 +110,7 @@ const globalErrorHandler = (err, req, res, _next) => {
     message: error.isOperational ? error.message : 'Something went wrong. Please try again later.',
     statusCode: error.statusCode,
     code: error.code,
-    details: process.env.NODE_ENV === 'development' ? err.stack : null,
+    details: app.environment === 'development' ? err.stack : null,
     errors: error.validationErrors || null,
   });
 };

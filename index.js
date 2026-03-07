@@ -16,12 +16,12 @@ validateEnv();
 
 const http = require("http");
 const app = require("./app");
-const { isSocketingEnabled } = require("./src/config/setting");
+const { app: appConfig, features } = require("./src/config/setting");
 const connectDB = require("./src/config/dbConnact");
 const socketService = require("./src/services/socketService");
 const LoggerService = require("./src/services/logger");
 
-const PORT = process.env.PORT || 3500;
+const PORT = appConfig.port;
 
 async function startServer() {
   try {
@@ -33,12 +33,12 @@ async function startServer() {
 
     // Initialize Socket.IO
 
-    if (isSocketingEnabled) { socketService.initialize(server) };
+    if (features.socketingEnabled) { socketService.initialize(server) };
 
 
     server.listen(PORT, () => {
       LoggerService.info(`Server running on port ${PORT}`);
-      LoggerService.info(`Environment: ${process.env.NODE_ENV || "development"}`);
+      LoggerService.info(`Environment: ${appConfig.environment}`);
     });
 
     /* =========================

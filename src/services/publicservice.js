@@ -2,6 +2,7 @@ const os = require('os');
 const process = require('process');
 const fs = require('fs').promises;
 const path = require('path');
+const { app } = require('../config/setting');
 
 class publicServices {
   static async getMemoryUsage() {
@@ -141,8 +142,8 @@ class publicServices {
             started: new Date(Date.now() - uptime * 1000).toISOString(),
           },
           envVars: {
-            nodeEnv: process.env.NODE_ENV || 'development',
-            port: process.env.PORT || 3000,
+            nodeEnv: app.environment,
+            port: app.port,
             total: Object.keys(process.env).length,
           },
           memory: this.formatBytes(process.memoryUsage().rss),
@@ -194,8 +195,8 @@ class publicServices {
         },
 
         env: {
-          nodeEnv: process.env.NODE_ENV || "development",
-          // port: process.env.PORT || 3000,
+          nodeEnv: app.environment,
+          // port: app.port || 3000,
           totalVars: Object.keys(process.env).length
         },
 

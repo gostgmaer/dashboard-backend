@@ -1,6 +1,7 @@
 const User = require('../models/user');
 const DeviceDetector = require('../services/deviceDetector');
 const jwt = require('jsonwebtoken');
+const { app, client, jwt: jwtConfig, otp } = require('../config/setting');
 const Order = require('../models/orders');
 const Product = require('../models/products');
 const mongoose = require('mongoose');
@@ -878,7 +879,7 @@ class authController {
       // Verify and decode refresh token
       let decoded;
       try {
-        decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+        decoded = jwt.verify(refreshToken, jwtConfig.refreshSecret);
       } catch (error) {
         return errorResponse(res, 'Invalid or expired refresh token', 401);
       }
@@ -902,7 +903,7 @@ class authController {
    */
   static async generateOTP(req, res) {
     try {
-      const { type = process.env.DEFAULT_OTP_TYPE || 'email', purpose = 'login' } = req.body;
+      const { type = otp.defaultMethod || 'email', purpose = 'login' } = req.body;
       const user = req.user;
 
       const otpResult = await user.generateOTP(type, purpose, req.deviceInfo);
@@ -1661,8 +1662,8 @@ class authController {
           emailVerified: user.emailVerified,
           phoneVerified: user.phoneVerified,
           systemDefaults: {
-            priorityOrder: process.env.OTP_PRIORITY_ORDER.split(','),
-            defaultMethod: process.env.DEFAULT_OTP_METHOD,
+            priorityOrder: otp.priorityOrder,
+            defaultMethod: otp.defaultMethod,
           },
         },
         'OTP settings retrieved successfully'
@@ -3076,11 +3077,11 @@ class authController {
       try {
         if (err) {
           console.error('Social auth error:', err);
-          return res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`);
+          return res.redirect(`${client.url}/login?error=auth_failed`);
         }
 
         if (!socialData) {
-          return res.redirect(`${process.env.CLIENT_URL}/login?error=access_denied`);
+          return res.redirect(`${client.url}/login?error=access_denied`);
         }
 
         // Get device info from session
@@ -3100,12 +3101,12 @@ class authController {
         delete req.session.deviceInfo;
 
         // Redirect with tokens
-        const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?` + `token=${tokens.accessToken}&` + `refresh=${tokens.refreshToken}&` + `new_user=${isNewUser}`;
+        const redirectUrl = `${client.url}/auth/callback?` + `token=${tokens.accessToken}&` + `refresh=${tokens.refreshToken}&` + `new_user=${isNewUser}`;
 
         res.redirect(redirectUrl);
       } catch (error) {
         console.error('Social callback error:', error);
-        res.redirect(`${process.env.CLIENT_URL}/login?error=processing_failed`);
+        res.redirect(`${client.url}/login?error=processing_failed`);
       }
     })(req, res, next);
   }
@@ -3155,17 +3156,17 @@ class authController {
     passport.authenticate(provider, { session: false }, async (err, socialData, info) => {
       try {
         if (err || !socialData) {
-          return res.redirect(`${process.env.CLIENT_URL}/profile?link_error=failed`);
+          return res.redirect(`${client.url}/profile?link_error=failed`);
         }
 
         const userId = req.session.linkingUserId;
         if (!userId) {
-          return res.redirect(`${process.env.CLIENT_URL}/profile?link_error=session_expired`);
+          return res.redirect(`${client.url}/profile?link_error=session_expired`);
         }
 
         const user = await User.findById(userId);
         if (!user) {
-          return res.redirect(`${process.env.CLIENT_URL}/profile?link_error=user_not_found`);
+          return res.redirect(`${client.url}/profile?link_error=user_not_found`);
         }
 
         // Link the social account
@@ -3175,10 +3176,10 @@ class authController {
         delete req.session.linkingUserId;
         delete req.session.isLinking;
 
-        res.redirect(`${process.env.CLIENT_URL}/profile?link_success=${provider}`);
+        res.redirect(`${client.url}/profile?link_success=${provider}`);
       } catch (error) {
         console.error('Social linking error:', error);
-        res.redirect(`${process.env.CLIENT_URL}/profile?link_error=processing_failed`);
+        res.redirect(`${client.url}/profile?link_error=processing_failed`);
       }
     })(req, res, next);
   }

@@ -4,18 +4,18 @@
  * Centralizes JWT settings for signing and verifying tokens.
  */
 
-require('dotenv').config();
+const { jwt } = require('./setting');
 
 module.exports = {
   // Secret used to sign JWTs
-  secret: process.env.JWT_SECRET || 'your-default-jwt-secret',
+  secret: jwt.secret,
 
   // Token expiration (e.g., '1h', '7d')
-  expiresIn: process.env.JWT_EXPIRES_IN || '1h',
+  expiresIn: jwt.expiresIn,
 
   // Issuer identifier
-  issuer: process.env.JWT_ISSUER || 'your-app-name',
+  issuer: jwt.issuer,
 
   // Audience identifier
-  audience: process.env.JWT_AUDIENCE || 'your-app-users',
+  audience: jwt.audience,
 };

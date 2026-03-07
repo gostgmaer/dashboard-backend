@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const handlebars = require('handlebars');
 const User = require('../models/user');
-const { emailHost, emailPort, emailSecure, mailUserName, mailPassword } = require('../config/setting');
+const { emailHost, emailPort, emailSecure, mailUserName, mailPassword, app, client, email: emailConfig } = require('../config/setting');
 const { sendEmail } = require('../email/index.js');
 class EmailService {
   constructor() {
@@ -312,9 +312,9 @@ class EmailService {
         username: recipient.username || recipient.firstName || 'User',
         email: recipient.email,
         additionalInfo: notification.data,
-        appName: process.env.APP_NAME || 'Easy Dev',
+        appName: app.name,
         year: new Date().getFullYear(),
-        actionUrl: notification.metadata?.actionUrl ? `${process.env.CLIENT_URL}${notification.metadata.actionUrl}` : null,
+        actionUrl: notification.metadata?.actionUrl ? `${client.url}${notification.metadata.actionUrl}` : null,
         priorityClass: notification.priority === 'HIGH' ? 'priority-high' : notification.priority === 'URGENT' ? 'priority-urgent' : '',
       };
       const m = await sendEmail(t[notification.type], templateData);
@@ -351,7 +351,7 @@ class EmailService {
 
       // Prepare template data with defaults
       const data = {
-        appName: process.env.APP_NAME || 'Your App',
+        appName: app.name,
         year: new Date().getFullYear(),
         ...templateData,
       };
@@ -360,8 +360,8 @@ class EmailService {
 
       const mailOptions = {
         from: {
-          name: process.env.SMTP_FROM_NAME || 'Your App',
-          address: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER,
+          name: emailConfig.senderName,
+          address: emailConfig.sender,
         },
         to,
         subject,

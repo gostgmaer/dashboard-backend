@@ -9,7 +9,7 @@ const Product = require('./products');
 const Address = require('./address');
 const Order = require('./orders');
 const Role = require('./role');
-const { jwtSecret } = require('../config/setting');
+const { jwtSecret, jwt: jwtConfig } = require('../config/setting');
 const otpService = require('../services/otpService');
 const { paginateSortSearch } = require('../utils/helper');
 const { default: tenant } = require('./tenant');
@@ -2408,7 +2408,7 @@ userSchema.method({
     };
 
     return jwt.sign(payload, JWT_ID_SECRET, {
-      expiresIn: process.env.JWT_ID_EXPIRY || '30d',
+      expiresIn: jwtConfig.idExpiry || '30d',
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     });

@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const User = require('../models/user');
 const otpService = require('../services/otpService');
 const DeviceDetector = require('../services/deviceDetector');
+const { jwt: jwtConfig, app, security } = require('../config/setting');
 
 /**
  * 🛡️ ENTERPRISE AUTHENTICATION MIDDLEWARE
@@ -37,10 +38,10 @@ class authAccess {
       // Verify JWT token
       let decoded;
       try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET, {
-          algorithms: [process.env.JWT_ALGORITHM || 'HS256'],
-          issuer: process.env.JWT_ISSUER,
-          audience: process.env.JWT_AUDIENCE,
+        decoded = jwt.verify(token, jwtConfig.secret, {
+          algorithms: [jwtConfig.algorithm],
+          issuer: jwtConfig.issuer,
+          audience: jwtConfig.audience,
         });
       } catch (jwtError) {
         return res.status(401).json({
@@ -378,7 +379,7 @@ class authAccess {
     }
 
     // Check for device mismatch
-    if (process.env.REQUIRE_DEVICE_VERIFICATION === 'true') {
+    if (security.requireDeviceVerification) {
       const expectedDeviceId = tokenData.deviceId;
       if (expectedDeviceId !== deviceInfo.deviceId) {
         checks.allowed = false;
@@ -392,7 +393,7 @@ class authAccess {
     }
 
     // Check for suspicious login patterns
-    if (process.env.ENABLE_SUSPICIOUS_LOGIN_DETECTION === 'true') {
+    if (security.enableSuspiciousLoginDetection) {
       const suspiciousActivity = await AuthMiddleware.detectSuspiciousActivity(user, deviceInfo);
       if (suspiciousActivity.detected) {
         checks.allowed = false;
@@ -404,7 +405,7 @@ class authAccess {
     }
 
     // Check IP whitelist if enabled
-    if (process.env.ENABLE_IP_WHITELIST === 'true') {
+    if (security.enableIpWhitelist) {
       const ipAllowed = AuthMiddleware.checkIPWhitelist(deviceInfo.ipAddress);
       if (!ipAllowed) {
         checks.allowed = false;
@@ -535,11 +536,11 @@ class authAccess {
    * Check if IP is in whitelist
    */
   static checkIPWhitelist(ip) {
-    if (!process.env.ALLOWED_IPS) {
+    if (!security.allowedIPs || security.allowedIPs.length === 0) {
       return true; // If no whitelist configured, allow all
     }
 
-    const allowedIPs = process.env.ALLOWED_IPS.split(',').map((ip) => ip.trim());
+    const allowedIPs = security.allowedIPs;
 
     // Check for exact match or CIDR range
     return allowedIPs.some((allowedIP) => {

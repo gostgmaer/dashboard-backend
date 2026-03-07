@@ -4,6 +4,7 @@
  */
 
 const redis = require('redis');
+const { services } = require('./setting');
 
 let cacheClient = null;
 let isConnected = false;
@@ -14,19 +15,19 @@ let isConnected = false;
 const initializeCache = async () => {
     try {
         // Skip Redis if not enabled
-        if (!process.env.REDIS_ENABLED || process.env.REDIS_ENABLED === 'false') {
+        if (!services.redis.enabled) {
             console.warn('⚠️ Redis disabled (REDIS_ENABLED not set). Caching disabled.');
             return null;
         }
 
         // Skip Redis if not configured
-        if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
+        if (!services.redis.url && !services.redis.host) {
             console.warn('⚠️ Redis not configured. Caching disabled.');
             return null;
         }
 
         const redisConfig = {
-            url: process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`,
+            url: services.redis.url || `redis://${services.redis.host}:${services.redis.port}`,
             socket: {
                 reconnectStrategy: (retries) => {
                     if (retries > 10) {
@@ -42,8 +43,8 @@ const initializeCache = async () => {
         };
 
         // Add password if provided
-        if (process.env.REDIS_PASSWORD) {
-            redisConfig.password = process.env.REDIS_PASSWORD;
+        if (services.redis.password) {
+            redisConfig.password = services.redis.password;
         }
 
         cacheClient = redis.createClient(redisConfig);

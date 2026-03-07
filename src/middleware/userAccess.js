@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
 const { checkLoginOTPRequirement, validateLoginOTP } = require('./otpMiddleware');
+const { jwt: jwtConfig } = require('../config/setting');
 
 /**
  * 🔐 AUTHENTICATION MIDDLEWARE
@@ -25,7 +26,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-jwt-key');
+    const decoded = jwt.verify(token, jwtConfig.secret);
 
     // Find user
     const user = await User.findById(decoded.id);

@@ -2,7 +2,7 @@
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const { jwtSecret } = require('../config/setting');
+const { jwtSecret, app } = require('../config/setting');
 
 class SocketService {
   constructor() {
@@ -23,7 +23,7 @@ class SocketService {
 
     this.setupMiddleware();
     this.setupEventHandlers();
-    console.log(`✅ Socket.IO server initialized successfully in ${process.env.NODE_ENV} mode`);
+    console.log(`✅ Socket.IO server initialized successfully in ${app.environment} mode`);
 
     return this.io;
   }
