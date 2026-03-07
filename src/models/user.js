@@ -50,13 +50,13 @@ const MAX_SESSIONS = parseInt(MAX_CONCURRENT_SESSIONS);
 
 const userSchema = new mongoose.Schema(
   {
-    // ─────────── Identity & Authentication ───────────
+    // ----------- Identity & Authentication -----------
     username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 30 },
     email: { type: String, required: true, unique: true },
     hash_password: { type: String, required: false },
     role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role' },
 
-    // ─────────── Personal Information ───────────
+    // ----------- Personal Information -----------
     firstName: { type: String, trim: true },
     lastName: { type: String, trim: true },
     dateOfBirth: { type: Date, default: null },
@@ -87,7 +87,7 @@ const userSchema = new mongoose.Schema(
       type: { type: String }, // MIME type (image/jpeg, application/pdf, etc.)
     },
 
-    // ─────────── Verification & Security ───────────
+    // ----------- Verification & Security -----------
     isVerified: { type: Boolean, default: false },
     emailVerified: { type: Boolean, default: false },
     emailVerificationTokens: [
@@ -171,7 +171,7 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // ─────────── Session & Tokens ───────────
+    // ----------- Session & Tokens -----------
     refreshTokens: [
       {
         token: { type: String, required: true },
@@ -299,7 +299,7 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
-    // ─────────── Relationships ───────────
+    // ----------- Relationships -----------
     address: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Address' }],
     orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
     favoriteProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
@@ -307,7 +307,7 @@ const userSchema = new mongoose.Schema(
     wishList: { type: mongoose.Schema.Types.ObjectId, ref: 'Wishlist' },
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
-    // ─────────── Social Accounts ───────────
+    // ----------- Social Accounts -----------
     socialAccounts: [
       {
         provider: { type: String, enum: ['google', 'facebook', 'twitter', 'github'] },
@@ -327,7 +327,7 @@ const userSchema = new mongoose.Schema(
       pinterest: { type: String, default: null },
     },
 
-    // ─────────── Preferences ───────────
+    // ----------- Preferences -----------
     preferences: {
       newsletter: { type: Boolean, default: false },
       notifications: { type: Boolean, default: true },
@@ -337,7 +337,7 @@ const userSchema = new mongoose.Schema(
     },
     interests: { type: [String], default: [] },
 
-    // ─────────── E-commerce Features ───────────
+    // ----------- E-commerce Features -----------
     loyaltyPoints: { type: Number, default: 0 },
     referralCode: { type: String },
     paymentMethods: [
@@ -359,7 +359,7 @@ const userSchema = new mongoose.Schema(
     subscriptionStatus: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
     subscriptionType: { type: String, enum: ['free', 'premium', 'enterprise'], default: 'free' },
 
-    // ─────────── Audit Fields ───────────
+    // ----------- Audit Fields -----------
     created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: {
@@ -1921,7 +1921,7 @@ userSchema.method({
       populate: {
         path: 'permissions', // populate the permissions inside role
         match: { isActive: true, isDeleted: false },
-        select: 'category resource action key', // only include what’s needed
+        select: 'category resource action key', // only include what�s needed
       },
     });
 
@@ -2626,7 +2626,7 @@ userSchema.method({
   // Email confirmation & reset
 
   // ========================================
-  // 🔐 SECURITY & DEVICE MANAGEMENT
+  // ?? SECURITY & DEVICE MANAGEMENT
   // ========================================
 
   /**
