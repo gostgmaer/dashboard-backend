@@ -16,7 +16,7 @@ const {
 } = require("../config/setting");
 const User = require("../models/user");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const createMailOptions = require("../email/mailOptions");
 const transporter = require("../email/mailTransporter");
 const { generateRandomString } = require("../utils/helper");

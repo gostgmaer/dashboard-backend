@@ -2,7 +2,7 @@ const { ReasonPhrases, StatusCodes } = require('http-status-codes');
 const { jwtSecret, refressSecret, applicaionName, host, confirmPath, resetPath, loginPath } = require('../../config/setting');
 const User = require('../../models/user');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const createMailOptions = require('../../email/mailOptions');
 const transporter = require('../../email/mailTransporter');

@@ -22,7 +22,7 @@
     "@paypal/paypal-server-sdk": "^2.1.0",
     "archiver": "^7.0.1",
     "axios": "^1.13.2",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
