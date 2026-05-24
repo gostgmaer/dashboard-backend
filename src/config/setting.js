@@ -38,21 +38,31 @@ const app = {
 // DATABASE CONFIGURATION
 // ============================================================================
 
+const rawDbTls = process.env.DB_TLS ?? process.env.DB_SSL;
+const rawDbTlsAllowInvalidCerts = process.env.DB_TLS_ALLOW_INVALID_CERTS;
+const rawDbSslValidate = process.env.DB_SSL_VALIDATE;
+
 const database = {
-  url: process.env.DATABASE_URL || process.env.MONGODB_URI,
-  collection: process.env.COLLECTION || 'main',
-  // Connection pool settings
-  maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE, 20),
-  minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE, 2),
-  maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME, 30000),
-  // Timeout settings
-  serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT, 5000),
-  socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT, 45000),
-  connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT, 10000),
-  heartbeatFrequencyMS: parseInt(process.env.DB_HEARTBEAT, 10000),
-  // TLS settings
-  tls: parseBoolean(process.env.DB_TLS, false),
-  tlsAllowInvalidCerts: parseBoolean(process.env.DB_TLS_ALLOW_INVALID_CERTS, false),
+	url: process.env.DATABASE_URL || process.env.MONGODB_URI,
+	collection: process.env.COLLECTION || 'main',
+	// Connection pool settings
+	maxPoolSize: parseInt(process.env.DB_MAX_POOL_SIZE, 20),
+	minPoolSize: parseInt(process.env.DB_MIN_POOL_SIZE, 2),
+	maxIdleTimeMS: parseInt(process.env.DB_MAX_IDLE_TIME, 30000),
+	// Timeout settings
+	serverSelectionTimeoutMS: parseInt(process.env.DB_SERVER_SELECTION_TIMEOUT, 5000),
+	socketTimeoutMS: parseInt(process.env.DB_SOCKET_TIMEOUT, 45000),
+	connectTimeoutMS: parseInt(process.env.DB_CONNECT_TIMEOUT, 10000),
+	heartbeatFrequencyMS: parseInt(process.env.DB_HEARTBEAT, 10000),
+	// TLS settings
+	// Keep undefined when no explicit env value is set so URI query params are not overridden.
+	tls: rawDbTls !== undefined ? parseBoolean(rawDbTls, false) : undefined,
+	enforceTls: parseBoolean(process.env.DB_ENFORCE_TLS, true),
+	tlsMinVersion: process.env.DB_TLS_MIN_VERSION || 'TLSv1.2',
+	tlsAllowInvalidCerts:
+		rawDbTlsAllowInvalidCerts !== undefined ? parseBoolean(rawDbTlsAllowInvalidCerts, false)
+		: rawDbSslValidate !== undefined ? !parseBoolean(rawDbSslValidate, true)
+		: undefined,
 };
 
 // ============================================================================

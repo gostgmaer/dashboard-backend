@@ -25,10 +25,6 @@ const PORT = appConfig.port;
 
 async function startServer() {
   try {
-    LoggerService.info('Connecting to database...');
-    await connectDB();
-    LoggerService.info('Database connected');
-
     const server = http.createServer(app);
 
     // Initialize Socket.IO
@@ -39,6 +35,19 @@ async function startServer() {
     server.listen(PORT, () => {
       LoggerService.info(`Server running on port ${PORT}`);
       LoggerService.info(`Environment: ${appConfig.environment}`);
+    });
+
+    LoggerService.info('Connecting to database...');
+    connectDB({
+      retry: true,
+      exitOnError: false,
+    }).then((connected) => {
+      if (!connected) {
+        LoggerService.warn('MongoDB not reachable yet. Running in degraded mode until reconnection.');
+      }
+    }).catch((error) => {
+      // Retry mode should not throw, but keep this as a safety net.
+      LoggerService.error('Unexpected MongoDB initialization error:', { error });
     });
 
     /* =========================
