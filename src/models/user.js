@@ -3496,14 +3496,22 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
   try {
     let { password, role: roleId, email, username, ...rest } = userData;
 
+    email = String(email || '')
+      .trim()
+      .toLowerCase();
+
+    const derivedUsername = String(username || email.split('@')[0] || '').trim();
+    username = derivedUsername.slice(0, 30);
+
+    if (!email || !username) {
+      throw new Error('Email and username are required');
+    }
+
     // Check uniqueness of email and username
     const exists = await this.findOne({
       $or: [{ email }, { username }],
     });
     if (exists) throw new Error('Email or username already registered');
-
-    email = email.trim().toLowerCase();
-    username = username.trim();
 
     // Role assignment with validation
     if (!roleId) {
@@ -3513,6 +3521,14 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
     } else {
       const roleExists = await Role.exists({ _id: roleId, isActive: true });
       if (!roleExists) throw new Error('Assigned role does not exist or not active');
+    }
+
+    if (!rest.tenantId) {
+      const activeTenant = await tenant.findOne({ isActive: true, isDeleted: false }).select('_id').lean();
+      if (!activeTenant?._id) {
+        throw new Error('Active tenant not configured');
+      }
+      rest.tenantId = activeTenant._id;
     }
 
     const confirmToken = jwt.sign(

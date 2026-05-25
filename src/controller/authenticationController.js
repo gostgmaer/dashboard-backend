@@ -13,6 +13,10 @@ const crypto = require('crypto');
 const { sendSuccess, sendCreated, sendError, HTTP_STATUS, standardResponse, errorResponse } = require('../utils/responseHelper');
 const NotificationMiddleware = require('../middleware/notificationMiddleware');
 const ActivityHelper = require('../services/activityHelpers');
+const otpService = require('../services/otpService');
+const { sendEmail } = require('../email');
+const { welcomeEmailTemplate } = require('../email/emailTemplates');
+const { checkPasswordStrength } = require('../utils/security');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
  * 
@@ -170,8 +174,14 @@ class authController {
       // Send email verification if OTP is enabled
 
       let verificationResult = null;
-      if (otpService.isEnabled(user.otpSettings)) {
+      const otpEnabled = otpService.isEnabled(user.otpSettings);
+      if (otpEnabled) {
         verificationResult = await user.generateOTP('email_verification', deviceInfo, 'email');
+      } else if (user.status !== 'active') {
+        user.status = 'active';
+        user.emailVerified = true;
+        user.confirmToken = null;
+        await user.save();
       }
       // await sendMessage(`${process.env.NODE_ENV}.email.notification.send`, {
       //   requestId: user.id,
@@ -196,8 +206,8 @@ class authController {
             username: user.username,
             status: user.status,
           },
-          otpEnabled: otpService.isEnabled(user.otpSettings),
-          verificationRequired: user.status === 'pending',
+          otpEnabled,
+          verificationRequired: otpEnabled && user.status === 'pending',
           verificationSent: !!verificationResult,
         },
         'Registration successful',

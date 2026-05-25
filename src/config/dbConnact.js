@@ -1,5 +1,6 @@
 // src/config/db.js
 
+const { execFileSync } = require('child_process');
 const mongoose = require('mongoose');
 const tls = require('tls');
 const { database, app } = require('./setting');
@@ -14,6 +15,7 @@ let isShutdownHookBound = false;
 let inFlightConnection = null;
 let retryTimer = null;
 let retryAttempt = 0;
+let resolvedConnectionUrl = null;
 
 const options = {
   // Connection pool
@@ -93,6 +95,61 @@ const bindShutdownHooks = () => {
   process.on('SIGTERM', gracefulExit);
 };
 
+const buildDirectMongoUrlFromSrv = (uri) => {
+  if (process.platform !== 'win32' || !uri?.startsWith('mongodb+srv://')) {
+    return uri;
+  }
+
+  if (resolvedConnectionUrl) {
+    return resolvedConnectionUrl;
+  }
+
+  const parsedUrl = new URL(uri);
+  const srvHost = parsedUrl.hostname;
+  const powershellScript = [
+    `$records = Resolve-DnsName -Type SRV _mongodb._tcp.${srvHost} | Select-Object NameTarget,Port`,
+    '$records | ConvertTo-Json -Compress',
+  ].join('; ');
+
+  try {
+    const output = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-Command', powershellScript],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ).trim();
+
+    if (!output) {
+      return uri;
+    }
+
+    const records = JSON.parse(output);
+    const srvRecords = Array.isArray(records) ? records : [records];
+
+    if (!srvRecords.length) {
+      return uri;
+    }
+
+    const authPart = parsedUrl.username
+      ? `${encodeURIComponent(parsedUrl.username)}${parsedUrl.password ? `:${encodeURIComponent(parsedUrl.password)}` : ''}@`
+      : '';
+    const seedList = srvRecords
+      .map((record) => `${String(record.NameTarget || '').replace(/\.$/, '')}:${record.Port}`)
+      .filter(Boolean)
+      .join(',');
+
+    if (!seedList) {
+      return uri;
+    }
+
+    resolvedConnectionUrl = `mongodb://${authPart}${seedList}${parsedUrl.pathname}${parsedUrl.search}`;
+    LoggerService.info('Expanded MongoDB SRV URI to direct seed list for Windows runtime');
+    return resolvedConnectionUrl;
+  } catch (error) {
+    LoggerService.warn('Failed to expand MongoDB SRV URI via PowerShell; falling back to original URI');
+    return uri;
+  }
+};
+
 const scheduleReconnect = (config) => {
   if (!config.retry) return;
   if (retryTimer) return;
@@ -140,7 +197,9 @@ const connectDB = async (config = {}) => {
   if (mongoose.connection.readyState === 1) return true;
   if (inFlightConnection) return inFlightConnection;
 
-  inFlightConnection = mongoose.connect(database.url, options)
+  const connectionUrl = buildDirectMongoUrlFromSrv(database.url);
+
+  inFlightConnection = mongoose.connect(connectionUrl, options)
     .then(() => true)
     .catch((error) => {
       LoggerService.error('MongoDB connection error:', { error });
