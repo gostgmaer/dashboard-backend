@@ -29,6 +29,17 @@ const RefundItemSchema = new mongoose.Schema(
   }
 );
 
+const timelineSchema = new mongoose.Schema(
+  {
+    status: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    note: { type: String, default: '' },
+    updated_by: { type: String, default: 'system' },
+    additionalData: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { _id: false }
+);
+
 const paymentSchema = new mongoose.Schema(
   {
     paymentId: { type: String, required: true, unique: true, index: true },
@@ -173,7 +184,8 @@ paymentSchema.pre('save', function (next) {
     // Set expiration to 30 minutes for pending payments
     this.expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   }
-  
+
+  next();
 });
 
 // STATIC METHODS
@@ -706,7 +718,7 @@ paymentSchema.pre('save', function (next) {
     }
   }
 
-  
+  next();
 });
 paymentSchema.methods.updateMetadata = function (metadataUpdate, note = 'Metadata updated', updated_by = 'system') {
   this.metadata = { ...this.metadata, ...metadataUpdate };
@@ -734,6 +746,9 @@ paymentSchema.methods.toAPIResponse = function () {
 
   return payment;
 };
+
+const PaymentSchema = paymentSchema;
+
 // Instance method to add refund
 PaymentSchema.methods.addRefund = function (refundData) {
   const refundId = `REF_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -871,7 +886,7 @@ paymentSchema.pre('save', function (next) {
     });
   }
 
-  
+  next();
 });
 
 // Post-save middleware

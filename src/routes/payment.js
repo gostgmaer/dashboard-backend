@@ -1,12 +1,44 @@
 const express = require('express');
 const router = express.Router();
-const paymentsController = require('../controller/paymentController'); // Adjust path as needed
+let paymentsControllerModule = {};
+try {
+  paymentsControllerModule = require('../controller/paymentController'); // Adjust path as needed
+} catch (error) {
+  console.error('Failed to load paymentController:', error.message);
+}
 const { body, query, param, validationResult } = require('express-validator');
 const {authMiddleware} = require('../middleware/auth');
 const authorize = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting'); // Assuming environment config
 const Payment = require('../models/payment'); // Assuming Payment model exists
+
+const createUnavailableHandler = (handlerName) => (req, res) =>
+  res.status(503).json({
+    success: false,
+    message: `Service unavailable: ${handlerName} is not configured`,
+  });
+
+let webhookController = {};
+try {
+  webhookController = require('../controller/WebhookController');
+} catch (error) {
+  console.error('Failed to load WebhookController:', error.message);
+}
+
+const WebhookController = new Proxy(webhookController || {}, {
+  get(target, prop) {
+    const value = target[prop];
+    return typeof value === 'function' ? value.bind(target) : createUnavailableHandler(`webhook.${String(prop)}`);
+  },
+});
+
+const paymentsController = new Proxy(paymentsControllerModule || {}, {
+  get(target, prop) {
+    const value = target[prop];
+    return typeof value === 'function' ? value.bind(target) : createUnavailableHandler(`payments.${String(prop)}`);
+  },
+});
 
 /**
  * 🚀 CONSOLIDATED PAYMENT ROUTES
@@ -31,6 +63,18 @@ const bulkOperationLimiter = rateLimit({
   message: { success: false, message: 'Too many requests, please try again later' }
 });
 
+const paymentRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { success: false, message: 'Too many payment requests, please try again later' }
+});
+
+const webhookRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { success: false, message: 'Too many webhook requests, please try again later' }
+});
+
 /**
  * Middleware to check instance-level access for payment-specific routes
  * Ensures the user has permission to access/modify the specific payment
@@ -43,7 +87,8 @@ const instanceCheckMiddleware = async (req, res, next) => {
       if (!payment) {
         return res.status(404).json({ success: false, message: 'Payment not found' });
       }
-      if (payment.userId.toString() !== req.user.id) { // Restrict to own payment
+      const ownerId = payment.userId || payment.customerId;
+      if (ownerId && ownerId.toString() !== req.user.id) { // Restrict to own payment
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s payment' });
       }
     }
@@ -181,6 +226,10 @@ const paymentValidation = {
     validate
   ]
 };
+
+const authenticateToken = authMiddleware;
+const validatePaymentRequest = paymentValidation.createPayment;
+const validateRefundRequest = paymentValidation.refund;
 
 // ========================================
 // 💸 USER PAYMENT OPERATIONS
