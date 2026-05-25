@@ -6,7 +6,7 @@ const TransactionLogSchema = new mongoose.Schema({
     orderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Order',
-        required: true,
+        required: false,
         index: true
     },
     paymentId: {
@@ -18,10 +18,14 @@ const TransactionLogSchema = new mongoose.Schema({
         type: String, // This will now store the refundId from the embedded refund
         index: true
     },
+    webhookEventId: {
+        type: String,
+        index: true
+    },
     eventType: {
         type: String,
         enum: ['payment_initiated', 'payment_processing', 'payment_completed', 'payment_failed', 
-               'payment_cancelled', 'refund_initiated', 'refund_completed', 'refund_failed',
+               'payment_cancelled', 'refund_initiated', 'refund_processing', 'refund_completed', 'refund_failed',
                'webhook_received', 'retry_attempted'],
         required: true,
         index: true
@@ -61,5 +65,14 @@ TransactionLogSchema.index({ paymentId: 1, createdAt: -1 });
 TransactionLogSchema.index({ eventType: 1, createdAt: -1 });
 TransactionLogSchema.index({ gateway: 1, createdAt: -1 });
 TransactionLogSchema.index({ refundId: 1, createdAt: -1 });
+TransactionLogSchema.index(
+    { gateway: 1, webhookEventId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            webhookEventId: { $exists: true, $type: 'string' }
+        }
+    }
+);
 
 module.exports = mongoose.model('TransactionLog', TransactionLogSchema);

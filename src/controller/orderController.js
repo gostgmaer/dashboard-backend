@@ -82,6 +82,58 @@ class OrderController {
     return mongoose.Types.ObjectId.isValid(id);
   }
 
+  async findOrderByIdOrCode(id, session = null) {
+    let order = null;
+    if (this.isValidObjectId(id)) {
+      order = await Order.findById(id).session(session);
+    }
+    if (!order) {
+      order = await Order.findOne({ order_id: id }).session(session);
+    }
+    return order;
+  }
+
+  async reserveInventory(items, session) {
+    const bulkOps = items.map((item) => ({
+      updateOne: {
+        filter: { _id: item.product, inventory: { $gte: item.quantity } },
+        update: {
+          $inc: {
+            inventory: -item.quantity,
+            soldCount: item.quantity,
+          },
+        },
+      },
+    }));
+
+    const reserveResult = await Product.bulkWrite(bulkOps, { session });
+    const matched = reserveResult?.matchedCount ?? reserveResult?.nMatched ?? 0;
+    if (matched !== items.length) {
+      throw new Error('Insufficient inventory for one or more products');
+    }
+  }
+
+  async restoreInventory(order, session) {
+    if (!order?.items?.length || order.inventoryRestoredAt) {
+      return;
+    }
+
+    const bulkOps = order.items.map((item) => ({
+      updateOne: {
+        filter: { _id: item.product },
+        update: {
+          $inc: {
+            inventory: item.quantity,
+            soldCount: -item.quantity,
+          },
+        },
+      },
+    }));
+
+    await Product.bulkWrite(bulkOps, { session });
+    order.inventoryRestoredAt = new Date();
+  }
+
   
   //---------------------------------------------------------------
   // CORE CRUD OPERATIONS
@@ -89,8 +141,14 @@ class OrderController {
 
   // Create order
   async createOrder(req, res) {
+    const session = await mongoose.startSession();
     try {
       const { user, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, items, additionalNotes, couponCode, payment_method, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
+      const idempotencyKey = String(req.headers['idempotency-key'] || req.body.idempotencyKey || '')
+        .trim()
+        .slice(0, 128);
+
+      await session.startTransaction();
 
       if (!this.isValidObjectId(user)) throw new Error('Invalid user ID');
       if (!email || !email.match(/^\S+@\S+\.\S+$/)) throw new Error('Valid email is required');
@@ -99,16 +157,40 @@ class OrderController {
       if (!shippingAddress || !shippingAddress.addressLine1 || !shippingAddress.city || !shippingAddress.postalCode || !shippingAddress.country) throw new Error('Complete shipping address is required');
       if (!Array.isArray(items) || items.length === 0) throw new Error('At least one order item required');
 
+      if (idempotencyKey) {
+        const existingOrder = await Order.findOne({ user, idempotencyKey }).session(session);
+        if (existingOrder) {
+          await session.commitTransaction();
+          return res.status(200).json({
+            message: 'Idempotent replay detected, returning existing order',
+            order_id: existingOrder.order_id,
+            invoice: existingOrder.invoice,
+          });
+        }
+      }
+
+      const normalizedItems = [];
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (!this.isValidObjectId(item.product)) throw new Error(`Invalid product ID for item ${i}`);
         if (!Number.isInteger(item.quantity) || item.quantity < 1) throw new Error(`Quantity must be positive integer for item ${i}`);
-        const product = await Product.findById(item.product);
+        const product = await Product.findById(item.product).session(session);
         if (!product) throw new Error(`Product not found for item ${i}`);
-        if (product.stock < item.quantity) throw new Error(`Insufficient stock for product ${product._id}`);
-        item.price = typeof item.price === 'number' && item.price >= 0 ? item.price : product.price;
-        item.discount = typeof item.discount === 'number' && item.discount >= 0 ? item.discount : 0;
+        const availableInventory = Number(product.inventory || 0);
+        if (availableInventory < item.quantity) throw new Error(`Insufficient inventory for product ${product._id}`);
+
+        const resolvedPrice = Number(product.finalPrice ?? product.basePrice ?? 0);
+        if (!Number.isFinite(resolvedPrice) || resolvedPrice < 0) throw new Error(`Invalid server price for product ${product._id}`);
+
+        normalizedItems.push({
+          ...item,
+          price: resolvedPrice,
+          discount: typeof item.discount === 'number' && item.discount >= 0 ? item.discount : 0,
+        });
       }
+
+      await this.reserveInventory(normalizedItems, session);
 
       const order = new Order({
         user,
@@ -119,10 +201,11 @@ class OrderController {
         shippingAddress,
         billingAddress,
         shippingMethod: shippingMethod || 'standard',
-        shippingPrice: shippingPrice || 0,
-        items,
+        shippingPrice: Math.max(Number(shippingPrice || 0), 0),
+        items: normalizedItems,
         additionalNotes: additionalNotes ? additionalNotes.trim() : '',
         couponCode: couponCode ? couponCode.trim() : '',
+        idempotencyKey: idempotencyKey || undefined,
         payment_method,
         orderSource,
         ipAddress,
@@ -141,15 +224,23 @@ class OrderController {
         currency: 'INR',
       });
 
+      order.$locals.inventoryReserved = true;
+
+      order.calculateTotals();
+
       if (couponCode) {
-        await order.applyCoupon(couponCode);
+        await order.applyCoupon(couponCode, { session });
       }
 
-      await order.save();
+      await order.save({ session });
+      await session.commitTransaction();
 
       return res.status(201).json({ message: 'Order created successfully', order_id: order.order_id, invoice: order.invoice });
     } catch (error) {
+      await session.abortTransaction();
       return this.handleError(res, error);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -363,27 +454,31 @@ class OrderController {
 
   // Delete order (soft cancel)
   async deleteOrder(req, res) {
+    const session = await mongoose.startSession();
     try {
       const { id } = req.params;
 
-      let order;
-      if (this.isValidObjectId(id)) {
-        order = await Order.findById(id);
-      }
-      if (!order) {
-        order = await Order.findOne({ order_id: id });
-      }
+      await session.startTransaction();
+
+      let order = await this.findOrderByIdOrCode(id, session);
       if (!order) return res.status(404).json({ error: 'Order not found' });
 
       if (['delivered', 'completed', 'canceled'].includes(order.status)) {
+        await session.abortTransaction();
         return res.status(400).json({ error: 'Order cannot be deleted due to its current status' });
       }
 
       await order.cancelOrder('Order deleted by user/admin');
+      await this.restoreInventory(order, session);
+      await order.save({ session });
+      await session.commitTransaction();
 
       return res.json({ message: 'Order canceled (soft deleted) successfully', order_id: order.order_id });
     } catch (error) {
+      await session.abortTransaction();
       return this.handleError(res, error);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -400,16 +495,20 @@ class OrderController {
       if (!transactionId) throw new Error('Transaction ID is required');
       if (typeof amount !== 'number' || amount <= 0) throw new Error('Valid payment amount is required');
 
-      let order;
-      if (this.isValidObjectId(id)) {
-        order = await Order.findById(id);
-      }
-      if (!order) {
-        order = await Order.findOne({ order_id: id });
-      }
+      const normalizedTxnId = transactionId.trim();
+      let order = await this.findOrderByIdOrCode(id);
       if (!order) throw new Error('Order not found');
 
-      await order.markAsPaid(transactionId.trim(), amount);
+      if (order.payment_status === 'paid' && order.transaction_id === normalizedTxnId) {
+        return res.json({ message: 'Payment already recorded', order_id: order.order_id, payment_status: order.payment_status });
+      }
+
+      const duplicateTxn = await Order.findOne({ _id: { $ne: order._id }, transaction_id: normalizedTxnId });
+      if (duplicateTxn) {
+        throw new Error('Transaction ID already used by another order');
+      }
+
+      await order.markAsPaid(normalizedTxnId, amount);
 
       await order.save();
 
@@ -421,28 +520,36 @@ class OrderController {
 
   // Refund an order partially or fully
   async refundOrder(req, res) {
+    const session = await mongoose.startSession();
     try {
       const { id } = req.params;
       const { amount, reason } = req.body;
 
       if (typeof amount !== 'number' || amount <= 0) throw new Error('Valid refund amount is required');
 
-      let order;
-      if (this.isValidObjectId(id)) {
-        order = await Order.findById(id);
-      }
-      if (!order) {
-        order = await Order.findOne({ order_id: id });
-      }
+      await session.startTransaction();
+
+      let order = await this.findOrderByIdOrCode(id, session);
       if (!order) throw new Error('Order not found');
+
+      const projectedRefundedAmount = Number(order.refunded_amount || 0) + amount;
+      const isFullRefund = projectedRefundedAmount >= Number(order.amount_paid || 0);
 
       await order.refundOrder(amount, reason || 'Customer refund requested');
 
-      await order.save();
+      if (isFullRefund && !order.inventoryRestoredAt) {
+        await this.restoreInventory(order, session);
+      }
+
+      await order.save({ session });
+      await session.commitTransaction();
 
       return res.json({ message: 'Refund processed successfully', order_id: order.order_id, payment_status: order.payment_status });
     } catch (error) {
+      await session.abortTransaction();
       return this.handleError(res, error);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -499,28 +606,34 @@ class OrderController {
   //---------------------------------------------------------------
 
   async updateOrderStatus(req, res) {
+    const session = await mongoose.startSession();
     try {
       const { id } = req.params;
-      const { newStatus, reason } = req.body;
+      const { newStatus, status, reason } = req.body;
+      const nextStatus = newStatus || status;
 
-      if (!newStatus) throw new Error('New status is required');
+      if (!nextStatus) throw new Error('New status is required');
 
-      let order = null;
-      if (this.isValidObjectId(id)) {
-        order = await Order.findById(id);
-      }
-      if (!order) {
-        order = await Order.findOne({ order_id: id });
-      }
+      await session.startTransaction();
+
+      let order = await this.findOrderByIdOrCode(id, session);
       if (!order) throw new Error('Order not found');
 
-      order.updateStatus(newStatus, reason);
+      order.updateStatus(nextStatus, reason);
 
-      await order.save();
+      if (nextStatus === 'canceled' && !order.inventoryRestoredAt) {
+        await this.restoreInventory(order, session);
+      }
 
-      return res.json({ message: `Order status updated to ${newStatus}`, order_id: order.order_id, status: order.status });
+      await order.save({ session });
+      await session.commitTransaction();
+
+      return res.json({ message: `Order status updated to ${nextStatus}`, order_id: order.order_id, status: order.status });
     } catch (error) {
+      await session.abortTransaction();
       return this.handleError(res, error);
+    } finally {
+      session.endSession();
     }
   }
 
@@ -717,6 +830,7 @@ class OrderController {
 
   // Apply coupon code to order and recalculate totals
   async applyCoupon(req, res) {
+    const session = await mongoose.startSession();
     try {
       const { id } = req.params;
       const { couponCode } = req.body;
@@ -725,18 +839,19 @@ class OrderController {
         throw new Error('Coupon code must be provided');
       }
 
-      let order = null;
-      if (this.isValidObjectId(id)) {
-        order = await Order.findById(id);
-      }
-      if (!order) {
-        order = await Order.findOne({ order_id: id });
-      }
+      await session.startTransaction();
+
+      let order = await this.findOrderByIdOrCode(id, session);
       if (!order) throw new Error('Order not found');
 
-      await order.applyCoupon(couponCode.trim());
+      if (order.discountAmount > 0 && order.couponCode && order.couponCode !== couponCode.trim().toUpperCase()) {
+        throw new Error('A coupon is already applied to this order');
+      }
 
-      await order.save();
+      await order.applyCoupon(couponCode.trim(), { session });
+
+      await order.save({ session });
+      await session.commitTransaction();
 
       return res.json({
         message: `Coupon ${couponCode.trim()} applied`,
@@ -745,7 +860,10 @@ class OrderController {
         total: order.total,
       });
     } catch (error) {
+      await session.abortTransaction();
       return this.handleError(res, error);
+    } finally {
+      session.endSession();
     }
   }
 

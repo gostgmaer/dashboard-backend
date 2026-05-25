@@ -1,11 +1,38 @@
-const { PaymentModel } = require('../models/payment'); // Adjust path as needed
+const { PaymentModel, Payment } = require('../models/payment'); // Adjust path as needed
+const Order = require('../models/orders');
+const PaypalService = require('../services/payment/PaypalService');
+const RazorpayService = require('../services/payment/RazorpayService');
+const StripeService = require('../services/payment/StripeService');
 const { body, query, param } = require('express-validator');
 const { validationResult } = require('express-validator');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../utils/apiUtils');
 const mongoose = require('mongoose');
-const csvWriter = require('csv-writer').createObjectCsvWriter; // For export, install: npm i csv-writer
 const fs = require('fs');
 const { client } = require('../config/setting');
+
+let csvWriter = null;
+try {
+  csvWriter = require('csv-writer');
+} catch (error) {
+  console.warn('csv-writer is not installed. CSV export will be unavailable.');
+}
+
+const safeApiCall = (handler) => async (req, res, next) => {
+  try {
+    return await handler(req, res, next);
+  } catch (error) {
+    return handleError(res, error, error.message || 'Internal server error');
+  }
+};
+
+const createGatewayClient = (ServiceClass, gatewayName) => {
+  try {
+    return new ServiceClass();
+  } catch (error) {
+    console.error(`Failed to initialize ${gatewayName} gateway client:`, error.message);
+    return null;
+  }
+};
 
 // Validation Functions
 const createPaymentValidator = [body('orderId').isMongoId().withMessage('Invalid order ID'), body('amount').isFloat({ min: 0 }).toFloat().withMessage('Amount must be a positive number'), body('currency').isIn(['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD']).withMessage('Invalid currency'), body('paymentMethod').isIn(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER', 'UPI']).withMessage('Invalid payment method'), body('paymentProvider').optional().isIn(['STRIPE', 'PAYPAL', 'RAZORPAY', 'INTERNAL']).withMessage('Invalid payment provider'), body('metadata').optional().isObject().withMessage('Metadata must be an object'), body('billingAddress').optional().isObject().withMessage('Billing address must be an object'), body('billingAddress.country').optional().isString().withMessage('Country must be a string')];
@@ -94,13 +121,21 @@ const checkPaymentOwnership = (req, payment) => {
 // PaymentController class
 class PaymentController {
   // Static services for gateway operations (from Artifact B)
-  static paypalService = new PaypalService();
-  static razorpayService = new RazorpayService();
-  static stripeService = new StripeService();
+  static paypalService = createGatewayClient(PaypalService, 'paypal');
+  static razorpayService = createGatewayClient(RazorpayService, 'razorpay');
+  static stripeService = createGatewayClient(StripeService, 'stripe');
+
+  static getIdempotencyKey(req) {
+    const rawValue = req.headers['idempotency-key'] || req.body?.idempotencyKey || '';
+    return String(rawValue).trim().slice(0, 128);
+  }
 
   // POST /payment/initiate
   static initiatePayment = safeApiCall(async (req, res) => {
     const { orderId, gateway, amount, currency, returnUrl, cancelUrl } = req.body;
+    const gatewayLower = String(gateway || '').toLowerCase();
+    const gatewayUpper = gatewayLower.toUpperCase();
+    const idempotencyKey = this.getIdempotencyKey(req);
 
     // Validate required fields
     if (!orderId || !gateway || !amount) {
@@ -112,7 +147,7 @@ class PaymentController {
 
     // Validate gateway
     const supportedGateways = ['paypal', 'razorpay', 'stripe', 'cod'];
-    if (!supportedGateways.includes(gateway)) {
+    if (!supportedGateways.includes(gatewayLower)) {
       return res.status(400).json({
         success: false,
         message: 'Unsupported payment gateway',
@@ -129,9 +164,31 @@ class PaymentController {
     }
 
     // Check if payment already exists for this order
+    if (idempotencyKey) {
+      const idempotentPayment = await Payment.findOne({
+        orderId,
+        'metadata.idempotencyKey': idempotencyKey,
+      });
+
+      if (idempotentPayment) {
+        return res.status(200).json({
+          success: true,
+          message: 'Idempotent replay detected, returning existing payment',
+          payment: {
+            paymentId: idempotentPayment.paymentId,
+            gatewayPaymentId: idempotentPayment.gatewayPaymentId,
+            status: idempotentPayment.status,
+            gateway: idempotentPayment.gateway,
+            amount: idempotentPayment.amount,
+            currency: idempotentPayment.currency,
+          },
+        });
+      }
+    }
+
     const existingPayment = await Payment.findOne({
       orderId,
-      status: { $in: ['pending', 'processing', 'completed'] },
+      status: { $in: ['PENDING', 'PROCESSING', 'AUTHORIZED', 'COMPLETED'] },
     });
 
     if (existingPayment) {
@@ -146,15 +203,18 @@ class PaymentController {
     const paymentId = `PAY_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Handle COD payments
-    if (gateway === 'cod') {
+    if (gatewayLower === 'cod') {
       const payment = new Payment({
         orderId,
         paymentId,
-        gateway: 'cod',
+        gateway: 'COD',
         amount,
         currency: currency || 'INR',
-        status: 'pending',
-        method: 'cod',
+        status: 'PENDING',
+        method: 'COD',
+        metadata: {
+          idempotencyKey: idempotencyKey || undefined,
+        },
       });
 
       await payment.save();
@@ -186,11 +246,14 @@ class PaymentController {
     const payment = new Payment({
       orderId,
       paymentId,
-      gateway,
+      gateway: gatewayUpper,
       amount,
-      currency: currency || (gateway === 'razorpay' ? 'INR' : 'USD'),
-      status: 'pending',
+      currency: currency || (gatewayLower === 'razorpay' ? 'INR' : 'USD'),
+      status: 'PENDING',
       method: this.determinePaymentMethod(req.body.method),
+      metadata: {
+        idempotencyKey: idempotencyKey || undefined,
+      },
     });
 
     await payment.save();
@@ -210,7 +273,7 @@ class PaymentController {
     let result;
 
     // Process payment based on gateway
-    switch (gateway) {
+    switch (gatewayLower) {
       case 'paypal':
         result = await this.paypalService.createPayment(paymentData);
         break;
@@ -225,8 +288,11 @@ class PaymentController {
     if (result.success) {
       // Update payment with gateway response
       payment.gatewayPaymentId = result.paymentId;
-      payment.status = 'processing';
+      payment.status = 'PROCESSING';
       payment.metadata = result.data;
+      if (idempotencyKey) {
+        payment.metadata = { ...payment.metadata, idempotencyKey };
+      }
       await payment.save();
 
       // Log transaction
@@ -245,8 +311,8 @@ class PaymentController {
         payment: {
           paymentId: payment.paymentId,
           gatewayPaymentId: result.paymentId,
-          status: 'processing',
-          gateway,
+          status: 'PROCESSING',
+          gateway: gatewayUpper,
           amount,
           currency: payment.currency,
           approvalUrl: result.approvalUrl,
@@ -255,7 +321,7 @@ class PaymentController {
       });
     } else {
       // Update payment status to failed
-      payment.status = 'failed';
+      payment.status = 'FAILED';
       payment.failureReason = result.error;
       await payment.save();
 
@@ -327,7 +393,7 @@ class PaymentController {
 
     if (verificationResult.success) {
       // Update payment status
-      payment.status = 'completed';
+      payment.status = 'COMPLETED';
       payment.completedAt = new Date();
       payment.metadata = { ...payment.metadata, verification: verificationResult.data };
       await payment.save();
@@ -361,7 +427,7 @@ class PaymentController {
       });
     } else {
       // Update payment status to failed
-      payment.status = 'failed';
+      payment.status = 'FAILED';
       payment.failureReason = verificationResult.error;
       await payment.save();
 
@@ -411,9 +477,10 @@ class PaymentController {
     }
 
     // Use new gateway if provided, otherwise use original
-    const retryGateway = gateway || payment.gateway;
+    const retryGatewayLower = String(gateway || payment.gateway || '').toLowerCase();
+    const retryGatewayUpper = retryGatewayLower.toUpperCase();
 
-    if (retryGateway === 'cod') {
+    if (retryGatewayLower === 'cod') {
       return res.status(400).json({
         success: false,
         message: 'COD payments cannot be retried',
@@ -423,10 +490,10 @@ class PaymentController {
     // Increment retry count
     payment.retryCount += 1;
     payment.lastRetryAt = new Date();
-    payment.status = 'processing';
+    payment.status = 'PROCESSING';
 
-    if (gateway && gateway !== payment.gateway) {
-      payment.gateway = gateway;
+    if (gateway && retryGatewayUpper !== String(payment.gateway || '').toUpperCase()) {
+      payment.gateway = retryGatewayUpper;
       payment.gatewayPaymentId = null; // Reset gateway payment ID
     }
 
@@ -449,7 +516,7 @@ class PaymentController {
     let result;
 
     // Process retry payment
-    switch (retryGateway) {
+    switch (retryGatewayLower) {
       case 'paypal':
         result = await this.paypalService.createPayment(paymentData);
         break;
@@ -472,7 +539,7 @@ class PaymentController {
         orderId: payment.orderId,
         paymentId: payment._id,
         eventType: 'retry_attempted',
-        gateway: retryGateway,
+        gateway: retryGatewayLower,
         status: 'processing',
         data: { retryCount: payment.retryCount, ...result.data },
       });
@@ -483,16 +550,16 @@ class PaymentController {
         payment: {
           paymentId: payment.paymentId,
           gatewayPaymentId: result.paymentId,
-          gateway: retryGateway,
+          gateway: retryGatewayUpper,
           retryCount: payment.retryCount,
-          status: 'processing',
+          status: 'PROCESSING',
           approvalUrl: result.approvalUrl,
           clientSecret: result.clientSecret,
         },
       });
     } else {
       // Update payment status back to failed
-      payment.status = 'failed';
+      payment.status = 'FAILED';
       payment.failureReason = result.error;
       await payment.save();
 
@@ -501,7 +568,7 @@ class PaymentController {
         orderId: payment.orderId,
         paymentId: payment._id,
         eventType: 'retry_attempted',
-        gateway: retryGateway,
+        gateway: retryGatewayLower,
         status: 'failed',
         errorDetails: result.error,
         data: { retryCount: payment.retryCount },
@@ -724,16 +791,18 @@ class PaymentController {
   // Helper: Determine payment method (from Artifact B)
   static determinePaymentMethod(method) {
     const methodMap = {
-      card: 'credit_card',
-      credit_card: 'credit_card',
-      debit_card: 'debit_card',
-      netbanking: 'net_banking',
-      wallet: 'wallet',
-      upi: 'upi',
-      cod: 'cod',
+      card: 'CREDIT_CARD',
+      credit_card: 'CREDIT_CARD',
+      debit_card: 'DEBIT_CARD',
+      netbanking: 'BANK_TRANSFER',
+      bank_transfer: 'BANK_TRANSFER',
+      wallet: 'DIGITAL_WALLET',
+      upi: 'UPI',
+      paypal: 'PAYPAL',
+      cod: 'COD',
     };
 
-    return methodMap[method] || 'credit_card';
+    return methodMap[String(method || '').toLowerCase()] || 'CREDIT_CARD';
   }
 
   // Helper: Log transaction (from Artifact B)
@@ -1267,6 +1336,9 @@ class PaymentController {
       if (format === 'json') {
         res.json({ success: true, data: payments });
       } else if (format === 'csv') {
+        if (!csvWriter || typeof csvWriter.createObjectCsvWriter !== 'function') {
+          return res.status(503).json({ error: 'CSV export is not available on this server' });
+        }
         const fileName = `payments_export_${Date.now()}.csv`;
         const csv = csvWriter.createObjectCsvWriter({
           path: fileName,
@@ -2454,3 +2526,5 @@ class PaymentController {
     }
   }
 }
+
+module.exports = PaymentController;

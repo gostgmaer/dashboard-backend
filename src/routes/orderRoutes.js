@@ -46,12 +46,13 @@ const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const orderId = req.params.id;
     if (orderId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
-      const Order = require('../models/Order'); // Assumed Order model
+      const Order = require('../models/orders');
       const order = await Order.findById(orderId);
       if (!order) {
         return res.status(404).json({ success: false, message: 'Order not found' });
       }
-      if (order.userId.toString() !== req.user.id && !req.user.permissions.includes('orders:manage')) { // Restrict to own orders or manage permission
+      const canManageOrders = Array.isArray(req.user.permissions) && req.user.permissions.includes('orders:manage');
+      if (order.user.toString() !== req.user.id && !canManageOrders) { // Restrict to own orders or manage permission
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s order' });
       }
     }

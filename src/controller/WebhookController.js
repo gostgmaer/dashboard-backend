@@ -1,23 +1,129 @@
 // controllers/WebhookController.js
+const mongoose = require('mongoose');
 const Payment = require('../models/payment');
 const TransactionLog = require('../models/TransactionLog');
-const Order = require('../models/order');
+const Order = require('../models/orders');
 const PaypalService = require('../services/payment/PaypalService');
-const RazorpayService = require('../services/payment/PaypalService');
+const RazorpayService = require('../services/payment/RazorpayService');
 const StripeService = require('../services/payment/StripeService');
 const { sendSuccess, sendError, HTTP_STATUS, ERROR_CODES } = require('../utils/responseHelper');
 const AppError = require('../utils/appError');
 const { catchAsync } = require('../middleware/errorHandler');
 
+const createGatewayClient = (ServiceClass, gatewayName) => {
+    try {
+        return new ServiceClass();
+    } catch (error) {
+        console.error(`Failed to initialize ${gatewayName} gateway client:`, error.message);
+        return null;
+    }
+};
+
 class WebhookController {
     constructor() {
-        this.paypalService = new PaypalService();
-        this.razorpayService = new RazorpayService();
-        this.stripeService = new StripeService();
+        this.paypalService = createGatewayClient(PaypalService, 'paypal');
+        this.razorpayService = createGatewayClient(RazorpayService, 'razorpay');
+        this.stripeService = createGatewayClient(StripeService, 'stripe');
+    }
+
+    getWebhookEventId(gateway, event, headers = {}) {
+        if (gateway === 'paypal') {
+            return event?.id || headers['paypal-transmission-id'] || null;
+        }
+        if (gateway === 'razorpay') {
+            return headers['x-razorpay-event-id'] || event?.payload?.payment?.entity?.id || event?.payload?.refund?.entity?.id || null;
+        }
+        if (gateway === 'stripe') {
+            return event?.id || headers['stripe-signature'] || null;
+        }
+        return null;
+    }
+
+    extractOrderIdFromWebhook(gateway, event) {
+        if (gateway === 'paypal') {
+            return event?.resource?.custom_id || null;
+        }
+        if (gateway === 'stripe') {
+            return event?.data?.object?.metadata?.order_id || null;
+        }
+        return null;
+    }
+
+    async registerWebhook(gateway, eventType, eventData, headers = {}) {
+        const webhookEventId = this.getWebhookEventId(gateway, eventData, headers);
+        const orderId = this.extractOrderIdFromWebhook(gateway, eventData);
+
+        if (webhookEventId) {
+            const existing = await TransactionLog.findOne({ gateway, webhookEventId, eventType: 'webhook_received' });
+            if (existing) {
+                return { duplicate: true, webhookEventId };
+            }
+        }
+
+        const webhookLog = new TransactionLog({
+            orderId,
+            eventType: 'webhook_received',
+            gateway,
+            status: eventType,
+            webhookEventId: webhookEventId || undefined,
+            data: eventData,
+        });
+
+        try {
+            await webhookLog.save();
+        } catch (error) {
+            if (error?.code === 11000 && webhookEventId) {
+                return { duplicate: true, webhookEventId };
+            }
+            throw error;
+        }
+
+        return { duplicate: false, webhookEventId };
+    }
+
+    async syncPaymentAndOrderAsPaid(payment, metadataPatch = {}) {
+        const session = await mongoose.startSession();
+        try {
+            await session.startTransaction();
+
+            const paymentDoc = await Payment.findById(payment._id).session(session);
+            if (!paymentDoc) {
+                await session.abortTransaction();
+                return;
+            }
+
+            if (paymentDoc.status !== 'COMPLETED') {
+                paymentDoc.status = 'COMPLETED';
+                paymentDoc.completedAt = new Date();
+                paymentDoc.metadata = { ...paymentDoc.metadata, ...metadataPatch };
+                await paymentDoc.save({ session });
+            }
+
+            await Order.findByIdAndUpdate(
+                paymentDoc.orderId,
+                {
+                    payment_status: 'paid',
+                    status: 'confirmed',
+                    paymentStatus: 'paid',
+                },
+                { session }
+            );
+
+            await this.logTransaction(paymentDoc, 'payment_completed', 'COMPLETED', null, session);
+            await session.commitTransaction();
+        } catch (error) {
+            await session.abortTransaction();
+            throw error;
+        } finally {
+            session.endSession();
+        }
     }
 
     // POST /webhook/paypal
     handlePaypalWebhook = catchAsync(async (req, res) => {
+        if (!this.paypalService) {
+            return res.status(503).json({ success: false, message: 'PayPal webhook service is unavailable' });
+        }
         const verification = this.paypalService.verifyWebhook(req.headers, req.rawBody);
 
         if (!verification.isValid) {
@@ -26,6 +132,13 @@ class WebhookController {
         }
 
         const event = req.body;
+        const webhookRegistration = await this.registerWebhook('paypal', event.event_type, event, req.headers);
+        if (webhookRegistration.duplicate) {
+            return sendSuccess(res, {
+                data: { received: true, duplicate: true },
+                message: 'Duplicate PayPal webhook ignored',
+            });
+        }
         console.log('PayPal Webhook Event:', event.event_type);
 
         switch (event.event_type) {
@@ -46,7 +159,6 @@ class WebhookController {
                 console.log('Unhandled PayPal event:', event.event_type);
         }
 
-        await this.logWebhookEvent('paypal', event.event_type, event);
         return sendSuccess(res, {
             data: { received: true },
             message: 'PayPal webhook processed',
@@ -55,6 +167,9 @@ class WebhookController {
 
     // POST /webhook/razorpay
     handleRazorpayWebhook = catchAsync(async (req, res) => {
+        if (!this.razorpayService) {
+            return res.status(503).json({ success: false, message: 'Razorpay webhook service is unavailable' });
+        }
         const verification = this.razorpayService.verifyWebhook(req.headers, req.rawBody);
 
         if (!verification.isValid) {
@@ -63,6 +178,13 @@ class WebhookController {
         }
 
         const event = req.body;
+        const webhookRegistration = await this.registerWebhook('razorpay', event.event, event, req.headers);
+        if (webhookRegistration.duplicate) {
+            return sendSuccess(res, {
+                data: { received: true, duplicate: true },
+                message: 'Duplicate Razorpay webhook ignored',
+            });
+        }
         console.log('Razorpay Webhook Event:', event.event);
 
         switch (event.event) {
@@ -91,7 +213,6 @@ class WebhookController {
                 console.log('Unhandled Razorpay event:', event.event);
         }
 
-        await this.logWebhookEvent('razorpay', event.event, event);
         return sendSuccess(res, {
             data: { received: true },
             message: 'Razorpay webhook processed',
@@ -100,6 +221,9 @@ class WebhookController {
 
     // POST /webhook/stripe
     handleStripeWebhook = catchAsync(async (req, res) => {
+        if (!this.stripeService) {
+            return res.status(503).json({ success: false, message: 'Stripe webhook service is unavailable' });
+        }
         const verification = this.stripeService.verifyWebhook(req.headers, req.rawBody);
 
         if (!verification.isValid) {
@@ -108,6 +232,13 @@ class WebhookController {
         }
 
         const event = verification.event;
+        const webhookRegistration = await this.registerWebhook('stripe', event.type, event, req.headers);
+        if (webhookRegistration.duplicate) {
+            return sendSuccess(res, {
+                data: { received: true, duplicate: true },
+                message: 'Duplicate Stripe webhook ignored',
+            });
+        }
         console.log('Stripe Webhook Event:', event.type);
 
         switch (event.type) {
@@ -130,7 +261,6 @@ class WebhookController {
                 console.log('Unhandled Stripe event:', event.type);
         }
 
-        await this.logWebhookEvent('stripe', event.type, event);
         return sendSuccess(res, {
             data: { received: true },
             message: 'Stripe webhook processed',
@@ -143,11 +273,11 @@ class WebhookController {
         const payment = await Payment.findOne({ gatewayPaymentId: orderId });
 
         if (payment) {
-            payment.status = 'processing';
+            payment.status = 'PROCESSING';
             payment.metadata = { ...payment.metadata, approval: event.resource };
             await payment.save();
 
-            await this.logTransaction(payment, 'payment_processing', 'processing');
+            await this.logTransaction(payment, 'payment_processing', 'PROCESSING');
         }
     }
 
@@ -158,17 +288,7 @@ class WebhookController {
         const payment = await Payment.findOne({ orderId: customId });
 
         if (payment) {
-            payment.status = 'completed';
-            payment.completedAt = new Date();
-            payment.metadata = { ...payment.metadata, capture: event.resource };
-            await payment.save();
-
-            await Order.findByIdAndUpdate(payment.orderId, {
-                paymentStatus: 'paid',
-                status: 'confirmed',
-            });
-
-            await this.logTransaction(payment, 'payment_completed', 'completed');
+            await this.syncPaymentAndOrderAsPaid(payment, { capture: event.resource });
         }
     }
 
@@ -177,11 +297,11 @@ class WebhookController {
         const payment = await Payment.findOne({ gatewayPaymentId: orderId });
 
         if (payment) {
-            payment.status = 'failed';
+            payment.status = 'FAILED';
             payment.failureReason = event.resource.reason_code || 'Payment denied';
             await payment.save();
 
-            await this.logTransaction(payment, 'payment_failed', 'failed');
+            await this.logTransaction(payment, 'payment_failed', 'FAILED');
         }
     }
 
@@ -195,7 +315,7 @@ class WebhookController {
             payment.updateRefundStatus(invoiceId, 'completed', refundId, event.resource);
             await payment.save();
 
-            await this.logTransaction(payment, 'refund_completed', 'completed', invoiceId);
+            await this.logTransaction(payment, 'refund_completed', 'COMPLETED', invoiceId);
         }
     }
 
@@ -205,11 +325,11 @@ class WebhookController {
         const payment = await Payment.findOne({ gatewayPaymentId: paymentData.order_id });
 
         if (payment) {
-            payment.status = 'processing';
+            payment.status = 'PROCESSING';
             payment.metadata = { ...payment.metadata, authorization: paymentData };
             await payment.save();
 
-            await this.logTransaction(payment, 'payment_processing', 'processing');
+            await this.logTransaction(payment, 'payment_processing', 'PROCESSING');
         }
     }
 
@@ -218,17 +338,7 @@ class WebhookController {
         const payment = await Payment.findOne({ gatewayPaymentId: paymentData.order_id });
 
         if (payment) {
-            payment.status = 'completed';
-            payment.completedAt = new Date();
-            payment.metadata = { ...payment.metadata, capture: paymentData };
-            await payment.save();
-
-            await Order.findByIdAndUpdate(payment.orderId, {
-                paymentStatus: 'paid',
-                status: 'confirmed',
-            });
-
-            await this.logTransaction(payment, 'payment_completed', 'completed');
+            await this.syncPaymentAndOrderAsPaid(payment, { capture: paymentData });
         }
     }
 
@@ -237,11 +347,11 @@ class WebhookController {
         const payment = await Payment.findOne({ gatewayPaymentId: paymentData.order_id });
 
         if (payment) {
-            payment.status = 'failed';
+            payment.status = 'FAILED';
             payment.failureReason = paymentData.error_description || 'Payment failed';
             await payment.save();
 
-            await this.logTransaction(payment, 'payment_failed', 'failed');
+            await this.logTransaction(payment, 'payment_failed', 'FAILED');
         }
     }
 
@@ -249,18 +359,8 @@ class WebhookController {
         const orderData = event.payload.order.entity;
         const payment = await Payment.findOne({ gatewayPaymentId: orderData.id });
 
-        if (payment && payment.status !== 'completed') {
-            payment.status = 'completed';
-            payment.completedAt = new Date();
-            payment.metadata = { ...payment.metadata, orderPaid: orderData };
-            await payment.save();
-
-            await Order.findByIdAndUpdate(payment.orderId, {
-                paymentStatus: 'paid',
-                status: 'confirmed',
-            });
-
-            await this.logTransaction(payment, 'payment_completed', 'completed');
+        if (payment) {
+            await this.syncPaymentAndOrderAsPaid(payment, { orderPaid: orderData });
         }
     }
 
@@ -275,7 +375,7 @@ class WebhookController {
                 refund.metadata = refundData;
                 await payment.save();
 
-                await this.logTransaction(payment, 'refund_processing', 'processing', refund.refundId);
+                await this.logTransaction(payment, 'refund_processing', 'PROCESSING', refund.refundId);
             }
         }
     }
@@ -292,7 +392,7 @@ class WebhookController {
                 refund.metadata = refundData;
                 await payment.save();
 
-                await this.logTransaction(payment, 'refund_completed', 'completed', refund.refundId);
+                await this.logTransaction(payment, 'refund_completed', 'COMPLETED', refund.refundId);
             }
         }
     }
@@ -308,7 +408,7 @@ class WebhookController {
                 refund.failureReason = refundData.error_description || 'Refund failed';
                 await payment.save();
 
-                await this.logTransaction(payment, 'refund_failed', 'failed', refund.refundId);
+                await this.logTransaction(payment, 'refund_failed', 'FAILED', refund.refundId);
             }
         }
     }
@@ -321,17 +421,7 @@ class WebhookController {
         const payment = await Payment.findOne({ orderId });
 
         if (payment) {
-            payment.status = 'completed';
-            payment.completedAt = new Date();
-            payment.metadata = { ...payment.metadata, paymentIntent };
-            await payment.save();
-
-            await Order.findByIdAndUpdate(payment.orderId, {
-                paymentStatus: 'paid',
-                status: 'confirmed',
-            });
-
-            await this.logTransaction(payment, 'payment_completed', 'completed');
+            await this.syncPaymentAndOrderAsPaid(payment, { paymentIntent });
         }
     }
 
@@ -342,11 +432,11 @@ class WebhookController {
         const payment = await Payment.findOne({ orderId });
 
         if (payment) {
-            payment.status = 'failed';
+            payment.status = 'FAILED';
             payment.failureReason = paymentIntent.last_payment_error?.message || 'Payment failed';
             await payment.save();
 
-            await this.logTransaction(payment, 'payment_failed', 'failed');
+            await this.logTransaction(payment, 'payment_failed', 'FAILED');
         }
     }
 
@@ -357,11 +447,11 @@ class WebhookController {
         const payment = await Payment.findOne({ orderId });
 
         if (payment) {
-            payment.status = 'cancelled';
+            payment.status = 'CANCELLED';
             payment.failureReason = 'Payment cancelled by user';
             await payment.save();
 
-            await this.logTransaction(payment, 'payment_cancelled', 'cancelled');
+            await this.logTransaction(payment, 'payment_cancelled', 'CANCELLED');
         }
     }
 
@@ -377,37 +467,22 @@ class WebhookController {
     }
 
     // Helper methods
-    async logTransaction(payment, eventType, status, refundId = null) {
+    async logTransaction(payment, eventType, status, refundId = null, session = null) {
         try {
             const logData = {
                 orderId: payment.orderId,
                 paymentId: payment._id,
                 refundId: refundId,
                 eventType,
-                gateway: payment.gateway,
+                gateway: String(payment.gateway || '').toLowerCase(),
                 status,
                 data: { webhook: true },
             };
 
             const transactionLog = new TransactionLog(logData);
-            await transactionLog.save();
+            await transactionLog.save(session ? { session } : undefined);
         } catch (error) {
             console.error('Failed to log webhook transaction:', error);
-        }
-    }
-
-    async logWebhookEvent(gateway, eventType, eventData) {
-        try {
-            const webhookLog = new TransactionLog({
-                eventType: 'webhook_received',
-                gateway,
-                status: eventType,
-                data: eventData,
-            });
-
-            await webhookLog.save();
-        } catch (error) {
-            console.error('Failed to log webhook event:', error);
         }
     }
 }

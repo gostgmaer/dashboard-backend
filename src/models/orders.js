@@ -117,6 +117,7 @@ const orderSchema = new mongoose.Schema(
     additionalNotes: { type: String, trim: true },
     notes: [{ type: String, trim: true }],
     couponCode: { type: String, trim: true, default: "" },
+    idempotencyKey: { type: String, trim: true, sparse: true },
     discountAmount: {
       type: Number,
       default: 0,
@@ -218,6 +219,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["low", "medium", "high"],
       default: "medium",
     }, // Order priority for fulfillment
+    inventoryRestoredAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -234,6 +236,15 @@ orderSchema.virtual("customerName").get(function () {
 // Indexes for performance
 // orderSchema.index({ order_id: 1 });
 orderSchema.index({ user: 1, createdAt: -1 });
+orderSchema.index(
+  { user: 1, idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      idempotencyKey: { $exists: true, $type: 'string' },
+    },
+  }
+);
 orderSchema.index({ status: 1 });
 orderSchema.index({ payment_status: 1 });
 orderSchema.index({ createdAt: -1 });
@@ -253,7 +264,7 @@ orderSchema.pre("save", async function (next) {
     if (!this.invoice) {
       this.invoice = `INV-${this.order_id}`;
     }
-    
+    next();
   } catch (error) {
     next(error);
   }
@@ -263,13 +274,16 @@ orderSchema.pre("save", async function (next) {
 orderSchema.pre("save", async function (next) {
   try {
     this.calculateTotals();
+    if (this.$locals?.inventoryReserved) {
+      return next();
+    }
     for (const item of this.items) {
       const product = await mongoose.model("Product").findById(item.product);
-      if (!product || product.stock < item.quantity) {
+      if (!product || Number(product.inventory || 0) < item.quantity) {
         throw new Error(`Insufficient stock for product ${item.product}`);
       }
     }
-    
+    next();
   } catch (error) {
     next(error);
   }
@@ -398,14 +412,76 @@ orderSchema.methods.getSummary = function () {
 };
 
 // Apply coupon
-orderSchema.methods.applyCoupon = async function (couponCode) {
-  const coupon = await mongoose.model("Coupon").findOne({ code: couponCode, active: true });
+orderSchema.methods.applyCoupon = async function (couponCode, options = {}) {
+  const { session } = options;
+  const normalizedCode = String(couponCode || '').trim().toUpperCase();
+  if (!normalizedCode) {
+    throw new Error('Coupon code is required');
+  }
+  if (this.couponCode === normalizedCode) {
+    return;
+  }
+  const now = new Date();
+  const couponQuery = mongoose.model("PromoCode").findOne({
+    code: normalizedCode,
+    isActive: true,
+    isDeleted: false,
+    startDate: { $lte: now },
+    endDate: { $gte: now },
+    $or: [
+      { globalUsageLimit: { $exists: false } },
+      { globalUsageLimit: null },
+      { globalUsageLimit: 0 },
+      { $expr: { $gt: ["$globalUsageLimit", "$usedCount"] } },
+    ],
+  });
+  if (session) couponQuery.session(session);
+  const coupon = await couponQuery;
   if (!coupon) throw new Error("Invalid or inactive coupon");
-  if (coupon.expiryDate < new Date()) throw new Error("Coupon expired");
-  this.couponCode = couponCode;
-  this.discountAmount = coupon.discountType === "percentage"
+  if (coupon.minOrderValue && this.subtotal < coupon.minOrderValue) {
+    throw new Error(`Minimum order value is ${coupon.minOrderValue}`);
+  }
+
+  if (coupon.customerLimit && coupon.customerLimit > 0) {
+    const usageQuery = mongoose.model('Order').countDocuments({
+      _id: { $ne: this._id },
+      user: this.user,
+      couponCode: normalizedCode,
+      status: { $nin: ['canceled', 'failed'] },
+    });
+    if (session) usageQuery.session(session);
+    const userUsageCount = await usageQuery;
+    if (userUsageCount >= coupon.customerLimit) {
+      throw new Error('Per-user coupon usage limit reached');
+    }
+  }
+
+  const rawDiscount = coupon.discountType === "percentage"
     ? (this.subtotal * coupon.discountValue) / 100
     : coupon.discountValue;
+
+  this.couponCode = normalizedCode;
+  this.discountAmount = Math.min(rawDiscount, this.subtotal);
+
+  const usageUpdateQuery = mongoose.model("PromoCode").updateOne(
+    {
+      _id: coupon._id,
+      $or: [
+        { globalUsageLimit: { $exists: false } },
+        { globalUsageLimit: null },
+        { globalUsageLimit: 0 },
+        { $expr: { $gt: ["$globalUsageLimit", "$usedCount"] } },
+      ],
+    },
+    { $inc: { usedCount: 1 } }
+  );
+  if (session) usageUpdateQuery.session(session);
+  const usageUpdate = await usageUpdateQuery;
+
+  if (!usageUpdate.modifiedCount) {
+    throw new Error("Coupon usage limit reached");
+  }
+
   this.calculateTotals();
 };
 

@@ -138,7 +138,6 @@ paymentSchema.index({ amount: 1, currency: 1 });
 // Indexes for better query performance
 paymentSchema.index({ orderId: 1, status: 1 });
 paymentSchema.index({ createdAt: -1 });
-paymentSchema.index({ 'refunds.refundId': 1 });
 paymentSchema.index({ 'refunds.status': 1 });
 
 // Virtual for refund status
