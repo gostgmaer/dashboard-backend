@@ -103,7 +103,7 @@ class WebhookController {
                 paymentDoc.orderId,
                 {
                     payment_status: 'paid',
-                    status: 'confirmed',
+                    status: 'processing',
                     paymentStatus: 'paid',
                 },
                 { session }

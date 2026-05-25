@@ -1,5 +1,6 @@
 // controllers/notificationController.js
 const notificationService = require('../services/NotificationService');
+const Notification = require('../models/notification');
 const { validationResult } = require('express-validator');
 const { sendSuccess, sendError, sendCreated, HTTP_STATUS, ERROR_CODES } = require('../utils/responseHelper');
 const AppError = require('../utils/appError');

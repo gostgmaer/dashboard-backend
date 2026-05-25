@@ -3,6 +3,7 @@ const { validationResult } = require('express-validator');
 const { sendSuccess, sendCreated, HTTP_STATUS } = require('../utils/responseHelper');
 const AppError = require('../utils/appError');
 const { catchAsync } = require('../middleware/errorHandler');
+const ActivityHelper = require('../services/activityHelpers');
 
 // Helper function to check authorization
 const checkAuthorization = (req, userId) => {
@@ -47,7 +48,7 @@ const wishlistController = {
       throw AppError.validation('Validation failed', errors.array());
     }
 
-    const { userId, productId } = req.body;
+    const { userId, productId } = req.params;
     checkAuthorization(req, userId);
 
     const wishlistItem = await Wishlist.approveWishlistItem({
@@ -101,7 +102,7 @@ const wishlistController = {
       throw AppError.validation('Validation failed', errors.array());
     }
 
-    const { userId, productId } = req.body;
+    const { userId, productId } = req.params;
     checkAuthorization(req, userId);
 
     const wishlistItem = await Wishlist.restoreWishlistItem({
@@ -179,7 +180,7 @@ const wishlistController = {
     const result = await Wishlist.clearWishlist(userId, req.user._id);
 
     return sendSuccess(res, {
-      data: { affected: result.nModified },
+      data: { affected: result.modifiedCount ?? 0 },
       message: 'Wishlist cleared successfully',
     });
   }),

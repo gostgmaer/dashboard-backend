@@ -162,7 +162,7 @@ class NotificationService {
       const notification = await Notification.findOneAndUpdate(
         { _id: notificationId, recipient: userId },
         {
-          status: 'read',
+          status: 'READ',
           readAt: new Date(),
         },
         { new: true }
@@ -175,7 +175,7 @@ class NotificationService {
       // Send real-time update
       socketService.sendToUser(userId, 'notification_updated', {
         id: notification._id,
-        status: 'read',
+        status: 'READ',
         readAt: notification.readAt,
       });
 
@@ -192,7 +192,7 @@ class NotificationService {
       const result = await Notification.updateMany(
         { recipient: userId, status: 'UNREAD' },
         {
-          status: 'read',
+          status: 'READ',
           readAt: new Date(),
         }
       );

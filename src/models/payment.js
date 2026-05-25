@@ -135,6 +135,15 @@ paymentSchema.index({ status: 1, createdAt: -1 });
 paymentSchema.index({ gateway: 1, status: 1 });
 paymentSchema.index({ method: 1, status: 1 });
 paymentSchema.index({ amount: 1, currency: 1 });
+paymentSchema.index(
+  { orderId: 1, 'metadata.idempotencyKey': 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      'metadata.idempotencyKey': { $exists: true, $type: 'string', $ne: '' },
+    },
+  }
+);
 // Indexes for better query performance
 paymentSchema.index({ orderId: 1, status: 1 });
 paymentSchema.index({ createdAt: -1 });
@@ -150,12 +159,12 @@ paymentSchema.virtual('refundStatus').get(function () {
 
 // Virtual for active refunds
 paymentSchema.virtual('activeRefunds').get(function () {
-  return this.refunds.filter((refund) => ['pending', 'processing'].includes(refund.status));
+  return this.refunds.filter((refund) => ['PENDING', 'PROCESSING'].includes(refund.status));
 });
 
 // Virtual for completed refunds
 paymentSchema.virtual('completedRefunds').get(function () {
-  return this.refunds.filter((refund) => refund.status === 'completed');
+  return this.refunds.filter((refund) => refund.status === 'COMPLETED');
 });
 
 // Virtual for payment age in hours
@@ -174,12 +183,12 @@ paymentSchema.virtual('paymentAge').get(function () {
 
 // Virtual for retry eligibility
 paymentSchema.virtual('canRetry').get(function () {
-  return this.status === 'failed' && this.retryCount < this.maxRetries && (!this.lastRetryAt || Date.now() - this.lastRetryAt > 60000); // 1 minute cooldown
+  return this.status === 'FAILED' && this.retryCount < this.maxRetries && (!this.lastRetryAt || Date.now() - this.lastRetryAt > 60000); // 1 minute cooldown
 });
 
 // Pre-save middleware to set expiration for pending payments
 paymentSchema.pre('save', function (next) {
-  if (this.isNew && this.status === 'pending' && !this.expiresAt) {
+  if (this.isNew && this.status === 'PENDING' && !this.expiresAt) {
     // Set expiration to 30 minutes for pending payments
     this.expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   }
@@ -710,7 +719,7 @@ paymentSchema.pre('save', function (next) {
     // Update payment status based on refund amount
     if (this.totalRefunded > 0 && this.status === 'COMPLETED') {
       if (this.totalRefunded >= this.amount) {
-        this.status = 'FULLY_REFUNDED';
+        this.status = 'REFUNDED';
       } else {
         this.status = 'PARTIALLY_REFUNDED';
       }
@@ -776,7 +785,7 @@ PaymentSchema.methods.updateRefundStatus = function (refundId, status, gatewayRe
   if (gatewayRefundId) refund.gatewayRefundId = gatewayRefundId;
   refund.metadata = { ...refund.metadata, ...metadata };
 
-  if (status === 'completed') {
+  if (status === 'COMPLETED') {
     refund.processedAt = new Date();
   }
 
@@ -794,7 +803,7 @@ PaymentSchema.methods.canRefund = function (amount = null) {
     return { canRefund: false, reason: 'Payment not completed' };
   }
 
-  if (this.gateway === 'cod') {
+  if (String(this.gateway || '').toUpperCase() === 'COD') {
     return { canRefund: false, reason: 'COD payments cannot be refunded through gateway' };
   }
 

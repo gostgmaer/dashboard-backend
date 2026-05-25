@@ -1,5 +1,6 @@
 const { PaymentModel, Payment } = require('../models/payment'); // Adjust path as needed
 const Order = require('../models/orders');
+const TransactionLog = require('../models/TransactionLog');
 const PaypalService = require('../services/payment/PaypalService');
 const RazorpayService = require('../services/payment/RazorpayService');
 const StripeService = require('../services/payment/StripeService');
@@ -133,15 +134,30 @@ class PaymentController {
   // POST /payment/initiate
   static initiatePayment = safeApiCall(async (req, res) => {
     const { orderId, gateway, amount, currency, returnUrl, cancelUrl } = req.body;
+    const normalizedAmount = Number(amount);
     const gatewayLower = String(gateway || '').toLowerCase();
     const gatewayUpper = gatewayLower.toUpperCase();
     const idempotencyKey = this.getIdempotencyKey(req);
 
+    const respondWithExistingPayment = (existing, message = 'Idempotent replay detected, returning existing payment') =>
+      res.status(200).json({
+        success: true,
+        message,
+        payment: {
+          paymentId: existing.paymentId,
+          gatewayPaymentId: existing.gatewayPaymentId,
+          status: existing.status,
+          gateway: existing.gateway,
+          amount: existing.amount,
+          currency: existing.currency,
+        },
+      });
+
     // Validate required fields
-    if (!orderId || !gateway || !amount) {
+    if (!orderId || !gateway || Number.isNaN(normalizedAmount) || normalizedAmount <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: orderId, gateway, amount',
+        message: 'Missing or invalid required fields: orderId, gateway, amount',
       });
     }
 
@@ -164,10 +180,10 @@ class PaymentController {
     }
 
     // Validate payment amount matches order total
-    if (Math.abs(amount - order.total) > 0.01) {
+    if (Math.abs(normalizedAmount - order.total) > 0.01) {
       return res.status(400).json({
         success: false,
-        message: `Payment amount (${amount}) does not match order total (${order.total})`,
+        message: `Payment amount (${normalizedAmount}) does not match order total (${order.total})`,
       });
     }
 
@@ -179,18 +195,7 @@ class PaymentController {
       });
 
       if (idempotentPayment) {
-        return res.status(200).json({
-          success: true,
-          message: 'Idempotent replay detected, returning existing payment',
-          payment: {
-            paymentId: idempotentPayment.paymentId,
-            gatewayPaymentId: idempotentPayment.gatewayPaymentId,
-            status: idempotentPayment.status,
-            gateway: idempotentPayment.gateway,
-            amount: idempotentPayment.amount,
-            currency: idempotentPayment.currency,
-          },
-        });
+        return respondWithExistingPayment(idempotentPayment);
       }
     }
 
@@ -216,7 +221,7 @@ class PaymentController {
         orderId,
         paymentId,
         gateway: 'COD',
-        amount,
+        amount: normalizedAmount,
         currency: currency || 'INR',
         status: 'PENDING',
         method: 'COD',
@@ -225,7 +230,17 @@ class PaymentController {
         },
       });
 
-      await payment.save();
+      try {
+        await payment.save();
+      } catch (saveError) {
+        if (saveError?.code === 11000 && idempotencyKey) {
+          const existingByKey = await Payment.findOne({ orderId, 'metadata.idempotencyKey': idempotencyKey });
+          if (existingByKey) {
+            return respondWithExistingPayment(existingByKey);
+          }
+        }
+        throw saveError;
+      }
 
       // Log transaction
       await this.logTransaction({
@@ -234,7 +249,7 @@ class PaymentController {
         eventType: 'payment_initiated',
         gateway: 'cod',
         status: 'pending',
-        data: { amount, currency },
+        data: { amount: normalizedAmount, currency },
       });
 
       return res.json({
@@ -255,7 +270,7 @@ class PaymentController {
       orderId,
       paymentId,
       gateway: gatewayUpper,
-      amount,
+      amount: normalizedAmount,
       currency: currency || (gatewayLower === 'razorpay' ? 'INR' : 'USD'),
       status: 'PENDING',
       method: this.determinePaymentMethod(req.body.method),
@@ -264,13 +279,23 @@ class PaymentController {
       },
     });
 
-    await payment.save();
+    try {
+      await payment.save();
+    } catch (saveError) {
+      if (saveError?.code === 11000 && idempotencyKey) {
+        const existingByKey = await Payment.findOne({ orderId, 'metadata.idempotencyKey': idempotencyKey });
+        if (existingByKey) {
+          return respondWithExistingPayment(existingByKey);
+        }
+      }
+      throw saveError;
+    }
 
     // Prepare payment data
     const paymentData = {
       orderId,
       paymentId,
-      amount,
+      amount: normalizedAmount,
       currency: payment.currency,
       returnUrl: returnUrl || `${client.url}/payment/success`,
       cancelUrl: cancelUrl || `${client.url}/payment/cancel`,
@@ -321,7 +346,7 @@ class PaymentController {
           gatewayPaymentId: result.paymentId,
           status: 'PROCESSING',
           gateway: gatewayUpper,
-          amount,
+          amount: normalizedAmount,
           currency: payment.currency,
           approvalUrl: result.approvalUrl,
           clientSecret: result.clientSecret,
@@ -370,9 +395,26 @@ class PaymentController {
       });
     }
 
+    if (payment.status === 'COMPLETED') {
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already verified',
+        payment: {
+          paymentId: payment.paymentId,
+          status: payment.status,
+          amount: payment.amount,
+          gateway: payment.gateway,
+          completedAt: payment.completedAt,
+        },
+      });
+    }
+
+    const gatewayLower = String(payment.gateway || '').toLowerCase();
+    const resolvedGatewayPaymentId = gatewayPaymentId || payment.gatewayPaymentId;
+
     let verificationResult;
 
-    switch (payment.gateway) {
+    switch (gatewayLower) {
       case 'razorpay':
         if (!signature) {
           return res.status(400).json({
@@ -380,16 +422,34 @@ class PaymentController {
             message: 'Signature is required for Razorpay verification',
           });
         }
-        const isValid = this.razorpayService.verifyPaymentSignature(payment.gatewayPaymentId, gatewayPaymentId, signature);
+        if (!resolvedGatewayPaymentId || !payment.gatewayPaymentId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Gateway payment ID is required for Razorpay verification',
+          });
+        }
+        const isValid = this.razorpayService.verifyPaymentSignature(payment.gatewayPaymentId, resolvedGatewayPaymentId, signature);
         verificationResult = { success: isValid };
         break;
 
       case 'paypal':
-        verificationResult = await this.paypalService.capturePayment(gatewayPaymentId);
+        if (!resolvedGatewayPaymentId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Gateway payment ID is required for PayPal verification',
+          });
+        }
+        verificationResult = await this.paypalService.capturePayment(resolvedGatewayPaymentId);
         break;
 
       case 'stripe':
-        verificationResult = await this.stripeService.getPaymentStatus(gatewayPaymentId);
+        if (!resolvedGatewayPaymentId) {
+          return res.status(400).json({
+            success: false,
+            message: 'Gateway payment ID is required for Stripe verification',
+          });
+        }
+        verificationResult = await this.stripeService.getPaymentStatus(resolvedGatewayPaymentId);
         break;
 
       default:
@@ -400,54 +460,99 @@ class PaymentController {
     }
 
     if (verificationResult.success) {
-      // Update payment status
-      payment.status = 'COMPLETED';
-      payment.completedAt = new Date();
-      payment.metadata = { ...payment.metadata, verification: verificationResult.data };
-      await payment.save();
+      const session = await mongoose.startSession();
+      let updatedPayment = null;
 
-      // Update order status
-      await Order.findByIdAndUpdate(payment.orderId, {
-        paymentStatus: 'paid',
-        status: 'confirmed',
-      });
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await Payment.findById(payment._id).session(session);
+          if (!paymentDoc) {
+            throw new Error('Payment not found during verification update');
+          }
 
-      // Log successful transaction
-      await this.logTransaction({
-        orderId: payment.orderId,
-        paymentId: payment._id,
-        eventType: 'payment_completed',
-        gateway: payment.gateway,
-        status: 'completed',
-        data: verificationResult.data,
-      });
+          if (paymentDoc.status === 'COMPLETED') {
+            updatedPayment = paymentDoc;
+            return;
+          }
+
+          paymentDoc.status = 'COMPLETED';
+          paymentDoc.completedAt = new Date();
+          paymentDoc.metadata = { ...paymentDoc.metadata, verification: verificationResult.data };
+          await paymentDoc.save({ session });
+          updatedPayment = paymentDoc;
+
+          await Order.findByIdAndUpdate(
+            paymentDoc.orderId,
+            {
+              payment_status: 'paid',
+              paymentStatus: 'paid',
+              status: 'processing',
+            },
+            { session }
+          );
+
+          await this.logTransaction({
+            orderId: paymentDoc.orderId,
+            paymentId: paymentDoc._id,
+            eventType: 'payment_completed',
+            gateway: paymentDoc.gateway,
+            status: 'completed',
+            data: verificationResult.data,
+            session,
+          });
+        });
+      } finally {
+        session.endSession();
+      }
 
       return res.json({
         success: true,
         message: 'Payment verified and completed successfully',
         payment: {
-          paymentId: payment.paymentId,
-          status: payment.status,
-          amount: payment.amount,
-          gateway: payment.gateway,
-          completedAt: payment.completedAt,
+          paymentId: updatedPayment.paymentId,
+          status: updatedPayment.status,
+          amount: updatedPayment.amount,
+          gateway: updatedPayment.gateway,
+          completedAt: updatedPayment.completedAt,
         },
       });
     } else {
-      // Update payment status to failed
-      payment.status = 'FAILED';
-      payment.failureReason = verificationResult.error;
-      await payment.save();
+      const session = await mongoose.startSession();
 
-      // Log failed verification
-      await this.logTransaction({
-        orderId: payment.orderId,
-        paymentId: payment._id,
-        eventType: 'payment_failed',
-        gateway: payment.gateway,
-        status: 'failed',
-        errorDetails: verificationResult.error,
-      });
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await Payment.findById(payment._id).session(session);
+          if (!paymentDoc) {
+            throw new Error('Payment not found during verification failure update');
+          }
+
+          paymentDoc.status = 'FAILED';
+          paymentDoc.failureReason = verificationResult.error;
+          await paymentDoc.save({ session });
+
+          await Order.findByIdAndUpdate(
+            paymentDoc.orderId,
+            {
+              payment_status: 'failed',
+              paymentStatus: 'failed',
+              status: 'payment-failed',
+            },
+            { session }
+          );
+
+          await this.logTransaction({
+            orderId: paymentDoc.orderId,
+            paymentId: paymentDoc._id,
+            eventType: 'payment_failed',
+            gateway: paymentDoc.gateway,
+            status: 'failed',
+            errorDetails: verificationResult.error,
+            session,
+          });
+        });
+      } finally {
+        session.endSession();
+      }
 
       return res.status(400).json({
         success: false,
@@ -496,28 +601,58 @@ class PaymentController {
     }
 
     // Increment retry count
-    payment.retryCount += 1;
-    payment.lastRetryAt = new Date();
-    payment.status = 'PROCESSING';
+    const session = await mongoose.startSession();
+    let retryPaymentDoc = null;
 
-    if (gateway && retryGatewayUpper !== String(payment.gateway || '').toUpperCase()) {
-      payment.gateway = retryGatewayUpper;
-      payment.gatewayPaymentId = null; // Reset gateway payment ID
+    try {
+      await session.withTransaction(async () => {
+        const paymentDoc = await Payment.findOne({ paymentId }).session(session);
+        if (!paymentDoc) {
+          throw new Error('Payment not found');
+        }
+
+        if (!paymentDoc.canRetry) {
+          throw new Error('Payment cannot be retried. Maximum retry limit reached or retry cooldown active.');
+        }
+
+        paymentDoc.retryCount += 1;
+        paymentDoc.lastRetryAt = new Date();
+        paymentDoc.status = 'PROCESSING';
+
+        if (gateway && retryGatewayUpper !== String(paymentDoc.gateway || '').toUpperCase()) {
+          paymentDoc.gateway = retryGatewayUpper;
+          paymentDoc.gatewayPaymentId = null; // Reset gateway payment ID
+        }
+
+        await paymentDoc.save({ session });
+
+        await Order.findByIdAndUpdate(
+          paymentDoc.orderId,
+          {
+            paymentStatus: 'pending',
+            payment_status: 'pending',
+            status: 'processing',
+          },
+          { session }
+        );
+
+        retryPaymentDoc = paymentDoc;
+      });
+    } finally {
+      session.endSession();
     }
 
-    await payment.save();
-
     // Get order details for retry
-    const order = await Order.findById(payment.orderId);
+    const order = await Order.findById(retryPaymentDoc.orderId);
 
     const paymentData = {
-      orderId: payment.orderId.toString(),
-      paymentId: payment.paymentId,
-      amount: payment.amount,
-      currency: payment.currency,
+      orderId: retryPaymentDoc.orderId.toString(),
+      paymentId: retryPaymentDoc.paymentId,
+      amount: retryPaymentDoc.amount,
+      currency: retryPaymentDoc.currency,
       returnUrl: `${client.url}/payment/success`,
       cancelUrl: `${client.url}/payment/cancel`,
-      description: `Retry Payment for Order #${order.orderNumber || payment.orderId}`,
+      description: `Retry Payment for Order #${order.orderNumber || retryPaymentDoc.orderId}`,
       customerEmail: req.user?.email,
     };
 
@@ -538,28 +673,40 @@ class PaymentController {
 
     if (result.success) {
       // Update payment with new gateway response
-      payment.gatewayPaymentId = result.paymentId;
-      payment.metadata = { ...payment.metadata, retry: result.data };
-      await payment.save();
+      const updateSession = await mongoose.startSession();
+      try {
+        await updateSession.withTransaction(async () => {
+          const paymentDoc = await Payment.findOne({ paymentId }).session(updateSession);
+          if (!paymentDoc) {
+            throw new Error('Payment not found');
+          }
 
-      // Log retry attempt
-      await this.logTransaction({
-        orderId: payment.orderId,
-        paymentId: payment._id,
-        eventType: 'retry_attempted',
-        gateway: retryGatewayLower,
-        status: 'processing',
-        data: { retryCount: payment.retryCount, ...result.data },
-      });
+          paymentDoc.gatewayPaymentId = result.paymentId;
+          paymentDoc.metadata = { ...paymentDoc.metadata, retry: result.data };
+          await paymentDoc.save({ session: updateSession });
+
+          await this.logTransaction({
+            orderId: paymentDoc.orderId,
+            paymentId: paymentDoc._id,
+            eventType: 'retry_attempted',
+            gateway: retryGatewayLower,
+            status: 'processing',
+            data: { retryCount: paymentDoc.retryCount, ...result.data },
+            session: updateSession,
+          });
+        });
+      } finally {
+        updateSession.endSession();
+      }
 
       return res.json({
         success: true,
         message: 'Payment retry initiated successfully',
         payment: {
-          paymentId: payment.paymentId,
+          paymentId: retryPaymentDoc.paymentId,
           gatewayPaymentId: result.paymentId,
           gateway: retryGatewayUpper,
-          retryCount: payment.retryCount,
+          retryCount: retryPaymentDoc.retryCount,
           status: 'PROCESSING',
           approvalUrl: result.approvalUrl,
           clientSecret: result.clientSecret,
@@ -567,26 +714,47 @@ class PaymentController {
       });
     } else {
       // Update payment status back to failed
-      payment.status = 'FAILED';
-      payment.failureReason = result.error;
-      await payment.save();
+      const failSession = await mongoose.startSession();
+      try {
+        await failSession.withTransaction(async () => {
+          const paymentDoc = await Payment.findOne({ paymentId }).session(failSession);
+          if (!paymentDoc) {
+            throw new Error('Payment not found');
+          }
 
-      // Log failed retry
-      await this.logTransaction({
-        orderId: payment.orderId,
-        paymentId: payment._id,
-        eventType: 'retry_attempted',
-        gateway: retryGatewayLower,
-        status: 'failed',
-        errorDetails: result.error,
-        data: { retryCount: payment.retryCount },
-      });
+          paymentDoc.status = 'FAILED';
+          paymentDoc.failureReason = result.error;
+          await paymentDoc.save({ session: failSession });
+
+          await Order.findByIdAndUpdate(
+            paymentDoc.orderId,
+            {
+              paymentStatus: 'failed',
+              payment_status: 'failed',
+            },
+            { session: failSession }
+          );
+
+          await this.logTransaction({
+            orderId: paymentDoc.orderId,
+            paymentId: paymentDoc._id,
+            eventType: 'retry_attempted',
+            gateway: retryGatewayLower,
+            status: 'failed',
+            errorDetails: result.error,
+            data: { retryCount: paymentDoc.retryCount },
+            session: failSession,
+          });
+        });
+      } finally {
+        failSession.endSession();
+      }
 
       return res.status(400).json({
         success: false,
         message: 'Payment retry failed',
         error: result.error,
-        retryCount: payment.retryCount,
+        retryCount: retryPaymentDoc.retryCount,
       });
     }
   });
@@ -594,8 +762,9 @@ class PaymentController {
   // POST /payment/refund - UPDATED FOR INTEGRATED REFUNDS
   static processRefund = safeApiCall(async (req, res) => {
     const { paymentId, amount, reason, description } = req.body;
+    const normalizedAmount = Number(amount);
 
-    if (!paymentId || !amount || !reason) {
+    if (!paymentId || Number.isNaN(normalizedAmount) || normalizedAmount <= 0 || !reason) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: paymentId, amount, reason',
@@ -610,8 +779,17 @@ class PaymentController {
       });
     }
 
+    const supportedRefundGateways = ['PAYPAL', 'RAZORPAY', 'STRIPE'];
+    const refundGatewayLower = String(payment.gateway || '').toLowerCase();
+    if (!supportedRefundGateways.includes(String(payment.gateway || '').toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: `Gateway ${payment.gateway} does not support refunds`,
+      });
+    }
+
     // Check if refund is possible
-    const refundCheck = payment.canRefund(amount);
+    const refundCheck = payment.canRefund(normalizedAmount);
     if (!refundCheck.canRefund) {
       return res.status(400).json({
         success: false,
@@ -619,18 +797,11 @@ class PaymentController {
       });
     }
 
-    // Add refund to payment
-    const refund = payment.addRefund({
-      amount,
-      reason,
-      description,
-    });
-
-    await payment.save();
+    const refundId = `REF_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const refundData = {
-      refundId: refund.refundId,
-      amount,
+      refundId,
+      amount: normalizedAmount,
       currency: payment.currency,
       reason,
       description,
@@ -639,7 +810,7 @@ class PaymentController {
     let result;
 
     // Process refund based on gateway
-    switch (payment.gateway) {
+    switch (refundGatewayLower) {
       case 'paypal':
         result = await this.paypalService.refundPayment(payment.gatewayPaymentId, refundData);
         break;
@@ -649,31 +820,62 @@ class PaymentController {
       case 'stripe':
         result = await this.stripeService.refundPayment(payment.gatewayPaymentId, refundData);
         break;
-      default:
-        return res.status(400).json({
-          success: false,
-          message: `Gateway ${payment.gateway} does not support refunds`,
-        });
     }
 
     if (result.success) {
-      // Update refund status
-      payment.updateRefundStatus(refund._id, result.status === 'succeeded' || result.status === 'processed' ? 'completed' : 'processing', result.refundId, result.data);
+      const normalizedRefundStatus = result.status === 'succeeded' || result.status === 'processed' ? 'COMPLETED' : 'PROCESSING';
+      const session = await mongoose.startSession();
+      let updatedRefund = null;
+      let updatedPayment = null;
 
-      await payment.save();
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await Payment.findOne({ paymentId }).session(session);
+          if (!paymentDoc) {
+            throw new Error('Payment not found while applying refund');
+          }
 
-      // Log refund transaction
-      await this.logTransaction({
-        orderId: payment.orderId,
-        paymentId: payment._id,
-        eventType: 'refund_initiated',
-        gateway: payment.gateway,
-        status: result.status === 'succeeded' || result.status === 'processed' ? 'completed' : 'processing',
-        data: { refundId: refund.refundId, ...result.data },
-      });
+          const createdRefund = paymentDoc.addRefund({
+            amount: normalizedAmount,
+            reason,
+            description,
+          });
+          createdRefund.refundId = refundId;
 
-      // Get updated refund info
-      const updatedRefund = payment.getRefund(refund._id);
+          paymentDoc.updateRefundStatus(createdRefund.refundId, normalizedRefundStatus, result.refundId, result.data);
+          await paymentDoc.save({ session });
+
+          updatedRefund = paymentDoc.getRefund(createdRefund.refundId);
+          updatedPayment = paymentDoc;
+
+          if (normalizedRefundStatus === 'COMPLETED') {
+            const isFullyRefunded = paymentDoc.totalRefunded >= paymentDoc.amount;
+            const paymentState = isFullyRefunded ? 'refunded' : 'partial';
+            const orderUpdate = {
+              payment_status: paymentState,
+              paymentStatus: paymentState,
+            };
+
+            if (isFullyRefunded) {
+              orderUpdate.status = 'refunded';
+            }
+
+            await Order.findByIdAndUpdate(paymentDoc.orderId, orderUpdate, { session });
+          }
+
+          await this.logTransaction({
+            orderId: paymentDoc.orderId,
+            paymentId: paymentDoc._id,
+            eventType: 'refund_initiated',
+            gateway: paymentDoc.gateway,
+            status: normalizedRefundStatus.toLowerCase(),
+            data: { refundId, ...result.data },
+            session,
+          });
+        });
+      } finally {
+        session.endSession();
+      }
 
       return res.json({
         success: true,
@@ -686,35 +888,55 @@ class PaymentController {
           reason: updatedRefund.reason,
         },
         payment: {
-          paymentId: payment.paymentId,
-          status: payment.status,
-          totalRefunded: payment.totalRefunded,
-          refundableAmount: payment.refundableAmount,
+          paymentId: updatedPayment.paymentId,
+          status: updatedPayment.status,
+          totalRefunded: updatedPayment.totalRefunded,
+          refundableAmount: updatedPayment.refundableAmount,
         },
       });
     } else {
-      // Update refund status to failed
-      payment.updateRefundStatus(refund._id, 'failed');
-      payment.refunds.id(refund._id).failureReason = result.error;
-      await payment.save();
+      const session = await mongoose.startSession();
 
-      // Log failed refund
-      await this.logTransaction({
-        orderId: payment.orderId,
-        paymentId: payment._id,
-        eventType: 'refund_failed',
-        gateway: payment.gateway,
-        status: 'failed',
-        errorDetails: result.error,
-        data: { refundId: refund.refundId },
-      });
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await Payment.findOne({ paymentId }).session(session);
+          if (!paymentDoc) {
+            throw new Error('Payment not found while handling refund failure');
+          }
+
+          const failedRefund = paymentDoc.addRefund({
+            amount: normalizedAmount,
+            reason,
+            description,
+          });
+          failedRefund.refundId = refundId;
+
+          paymentDoc.updateRefundStatus(failedRefund.refundId, 'FAILED');
+          const failedDoc = paymentDoc.getRefund(failedRefund.refundId);
+          failedDoc.failureReason = result.error;
+          await paymentDoc.save({ session });
+
+          await this.logTransaction({
+            orderId: paymentDoc.orderId,
+            paymentId: paymentDoc._id,
+            eventType: 'refund_failed',
+            gateway: paymentDoc.gateway,
+            status: 'failed',
+            errorDetails: result.error,
+            data: { refundId },
+            session,
+          });
+        });
+      } finally {
+        session.endSession();
+      }
 
       return res.status(400).json({
         success: false,
         message: 'Refund processing failed',
         error: result.error,
         refund: {
-          refundId: refund.refundId,
+          refundId,
           status: 'failed',
           failureReason: result.error,
         },
@@ -816,11 +1038,12 @@ class PaymentController {
   // Helper: Log transaction (from Artifact B)
   static async logTransaction(logData) {
     try {
+      const normalizedGateway = String(logData.gateway || '').toLowerCase();
       const transactionLog = new TransactionLog({
         orderId: logData.orderId,
         paymentId: logData.paymentId,
         eventType: logData.eventType,
-        gateway: logData.gateway,
+        gateway: normalizedGateway,
         status: logData.status,
         previousStatus: logData.previousStatus,
         data: logData.data,
@@ -829,7 +1052,11 @@ class PaymentController {
         userAgent: logData.userAgent,
       });
 
-      await transactionLog.save();
+      if (logData.session) {
+        await transactionLog.save({ session: logData.session });
+      } else {
+        await transactionLog.save();
+      }
     } catch (error) {
       //logger.error('Failed to log transaction', { error });
     }
@@ -903,8 +1130,41 @@ class PaymentController {
         return res.status(400).json({ error: 'Invalid status transition' });
       }
 
-      await payment.updateStatus(status, note, updated_by);
-      const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
+      const session = await mongoose.startSession();
+      let updatedPayment = null;
+
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await PaymentModel.findById(id).session(session).populate('customerId');
+          if (!paymentDoc) {
+            throw new Error('Payment not found');
+          }
+
+          checkPaymentOwnership(req, paymentDoc);
+
+          paymentDoc.updateStatus(status, note, updated_by);
+          await paymentDoc.save({ session });
+
+          const orderUpdate = {};
+          if (status === 'COMPLETED') {
+            orderUpdate.payment_status = 'paid';
+            orderUpdate.paymentStatus = 'paid';
+            orderUpdate.status = 'processing';
+          } else if (status === 'FAILED' || status === 'CANCELLED' || status === 'EXPIRED') {
+            orderUpdate.payment_status = 'failed';
+            orderUpdate.paymentStatus = 'failed';
+          }
+
+          if (Object.keys(orderUpdate).length > 0) {
+            await Order.findByIdAndUpdate(paymentDoc.orderId, orderUpdate, { session });
+          }
+
+          updatedPayment = paymentDoc;
+        });
+      } finally {
+        session.endSession();
+      }
+
       const formattedPayment = updatedPayment.toAPIResponse();
 
       // logger.info('Payment status updated', { paymentId: id, newStatus: status, updated_by });
@@ -937,8 +1197,42 @@ class PaymentController {
         return res.status(400).json({ error: 'Refund amount exceeds refundable amount' });
       }
 
-      await payment.addRefund({ amount, reason, created_by });
-      const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
+      const session = await mongoose.startSession();
+      let updatedPayment = null;
+
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await PaymentModel.findById(id).session(session).populate('customerId');
+          if (!paymentDoc) {
+            throw new Error('Payment not found');
+          }
+
+          checkPaymentOwnership(req, paymentDoc);
+          if (!paymentDoc.canRefund()) {
+            throw new Error('Payment cannot be refunded');
+          }
+          if (amount > paymentDoc.refundableAmount) {
+            throw new Error('Refund amount exceeds refundable amount');
+          }
+
+          paymentDoc.addRefund({ amount, reason, created_by });
+          await paymentDoc.save({ session });
+
+          const orderUpdate = {
+            payment_status: paymentDoc.totalRefunded >= paymentDoc.amount ? 'refunded' : 'partial',
+            paymentStatus: paymentDoc.totalRefunded >= paymentDoc.amount ? 'refunded' : 'partial',
+          };
+          if (paymentDoc.totalRefunded >= paymentDoc.amount) {
+            orderUpdate.status = 'refunded';
+          }
+
+          await Order.findByIdAndUpdate(paymentDoc.orderId, orderUpdate, { session });
+          updatedPayment = paymentDoc;
+        });
+      } finally {
+        session.endSession();
+      }
+
       const formattedPayment = updatedPayment.toAPIResponse();
 
       // logger.info('Refund added', { paymentId: id, refundAmount: amount });
@@ -1258,8 +1552,36 @@ class PaymentController {
 
       checkPaymentOwnership(req, payment);
 
-      await payment.markAsPaid(note);
-      const updatedPayment = await PaymentModel.findById(id).populate('orderId customerId');
+      const session = await mongoose.startSession();
+      let updatedPayment = null;
+
+      try {
+        await session.withTransaction(async () => {
+          const paymentDoc = await PaymentModel.findById(id).session(session).populate('customerId');
+          if (!paymentDoc) {
+            throw new Error('Payment not found');
+          }
+
+          checkPaymentOwnership(req, paymentDoc);
+          paymentDoc.markAsPaid(note);
+          await paymentDoc.save({ session });
+
+          await Order.findByIdAndUpdate(
+            paymentDoc.orderId,
+            {
+              payment_status: 'paid',
+              paymentStatus: 'paid',
+              status: 'processing',
+            },
+            { session }
+          );
+
+          updatedPayment = paymentDoc;
+        });
+      } finally {
+        session.endSession();
+      }
+
       const formattedPayment = updatedPayment.toAPIResponse();
 
       // logger.info('Payment marked as paid', { paymentId: id });
@@ -2513,18 +2835,43 @@ class PaymentController {
 
       const results = [];
       for (const payment of payments) {
-        if (!payment.canRefund()) {
-          results.push({ paymentId: payment._id, status: 'failed', message: 'Payment cannot be refunded' });
-          continue;
-        }
-        const refundAmount = payment.amount * (amountPercentage / 100);
-        if (refundAmount > payment.refundableAmount) {
-          results.push({ paymentId: payment._id, status: 'failed', message: 'Refund amount exceeds refundable amount' });
-          continue;
-        }
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => {
+            const paymentDoc = await PaymentModel.findById(payment._id).session(session).populate('customerId');
+            if (!paymentDoc) {
+              results.push({ paymentId: payment._id, status: 'failed', message: 'Payment not found' });
+              return;
+            }
 
-        await payment.addRefund({ amount: refundAmount, reason, created_by });
-        results.push({ paymentId: payment._id, status: 'success', refundAmount });
+            if (!paymentDoc.canRefund()) {
+              results.push({ paymentId: payment._id, status: 'failed', message: 'Payment cannot be refunded' });
+              return;
+            }
+
+            const refundAmount = paymentDoc.amount * (amountPercentage / 100);
+            if (refundAmount > paymentDoc.refundableAmount) {
+              results.push({ paymentId: payment._id, status: 'failed', message: 'Refund amount exceeds refundable amount' });
+              return;
+            }
+
+            paymentDoc.addRefund({ amount: refundAmount, reason, created_by });
+            await paymentDoc.save({ session });
+
+            const orderUpdate = {
+              payment_status: paymentDoc.totalRefunded >= paymentDoc.amount ? 'refunded' : 'partial',
+              paymentStatus: paymentDoc.totalRefunded >= paymentDoc.amount ? 'refunded' : 'partial',
+            };
+            if (paymentDoc.totalRefunded >= paymentDoc.amount) {
+              orderUpdate.status = 'refunded';
+            }
+            await Order.findByIdAndUpdate(paymentDoc.orderId, orderUpdate, { session });
+
+            results.push({ paymentId: payment._id, status: 'success', refundAmount });
+          });
+        } finally {
+          session.endSession();
+        }
       }
 
       // logger.info('Bulk refunds processed', { paymentCount: paymentIds.length, amountPercentage });

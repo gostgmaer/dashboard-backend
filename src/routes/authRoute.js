@@ -41,6 +41,18 @@ const otpRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
+const refreshTokenRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: {
+    success: false,
+    message: 'Too many refresh token requests, please try again later.',
+    error: 'REFRESH_RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ========================================
 // 🔑 PUBLIC ENDPOINTS
 // ========================================
@@ -61,7 +73,7 @@ authRoute.post('/verify/:id', authMiddleware, authController.verifyUser);
 authRoute.post('/logout', authMiddleware, authController.logout);
 authRoute.get('/permissions', authMiddleware, authController.getUserPermissionsController);
 authRoute.post('/logout-all', authMiddleware, authController.logoutAll);
-authRoute.post('/refresh-token', authController.refreshToken);
+authRoute.post('/refresh-token', refreshTokenRateLimit, authController.refreshToken);
 authRoute.post('/change-password', authMiddleware, authController.changePassword);
 
 // ========================================

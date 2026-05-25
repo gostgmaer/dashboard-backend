@@ -1,6 +1,7 @@
 const Cart = require('../../models/cart');
 const Product = require('../../models/products');
 const Order = require('../../models/orders');
+const User = require('../../models/user');
 const mongoose = require('mongoose');
 const { sendSuccess, sendCreated, HTTP_STATUS } = require('../../utils/responseHelper');
 const AppError = require('../../utils/appError');
@@ -229,6 +230,11 @@ exports.convertCart = catchAsync(async (req, res) => {
   try {
     const userId = req.user._id;
     const { shippingAddress, paymentMethod = 'cod' } = req.body;
+    const user = await User.findById(userId).select('email firstName lastName phoneNumber');
+
+    if (!user) {
+      throw AppError.notFound('User not found');
+    }
 
     const cart = await Cart.getActiveCartByUser(userId);
     if (!cart.items || cart.items.length === 0) {
@@ -241,17 +247,35 @@ exports.convertCart = catchAsync(async (req, res) => {
     // Build order items from cart
     const orderItems = cart.items.map((item) => ({
       product: item.product._id,
-      name: item.product.title || item.product.name,
       quantity: item.quantity,
       price: item.product.finalPrice || item.product.basePrice || 0,
     }));
 
+    const normalizedShippingAddress = shippingAddress || {};
+    if (
+      !normalizedShippingAddress.addressLine1 ||
+      !normalizedShippingAddress.city ||
+      !normalizedShippingAddress.postalCode ||
+      !normalizedShippingAddress.country
+    ) {
+      throw AppError.badRequest('Valid shippingAddress is required with addressLine1, city, postalCode and country');
+    }
+
+    if (!user.email || !user.firstName || !user.lastName || !user.phoneNumber) {
+      throw AppError.badRequest('User profile must include email, firstName, lastName and phoneNumber before checkout');
+    }
+
     const order = new Order({
       user: userId,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phoneNumber,
+      shippingAddress: normalizedShippingAddress,
       items: orderItems,
       total: totals.payableTotal,
+      subtotal: totals.subtotal,
       amount_due: totals.payableTotal,
-      shipping_address: shippingAddress || undefined,
       payment_method: paymentMethod,
       status: 'pending',
       payment_status: 'unpaid',

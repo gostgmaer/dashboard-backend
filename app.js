@@ -56,6 +56,8 @@ const authRoute = require('./src/routes/authRoute');
 const fileRoutes = require('./src/routes/fileRoutes');
 const templateRoutes = require('./src/controller/resume/Template_Routes');
 const { publicRoutes } = require('./src/routes/public');
+const shippingRoute = require('./src/routes/shipping');
+const dashboardRoute = require('./src/routes/dashboard');
 
 /* =========================
    App Initialization
@@ -210,6 +212,8 @@ app.use('/api/components', safeRoute('Components', componentsRoutes));
 app.use('/api/templates', safeRoute('Templates', templateRoutes));
 app.use('/api/inquiry', safeRoute('Inquiry', InquiryRoutes));
 app.use('/api/masters', safeRoute('Masters', masterRoute));
+app.use('/api', safeRoute('Shipping', shippingRoute));
+app.use('/api', safeRoute('Dashboard', dashboardRoute));
 app.use('/api', safeRoute('Public', publicRoutes));
 
 /* =========================

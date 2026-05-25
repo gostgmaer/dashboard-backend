@@ -2341,7 +2341,8 @@ userSchema.method({
   },
 
   async resetPassword(token, newPassword) {
-    if (!this.resetToken || this.resetToken !== token) {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    if (!this.resetToken || this.resetToken !== hashedToken) {
       throw new Error('Invalid reset token');
     }
 
@@ -3808,8 +3809,9 @@ userSchema.statics.getAverageOrdersPerUser = async function () {
     return { user, resetToken };
   }),
   (userSchema.statics.completePasswordReset = async function (token, newPassword) {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     const user = await this.findOne({
-      resetToken: token,
+      resetToken: hashedToken,
       resetTokenExpiration: { $gt: new Date() },
     });
 

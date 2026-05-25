@@ -53,7 +53,7 @@ Successfully centralized **ALL** environment variables into `src/config/setting.
 5. **Client URLs** (`client`) - frontend URLs
 6. **Email Configuration** (`email`) - SMTP, OAuth2, fallback
 7. **Payment Gateways** (`payment`) - PayPal, Stripe, Razorpay
-8. **File Storage** (`storage`) - local, S3, GCS, Azure, Firebase
+8. **File Storage** (`storage`) - local, S3, GCS, Azure
 9. **Third-Party Services** (`services`) - Redis, Twilio, Mailchimp
 10. **OTP & 2FA** (`otp`) - TOTP, email OTP, SMS OTP
 11. **Business Settings** (`business`) - company info, currency

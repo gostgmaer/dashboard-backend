@@ -171,7 +171,7 @@ payment.encryptionKey
 const { storage } = require('./src/config/setting');
 
 // General:
-storage.type              // 'local', 's3', 'gcs', 'azure', 'firebase'
+storage.type              // 'local', 's3', 'gcs', 'azure'
 storage.localPath
 storage.tempUploadDir
 storage.permanentUploadDir
@@ -203,21 +203,6 @@ storage.azure.container
 storage.azure.account
 storage.azure.accessKey
 storage.azure.connectionString
-
-// Firebase Storage:
-storage.firebase.bucket
-storage.firebase.projectId
-storage.firebase.clientEmail
-storage.firebase.privateKey
-storage.firebase.keyFile
-storage.firebase.authDomain
-storage.firebase.messagingSenderId
-storage.firebase.appId
-storage.firebase.emulator.enabled
-storage.firebase.emulator.host
-storage.firebase.emulator.protocol
-storage.firebase.emulator.auth
-storage.firebase.emulator.storage
 ```
 
 ### 9. Third-Party Services (`services`)

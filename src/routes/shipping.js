@@ -1,13 +1,16 @@
-const express = require("express");
+const express = require('express');
+
 const shippingRoute = express.Router();
 
-const {
-  profile,
-  updateUser,
-  getusers,
-  deleteUser,
-} = require("../controller/orders/orders");
+const notImplemented = (feature) => (_req, res) => {
+  res.status(501).json({
+    success: false,
+    message: `${feature} is not implemented yet`,
+  });
+};
 
-shippingRoute.route("/shipping-methods").get();
-shippingRoute.route("/payment-methods").get();
-shippingRoute.route("/checkout").post();
+shippingRoute.get('/shipping-methods', notImplemented('Shipping methods API'));
+shippingRoute.get('/payment-methods', notImplemented('Payment methods API'));
+shippingRoute.post('/checkout', notImplemented('Checkout API'));
+
+module.exports = shippingRoute;

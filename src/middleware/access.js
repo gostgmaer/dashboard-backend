@@ -25,7 +25,7 @@ class authAccess {
    */
   static async authenticate(req, res, next) {
     try {
-      const token = AuthMiddleware.extractToken(req);
+      const token = authAccess.extractToken(req);
 
       if (!token) {
         return res.status(401).json({
@@ -101,7 +101,7 @@ class authAccess {
       req.deviceInfo = deviceInfo;
 
       // Check device-based security
-      const securityCheck = await AuthMiddleware.performSecurityChecks(user, deviceInfo, tokenData);
+      const securityCheck = await authAccess.performSecurityChecks(user, deviceInfo, tokenData);
       if (!securityCheck.allowed) {
         return res.status(401).json({
           success: false,
@@ -112,7 +112,7 @@ class authAccess {
       }
 
       // Check if OTP is required for this operation
-      const otpRequired = await AuthMiddleware.checkOTPRequirement(req, user, deviceInfo);
+      const otpRequired = await authAccess.checkOTPRequirement(req, user, deviceInfo);
       if (otpRequired.required && !otpRequired.satisfied) {
         return res.status(200).json({
           success: false,
@@ -149,7 +149,7 @@ class authAccess {
    */
   static async optionalAuthenticate(req, res, next) {
     try {
-      const token = AuthMiddleware.extractToken(req);
+      const token = authAccess.extractToken(req);
 
       if (!token) {
         req.user = null;
@@ -158,7 +158,7 @@ class authAccess {
       }
 
       // Use the main authenticate logic but don't fail if no token
-      await AuthMiddleware.authenticate(req, res, next);
+      await authAccess.authenticate(req, res, next);
     } catch (error) {
       // If authentication fails, continue without user
       req.user = null;
@@ -343,11 +343,6 @@ class authAccess {
       return authHeader.substring(7);
     }
 
-    // Check query parameter
-    if (req.query.token) {
-      return req.query.token;
-    }
-
     // Check cookies
     if (req.cookies && req.cookies.access_token) {
       return req.cookies.access_token;
@@ -394,7 +389,7 @@ class authAccess {
 
     // Check for suspicious login patterns
     if (security.enableSuspiciousLoginDetection) {
-      const suspiciousActivity = await AuthMiddleware.detectSuspiciousActivity(user, deviceInfo);
+      const suspiciousActivity = await authAccess.detectSuspiciousActivity(user, deviceInfo);
       if (suspiciousActivity.detected) {
         checks.allowed = false;
         checks.reason = suspiciousActivity.reason;
@@ -406,7 +401,7 @@ class authAccess {
 
     // Check IP whitelist if enabled
     if (security.enableIpWhitelist) {
-      const ipAllowed = AuthMiddleware.checkIPWhitelist(deviceInfo.ipAddress);
+      const ipAllowed = authAccess.checkIPWhitelist(deviceInfo.ipAddress);
       if (!ipAllowed) {
         checks.allowed = false;
         checks.reason = 'IP address not in whitelist';
@@ -626,7 +621,7 @@ class authAccess {
 
       // Verify CSRF token (implement your CSRF verification logic)
       // This is a simplified check - use a proper CSRF library in production
-      if (!AuthMiddleware.verifyCsrfToken(token, req.session)) {
+      if (!authAccess.verifyCsrfToken(token, req.session)) {
         return res.status(403).json({
           success: false,
           message: 'Invalid CSRF token',
