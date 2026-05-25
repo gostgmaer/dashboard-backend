@@ -231,27 +231,6 @@ const storage = {
     connectionString: process.env.AZURE_CONNECTION_STRING || '',
   },
   
-  // Firebase Storage
-  firebase: {
-    bucket: process.env.FIREBASE_BUCKET || process.env.BUCKET_NAME || '',
-    projectId: process.env.FIREBASE_PROJECT_ID || '',
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
-    privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : '',
-    keyFile: process.env.FIREBASE_KEY_FILE || '',
-    authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
-    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: process.env.FIREBASE_APP_ID || '',
-    
-    // Emulator settings
-    emulator: {
-      enabled: parseBoolean(process.env.USE_FIREBASE_EMULATOR, false),
-      host: process.env.FIREBASE_EMULATOR_HOST || 'localhost:9199',
-      protocol: process.env.FIREBASE_EMULATOR_PROTOCOL || 'http',
-      auth: parseBoolean(process.env.FIREBASE_EMULATOR_AUTH, false),
-      storage: parseBoolean(process.env.FIREBASE_EMULATOR_STORAGE, false),
-    },
-  },
-  
   // Cloudflare R2 (S3-compatible)
   r2: {
     endpoint: process.env.R2_ENDPOINT || '',
@@ -535,21 +514,8 @@ module.exports = {
   virusScanApiKey: storage.virusScan.apiKey,
   tempUploadDir: storage.tempUploadDir,
   permanentUploadDir: storage.permanentUploadDir,
-  firebaseBucket: storage.firebase.bucket,
-  firebaseProjectId: storage.firebase.projectId,
-  firebaseClientEmail: storage.firebase.clientEmail,
-  firebasePrivateKey: storage.firebase.privateKey,
-  firebaseKeyFile: storage.firebase.keyFile,
-  useFirebaseEmulator: storage.firebase.emulator.enabled,
-  firebaseEmulatorHost: storage.firebase.emulator.host,
-  firebaseEmulatorProtocol: storage.firebase.emulator.protocol,
-  firebaseEmulatorAuth: storage.firebase.emulator.auth,
-  firebaseEmulatorStorage: storage.firebase.emulator.storage,
-  bucketName: storage.firebase.bucket,
+  bucketName: storage.s3.bucket,
   localStoragePath: storage.localPath,
-  firebaseAuthDomain: storage.firebase.authDomain,
-  firebaseMessagingSenderId: storage.firebase.messagingSenderId,
-  firebaseAppId: storage.firebase.appId,
   
   // Services (legacy)
   mailchimpKey: services.mailchimp.apiKey,

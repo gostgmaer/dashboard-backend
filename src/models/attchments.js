@@ -13,8 +13,8 @@ const attachmentSchema = new mongoose.Schema(
     thumbnailUrl: { type: String, trim: true },
     isDeleted: { type: Boolean, default: false },
     // Metadata
-    storageType: { type: String, enum: ["local", "s3", "cloudinary", "gcs", "firebase", "azure"], default: "local" },
-    bucketName: { type: String, trim: true }, // S3 bucket, Firebase storage bucket, or Azure container
+    storageType: { type: String, enum: ["local", "s3", "cloudinary", "gcs", "azure"], default: "local" },
+    bucketName: { type: String, trim: true }, // S3 bucket, GCS bucket, or Azure container
     storagePath: { type: String, trim: true }, // Full path in cloud storage
     cloudMetadata: { type: Map, of: String }, // Store cloud-specific metadata (e.g., ETag for S3)
     checksum: { type: String, trim: true },
@@ -134,12 +134,6 @@ attachmentSchema.methods.generateSignedUrl = async function (expirySeconds = 360
       //   Key: this.storagePath,
       //   Expires: expirySeconds
       // });
-      break;
-    case "firebase":
-      // Implement Firebase Storage signed URL generation
-      // Example: const { getStorage, getDownloadURL } = require('firebase/storage');
-      // const storage = getStorage();
-      // signedUrl = await getDownloadURL(ref(storage, this.storagePath));
       break;
     case "azure":
       // Implement Azure Blob Storage SAS token generation
@@ -395,7 +389,7 @@ attachmentSchema.pre("save", function (next) {
   if (this.extension) this.extension = this.extension.toLowerCase();
   
   // Validate cloud storage configuration
-  if (["s3", "firebase", "azure", "gcs"].includes(this.storageType)) {
+  if (["s3", "azure", "gcs"].includes(this.storageType)) {
     if (!this.bucketName) {
       return next(new Error("bucketName is required for cloud storage"));
     }
@@ -403,8 +397,7 @@ attachmentSchema.pre("save", function (next) {
       return next(new Error("storagePath is required for cloud storage"));
     }
   }
-  
-  
+  next();
 });
 
 attachmentSchema.post("save", function (doc) {

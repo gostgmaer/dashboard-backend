@@ -2,31 +2,16 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
-const { initializeApp } = require('firebase/app');
-const { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } = require('firebase/storage');
-const {  PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const { storageType, localStoragePath, firebasePrivateKey,azureContainer, firebaseAuthDomain, azurestorage_conn_string, firebaseProjectId, firebaseBucket, firebaseMessagingSenderId, firebaseAppId, s3Region, s3AccessKey, s3SecretKey, bucketName } = require('../../config/setting');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { storageType, localStoragePath, azureContainer, azurestorage_conn_string, s3Region, s3AccessKey, s3SecretKey, bucketName } = require('../../config/setting');
 const Attachment = require("../../models/attchments");
 const { BlobServiceClient } = require("@azure/storage-blob");
 // const { standardResponse } = require('../../utils/apiUtils');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 // Ensure local upload directory exists
-if (storageType === 'firebase' || storageType === 'local') {
+if (storageType === 'local') {
     fs.mkdir(localStoragePath, { recursive: true }).catch(console.error);
 }
-
-
-// Initialize Firebase (if used)
- const firebaseConfig = {
-    apiKey: firebasePrivateKey,
-    authDomain: firebaseAuthDomain,
-    projectId: firebaseProjectId,
-    storageBucket: firebaseBucket,
-    messagingSenderId: firebaseMessagingSenderId,
-    appId: firebaseAppId,
-};
- const firebaseApp = storageType === "firebase" ? initializeApp(firebaseConfig) : null;
- const firebaseStorage = firebaseApp ? getStorage(firebaseApp) : null;
 
 // Initialize AWS S3 (if used)
  const s3Client = storageType === "s3" ? new S3Client({
@@ -99,16 +84,6 @@ exports.uploadFile = [
                 case 'local':
                     fileUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
                     storagePath = path.join(localStoragePath, file.filename);
-                    break;
-                case 'firebase':
-                    storagePath = `tenants/${_id}/${fileName}`;
-                    const fileRef = ref(firebaseStorage, storagePath);
-                    const metadata = {
-                        contentType: file.mimetype,
-                        customMetadata: { _id, uploadedBy: _id },
-                    };
-                    await uploadBytes(fileRef, file.buffer, metadata);
-                    fileUrl = await getDownloadURL(fileRef);
                     break;
                 case 's3':
                     storagePath = `tenants/${_id}/${fileName}`;
@@ -212,14 +187,6 @@ exports.updateFile = [
                     // Save new file
                     fileUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
                     break;
-                case 'firebase':
-                    const fileRef = ref(firebaseStorage, attachment.storagePath);
-                    await uploadBytes(fileRef, file.buffer, {
-                        contentType: file.mimetype,
-                        customMetadata: { tenantId, uploadedBy: _id },
-                    });
-                    fileUrl = await getDownloadURL(fileRef);
-                    break;
                 case 's3':
                     await s3Client.send(
                         new PutObjectCommand({
@@ -293,18 +260,8 @@ exports.renameFile = async (req, res, next) => {
         if (storageType !== 'local') {
             newStoragePath = `tenants/${tenantId}/${uuidv4()}.${fileExtension}`;
             switch (storageType) {
-                case 'firebase':
-                    const oldRef = ref(firebaseStorage, attachment.storagePath);
-                    const newRef = ref(firebaseStorage, newStoragePath);
-                    await uploadBytes(newRef, await (await fetch(attachment.fileUrl)).arrayBuffer(), {
-                        contentType: attachment.fileType,
-                        customMetadata: { tenantId, uploadedBy: _id },
-                    });
-                    await deleteObject(oldRef).catch(() => { });
-                    fileUrl = await getDownloadURL(newRef);
-                    break;
                 case 's3':
-                    await S3Client.send(
+                    await s3Client.send(
                         new PutObjectCommand({
                             Bucket: bucketName,
                             Key: newStoragePath,
@@ -314,7 +271,7 @@ exports.renameFile = async (req, res, next) => {
                             ACL: 'public-read',
                         })
                     );
-                    await S3Client.send(
+                    await s3Client.send(
                         new DeleteObjectCommand({
                             Bucket: bucketName,
                             Key: attachment.storagePath,
@@ -371,12 +328,8 @@ exports.removeFile = async (req, res, next) => {
             case 'local':
                 await fs.unlink(attachment.storagePath).catch(() => { });
                 break;
-            case 'firebase':
-                const fileRef = ref(firebaseStorage, attachment.storagePath);
-                await deleteObject(fileRef).catch(() => { });
-                break;
             case 's3':
-                await S3Client
+                await s3Client
                     .send(
                         new DeleteObjectCommand({
                             Bucket: bucketName,
