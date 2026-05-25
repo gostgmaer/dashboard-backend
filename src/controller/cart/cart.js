@@ -1,5 +1,6 @@
 const Cart = require('../../models/cart');
 const Product = require('../../models/products');
+const Order = require('../../models/orders');
 const mongoose = require('mongoose');
 const { sendSuccess, sendCreated, HTTP_STATUS } = require('../../utils/responseHelper');
 const AppError = require('../../utils/appError');
@@ -222,17 +223,58 @@ exports.applyCartDiscount = catchAsync(async (req, res) => {
 
 // Convert cart
 exports.convertCart = catchAsync(async (req, res) => {
-  const userId = req.user._id;
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  const cart = await Cart.getActiveCartByUser(userId);
-  cart.status = 'converted';
-  cart.updated_by = userId;
-  await cart.save();
+  try {
+    const userId = req.user._id;
+    const { shippingAddress, paymentMethod = 'cod' } = req.body;
 
-  return sendSuccess(res, {
-    data: cart,
-    message: 'Cart converted successfully',
-  });
+    const cart = await Cart.getActiveCartByUser(userId);
+    if (!cart.items || cart.items.length === 0) {
+      throw AppError.badRequest('Cart is empty');
+    }
+
+    await cart.populate('items.product');
+    const totals = cart.calculateTotals();
+
+    // Build order items from cart
+    const orderItems = cart.items.map((item) => ({
+      product: item.product._id,
+      name: item.product.title || item.product.name,
+      quantity: item.quantity,
+      price: item.product.finalPrice || item.product.basePrice || 0,
+    }));
+
+    const order = new Order({
+      user: userId,
+      items: orderItems,
+      total: totals.payableTotal,
+      amount_due: totals.payableTotal,
+      shipping_address: shippingAddress || undefined,
+      payment_method: paymentMethod,
+      status: 'pending',
+      payment_status: 'unpaid',
+    });
+
+    await order.save({ session });
+
+    cart.status = 'converted';
+    cart.updated_by = userId;
+    await cart.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return sendCreated(res, {
+      data: { orderId: order._id, order_id: order.order_id },
+      message: 'Cart converted to order successfully',
+    });
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
 });
 
 // Merge cart

@@ -180,16 +180,16 @@ const signIn = async (req, res) => {
       const user = await User.findOne({ email: req.body.email });
 
       if (!user) {
-        res.status(StatusCodes.NOT_FOUND).json({
-          message: 'Inavalid User Name!',
-          statusCode: StatusCodes.NOT_FOUND,
-          status: ReasonPhrases.NOT_FOUND,
+        res.status(StatusCodes.UNAUTHORIZED).json({
+          message: 'Invalid email or password',
+          statusCode: StatusCodes.UNAUTHORIZED,
+          status: ReasonPhrases.UNAUTHORIZED,
         });
       } else {
         const isPasswordValid = await bcrypt.compare(req.body.password, user.hash_password);
         if (!isPasswordValid) {
           res.status(StatusCodes.UNAUTHORIZED).json({
-            message: 'Password is invalid!',
+            message: 'Invalid email or password',
             statusCode: StatusCodes.UNAUTHORIZED,
             status: ReasonPhrases.UNAUTHORIZED,
           });
@@ -242,16 +242,16 @@ const customsignIn = async (req, res) => {
     } else {
       const user = await User.findOne({ email: req.body.email });
       if (!user) {
-        res.status(StatusCodes.NOT_FOUND).json({
-          message: 'Inavalid User Name!',
-          statusCode: StatusCodes.NOT_FOUND,
-          status: ReasonPhrases.NOT_FOUND,
+        res.status(StatusCodes.UNAUTHORIZED).json({
+          message: 'Invalid email or password',
+          statusCode: StatusCodes.UNAUTHORIZED,
+          status: ReasonPhrases.UNAUTHORIZED,
         });
       } else {
         const isPasswordValid = await bcrypt.compare(req.body.password, user.hash_password);
         if (!isPasswordValid) {
           res.status(StatusCodes.UNAUTHORIZED).json({
-            message: 'Password is invalid!',
+            message: 'Invalid email or password',
             statusCode: StatusCodes.UNAUTHORIZED,
             status: ReasonPhrases.UNAUTHORIZED,
           });

@@ -235,9 +235,9 @@ cartSchema.methods.updateQuantity = async function (productId, quantity, updated
 
     // Adjust stock based on quantity difference
     const quantityDiff = quantity - item.quantity;
-    if (product.stock < quantityDiff) throw new Error('Insufficient stock');
+    if (product.inventory < quantityDiff) throw new Error('Insufficient stock');
 
-    await mongoose.model('Product').updateOne({ _id: productId }, { $inc: { stock: -quantityDiff } });
+    await mongoose.model('Product').updateOne({ _id: productId }, { $inc: { inventory: -quantityDiff } });
 
     item.quantity = quantity;
     if (itemDiscount !== undefined) item.itemDiscount = itemDiscount;

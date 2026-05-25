@@ -486,8 +486,10 @@ class OrderController {
   // PAYMENT & TRANSACTIONS
   //---------------------------------------------------------------
 
-  // Mark order as paid and update loyalty points
+  // Mark order as paid and update loyalty points (transaction-safe)
   async markAsPaid(req, res) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
     try {
       const { id } = req.params;
       const { transactionId, amount } = req.body;
@@ -496,24 +498,32 @@ class OrderController {
       if (typeof amount !== 'number' || amount <= 0) throw new Error('Valid payment amount is required');
 
       const normalizedTxnId = transactionId.trim();
-      let order = await this.findOrderByIdOrCode(id);
+      let order = await Order.findOne(
+        this.isValidObjectId(id) ? { _id: id } : { order_id: id }
+      ).session(session);
       if (!order) throw new Error('Order not found');
 
       if (order.payment_status === 'paid' && order.transaction_id === normalizedTxnId) {
+        await session.abortTransaction();
+        session.endSession();
         return res.json({ message: 'Payment already recorded', order_id: order.order_id, payment_status: order.payment_status });
       }
 
-      const duplicateTxn = await Order.findOne({ _id: { $ne: order._id }, transaction_id: normalizedTxnId });
+      const duplicateTxn = await Order.findOne({ _id: { $ne: order._id }, transaction_id: normalizedTxnId }).session(session);
       if (duplicateTxn) {
         throw new Error('Transaction ID already used by another order');
       }
 
-      await order.markAsPaid(normalizedTxnId, amount);
+      order.markAsPaid(normalizedTxnId, amount);
+      await order.save({ session });
 
-      await order.save();
+      await session.commitTransaction();
+      session.endSession();
 
       return res.json({ message: 'Payment recorded successfully', order_id: order.order_id, payment_status: order.payment_status });
     } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
       return this.handleError(res, error);
     }
   }

@@ -6,7 +6,7 @@ const categorySchema = new mongoose.Schema(
   {
     title: { type: String, required: true, unique: true, trim: true },
     slug: { type: String, required: true, trim: true, lowercase: true, index: true },
-    child: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+    children: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
     status: {
       type: String,
       required: true,
@@ -50,7 +50,7 @@ categorySchema.pre("validate", function (next) {
   if (this.isModified("title")) {
     this.slug = slugify(this.title, { lower: true, strict: true });
   }
-  
+  next();
 });
 
 categorySchema.pre("save", async function (next) {
@@ -70,7 +70,7 @@ categorySchema.pre("save", async function (next) {
       });
     }
   }
-  
+  next();
 });
 
 categorySchema.pre("init", function (doc) {

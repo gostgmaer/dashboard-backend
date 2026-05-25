@@ -163,6 +163,14 @@ class PaymentController {
       });
     }
 
+    // Validate payment amount matches order total
+    if (Math.abs(amount - order.total) > 0.01) {
+      return res.status(400).json({
+        success: false,
+        message: `Payment amount (${amount}) does not match order total (${order.total})`,
+      });
+    }
+
     // Check if payment already exists for this order
     if (idempotencyKey) {
       const idempotentPayment = await Payment.findOne({

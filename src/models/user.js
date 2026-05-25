@@ -16,11 +16,11 @@ const { default: tenant } = require('./tenant');
 
 const SALT_ROUNDS = 10;
 
-// Environment variables with enhanced defaults
+// Environment variables — NO weak defaults; crash at startup if unset
 const {
-  JWT_SECRET = 'your-super-secret-jwt-key',
-  JWT_ID_SECRET = 'dasd98a7sd97as89d7a98sd7',
-  JWT_REFRESH_SECRET = 'your-super-secret-refresh-key',
+  JWT_SECRET,
+  JWT_ID_SECRET,
+  JWT_REFRESH_SECRET,
   JWT_EXPIRY = '1h',
   JWT_REFRESH_EXPIRY = '7d',
   JWT_ID_EXPIRY = '30d',
@@ -31,7 +31,7 @@ const {
   OTP_EXPIRY_MINUTES = '5',
   MAX_LOGIN_ATTEMPTS = '5',
   LOCKOUT_TIME_MINUTES = '30',
-  OTP_SECRET = 'your-otp-secret',
+  OTP_SECRET,
   ENABLE_OTP_VERIFICATION = 'false',
   OTP_PRIORITY_ORDER = 'totp,email,sms',
   DEFAULT_OTP_METHOD = 'totp',
@@ -2524,20 +2524,22 @@ userSchema.method({
 
   async generateResetPasswordToken() {
     const t = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(t).digest('hex');
     const time = new Date(Date.now() + 60 * 60 * 1000);
-    this.resetToken = t;
+    this.resetToken = hashedToken;
     this.resetTokenExpiration = time; // 1 hour
     this.passwordReset = {
-      token: t,
+      token: hashedToken,
       tokenExpiry: time, // 1 hour
       attempts: 0,
       lastAttempt: new Date(),
     };
     await this.save();
-    return this.resetToken;
+    return t; // return raw token to send to user
   },
   async checkResetTokenValidity(token) {
-    return this.passwordReset.token === token && this.passwordReset.tokenExpiry > Date.now();
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    return this.passwordReset.token === hashedToken && this.passwordReset.tokenExpiry > Date.now();
   },
 
   async verifyEmail() {

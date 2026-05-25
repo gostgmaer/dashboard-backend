@@ -268,7 +268,7 @@ productSchema.pre('save', async function (next) {
     let slug = baseSlug;
     let counter = 1;
     const ProductModel = product.constructor;
-    while (await ProductModel.exists({ slug, _id: { $ne: doc._id } })) {
+    while (await ProductModel.exists({ slug, _id: { $ne: product._id } })) {
       slug = `${baseSlug}-${counter++}`;
     }
     product.slug = slug;

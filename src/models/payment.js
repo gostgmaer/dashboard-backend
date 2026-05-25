@@ -699,20 +699,20 @@ paymentSchema.methods.calculateRiskScore = function () {
 // Pre-save middleware to set expiration for pending payments
 paymentSchema.pre('save', function (next) {
   // Set expiration for new pending payments
-  if (this.isNew && this.status === 'pending' && !this.expiresAt) {
+  if (this.isNew && this.status === 'PENDING' && !this.expiresAt) {
     this.expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
   }
 
   // Calculate total refunded amount
   if (this.isModified('refunds')) {
-    this.totalRefunded = this.refunds.filter((refund) => refund.status === 'completed').reduce((total, refund) => total + refund.amount, 0);
+    this.totalRefunded = this.refunds.filter((refund) => refund.status === 'COMPLETED').reduce((total, refund) => total + refund.amount, 0);
 
     // Update payment status based on refund amount
-    if (this.totalRefunded > 0 && this.status === 'completed') {
+    if (this.totalRefunded > 0 && this.status === 'COMPLETED') {
       if (this.totalRefunded >= this.amount) {
-        this.status = 'fully_refunded';
+        this.status = 'FULLY_REFUNDED';
       } else {
-        this.status = 'partially_refunded';
+        this.status = 'PARTIALLY_REFUNDED';
       }
     }
   }
@@ -757,7 +757,7 @@ PaymentSchema.methods.addRefund = function (refundData) {
     amount: refundData.amount,
     reason: refundData.reason,
     description: refundData.description,
-    status: 'pending',
+    status: 'PENDING',
   };
 
   this.refunds.push(refund);
@@ -790,7 +790,7 @@ PaymentSchema.methods.getRefund = function (refundId) {
 
 // Instance method to check if refund is possible
 PaymentSchema.methods.canRefund = function (amount = null) {
-  if (this.status !== 'completed' && this.status !== 'partially_refunded') {
+  if (this.status !== 'COMPLETED' && this.status !== 'PARTIALLY_REFUNDED') {
     return { canRefund: false, reason: 'Payment not completed' };
   }
 
@@ -813,7 +813,7 @@ PaymentSchema.methods.canRefund = function (amount = null) {
 // Static method to find payments with pending refunds
 PaymentSchema.statics.findWithPendingRefunds = function () {
   return this.find({
-    'refunds.status': { $in: ['pending', 'processing'] },
+    'refunds.status': { $in: ['PENDING', 'PROCESSING'] },
   });
 };
 

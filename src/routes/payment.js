@@ -110,6 +110,41 @@ const validate = (req, res, next) => {
   next();
 };
 
+const validateIdempotencyKey = ({ required = false } = {}) => (req, res, next) => {
+  const headerValue = String(req.headers['idempotency-key'] || '').trim();
+  const bodyValue = String(req.body?.idempotencyKey || '').trim();
+
+  if (!headerValue && !bodyValue) {
+    if (required) {
+      return res.status(400).json({
+        success: false,
+        message: 'Idempotency key is required',
+      });
+    }
+    return next();
+  }
+
+  const idempotencyKey = headerValue || bodyValue;
+  const keyPattern = /^[A-Za-z0-9:_-]{8,128}$/;
+
+  if (!keyPattern.test(idempotencyKey)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid idempotency key format',
+    });
+  }
+
+  if (headerValue && bodyValue && headerValue !== bodyValue) {
+    return res.status(400).json({
+      success: false,
+      message: 'Idempotency key mismatch between header and body',
+    });
+  }
+
+  req.body.idempotencyKey = idempotencyKey;
+  next();
+};
+
 // ========================================
 // 🔧 VALIDATION SCHEMAS
 // ========================================
@@ -240,6 +275,7 @@ const validateRefundRequest = paymentValidation.refund;
 router.post('/initiate', 
     authenticateToken,
     paymentRateLimit,
+  validateIdempotencyKey({ required: true }),
     validatePaymentRequest,
     paymentsController.initiatePayment
 );
@@ -290,6 +326,7 @@ router.post('/',
   authMiddleware,
 
   instanceCheckMiddleware,
+  validateIdempotencyKey({ required: true }),
   paymentValidation.createPayment,
   paymentsController.createPayment
 );

@@ -9,6 +9,9 @@ const requiredEnvVars = [
     'MONGODB_URI',
     'SESSION_SECRET',
     'JWT_SECRET',
+    'JWT_ID_SECRET',
+    'JWT_REFRESH_SECRET',
+    'OTP_SECRET',
 ];
 
 const optionalEnvVars = {
