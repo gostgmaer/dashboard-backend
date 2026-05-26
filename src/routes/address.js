@@ -3,7 +3,6 @@ const addressRoute = express.Router();
 const addressController = require('../controller/addresses/address');
 const { body, query, param, validationResult } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth'); // Uncommented
-const authorize = require('../middleware/authorize'); // Assuming authorize is exported from auth middleware
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting'); // Assumed from userRoutes.js
 const Address = require('../models/address');
@@ -48,7 +47,8 @@ const instanceCheckMiddleware = async (req, res, next) => {
       if (!address) {
         return res.status(404).json({ success: false, message: 'Address not found' });
       }
-      if (address.userId.toString() !== req.user.id) {
+      const ownerId = address.user?.toString?.() || address.userId?.toString?.();
+      if (ownerId !== req.user.id) {
         // Restrict to own addresses
         return res.status(403).json({ success: false, message: "Forbidden: Cannot access another user's address" });
       }
@@ -58,7 +58,8 @@ const instanceCheckMiddleware = async (req, res, next) => {
       if (!address) {
         return res.status(404).json({ success: false, message: 'Second address not found' });
       }
-      if (address.userId.toString() !== req.user.id) {
+      const ownerId = address.user?.toString?.() || address.userId?.toString?.();
+      if (ownerId !== req.user.id) {
         return res.status(403).json({ success: false, message: "Forbidden: Cannot access another user's address" });
       }
     }
