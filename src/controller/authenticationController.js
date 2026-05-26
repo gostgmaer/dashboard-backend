@@ -16,6 +16,7 @@ const ActivityHelper = require('../services/activityHelpers');
 const otpService = require('../services/otpService');
 const { sendEmail } = require('../email');
 const { welcomeEmailTemplate } = require('../email/emailTemplates');
+const { passwordResetRequestTemplate } = require('../email/emailTemplate');
 const { checkPasswordStrength } = require('../utils/security');
 /**
  * 🚀 CONSOLIDATED ROBUST USER CONTROLLER
@@ -76,19 +77,7 @@ class authController {
     return 'Inactive';
   }
 
-  static calculateProfileCompleteness(user) {
-    const requiredFields = ['firstName', 'lastName', 'email', 'phoneNumber', 'dateOfBirth', 'gender', 'profilePicture'];
-    const completedFields = requiredFields.filter((field) => user[field] !== null && user[field] !== undefined && user[field] !== '');
-    const addressComplete = user.address && user.address.length > 0;
-    const paymentComplete = user.paymentMethods && user.paymentMethods.length > 0;
-    const securityComplete = user.hasActiveTOTP;
-
-    let percentage = (completedFields.length / requiredFields.length) * 70;
-    if (addressComplete) percentage += 10;
-    if (paymentComplete) percentage += 10;
-    if (securityComplete) percentage += 10;
-    return Math.round(percentage);
-  }
+ 
 
   static enrichUser(user, includeCalculated = true) {
     const userObj = user.toObject ? user.toObject() : user;
@@ -789,7 +778,8 @@ class authController {
     try {
       const { tempToken, method } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
-    } catch (error) { }
+    } catch (error) { console.log();
+    }
   }
   /**
    * MFA verification - Step 2
@@ -1007,9 +997,15 @@ class authController {
    */
   static async changePassword(req, res) {
     try {
-      const user = req.user;
+      const authenticatedUser = req.user;
       const { currentPassword, newPassword, confirmPassword } = req.body;
       const deviceInfo = DeviceDetector.detectDevice(req);
+
+      const user = await User.findById(authenticatedUser?._id || authenticatedUser?.id);
+
+      if (!user) {
+        return errorResponse(res, 'User not found', 404);
+      }
 
       if (!currentPassword || !newPassword || !confirmPassword) {
         return errorResponse(res, 'All password fields are required', 400);
