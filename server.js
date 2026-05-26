@@ -5,18 +5,25 @@
  * - Starts HTTP server
  * - Handles graceful shutdown
  * - Node 20 safe
+ *
+ * STARTUP ORDER:
+ * 1. dotenv — loads essential infrastructure env vars
+ * 2. connectDB — establishes the MongoDB connection
+ * 3. seedSettings — populates default key-value settings
+ * 4. Setting.getSettings() — warms the in-memory settings cache
+ * 5. require('./app') — Express app (uses Proxy-backed config)
+ * 6. server.listen() — starts accepting requests
+ *
+ * Steps 2-4 ensure the settings cache is warm before any
+ * Proxy-backed config section (email, payment, storage, etc.)
+ * is first accessed by middleware or route handlers.
  */
 
 require("dotenv").config();
 
 const http = require("http");
-const app = require("./app");
-const { app: appConfig, features } = require("./src/config/setting");
 const connectDB = require("./src/config/dbConnact");
-const socketService = require("./src/services/socketService");
 const seedSettings = require("./src/config/seedSettings");
-
-const PORT = appConfig.port;
 
 async function startServer() {
   try {
@@ -24,10 +31,10 @@ async function startServer() {
     await connectDB();
     console.log("✅ Database connected");
 
-    // Run settings seeds
+    // Run settings seeds (idempotent — skips existing keys)
     await seedSettings();
 
-    // Warm settings cache
+    // Warm settings cache so Proxy-backed sections resolve from DB
     const Setting = require("./src/models/Setting");
     try {
       await Setting.getSettings();
@@ -36,12 +43,18 @@ async function startServer() {
       console.error("⚠️ Failed to warm settings cache:", err.message);
     }
 
+    // Now load the Express app — all Proxy sections will resolve from cache
+    const app = require("./app");
+    const { app: appConfig, features } = require("./src/config/setting");
+    const socketService = require("./src/services/socketService");
+
+    const PORT = appConfig.port;
     const server = http.createServer(app);
 
     // Initialize Socket.IO
-    
-      if (features.socketingEnabled){ socketService.initialize(server)};
-
+    if (features.socketingEnabled) {
+      socketService.initialize(server);
+    }
 
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

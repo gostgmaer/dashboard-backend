@@ -8,8 +8,8 @@ All environment variables are now centralized in `src/config/setting.js`. **DO N
 > **Database-Driven Platform Settings**
 >
 > Several configurations have been migrated from static environment variables in `.env` to database records. This enables changing credentials, toggles, and modes dynamically at runtime on a per-tenant (`siteKey`) basis via the **Platform Settings UI** in the administrator dashboard, eliminating server restarts:
-> - **Branding**: `BRAND_NAME` (now `siteName`)
-> - **Email (SMTP)**: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS` (now `smtpHost`, `smtpPort`, `smtpUser`, `smtpPassword`)
+> - **Branding**: `BRAND_NAME` (now `siteName`), `APPLICATION_NAME` (now `name`)
+> - **Email (SMTP)**: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`, `FROM_EMAIL` (now `smtpHost`, `smtpPort`, `smtpUser`, `smtpPassword`, `contactInfo.email`)
 > - **Stripe Gateway**: `STRIPE_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
 > - **PayPal Gateway**: `PAYPAL_ENABLED`, `PAYPAL_MODE`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`
 > - **Razorpay Gateway**: `RAZORPAY_ENABLED`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`

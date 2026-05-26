@@ -88,15 +88,20 @@ app.use(helmet({
 // Import settings
 const { security, session: sessionConfig, app: appConfig } = require('./src/config/setting');
 
-// CORS configuration
-const allowedOrigins = security.allowedOrigins.length > 0 
-   ? security.allowedOrigins 
-   : ['http://localhost:3000', 'http://localhost:3001'];
-
+// CORS configuration — evaluated dynamically on each request via Proxy
 app.use(cors({
    origin: (origin, callback) => {
+      // Resolve allowed origins from DB settings cache (real-time)
+      let origins = security.allowedOrigins;
+      if (typeof origins === 'string') {
+         origins = origins.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      const allowed = Array.isArray(origins) && origins.length > 0
+         ? origins
+         : ['http://localhost:3000', 'http://localhost:3001'];
+
       // Allow requests with no origin (mobile apps, Postman)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowed.includes(origin)) {
          callback(null, true);
       } else {
          callback(new Error('Not allowed by CORS'));
@@ -104,7 +109,7 @@ app.use(cors({
    },
    credentials: true,
    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Idempotency-Key'],
+   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Idempotency-Key', 'x-tenant', 'x-tennet'],
 }));
 
 // Compression

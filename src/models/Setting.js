@@ -533,15 +533,13 @@ settingSchema.statics.updateWithAudit = async function (updateObj) {
 
 // Schema Metadata Definition for Auto-Generating dynamic UI
 const SETTING_DEFINITIONS = [
-  // Basic Section
+  // ── Basic ──
   { key: 'siteName', label: 'Site Name', type: 'string', section: 'basic' },
-  { key: 'siteKey', label: 'Site Key (Tenant ID)', type: 'string', section: 'basic', disabled: true },
+  { key: 'name', label: 'Application Name', type: 'string', section: 'basic' },
   { key: 'isLive', label: 'Site Live Status', type: 'boolean', section: 'basic' },
   { key: 'maintenanceMode', label: 'Maintenance Mode', type: 'boolean', section: 'basic' },
-  { key: 'minOrderAmount', label: 'Min Order Amount ($)', type: 'number', section: 'basic' },
-  { key: 'maxOrderAmount', label: 'Max Order Amount ($)', type: 'number', section: 'basic' },
 
-  // Contact Info Section
+  // ── Contact Info ──
   { key: 'contactInfo.email', label: 'Contact Email', type: 'string', section: 'contact' },
   { key: 'contactInfo.phone', label: 'Contact Phone', type: 'string', section: 'contact' },
   { key: 'contactInfo.address.street', label: 'Street Address', type: 'string', section: 'contact' },
@@ -550,52 +548,136 @@ const SETTING_DEFINITIONS = [
   { key: 'contactInfo.address.zipCode', label: 'ZIP / Postal Code', type: 'string', section: 'contact' },
   { key: 'contactInfo.address.country', label: 'Country', type: 'string', section: 'contact' },
 
-  // Branding Section
+  // ── Branding ──
   { key: 'branding.logo', label: 'Logo URL', type: 'string', section: 'branding' },
   { key: 'branding.favicon', label: 'Favicon URL', type: 'string', section: 'branding' },
   { key: 'branding.themeColor', label: 'Theme Primary Color', type: 'color', section: 'branding' },
 
-  // Currency & Tax Section
+  // ── Currency & Tax ──
   { key: 'currency', label: 'Currency Code', type: 'select', section: 'currency', options: ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD'] },
   { key: 'currencySymbol', label: 'Currency Symbol', type: 'string', section: 'currency' },
   { key: 'taxRate', label: 'Tax Rate (%)', type: 'number', section: 'currency' },
 
-  // SMTP Settings Section
-  { key: 'smtpHost', label: 'SMTP Host', type: 'string', section: 'email' },
-  { key: 'smtpPort', label: 'SMTP Port', type: 'number', section: 'email' },
-  { key: 'smtpUser', label: 'SMTP Username', type: 'string', section: 'email' },
-  { key: 'smtpPassword', label: 'SMTP Password', type: 'password', section: 'email' },
+  // ── Client URLs ──
+  { key: 'client.url', label: 'Frontend URL', type: 'string', section: 'client' },
+  { key: 'client.loginPage', label: 'Login Page Path', type: 'string', section: 'client' },
+  { key: 'client.resetPasswordUrl', label: 'Reset Password Path', type: 'string', section: 'client' },
+  { key: 'client.emailVerifyUrl', label: 'Email Verify Path', type: 'string', section: 'client' },
 
-  // Stripe Gateway Section
-  { key: 'stripeEnabled', label: 'Stripe Enabled', type: 'boolean', section: 'stripe' },
-  { key: 'stripePublicKey', label: 'Stripe Public Key', type: 'string', section: 'stripe' },
-  { key: 'stripeSecretKey', label: 'Stripe Secret Key', type: 'password', section: 'stripe' },
-  { key: 'stripeWebhookSecret', label: 'Stripe Webhook Secret', type: 'password', section: 'stripe' },
+  // ── Security / CORS ──
+  { key: 'security.allowedOrigins', label: 'Allowed CORS Origins (comma-separated)', type: 'text', section: 'security' },
+  { key: 'security.allowedIPs', label: 'Allowed IP Addresses (comma-separated)', type: 'text', section: 'security' },
+  { key: 'security.requireDeviceVerification', label: 'Require Device Verification', type: 'boolean', section: 'security' },
+  { key: 'security.enableSuspiciousLoginDetection', label: 'Suspicious Login Detection', type: 'boolean', section: 'security' },
+  { key: 'security.enableIpWhitelist', label: 'Enable IP Whitelist', type: 'boolean', section: 'security' },
 
-  // PayPal Gateway Section
-  { key: 'paypalEnabled', label: 'PayPal Enabled', type: 'boolean', section: 'paypal' },
-  { key: 'paypalClientId', label: 'PayPal Client ID', type: 'string', section: 'paypal' },
-  { key: 'paypalClientSecret', label: 'PayPal Client Secret', type: 'password', section: 'paypal' },
-  { key: 'paypalMode', label: 'PayPal Mode', type: 'select', section: 'paypal', options: ['sandbox', 'live'] },
-  { key: 'paypalWebhookId', label: 'PayPal Webhook ID', type: 'string', section: 'paypal' },
+  // ── Email / SMTP ──
+  { key: 'email.name', label: 'Sender Display Name', type: 'string', section: 'email' },
+  { key: 'email.sender', label: 'From Email Address', type: 'string', section: 'email' },
+  { key: 'email.service', label: 'Email Service (e.g. gmail, brevo)', type: 'string', section: 'email' },
+  { key: 'email.host', label: 'SMTP Host', type: 'string', section: 'email' },
+  { key: 'email.port', label: 'SMTP Port', type: 'number', section: 'email' },
+  { key: 'email.secure', label: 'SMTP Secure (TLS)', type: 'boolean', section: 'email' },
+  { key: 'email.user', label: 'SMTP Username', type: 'string', section: 'email' },
+  { key: 'email.password', label: 'SMTP Password', type: 'password', section: 'email' },
+  { key: 'email.oauth2ClientId', label: 'OAuth2 Client ID', type: 'string', section: 'email' },
+  { key: 'email.oauth2ClientSecret', label: 'OAuth2 Client Secret', type: 'password', section: 'email' },
+  { key: 'email.oauth2RefreshToken', label: 'OAuth2 Refresh Token', type: 'password', section: 'email' },
+  { key: 'email.oauth2RedirectUri', label: 'OAuth2 Redirect URI', type: 'string', section: 'email' },
+  { key: 'email.fallback.service', label: 'Fallback Email Service', type: 'string', section: 'email_fallback' },
+  { key: 'email.fallback.host', label: 'Fallback SMTP Host', type: 'string', section: 'email_fallback' },
+  { key: 'email.fallback.port', label: 'Fallback SMTP Port', type: 'number', section: 'email_fallback' },
+  { key: 'email.fallback.user', label: 'Fallback SMTP User', type: 'string', section: 'email_fallback' },
+  { key: 'email.fallback.password', label: 'Fallback SMTP Password', type: 'password', section: 'email_fallback' },
+  { key: 'email.debug', label: 'Email Debug Mode', type: 'boolean', section: 'email' },
 
-  // Razorpay Gateway Section
-  { key: 'razorpayEnabled', label: 'Razorpay Enabled', type: 'boolean', section: 'razorpay' },
-  { key: 'razorpayKeyId', label: 'Razorpay Key ID', type: 'string', section: 'razorpay' },
-  { key: 'razorpayKeySecret', label: 'Razorpay Key Secret', type: 'password', section: 'razorpay' },
-  { key: 'razorpayWebhookSecret', label: 'Razorpay Webhook Secret', type: 'password', section: 'razorpay' },
+  // ── Stripe Gateway ──
+  { key: 'payment.stripe.enabled', label: 'Stripe Enabled', type: 'boolean', section: 'stripe' },
+  { key: 'payment.stripe.publicKey', label: 'Stripe Public Key', type: 'string', section: 'stripe' },
+  { key: 'payment.stripe.secretKey', label: 'Stripe Secret Key', type: 'password', section: 'stripe' },
+  { key: 'payment.stripe.webhookSecret', label: 'Stripe Webhook Secret', type: 'password', section: 'stripe' },
 
-  // OTP & Two-Factor MFA Section
-  { key: 'otpEnabled', label: 'OTP Multi-Factor Enabled', type: 'boolean', section: 'otp' },
-  { key: 'otpDefaultMethod', label: 'Default OTP Delivery', type: 'select', section: 'otp', options: ['email', 'sms', 'totp'] },
-  { key: 'otpExpiryMinutes', label: 'OTP Expiry (minutes)', type: 'number', section: 'otp' },
-  { key: 'otpMaxAttempts', label: 'Maximum Verification Attempts', type: 'number', section: 'otp' },
-  { key: 'otpLength', label: 'OTP Code Length', type: 'number', section: 'otp' },
-  { key: 'twilioAccountSid', label: 'Twilio Account SID', type: 'string', section: 'otp' },
-  { key: 'twilioAuthToken', label: 'Twilio Auth Token', type: 'password', section: 'otp' },
-  { key: 'twilioPhoneNumber', label: 'Twilio Phone Number', type: 'string', section: 'otp' },
+  // ── PayPal Gateway ──
+  { key: 'payment.paypal.enabled', label: 'PayPal Enabled', type: 'boolean', section: 'paypal' },
+  { key: 'payment.paypal.clientId', label: 'PayPal Client ID', type: 'string', section: 'paypal' },
+  { key: 'payment.paypal.clientSecret', label: 'PayPal Client Secret', type: 'password', section: 'paypal' },
+  { key: 'payment.paypal.mode', label: 'PayPal Mode', type: 'select', section: 'paypal', options: ['sandbox', 'live'] },
+  { key: 'payment.paypal.webhookId', label: 'PayPal Webhook ID', type: 'string', section: 'paypal' },
 
-  // Policies Section
+  // ── Razorpay Gateway ──
+  { key: 'payment.razorpay.enabled', label: 'Razorpay Enabled', type: 'boolean', section: 'razorpay' },
+  { key: 'payment.razorpay.publicKey', label: 'Razorpay Key ID', type: 'string', section: 'razorpay' },
+  { key: 'payment.razorpay.secretKey', label: 'Razorpay Key Secret', type: 'password', section: 'razorpay' },
+  { key: 'payment.razorpay.webhookSecret', label: 'Razorpay Webhook Secret', type: 'password', section: 'razorpay' },
+
+  // ── Storage ──
+  { key: 'storage.type', label: 'Storage Provider', type: 'select', section: 'storage', options: ['local', 's3', 'gcs', 'azure', 'r2'] },
+  { key: 'storage.localPath', label: 'Local Storage Path', type: 'string', section: 'storage' },
+  { key: 'storage.maxFileSize', label: 'Max File Size (bytes)', type: 'number', section: 'storage' },
+  { key: 'storage.signedUrlExpiry', label: 'Signed URL Expiry (seconds)', type: 'number', section: 'storage' },
+
+  // ── Storage: Azure ──
+  { key: 'storage.azure.container', label: 'Azure Container', type: 'string', section: 'storage_azure' },
+  { key: 'storage.azure.account', label: 'Azure Account', type: 'string', section: 'storage_azure' },
+  { key: 'storage.azure.accessKey', label: 'Azure Access Key', type: 'password', section: 'storage_azure' },
+  { key: 'storage.azure.connectionString', label: 'Azure Connection String', type: 'password', section: 'storage_azure' },
+
+  // ── Storage: S3 ──
+  { key: 'storage.s3.bucket', label: 'S3 Bucket', type: 'string', section: 'storage_s3' },
+  { key: 'storage.s3.region', label: 'S3 Region', type: 'string', section: 'storage_s3' },
+  { key: 'storage.s3.accessKey', label: 'S3 Access Key', type: 'password', section: 'storage_s3' },
+  { key: 'storage.s3.secretKey', label: 'S3 Secret Key', type: 'password', section: 'storage_s3' },
+
+  // ── Storage: GCS ──
+  { key: 'storage.gcs.bucket', label: 'GCS Bucket', type: 'string', section: 'storage_gcs' },
+  { key: 'storage.gcs.projectId', label: 'GCS Project ID', type: 'string', section: 'storage_gcs' },
+  { key: 'storage.gcs.clientEmail', label: 'GCS Client Email', type: 'string', section: 'storage_gcs' },
+  { key: 'storage.gcs.privateKey', label: 'GCS Private Key', type: 'password', section: 'storage_gcs' },
+
+  // ── Storage: R2 ──
+  { key: 'storage.r2.endpoint', label: 'R2 Endpoint', type: 'string', section: 'storage_r2' },
+  { key: 'storage.r2.bucket', label: 'R2 Bucket', type: 'string', section: 'storage_r2' },
+  { key: 'storage.r2.accessKey', label: 'R2 Access Key', type: 'password', section: 'storage_r2' },
+  { key: 'storage.r2.secretKey', label: 'R2 Secret Key', type: 'password', section: 'storage_r2' },
+  { key: 'storage.r2.publicDomain', label: 'R2 Public Domain', type: 'string', section: 'storage_r2' },
+
+  // ── Services: Twilio ──
+  { key: 'services.twilio.accountSid', label: 'Twilio Account SID', type: 'string', section: 'twilio' },
+  { key: 'services.twilio.authToken', label: 'Twilio Auth Token', type: 'password', section: 'twilio' },
+  { key: 'services.twilio.phoneNumber', label: 'Twilio Phone Number', type: 'string', section: 'twilio' },
+
+  // ── Services: OAuth / Social ──
+  { key: 'services.google.clientId', label: 'Google Client ID', type: 'string', section: 'oauth' },
+  { key: 'services.google.placesApiKey', label: 'Google Places API Key', type: 'password', section: 'oauth' },
+  { key: 'services.facebook.appId', label: 'Facebook App ID', type: 'string', section: 'oauth' },
+  { key: 'services.github.clientId', label: 'GitHub Client ID', type: 'string', section: 'oauth' },
+  { key: 'services.apple.clientId', label: 'Apple Client ID', type: 'string', section: 'oauth' },
+  { key: 'services.twitter.apiKey', label: 'Twitter API Key', type: 'string', section: 'oauth' },
+  { key: 'services.twitter.apiSecret', label: 'Twitter API Secret', type: 'password', section: 'oauth' },
+  { key: 'services.storeUrl', label: 'Store URL (for emails)', type: 'string', section: 'oauth' },
+
+  // ── OTP & Two-Factor ──
+  { key: 'otp.enabled', label: 'OTP Verification Enabled', type: 'boolean', section: 'otp' },
+  { key: 'otp.defaultMethod', label: 'Default OTP Method', type: 'select', section: 'otp', options: ['email', 'sms', 'totp'] },
+  { key: 'otp.expiryMinutes', label: 'OTP Expiry (minutes)', type: 'number', section: 'otp' },
+  { key: 'otp.maxAttempts', label: 'Max Verification Attempts', type: 'number', section: 'otp' },
+  { key: 'otp.totp.appName', label: 'TOTP App Name', type: 'string', section: 'otp' },
+  { key: 'otp.totp.issuer', label: 'TOTP Issuer', type: 'string', section: 'otp' },
+  { key: 'otp.smsOtp.length', label: 'SMS OTP Code Length', type: 'number', section: 'otp' },
+  { key: 'otp.emailOtp.length', label: 'Email OTP Code Length', type: 'number', section: 'otp' },
+
+  // ── Business ──
+  { key: 'business.companyName', label: 'Company Name', type: 'string', section: 'business' },
+  { key: 'business.brandName', label: 'Brand Name', type: 'string', section: 'business' },
+  { key: 'business.currency', label: 'Business Currency', type: 'select', section: 'business', options: ['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD'] },
+
+  // ── Features ──
+  { key: 'features.socketingEnabled', label: 'WebSocket / Socket.IO Enabled', type: 'boolean', section: 'features' },
+
+  // ── Notifications ──
+  { key: 'notifications.webhookUrl', label: 'Notification Webhook URL', type: 'string', section: 'notifications' },
+
+  // ── Policies ──
   { key: 'returnPolicy', label: 'Return Policy Text', type: 'text', section: 'policies' },
   { key: 'privacyPolicy', label: 'Privacy Policy Text', type: 'text', section: 'policies' },
   { key: 'termsOfService', label: 'Terms of Service Text', type: 'text', section: 'policies' },

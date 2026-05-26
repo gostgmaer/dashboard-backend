@@ -7,11 +7,8 @@ const {
 const {
 
   jwtSecret,
-
-  applicaionName,
-  host,
-
-  confirmPath,
+  app: appConfig,
+  client: clientConfig,
 
 } = require("../config/setting");
 const User = require("../models/user");
@@ -138,14 +135,14 @@ async function checkoutMiddleware(req, res, next) {
             let mailBody = {
               body: {
                 name: data.fullName,
-                intro: `Welcome to ${applicaionName}! We are excited to have you on board.`,
-                additionalInfo: `Thank you for choosing ${applicaionName}. You now have access to our premium features, your temporary password is ${password}`,
+                intro: `Welcome to ${appConfig.name}! We are excited to have you on board.`,
+                additionalInfo: `Thank you for choosing ${appConfig.name}. You now have access to our premium features, your temporary password is ${password}`,
                 action: {
-                  instructions: `To get started with ${applicaionName}, please click here:`,
+                  instructions: `To get started with ${appConfig.name}, please click here:`,
                   button: {
                     color: "#22BC66", // Optional action button color
                     text: "Confirm Your Account",
-                    link: `${host}/${confirmPath}?token=${token}`,
+                    link: `${clientConfig.url}/${clientConfig.emailVerifyUrl}?token=${token}`,
                   },
                 },
                 outro:
@@ -157,7 +154,7 @@ async function checkoutMiddleware(req, res, next) {
                 createMailOptions(
                   "salted",
                   data.email,
-                  `Welcome to ${applicaionName} - Confirm Your Email`,
+                  `Welcome to ${appConfig.name} - Confirm Your Email`,
                   mailBody
                 )
               )
