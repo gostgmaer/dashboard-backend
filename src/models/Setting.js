@@ -6,133 +6,109 @@ const cachedSettingsMap = new Map();
 
 const settingSchema = new mongoose.Schema(
   {
-    siteName: { type: String, required: true, trim: true },
-    siteKey: { type: String, required: true, unique: true, trim: true },
-    isDeleted: { type: Boolean, default: false },
-    name: { type: String, trim: true },
-
-    contactInfo: {
-      email: { type: String, required: true, lowercase: true, trim: true },
-      phone: { type: String, trim: true },
-      address: {
-        street: { type: String, trim: true },
-        city: { type: String, trim: true },
-        state: { type: String, trim: true },
-        zipCode: { type: String, trim: true },
-        country: { type: String, trim: true },
-      },
-    },
-
-    branding: {
-      logo: { type: String, trim: true },
-      favicon: { type: String, trim: true },
-      themeColor: { type: String, default: '#000000' },
-    },
-
-    shippingOptions: [{ type: String, trim: true }],
-    emailTemplates: {
-      orderConfirmation: { type: String },
-      passwordReset: { type: String },
-    },
-
-    seo: {
-      title: { type: String, trim: true },
-      description: { type: String, trim: true },
-      keywords: [{ type: String, trim: true }],
-    },
-
-    analytics: {
-      googleAnalyticsID: { type: String, trim: true },
-      facebookPixelID: { type: String, trim: true },
-    },
-
-    currency: { type: String, required: true, default: 'USD', trim: true },
-    taxRate: { type: Number, default: 0 },
-
-    logo: { type: String, trim: true },
-    favicon: { type: String, trim: true },
-    enabledMFA: { type: Boolean, default: false },
-    paymentMethods: [{ type: String, trim: true }],
-    shippingMethods: [{ type: String, trim: true }],
-
-    orderConfirmationEmailTemplate: { type: String },
-    passwordResetEmailTemplate: { type: String },
-
-    smtpHost: { type: String, trim: true },
-    smtpPort: { type: Number },
-    smtpUser: { type: String, trim: true },
-    smtpPassword: { type: String, trim: true },
-
-    stripeEnabled: { type: Boolean, default: false },
-    stripePublicKey: { type: String, trim: true },
-    stripeSecretKey: { type: String, trim: true },
-    stripeWebhookSecret: { type: String, trim: true },
-
-    paypalEnabled: { type: Boolean, default: false },
-    paypalClientId: { type: String, trim: true },
-    paypalClientSecret: { type: String, trim: true },
-    paypalMode: { type: String, default: 'sandbox', trim: true },
-    paypalWebhookId: { type: String, trim: true },
-
-    razorpayEnabled: { type: Boolean, default: false },
-    razorpayKeyId: { type: String, trim: true },
-    razorpayKeySecret: { type: String, trim: true },
-    razorpayWebhookSecret: { type: String, trim: true },
-
-    otpEnabled: { type: Boolean, default: false },
-    otpDefaultMethod: { type: String, default: 'email', trim: true },
-    otpExpiryMinutes: { type: Number, default: 5 },
-    otpMaxAttempts: { type: Number, default: 3 },
-    otpLength: { type: Number, default: 6 },
-
-    socialMediaLinks: {
-      facebook: { type: String, trim: true },
-      twitter: { type: String, trim: true },
-      instagram: { type: String, trim: true },
-      linkedin: { type: String, trim: true },
-      youtube: { type: String, trim: true },
-      pinterest: { type: String, trim: true },
-      tiktok: { type: String, trim: true },
-    },
-
-    isLive: { type: Boolean, default: true },
-    maintenanceMode: { type: Boolean, default: false },
-    maintenanceReason: { type: String, trim: true },
-
-    featuredCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
-
-    currencySymbol: { type: String, default: '$', trim: true },
-    minOrderAmount: { type: Number, default: 0 },
-    maxOrderAmount: { type: Number },
-
-    loyaltyProgram: {
-      enabled: { type: Boolean, default: false },
-      pointsPerDollar: { type: Number, default: 1 },
-    },
-
-    returnPolicy: { type: String },
-    privacyPolicy: { type: String },
-    termsOfService: { type: String },
-
-    features: { type: Map, of: Boolean, default: {} },
+    siteKey: { type: String, required: true, trim: true },
+    key: { type: String, required: true, trim: true },
+    value: { type: mongoose.Schema.Types.Mixed }
   },
-   {   timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true } }
+  {
+    timestamps: true
+  }
 );
 
-// ===== Helper / Static Methods =====
+// Compound unique index for tenant + key
+settingSchema.index({ siteKey: 1, key: 1 }, { unique: true });
+
+// ===== Helper Utilities =====
+
+// Flatten nested object to dot-notation keys
+function flattenObject(obj, prefix = '') {
+  const result = {};
+  for (const k in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, k)) {
+      const pre = prefix ? prefix + '.' + k : k;
+      if (
+        typeof obj[k] === 'object' &&
+        obj[k] !== null &&
+        !Array.isArray(obj[k]) &&
+        !(obj[k] instanceof Date) &&
+        !(obj[k] instanceof mongoose.Types.ObjectId)
+      ) {
+        Object.assign(result, flattenObject(obj[k], pre));
+      } else {
+        result[pre] = obj[k];
+      }
+    }
+  }
+  return result;
+}
+
+// Reconstruct a nested object from flat dot-notation keys
+function inflateSettings(docs, siteKey) {
+  const settingsObj = {
+    siteKey,
+    isInMaintenance() {
+      return this.maintenanceMode === true;
+    },
+    isStoreLive() {
+      return this.isLive === true;
+    },
+    toJSONSafe() {
+      return toJSONSafe(this);
+    }
+  };
+  for (const doc of docs) {
+    if (!doc.key) continue;
+    const keys = doc.key.split('.');
+    let current = settingsObj;
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      if (i === keys.length - 1) {
+        current[k] = doc.value;
+      } else {
+        if (!current[k] || typeof current[k] !== 'object') {
+          current[k] = {};
+        }
+        current = current[k];
+      }
+    }
+  }
+  return settingsObj;
+}
+
+// Strip password/secret fields
+function toJSONSafe(settingsObj) {
+  const safeObj = JSON.parse(JSON.stringify(settingsObj));
+  const definitions = Setting.SETTING_DEFINITIONS || [];
+  definitions.forEach(def => {
+    if (def.type === 'password') {
+      const parts = def.key.split('.');
+      let current = safeObj;
+      for (let i = 0; i < parts.length; i++) {
+        if (i === parts.length - 1) {
+          if (current) delete current[parts[i]];
+        } else {
+          current = current ? current[parts[i]] : undefined;
+        }
+      }
+    }
+  });
+  return safeObj;
+}
+
+// ===== Static / Instance Methods =====
 
 // Get the current settings (singleton pattern)
 settingSchema.statics.getSettings = async function () {
-  if (cachedSettingsMap.has('__default__')) {
-    return cachedSettingsMap.get('__default__');
-  }
   const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
-  const settings = await this.findOne({ siteKey: activeTenantKey }).lean();
-  if (settings) {
+  if (cachedSettingsMap.has(activeTenantKey)) {
+    return cachedSettingsMap.get(activeTenantKey);
+  }
+  const docs = await this.find({ siteKey: activeTenantKey }).lean();
+  let settings = null;
+  if (docs && docs.length > 0) {
+    settings = inflateSettings(docs, activeTenantKey);
+    cachedSettingsMap.set(activeTenantKey, settings);
     cachedSettingsMap.set('__default__', settings);
-    cachedSettingsMap.set(settings.siteKey, settings);
   }
   return settings;
 };
@@ -142,8 +118,10 @@ settingSchema.statics.getSettingsBySite = async function (siteKey) {
   if (cachedSettingsMap.has(siteKey)) {
     return cachedSettingsMap.get(siteKey);
   }
-  const settings = await this.findOne({ siteKey }).lean();
-  if (settings) {
+  const docs = await this.find({ siteKey }).lean();
+  let settings = null;
+  if (docs && docs.length > 0) {
+    settings = inflateSettings(docs, siteKey);
     cachedSettingsMap.set(siteKey, settings);
   }
   return settings;
@@ -160,147 +138,241 @@ settingSchema.statics.getCachedSettings = function (siteKey) {
   return null;
 };
 
+// Clear cached settings
+settingSchema.statics.clearCache = function () {
+  cachedSettingsMap.clear();
+};
+
 // Update settings (create if not exists)
 settingSchema.statics.updateSettings = async function (data, updated_by) {
-  const updateData = { ...data };
-  if (updated_by) updateData.updated_by = updated_by;
-
-  const result = await this.findOneAndUpdate({}, updateData, {
-    upsert: true,
-    new: true,
-    runValidators: true,
-  });
-  
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject(data);
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Toggle maintenance mode
 settingSchema.statics.toggleMaintenanceMode = async function (status) {
-  const result = await this.findOneAndUpdate({}, { maintenanceMode: status }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'maintenanceMode' },
+    { value: status },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Toggle live status
 settingSchema.statics.toggleLiveStatus = async function (status) {
-  const result = await this.findOneAndUpdate({}, { isLive: status }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'isLive' },
+    { value: status },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update branding
 settingSchema.statics.updateBranding = async function (branding) {
-  const result = await this.findOneAndUpdate({}, { branding }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject({ branding });
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update SEO settings
 settingSchema.statics.updateSEO = async function (seo) {
-  const result = await this.findOneAndUpdate({}, { seo }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject({ seo });
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update payment methods
 settingSchema.statics.updatePaymentMethods = async function (methods) {
-  const result = await this.findOneAndUpdate({}, { paymentMethods: methods }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'paymentMethods' },
+    { value: methods },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
-
-// ===== Additional Static Methods =====
 
 // Update contact info
 settingSchema.statics.updateContactInfo = async function (contactInfo) {
-  const result = await this.findOneAndUpdate({}, { contactInfo }, { new: true, runValidators: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject({ contactInfo });
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update shipping options
 settingSchema.statics.updateShippingOptions = async function (options) {
-  const result = await this.findOneAndUpdate({}, { shippingOptions: options }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'shippingOptions' },
+    { value: options },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update email templates
 settingSchema.statics.updateEmailTemplates = async function (templates) {
-  const result = await this.findOneAndUpdate({}, { emailTemplates: templates }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject({ emailTemplates: templates });
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update analytics IDs
 settingSchema.statics.updateAnalytics = async function (analytics) {
-  const result = await this.findOneAndUpdate({}, { analytics }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject({ analytics });
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update currency & tax settings
 settingSchema.statics.updateCurrencyAndTax = async function ({ currency, currencySymbol, taxRate }) {
-  const result = await this.findOneAndUpdate({}, { currency, currencySymbol, taxRate }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  if (currency !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'currency' }, { value: currency }, { upsert: true });
+  }
+  if (currencySymbol !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'currencySymbol' }, { value: currencySymbol }, { upsert: true });
+  }
+  if (taxRate !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'taxRate' }, { value: taxRate }, { upsert: true });
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update loyalty program settings
 settingSchema.statics.updateLoyaltyProgram = async function (loyaltyProgram) {
-  const result = await this.findOneAndUpdate({}, { loyaltyProgram }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject({ loyaltyProgram });
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update policies (return, privacy, terms)
 settingSchema.statics.updatePolicies = async function (policies) {
-  const result = await this.findOneAndUpdate(
-    {},
-    {
-      returnPolicy: policies.returnPolicy,
-      privacyPolicy: policies.privacyPolicy,
-      termsOfService: policies.termsOfService,
-    },
-    { new: true }
-  );
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  if (policies.returnPolicy !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'returnPolicy' }, { value: policies.returnPolicy }, { upsert: true });
+  }
+  if (policies.privacyPolicy !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'privacyPolicy' }, { value: policies.privacyPolicy }, { upsert: true });
+  }
+  if (policies.termsOfService !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'termsOfService' }, { value: policies.termsOfService }, { upsert: true });
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update featured categories
 settingSchema.statics.updateFeaturedCategories = async function (categoryIds) {
-  const result = await this.findOneAndUpdate({}, { featuredCategories: categoryIds }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'featuredCategories' },
+    { value: categoryIds },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update min/max order amounts
 settingSchema.statics.updateOrderLimits = async function ({ minOrderAmount, maxOrderAmount }) {
-  const result = await this.findOneAndUpdate({}, { minOrderAmount, maxOrderAmount }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  if (minOrderAmount !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'minOrderAmount' }, { value: minOrderAmount }, { upsert: true });
+  }
+  if (maxOrderAmount !== undefined) {
+    await this.findOneAndUpdate({ siteKey: activeTenantKey, key: 'maxOrderAmount' }, { value: maxOrderAmount }, { upsert: true });
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Reset settings to defaults (useful for staging/dev)
 settingSchema.statics.resetToDefaults = async function (defaultData) {
-  await this.deleteMany({});
-  const result = await this.create(defaultData);
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.deleteMany({ siteKey: activeTenantKey });
+  const flat = flattenObject(defaultData);
+  const docs = Object.keys(flat).map(k => ({
+    siteKey: activeTenantKey,
+    key: k,
+    value: flat[k]
+  }));
+  await this.insertMany(docs);
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Safe public settings resolver
 settingSchema.statics.getPublicSettings = async function () {
   const settings = await this.getSettings();
   if (!settings) return null;
-  return new this(settings).toJSONSafe();
-};
-
-// Clear cached settings
-settingSchema.statics.clearCache = function () {
-  cachedSettingsMap.clear();
+  return toJSONSafe(settings);
 };
 
 // Get section
@@ -312,110 +384,151 @@ settingSchema.statics.getSection = async function (section) {
 
 // Reset section
 settingSchema.statics.resetSection = async function (section, defaultValue) {
-  const result = await this.findOneAndUpdate({}, { [section]: defaultValue }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const regex = new RegExp(`^${section}\\.`);
+  await this.deleteMany({ siteKey: activeTenantKey, key: { $regex: regex } });
+  const flat = flattenObject({ [section]: defaultValue });
+  const docs = Object.keys(flat).map(k => ({
+    siteKey: activeTenantKey,
+    key: k,
+    value: flat[k]
+  }));
+  await this.insertMany(docs);
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Set maintenance mode with reason
 settingSchema.statics.setMaintenanceMode = async function (status, reason) {
-  const result = await this.findOneAndUpdate({}, { maintenanceMode: status, maintenanceReason: reason }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'maintenanceMode' },
+    { value: status },
+    { upsert: true, new: true }
+  );
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'maintenanceReason' },
+    { value: reason },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Toggle dynamic feature flag
 settingSchema.statics.toggleFeature = async function (featureName, status) {
-  const result = await this.findOneAndUpdate({}, { [`features.${featureName}`]: status }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: `features.${featureName}` },
+    { value: status },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update a single branding field
 settingSchema.statics.updateBrandingField = async function (key, value) {
-  const result = await this.findOneAndUpdate({}, { [`branding.${key}`]: value }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: `branding.${key}` },
+    { value },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Add payment method
 settingSchema.statics.addPaymentMethod = async function (method) {
-  const result = await this.findOneAndUpdate({}, { $addToSet: { paymentMethods: method } }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const doc = await this.findOne({ siteKey: activeTenantKey, key: 'paymentMethods' });
+  const current = doc ? doc.value : [];
+  if (!current.includes(method)) {
+    current.push(method);
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: 'paymentMethods' },
+      { value: current },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Remove payment method
 settingSchema.statics.removePaymentMethod = async function (method) {
-  const result = await this.findOneAndUpdate({}, { $pull: { paymentMethods: method } }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const doc = await this.findOne({ siteKey: activeTenantKey, key: 'paymentMethods' });
+  const current = doc ? doc.value : [];
+  const updated = current.filter(m => m !== method);
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'paymentMethods' },
+    { value: updated },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update currency
 settingSchema.statics.updateCurrency = async function (currency) {
-  const result = await this.findOneAndUpdate({}, { currency }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'currency' },
+    { value: currency },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Increment loyalty points
 settingSchema.statics.incrementLoyaltyPoints = async function (points) {
-  const result = await this.findOneAndUpdate({}, { $inc: { 'loyaltyProgram.pointsPerDollar': points } }, { new: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const doc = await this.findOne({ siteKey: activeTenantKey, key: 'loyaltyProgram.pointsPerDollar' });
+  const current = doc ? doc.value : 1;
+  const updated = current + points;
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: 'loyaltyProgram.pointsPerDollar' },
+    { value: updated },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Update specific policy
 settingSchema.statics.updatePolicy = async function (type, content) {
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
   const fieldMap = {
     return: 'returnPolicy',
     privacy: 'privacyPolicy',
     terms: 'termsOfService'
   };
   const fieldName = fieldMap[type] || type;
-  const result = await this.findOneAndUpdate({}, { [fieldName]: content }, { new: true });
+  await this.findOneAndUpdate(
+    { siteKey: activeTenantKey, key: fieldName },
+    { value: content },
+    { upsert: true, new: true }
+  );
   cachedSettingsMap.clear();
-  return result;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Audit update
 settingSchema.statics.updateWithAudit = async function (updateObj) {
-  const result = await this.findOneAndUpdate({}, updateObj, { new: true, runValidators: true });
+  const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+  const flat = flattenObject(updateObj);
+  for (const [k, v] of Object.entries(flat)) {
+    await this.findOneAndUpdate(
+      { siteKey: activeTenantKey, key: k },
+      { value: v },
+      { upsert: true, new: true }
+    );
+  }
   cachedSettingsMap.clear();
-  return result;
-};
-
-// ===== Additional Instance Methods =====
-
-// Merge partial updates into current settings
-settingSchema.methods.mergeAndSave = async function (partialData) {
-  Object.assign(this, partialData);
-  const result = await this.save();
-  cachedSettingsMap.clear();
-  return result;
-};
-
-// Check if store is in maintenance mode
-settingSchema.methods.isInMaintenance = function () {
-  return this.maintenanceMode === true;
-};
-
-// Check if store is live
-settingSchema.methods.isStoreLive = function () {
-  return this.isLive === true;
-};
-
-// Safe JSON output
-settingSchema.methods.toJSONSafe = function () {
-  const obj = this.toObject();
-  delete obj.smtpPassword; // never expose sensitive data
-  delete obj.stripeSecretKey;
-  delete obj.stripeWebhookSecret;
-  delete obj.paypalClientSecret;
-  delete obj.razorpayKeySecret;
-  delete obj.razorpayWebhookSecret;
-  return obj;
+  return this.getSettingsBySite(activeTenantKey);
 };
 
 // Schema Metadata Definition for Auto-Generating dynamic UI
@@ -478,6 +591,9 @@ const SETTING_DEFINITIONS = [
   { key: 'otpExpiryMinutes', label: 'OTP Expiry (minutes)', type: 'number', section: 'otp' },
   { key: 'otpMaxAttempts', label: 'Maximum Verification Attempts', type: 'number', section: 'otp' },
   { key: 'otpLength', label: 'OTP Code Length', type: 'number', section: 'otp' },
+  { key: 'twilioAccountSid', label: 'Twilio Account SID', type: 'string', section: 'otp' },
+  { key: 'twilioAuthToken', label: 'Twilio Auth Token', type: 'password', section: 'otp' },
+  { key: 'twilioPhoneNumber', label: 'Twilio Phone Number', type: 'string', section: 'otp' },
 
   // Policies Section
   { key: 'returnPolicy', label: 'Return Policy Text', type: 'text', section: 'policies' },
@@ -487,5 +603,8 @@ const SETTING_DEFINITIONS = [
 
 const Setting = mongoose.model('Setting', settingSchema);
 Setting.SETTING_DEFINITIONS = SETTING_DEFINITIONS;
+Setting.flattenObject = flattenObject;
+Setting.inflateSettings = inflateSettings;
+Setting.toJSONSafe = toJSONSafe;
 
 module.exports = Setting;

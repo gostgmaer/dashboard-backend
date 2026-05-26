@@ -168,6 +168,25 @@ settingRoute.get('/tenants',
   settingsCtrl.listTenants
 );
 
+// GET /api/settings/public - Get public (safe) settings resolved by tenant header/param
+settingRoute.get('/public',
+  settingsCtrl.getPublicSettings
+);
+
+// GET /api/settings/private - Get private settings resolved by tenant header
+settingRoute.get('/private',
+  authMiddleware,
+  settingsCtrl.getPrivateSettings
+);
+
+// PATCH /api/settings/update-field - Update setting field dynamically for resolved tenant
+const { ensureTenant } = require('../utils/tenantHelper');
+settingRoute.patch('/update-field',
+  authMiddleware,
+  ensureTenant,
+  settingsCtrl.updateField
+);
+
 // GET /api/settings/:siteKey/dynamic-schema - Get dynamic schema
 settingRoute.get('/:siteKey/dynamic-schema',
   authMiddleware,
@@ -179,6 +198,7 @@ settingRoute.patch('/:siteKey/update-field',
   authMiddleware,
   settingsCtrl.updateField
 );
+
 
 // GET /api/setting/:siteKey - Get settings for a specific site/app
 settingRoute.get('/:siteKey',

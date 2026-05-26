@@ -1,16 +1,23 @@
 const Setting = require('../../models/Setting');
-// const { standardResponse } = require('../../utils/apiUtils');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
+const { getTenantId } = require('../../utils/tenantHelper');
+
 // ================== GETTERS ==================
 
 exports.createSettings = async (req, res) => {
   try {
-    const { siteKey, ...data } = req.body;
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier (siteKey or header) is required', 400);
+    }
     const exists = await Setting.findOne({ siteKey });
     if (exists) {
       return errorResponse(res, `Settings for ${siteKey} already exist`, 400);
     }
-    const created = await Setting.create({ siteKey, ...data });
+    const flat = Setting.flattenObject(req.body);
+    const docs = Object.entries(flat).map(([k, v]) => ({ siteKey, key: k, value: v }));
+    await Setting.insertMany(docs);
+    const created = await Setting.getSettingsBySite(siteKey);
     return standardResponse(res, true, created, `Settings for ${siteKey} created`, 201);
   } catch (error) {
     return errorResponse(res, 'Failed to create settings', 500, error);
@@ -19,8 +26,27 @@ exports.createSettings = async (req, res) => {
 
 exports.getSettingsBySite = async (req, res) => {
   try {
-    const { siteKey } = req.params;
-    const settings = await Setting.findOne({ siteKey }).select('-_id -id -isDeleted -siteKey');
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier (siteKey or header) is required', 400);
+    }
+    const settings = await Setting.getSettingsBySite(siteKey);
+    if (!settings) {
+      return errorResponse(res, `No settings found for ${siteKey}`, 404);
+    }
+    return standardResponse(res, true, settings, `Settings for ${siteKey} retrieved`);
+  } catch (error) {
+    return errorResponse(res, 'Failed to get settings', 500, error);
+  }
+};
+
+exports.getPrivateSettings = async (req, res) => {
+  try {
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier (siteKey or header) is required', 400);
+    }
+    const settings = await Setting.getSettingsBySite(siteKey);
     if (!settings) {
       return errorResponse(res, `No settings found for ${siteKey}`, 404);
     }
@@ -32,12 +58,20 @@ exports.getSettingsBySite = async (req, res) => {
 
 exports.updateSettingsBySite = async (req, res) => {
   try {
-    const { siteKey } = req.params;
-    const updated = await Setting.findOneAndUpdate(
-      { siteKey },
-      req.body,
-      { new: true, upsert: true, runValidators: true }
-    );
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier (siteKey or header) is required', 400);
+    }
+    const flat = Setting.flattenObject(req.body);
+    for (const [k, v] of Object.entries(flat)) {
+      await Setting.findOneAndUpdate(
+        { siteKey, key: k },
+        { value: v },
+        { new: true, upsert: true }
+      );
+    }
+    Setting.clearCache();
+    const updated = await Setting.getSettingsBySite(siteKey);
     return standardResponse(res, true, updated, `Settings for ${siteKey} updated`);
   } catch (error) {
     return errorResponse(res, 'Failed to update settings', 500, error);
@@ -46,11 +80,15 @@ exports.updateSettingsBySite = async (req, res) => {
 
 exports.deleteSettingsBySite = async (req, res) => {
   try {
-    const { siteKey } = req.params;
-    const deleted = await Setting.findOneAndDelete({ siteKey });
-    if (!deleted) {
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier (siteKey or header) is required', 400);
+    }
+    const deleted = await Setting.deleteMany({ siteKey });
+    if (deleted.deletedCount === 0) {
       return errorResponse(res, `No settings found for ${siteKey}`, 404);
     }
+    Setting.clearCache();
     return standardResponse(res, true, null, `Settings for ${siteKey} deleted`);
   } catch (error) {
     return errorResponse(res, 'Failed to delete settings', 500, error);
@@ -59,7 +97,13 @@ exports.deleteSettingsBySite = async (req, res) => {
 
 exports.listAllSettings = async (req, res) => {
   try {
-    const all = await Setting.find().lean();
+    const docs = await Setting.find().lean();
+    const groups = {};
+    for (const d of docs) {
+      if (!groups[d.siteKey]) groups[d.siteKey] = [];
+      groups[d.siteKey].push(d);
+    }
+    const all = Object.keys(groups).map(siteKey => Setting.inflateSettings(groups[siteKey], siteKey));
     return standardResponse(res, true, all, 'All settings retrieved');
   } catch (error) {
     return errorResponse(res, 'Failed to list settings', 500, error);
@@ -77,8 +121,13 @@ exports.getSettings = async (req, res) => {
 
 exports.getPublicSettings = async (req, res) => {
   try {
-    const settings = await Setting.getPublicSettings();
-    return standardResponse(res, true, settings, 'Public settings retrieved');
+    const siteKey = getTenantId(req) || process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+    const settings = await Setting.getSettingsBySite(siteKey);
+    if (!settings) {
+      return errorResponse(res, `No settings found for ${siteKey}`, 404);
+    }
+    const safeSettings = Setting.toJSONSafe(settings);
+    return standardResponse(res, true, safeSettings, 'Public settings retrieved');
   } catch (error) {
     return errorResponse(res, 'Failed to get public settings', 500, error);
   }
@@ -355,7 +404,6 @@ exports.updateWithAudit = async (req, res) => {
 exports.listTenants = async (req, res) => {
   try {
     const tenants = await Setting.distinct('siteKey');
-    // Ensure active tenant is always in the list even if not seeded yet
     const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
     if (!tenants.includes(activeTenantKey)) {
       tenants.push(activeTenantKey);
@@ -369,7 +417,10 @@ exports.listTenants = async (req, res) => {
 // GET /api/settings/:siteKey/dynamic-schema
 exports.getDynamicSchema = async (req, res) => {
   try {
-    const { siteKey } = req.params;
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier is required', 400);
+    }
     let settings = await Setting.getSettingsBySite(siteKey);
     if (!settings) {
       // Automatically seed if missing during schema call
@@ -439,7 +490,10 @@ exports.getDynamicSchema = async (req, res) => {
 // PATCH /api/settings/:siteKey/update-field
 exports.updateField = async (req, res) => {
   try {
-    const { siteKey } = req.params;
+    const siteKey = getTenantId(req);
+    if (!siteKey) {
+      return errorResponse(res, 'Tenant identifier (x-tenant header or siteKey) is required', 400);
+    }
     const { key, value } = req.body;
 
     if (!key) {
@@ -465,19 +519,13 @@ exports.updateField = async (req, res) => {
     }
 
     const updated = await Setting.findOneAndUpdate(
-      { siteKey },
-      { [key]: updateVal },
-      { new: true, runValidators: true }
+      { siteKey, key },
+      { value: updateVal },
+      { new: true, upsert: true }
     );
 
-    if (!updated) {
-      return errorResponse(res, `No settings found for ${siteKey}`, 404);
-    }
-
     // Clear settings cache
-    if (Setting.clearCache) {
-      Setting.clearCache();
-    }
+    Setting.clearCache();
 
     return standardResponse(res, true, updated, `Field ${key} updated successfully`);
   } catch (error) {
