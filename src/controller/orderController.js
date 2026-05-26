@@ -316,6 +316,47 @@ class OrderController {
     }
   }
 
+  async trackPublicOrder(req, res) {
+    try {
+      const orderId = String(req.body.orderId || req.body.id || '').trim();
+      const email = String(req.body.email || '').trim().toLowerCase();
+
+      if (!orderId) {
+        throw new Error('Order ID is required');
+      }
+
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
+        throw new Error('Valid email is required');
+      }
+
+      let order = null;
+      if (this.isValidObjectId(orderId)) {
+        order = await Order.findById(orderId).populate('items.product').populate('user', 'firstName lastName email');
+      }
+
+      if (!order) {
+        order = await Order.findOne({
+          $or: [{ order_id: orderId }, { invoice: orderId }],
+        }).populate('items.product').populate('user', 'firstName lastName email');
+      }
+
+      if (!order || String(order.email || '').trim().toLowerCase() !== email) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      return res.json({
+        success: true,
+        statusCode: 200,
+        message: 'Order retrieved successfully',
+        data: order,
+        result: order,
+        results: order,
+      });
+    } catch (error) {
+      return this.handleError(res, error);
+    }
+  }
+
   // Get orders list with filters and pagination
   // Enhanced getOrders with flexible multiple filter support
 

@@ -224,6 +224,9 @@ const orderValidation = {
 // 📋 CRUD OPERATIONS
 // ========================================
 
+// POST /api/orders/track - Public order tracking by order ID + email
+router.post('/track', orderController.trackPublicOrder);
+
 // POST /api/orders - Create a new order
 router.post('/', 
   authMiddleware,

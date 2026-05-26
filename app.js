@@ -204,6 +204,7 @@ app.use('/api/attachments', safeRoute('Attachments', attachmentRoutes));
 app.use('/api/addresses', safeRoute('Addresses', addressRoute));
 app.use('/api/discounts', safeRoute('Discounts', discountRoute));
 app.use('/api/coupons', safeRoute('Coupons', couponRouter));
+app.use('/api/contact', safeRoute('Contacts', contactsRoute));
 app.use('/api/contacts', safeRoute('Contacts', contactsRoute));
 app.use('/api/logs', safeRoute('Logs', logRoutes));
 app.use('/api/activity-logs', safeRoute('ActivityLogs', userActivityroute));
