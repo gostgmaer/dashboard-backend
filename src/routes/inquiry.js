@@ -5,6 +5,7 @@ const { authMiddleware } = require('../middleware/auth');
 
 // Public: Submit inquiry
 router.post('/submit', InquiryController.createInquiry);
+router.post('/track', InquiryController.trackInquiry);
 
 // Admin routes
 router.get('/', authMiddleware, InquiryController.getAllInquiries);

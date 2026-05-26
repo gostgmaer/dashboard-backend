@@ -3,9 +3,76 @@ const { sendEmail } = require('../email');
 const { logActivity } = require('../services/activityLogService');
 const { NEW_INQUIRY_CLIENT, NEW_INQUIRY_ADMIN } = require('../email/contactInquiry');
 const { PROJECT_PROPOSAL_EMAIL } = require('../email/emailTemplate');
-const { sendSuccess, sendCreated, sendPaginated, HTTP_STATUS } = require('../utils/responseHelper');
+const { sendSuccess, sendCreated, sendPaginated } = require('../utils/responseHelper');
 const AppError = require('../utils/appError');
 const { catchAsync } = require('../middleware/errorHandler');
+
+const SUPPORT_CATEGORY_ALIASES = {
+  'general-inquiry': 'general',
+  'order-issue': 'order',
+  'shipping-delivery': 'shipping',
+  'returns-refunds': 'returns',
+  'payment-issue': 'payment',
+  'product-question': 'product',
+  'account-support': 'account',
+  'technical-support': 'technical',
+};
+
+const SUPPORT_CATEGORY_TO_PROJECT_TYPE = {
+  general: 'other',
+  order: 'ecommerce',
+  shipping: 'maintenance',
+  returns: 'maintenance',
+  payment: 'ecommerce',
+  product: 'ecommerce',
+  account: 'consulting',
+  technical: 'maintenance',
+  feedback: 'other',
+  other: 'other',
+};
+
+const normalizeSupportCategory = (value) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (!normalized) return 'general';
+
+  return SUPPORT_CATEGORY_ALIASES[normalized] || normalized;
+};
+
+const parseInquiryNumber = (value) => {
+  const input = String(value || '').trim().toUpperCase();
+  if (!input) return null;
+
+  const digits = input.match(/\d+/g);
+  if (!digits?.length) return null;
+
+  const parsed = Number(digits.join(''));
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const buildInquiryName = (body = {}) => {
+  const fullName = [body.firstName, body.lastName].filter(Boolean).join(' ').trim();
+  return body.name || body.client?.name || fullName;
+};
+
+const buildInquirySubject = (body = {}, category = 'general') => {
+  if (body.subject || body.message?.subject) {
+    return body.subject || body.message?.subject;
+  }
+
+  const label = category
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+  return `${label || 'Support'} request`;
+};
 
 // ================================
 // CONTACT INQUIRY CONTROLLERS
@@ -14,8 +81,30 @@ const { catchAsync } = require('../middleware/errorHandler');
 class InquiryController {
   // CREATE - Submit new inquiry
   static createInquiry = catchAsync(async (req, res) => {
+    const category = normalizeSupportCategory(req.body.category);
+    const projectType = req.body.projectType || req.body.projectDetails?.servicesInterested?.[0] || SUPPORT_CATEGORY_TO_PROJECT_TYPE[category] || 'other';
     // support both old nested shape and the current flat schema
-    const inquiryData = { name: req.body.name || req.body.client?.name, email: req.body.email || req.body.client?.email, phone: req.body.phone || req.body.client?.phone, company: req.body.company || req.body.client?.companyName, website: req.body.website || req.body.client?.websiteUrl, projectType: req.body.projectType || req.body.projectDetails?.servicesInterested?.[0], budget: req.body.budget || req.body.projectDetails?.budgetRange, timeline: req.body.timeline || req.body.projectDetails?.timelinePreference, description: req.body.description || req.body.message?.body, requirements: req.body.requirements || req.body.preferences?.requirements, attachments: req.body.attachments, preferredContactMethod: req.body.preferredContactMethod || req.body.preferences?.preferredContactMethod, source: req.body.source, referrer: req.body.referrer, ipAddress: req.ip, userAgent: req.headers['user-agent'] };
+    const inquiryData = {
+      name: buildInquiryName(req.body),
+      email: req.body.email || req.body.client?.email,
+      phone: req.body.phone || req.body.client?.phone,
+      company: req.body.company || req.body.client?.companyName,
+      website: req.body.website || req.body.client?.websiteUrl,
+      subject: buildInquirySubject(req.body, category),
+      category,
+      orderReference: req.body.orderReference || req.body.orderNumber,
+      projectType,
+      budget: req.body.budget || req.body.projectDetails?.budgetRange || 'not-sure',
+      timeline: req.body.timeline || req.body.projectDetails?.timelinePreference || 'flexible',
+      description: req.body.description || req.body.message?.body || req.body.message,
+      requirements: req.body.requirements || req.body.preferences?.requirements,
+      attachments: req.body.attachments,
+      preferredContactMethod: req.body.preferredContactMethod || req.body.preferences?.preferredContactMethod || 'email',
+      source: req.body.source || 'website',
+      referrer: req.body.referrer,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    };
 
     const inquiry = new Inquiry(inquiryData);
     await inquiry.save();
@@ -27,7 +116,25 @@ class InquiryController {
     await sendEmail(NEW_INQUIRY_CLIENT, emailPayload);
     await sendEmail(NEW_INQUIRY_ADMIN, { ...emailPayload, email: 'kishor81160@gmail.com' });
 
-    return sendCreated(res, { data: inquiry.toAPIResponse(), message: 'Inquiry submitted successfully' });
+    return sendCreated(res, { data: inquiry.toPublicResponse(), message: 'Ticket submitted successfully' });
+  });
+
+  // PUBLIC TRACK - Get a ticket by ticket number + email
+  static trackInquiry = catchAsync(async (req, res) => {
+    const inquiryNumber = parseInquiryNumber(req.body.ticketId || req.body.ticketNumber || req.body.inquiryNumber);
+    const email = String(req.body.email || '').trim().toLowerCase();
+
+    if (!inquiryNumber || !email) {
+      throw AppError.badRequest('Ticket ID and email are required');
+    }
+
+    const inquiry = await Inquiry.findOne({ inquiryNumber, email, isDeleted: false });
+
+    if (!inquiry) {
+      throw AppError.notFound('Ticket not found');
+    }
+
+    return sendSuccess(res, { data: inquiry.toPublicResponse(), message: 'Ticket retrieved successfully' });
   });
 
   // GET ALL - Dashboard listing with filters
@@ -142,7 +249,7 @@ class InquiryController {
     }
 
     // Update status
-    inquiry.status = 'Contacted';
+    inquiry.status = 'contacted';
     await inquiry.save();
 
     return sendSuccess(res, { data: { sent, inquiry: inquiry.toAPIResponse() }, message: `Client contacted via ${method}` });
@@ -150,7 +257,7 @@ class InquiryController {
 
   // DELETE - Soft delete (archive)
   static archiveInquiry = catchAsync(async (req, res) => {
-    const inquiry = await Inquiry.findByIdAndUpdate(req.params.id, { status: 'closed', priority: 'low', deletedAt: new Date(), isDeleted: true }, { new: true });
+    const inquiry = await Inquiry.findByIdAndUpdate(req.params.id, { status: 'completed', priority: 'low', deletedAt: new Date(), isDeleted: true }, { new: true });
 
     if (!inquiry) {
       throw AppError.notFound('Inquiry not found');

@@ -39,6 +39,25 @@ const inquirySchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'Website URL cannot exceed 200 characters']
   },
+  subject: {
+    type: String,
+    trim: true,
+    maxlength: [200, 'Subject cannot exceed 200 characters'],
+    default: 'Support request'
+  },
+  category: {
+    type: String,
+    enum: {
+      values: ['general', 'order', 'shipping', 'returns', 'payment', 'product', 'account', 'technical', 'feedback', 'other'],
+      message: '{VALUE} is not a valid support category'
+    },
+    default: 'general'
+  },
+  orderReference: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Order reference cannot exceed 100 characters']
+  },
 
   // Project Details
   projectType: {
@@ -231,6 +250,7 @@ const inquirySchema = new mongoose.Schema({
 // Indexes
 inquirySchema.index({ status: 1 });
 inquirySchema.index({ priority: 1 });
+inquirySchema.index({ category: 1 });
 inquirySchema.index({ projectType: 1 });
 inquirySchema.index({ createdAt: -1 });
 inquirySchema.index({ assignedTo: 1 });
@@ -252,16 +272,12 @@ inquirySchema.index({
 inquirySchema.pre('save', async function () {
   if (this.isNew) {
     // --- sequential number logic ------------------------------------------------
-    try {
-      const counter = await Counter.findOneAndUpdate(
-        { name: 'inquiry' },
-        { $inc: { seq: 1 } },
-        { new: true, upsert: true }
-      );
-      this.inquiryNumber = counter.seq;
-    } catch (err) {
-      throw err;
-    }
+    const counter = await Counter.findOneAndUpdate(
+      { name: 'inquiry' },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    this.inquiryNumber = counter.seq;
 
     // --- priority logic ---------------------------------------------------------
     const highBudgets = ['50k-100k', 'over-100k'];
@@ -388,6 +404,11 @@ inquirySchema.virtual('preferences').get(function () {
   };
 });
 
+inquirySchema.virtual('ticketId').get(function () {
+  if (!this.inquiryNumber) return null;
+  return `SUP-${String(this.inquiryNumber).padStart(6, '0')}`;
+});
+
 inquirySchema.virtual('admin').get(function () {
   return {
     priority: this.priority,
@@ -402,6 +423,27 @@ inquirySchema.methods.toAPIResponse = function () {
   delete obj.__v;
   if (obj.isDeleted) delete obj.isDeleted;
   return obj;
+};
+
+inquirySchema.methods.toPublicResponse = function () {
+  const obj = this.toObject({ virtuals: true });
+  return {
+    _id: obj._id,
+    inquiryNumber: obj.inquiryNumber,
+    ticketId: obj.ticketId,
+    name: obj.name,
+    email: obj.email,
+    phone: obj.phone,
+    subject: obj.subject,
+    category: obj.category,
+    orderReference: obj.orderReference,
+    description: obj.description,
+    status: obj.status,
+    priority: obj.priority,
+    preferredContactMethod: obj.preferredContactMethod,
+    createdAt: obj.createdAt,
+    updatedAt: obj.updatedAt,
+  };
 };
 
 // Flexible search helper used by controller
