@@ -14,6 +14,7 @@ const app = require("./app");
 const { app: appConfig, features } = require("./src/config/setting");
 const connectDB = require("./src/config/dbConnact");
 const socketService = require("./src/services/socketService");
+const seedSettings = require("./src/config/seedSettings");
 
 const PORT = appConfig.port;
 
@@ -22,6 +23,18 @@ async function startServer() {
     console.log("⏳ Connecting to database...");
     await connectDB();
     console.log("✅ Database connected");
+
+    // Run settings seeds
+    await seedSettings();
+
+    // Warm settings cache
+    const Setting = require("./src/models/Setting");
+    try {
+      await Setting.getSettings();
+      console.log("✅ Settings cache warmed");
+    } catch (err) {
+      console.error("⚠️ Failed to warm settings cache:", err.message);
+    }
 
     const server = http.createServer(app);
 

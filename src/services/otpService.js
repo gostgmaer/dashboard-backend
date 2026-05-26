@@ -20,12 +20,20 @@ const { otp: otpConfig, services } = require('../config/setting');
 
 class OTPService {
   constructor() {
-    this.config = {
-      enabled: otpConfig.enabled,
-      defaultMethod: otpConfig.defaultMethod,
-      allowFallback: false, // enforce single method only
-      expiryMinutes: otpConfig.expiryMinutes,
-      maxAttempts: otpConfig.maxAttempts,
+    this.rateLimitStore = new Map();
+  }
+
+  get config() {
+    const Setting = require('../models/Setting');
+    const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+    const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
+
+    return {
+      enabled: dbSettings?.otpEnabled !== undefined ? dbSettings.otpEnabled : otpConfig.enabled,
+      defaultMethod: dbSettings?.otpDefaultMethod || otpConfig.defaultMethod,
+      allowFallback: false,
+      expiryMinutes: dbSettings?.otpExpiryMinutes || otpConfig.expiryMinutes,
+      maxAttempts: dbSettings?.otpMaxAttempts || otpConfig.maxAttempts,
       rateLimit: {
         window: otpConfig.rateLimit.windowMs,
         maxRequests: otpConfig.rateLimit.maxRequests,
@@ -34,27 +42,37 @@ class OTPService {
         secretLength: otpConfig.totp.secretLength,
         window: otpConfig.totp.window,
         step: otpConfig.totp.step,
-        appName: otpConfig.totp.appName,
-        issuer: otpConfig.totp.issuer,
+        appName: dbSettings?.siteName || otpConfig.totp.appName,
+        issuer: dbSettings?.siteName || otpConfig.totp.issuer,
       },
       email: {
-        length: otpConfig.emailOtp.length,
+        length: dbSettings?.otpLength || otpConfig.emailOtp.length,
         template: otpConfig.emailOtp.template,
-        sender: otpConfig.emailOtp.sender,
+        sender: dbSettings?.contactInfo?.email || otpConfig.emailOtp.sender,
       },
       sms: {
-        length: otpConfig.smsOtp.length,
+        length: dbSettings?.otpLength || otpConfig.smsOtp.length,
         provider: otpConfig.smsOtp.provider,
       },
     };
+  }
 
-    this.preferredMethod = this.config.defaultMethod;
+  get preferredMethod() {
+    return this.config.defaultMethod;
+  }
 
-    if (this.config.sms.provider === 'twilio' && services.twilio.accountSid) {
-      this.twilioClient = twilio(services.twilio.accountSid, services.twilio.authToken);
+  get twilioClient() {
+    const Setting = require('../models/Setting');
+    const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+    const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
+    
+    const accountSid = dbSettings?.twilioAccountSid || services?.twilio?.accountSid;
+    const authToken = dbSettings?.twilioAuthToken || services?.twilio?.authToken;
+    
+    if (accountSid && authToken) {
+      return twilio(accountSid, authToken);
     }
-
-    this.rateLimitStore = new Map();
+    return null;
   }
 
   /**
@@ -346,12 +364,14 @@ class OTPService {
 
       await user.save();
 
-      // Send SMS
-      const message = `Your ${this.config.totp.appName} verification code is: ${code}. Valid for ${this.config.expiryMinutes} minutes. Don't share this code.`;
+      const Setting = require('../models/Setting');
+      const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+      const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
+      const twilioPhone = dbSettings?.twilioPhoneNumber || services?.twilio?.phoneNumber;
 
       const smsResult = await this.twilioClient.messages.create({
         body: message,
-        from: services.twilio.phoneNumber,
+        from: twilioPhone,
         to: user.phoneNumber,
       });
 

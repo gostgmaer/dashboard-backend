@@ -162,6 +162,24 @@ settingRoute.get('/',
   settingsCtrl.listAllSettings
 );
 
+// GET /api/settings/tenants - List all unique tenants (siteKeys)
+settingRoute.get('/tenants',
+  authMiddleware,
+  settingsCtrl.listTenants
+);
+
+// GET /api/settings/:siteKey/dynamic-schema - Get dynamic schema
+settingRoute.get('/:siteKey/dynamic-schema',
+  authMiddleware,
+  settingsCtrl.getDynamicSchema
+);
+
+// PATCH /api/settings/:siteKey/update-field - Update setting field dynamically
+settingRoute.patch('/:siteKey/update-field',
+  authMiddleware,
+  settingsCtrl.updateField
+);
+
 // GET /api/setting/:siteKey - Get settings for a specific site/app
 settingRoute.get('/:siteKey',
   // authMiddleware,
@@ -505,6 +523,9 @@ const routeOrderMiddleware = (req, res, next) => {
     path.includes('/section/') ||
     path.includes('/reset') ||
     path.includes('/audit-update') ||
+    path.includes('/tenants') ||
+    path.includes('/dynamic-schema') ||
+    path.includes('/update-field') ||
     path.includes('/branding') ||
     path.includes('/seo') ||
     path.includes('/payment-methods') ||

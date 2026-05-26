@@ -1,28 +1,27 @@
-
 // services/StripeService.js
 const { payment } = require('../../config/setting');
 const StripeFactory = require('stripe');
-const crypto = require('crypto');
+const Setting = require('../../models/Setting');
 
 class StripeService {
     constructor() {
-        this.webhookSecret = payment.stripe.webhookSecret;
-        this.stripe = null;
-        if (payment?.stripe?.secretKey) {
-            this.stripe = StripeFactory(payment.stripe.secretKey);
-        }
+        // Constructor is kept minimal to avoid synchronous boot dependency
     }
 
-    ensureClient() {
-        if (!this.stripe) {
-            throw new Error('Stripe client is not configured');
+    async getClient() {
+        const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+        const dbSettings = await Setting.getSettingsBySite(siteKey);
+        
+        const secretKey = dbSettings?.stripeSecretKey || payment?.stripe?.secretKey;
+        if (!secretKey) {
+            throw new Error('Stripe client secret key is not configured');
         }
-        return this.stripe;
+        return StripeFactory(secretKey);
     }
 
     async createPayment(paymentData) {
         try {
-            const stripe = this.ensureClient();
+            const stripe = await this.getClient();
             const paymentIntent = await stripe.paymentIntents.create({
                 amount: Math.round(paymentData.amount * 100), // Convert to cents
                 currency: paymentData.currency || 'usd',
@@ -53,7 +52,7 @@ class StripeService {
 
     async confirmPayment(paymentIntentId, paymentMethodId) {
         try {
-            const stripe = this.ensureClient();
+            const stripe = await this.getClient();
             const paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
                 payment_method: paymentMethodId
             });
@@ -74,7 +73,7 @@ class StripeService {
 
     async capturePayment(paymentIntentId) {
         try {
-            const stripe = this.ensureClient();
+            const stripe = await this.getClient();
             const paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
 
             return {
@@ -94,7 +93,7 @@ class StripeService {
 
     async refundPayment(paymentIntentId, refundData) {
         try {
-            const stripe = this.ensureClient();
+            const stripe = await this.getClient();
             const refund = await stripe.refunds.create({
                 payment_intent: paymentIntentId,
                 amount: Math.round(refundData.amount * 100), // Convert to cents
@@ -120,15 +119,22 @@ class StripeService {
         }
     }
 
-    verifyWebhook(headers, body) {
+    async verifyWebhook(headers, body) {
         try {
-            const stripe = this.ensureClient();
+            const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+            const dbSettings = await Setting.getSettingsBySite(siteKey);
+            const stripe = await this.getClient();
             const signature = headers['stripe-signature'];
+            const webhookSecret = dbSettings?.stripeWebhookSecret || payment?.stripe?.webhookSecret;
+
+            if (!webhookSecret) {
+                throw new Error('Stripe webhook secret is not configured');
+            }
 
             const event = stripe.webhooks.constructEvent(
                 body,
                 signature,
-                this.webhookSecret
+                webhookSecret
             );
 
             return {
@@ -145,7 +151,7 @@ class StripeService {
 
     async getPaymentStatus(paymentIntentId) {
         try {
-            const stripe = this.ensureClient();
+            const stripe = await this.getClient();
             const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
             return {
@@ -174,7 +180,7 @@ class StripeService {
 
     async createSetupIntent(customerId) {
         try {
-            const stripe = this.ensureClient();
+            const stripe = await this.getClient();
             const setupIntent = await stripe.setupIntents.create({
                 customer: customerId,
                 usage: 'off_session'

@@ -428,7 +428,7 @@ class PaymentController {
             message: 'Gateway payment ID is required for Razorpay verification',
           });
         }
-        const isValid = this.razorpayService.verifyPaymentSignature(payment.gatewayPaymentId, resolvedGatewayPaymentId, signature);
+        const isValid = await this.razorpayService.verifyPaymentSignature(payment.gatewayPaymentId, resolvedGatewayPaymentId, signature);
         verificationResult = { success: isValid };
         break;
 

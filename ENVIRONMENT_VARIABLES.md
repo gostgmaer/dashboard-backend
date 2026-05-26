@@ -4,6 +4,17 @@
 
 All environment variables are now centralized in `src/config/setting.js`. **DO NOT** use `process.env` directly in your application code. Instead, import the appropriate configuration objects from the settings module.
 
+> [!IMPORTANT]
+> **Database-Driven Platform Settings**
+>
+> Several configurations have been migrated from static environment variables in `.env` to database records. This enables changing credentials, toggles, and modes dynamically at runtime on a per-tenant (`siteKey`) basis via the **Platform Settings UI** in the administrator dashboard, eliminating server restarts:
+> - **Branding**: `BRAND_NAME` (now `siteName`)
+> - **Email (SMTP)**: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS` (now `smtpHost`, `smtpPort`, `smtpUser`, `smtpPassword`)
+> - **Stripe Gateway**: `STRIPE_ENABLED`, `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
+> - **PayPal Gateway**: `PAYPAL_ENABLED`, `PAYPAL_MODE`, `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`
+> - **Razorpay Gateway**: `RAZORPAY_ENABLED`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
+> - **OTP & Twilio MFA**: `ENABLE_OTP_VERIFICATION`, `DEFAULT_OTP_METHOD`, `OTP_EXPIRY_MINUTES`, `OTP_MAX_ATTEMPTS`, `SMS_OTP_LENGTH`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+
 ## ✅ Correct Usage
 
 ```javascript

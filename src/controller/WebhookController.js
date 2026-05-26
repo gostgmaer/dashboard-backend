@@ -124,7 +124,7 @@ class WebhookController {
         if (!this.paypalService) {
             return res.status(503).json({ success: false, message: 'PayPal webhook service is unavailable' });
         }
-        const verification = this.paypalService.verifyWebhook(req.headers, req.rawBody);
+        const verification = await this.paypalService.verifyWebhook(req.headers, req.rawBody);
 
         if (!verification.isValid) {
             console.error('Invalid PayPal webhook signature');
@@ -170,7 +170,7 @@ class WebhookController {
         if (!this.razorpayService) {
             return res.status(503).json({ success: false, message: 'Razorpay webhook service is unavailable' });
         }
-        const verification = this.razorpayService.verifyWebhook(req.headers, req.rawBody);
+        const verification = await this.razorpayService.verifyWebhook(req.headers, req.rawBody);
 
         if (!verification.isValid) {
             console.error('Invalid Razorpay webhook signature');
@@ -224,7 +224,7 @@ class WebhookController {
         if (!this.stripeService) {
             return res.status(503).json({ success: false, message: 'Stripe webhook service is unavailable' });
         }
-        const verification = this.stripeService.verifyWebhook(req.headers, req.rawBody);
+        const verification = await this.stripeService.verifyWebhook(req.headers, req.rawBody);
 
         if (!verification.isValid) {
             console.error('Invalid Stripe webhook signature');

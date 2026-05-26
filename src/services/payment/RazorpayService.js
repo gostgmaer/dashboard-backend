@@ -1,20 +1,31 @@
-
 // services/RazorpayService.js
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { payment } = require('../../config/setting');
+const Setting = require('../../models/Setting');
 
 class RazorpayService {
     constructor() {
-        this.razorpay = new Razorpay({
-            key_id: payment.razorpay.publicKey,
-            key_secret: payment.razorpay.secretKey
-        });
-        this.webhookSecret = payment.razorpay.webhookSecret;
+        // Constructor is kept minimal to avoid synchronous boot dependency
+    }
+
+    async getClient() {
+        const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+        const dbSettings = await Setting.getSettingsBySite(siteKey);
+
+        const key_id = dbSettings?.razorpayKeyId || payment?.razorpay?.publicKey;
+        const key_secret = dbSettings?.razorpayKeySecret || payment?.razorpay?.secretKey;
+
+        if (!key_id || !key_secret) {
+            throw new Error('Razorpay keys are not configured');
+        }
+
+        return new Razorpay({ key_id, key_secret });
     }
 
     async createPayment(paymentData) {
         try {
+            const razorpay = await this.getClient();
             const orderOptions = {
                 amount: Math.round(paymentData.amount * 100), // Convert to paise
                 currency: paymentData.currency || 'INR',
@@ -26,7 +37,7 @@ class RazorpayService {
                 }
             };
 
-            const order = await this.razorpay.orders.create(orderOptions);
+            const order = await razorpay.orders.create(orderOptions);
 
             return {
                 success: true,
@@ -47,16 +58,17 @@ class RazorpayService {
 
     async capturePayment(paymentId, amount) {
         try {
-            const payment = await this.razorpay.payments.capture(
+            const razorpay = await this.getClient();
+            const paymentDoc = await razorpay.payments.capture(
                 paymentId, 
                 Math.round(amount * 100)
             );
 
             return {
                 success: true,
-                captureId: payment.id,
-                status: payment.status,
-                data: payment
+                captureId: paymentDoc.id,
+                status: paymentDoc.status,
+                data: paymentDoc
             };
         } catch (error) {
             return {
@@ -69,6 +81,7 @@ class RazorpayService {
 
     async refundPayment(paymentId, refundData) {
         try {
+            const razorpay = await this.getClient();
             const refundOptions = {
                 amount: Math.round(refundData.amount * 100), // Convert to paise
                 speed: 'optimum',
@@ -79,7 +92,7 @@ class RazorpayService {
                 receipt: refundData.refundId
             };
 
-            const refund = await this.razorpay.payments.refund(paymentId, refundOptions);
+            const refund = await razorpay.payments.refund(paymentId, refundOptions);
 
             return {
                 success: true,
@@ -96,12 +109,20 @@ class RazorpayService {
         }
     }
 
-    verifyWebhook(headers, body) {
+    async verifyWebhook(headers, body) {
         try {
+            const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+            const dbSettings = await Setting.getSettingsBySite(siteKey);
+            const webhookSecret = dbSettings?.razorpayWebhookSecret || payment?.razorpay?.webhookSecret;
+
+            if (!webhookSecret) {
+                throw new Error('Razorpay webhook secret is not configured');
+            }
+
             const signature = headers['x-razorpay-signature'];
 
             const expectedSignature = crypto
-                .createHmac('sha256', this.webhookSecret)
+                .createHmac('sha256', webhookSecret)
                 .update(body)
                 .digest('hex');
 
@@ -123,12 +144,20 @@ class RazorpayService {
         }
     }
 
-    verifyPaymentSignature(orderId, paymentId, signature) {
+    async verifyPaymentSignature(orderId, paymentId, signature) {
         try {
-            const body = `\${orderId}|\${paymentId}`;
+            const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+            const dbSettings = await Setting.getSettingsBySite(siteKey);
+            const key_secret = dbSettings?.razorpayKeySecret || payment?.razorpay?.secretKey;
+
+            if (!key_secret) {
+                throw new Error('Razorpay secret key is not configured');
+            }
+
+            const body = `${orderId}|${paymentId}`;
 
             const expectedSignature = crypto
-                .createHmac('sha256', payment.razorpay.secretKey)
+                .createHmac('sha256', key_secret)
                 .update(body)
                 .digest('hex');
 
@@ -143,12 +172,13 @@ class RazorpayService {
 
     async getPaymentStatus(paymentId) {
         try {
-            const payment = await this.razorpay.payments.fetch(paymentId);
+            const razorpay = await this.getClient();
+            const paymentDoc = await razorpay.payments.fetch(paymentId);
 
             return {
                 success: true,
-                status: payment.status,
-                data: payment
+                status: paymentDoc.status,
+                data: paymentDoc
             };
         } catch (error) {
             return {
@@ -160,7 +190,8 @@ class RazorpayService {
 
     async getOrderStatus(orderId) {
         try {
-            const order = await this.razorpay.orders.fetch(orderId);
+            const razorpay = await this.getClient();
+            const order = await razorpay.orders.fetch(orderId);
 
             return {
                 success: true,

@@ -350,3 +350,137 @@ exports.updateWithAudit = async (req, res) => {
     return errorResponse(res, 'Failed to update settings with audit', 500, error);
   }
 };
+
+// GET /api/settings/tenants
+exports.listTenants = async (req, res) => {
+  try {
+    const tenants = await Setting.distinct('siteKey');
+    // Ensure active tenant is always in the list even if not seeded yet
+    const activeTenantKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
+    if (!tenants.includes(activeTenantKey)) {
+      tenants.push(activeTenantKey);
+    }
+    return standardResponse(res, true, tenants, 'Active tenants list retrieved successfully');
+  } catch (error) {
+    return errorResponse(res, 'Failed to list tenants', 500, error);
+  }
+};
+
+// GET /api/settings/:siteKey/dynamic-schema
+exports.getDynamicSchema = async (req, res) => {
+  try {
+    const { siteKey } = req.params;
+    let settings = await Setting.getSettingsBySite(siteKey);
+    if (!settings) {
+      // Automatically seed if missing during schema call
+      const seedSettings = require('../../config/seedSettings');
+      await seedSettings();
+      settings = await Setting.getSettingsBySite(siteKey);
+    }
+    
+    if (!settings) {
+      return errorResponse(res, `No settings found for ${siteKey}`, 404);
+    }
+
+    const definitions = Setting.SETTING_DEFINITIONS || [];
+    
+    // Group fields by section
+    const sectionMap = {
+      basic: { id: 'basic', title: 'Basic Settings', fields: [] },
+      contact: { id: 'contact', title: 'Contact Information', fields: [] },
+      branding: { id: 'branding', title: 'Branding', fields: [] },
+      currency: { id: 'currency', title: 'Currency & Tax', fields: [] },
+      email: { id: 'email', title: 'SMTP Settings', fields: [] },
+      stripe: { id: 'stripe', title: 'Stripe Gateway', fields: [] },
+      paypal: { id: 'paypal', title: 'PayPal Gateway', fields: [] },
+      razorpay: { id: 'razorpay', title: 'Razorpay Gateway', fields: [] },
+      otp: { id: 'otp', title: 'OTP & MFA Settings', fields: [] },
+      policies: { id: 'policies', title: 'Policies', fields: [] },
+    };
+
+    definitions.forEach(def => {
+      // Resolve value from nested properties
+      const keys = def.key.split('.');
+      let val = settings;
+      for (const k of keys) {
+        val = val ? val[k] : undefined;
+      }
+
+      // Mask password/secret fields
+      let isConfigured = false;
+      if (def.type === 'password') {
+        isConfigured = !!val;
+        val = val ? '••••••••' : '';
+      }
+
+      const fieldData = {
+        key: def.key,
+        label: def.label,
+        type: def.type,
+        value: val !== undefined ? val : '',
+        disabled: def.disabled || false,
+        options: def.options || undefined,
+        isConfigured: def.type === 'password' ? isConfigured : undefined
+      };
+
+      if (sectionMap[def.section]) {
+        sectionMap[def.section].fields.push(fieldData);
+      }
+    });
+
+    const sections = Object.values(sectionMap).filter(sec => sec.fields.length > 0);
+
+    return standardResponse(res, true, sections, 'Dynamic settings schema retrieved successfully');
+  } catch (error) {
+    return errorResponse(res, 'Failed to retrieve dynamic settings schema', 500, error);
+  }
+};
+
+// PATCH /api/settings/:siteKey/update-field
+exports.updateField = async (req, res) => {
+  try {
+    const { siteKey } = req.params;
+    const { key, value } = req.body;
+
+    if (!key) {
+      return errorResponse(res, 'Field key is required', 400);
+    }
+
+    // Prepare update payload
+    let updateVal = value;
+    // Basic type normalization if needed
+    const def = Setting.SETTING_DEFINITIONS.find(d => d.key === key);
+    if (def) {
+      if (def.type === 'number' && typeof value === 'string') {
+        updateVal = Number(value);
+      }
+      if (def.type === 'boolean' && typeof value !== 'boolean') {
+        updateVal = value === 'true' || value === 1 || value === true;
+      }
+    }
+
+    // Do not update password fields if value is mask
+    if (def && def.type === 'password' && value === '••••••••') {
+      return standardResponse(res, true, null, 'Field skipped (no changes)');
+    }
+
+    const updated = await Setting.findOneAndUpdate(
+      { siteKey },
+      { [key]: updateVal },
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return errorResponse(res, `No settings found for ${siteKey}`, 404);
+    }
+
+    // Clear settings cache
+    if (Setting.clearCache) {
+      Setting.clearCache();
+    }
+
+    return standardResponse(res, true, updated, `Field ${key} updated successfully`);
+  } catch (error) {
+    return errorResponse(res, 'Failed to update setting field', 500, error);
+  }
+};
