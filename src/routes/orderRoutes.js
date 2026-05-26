@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controller/orderController');
 const { body, query, param, validationResult } = require('express-validator');
-const {authMiddleware} = require('../middleware/auth');
-const  authorize  = require('../middleware/authorize');
+const { authMiddleware, optionalAuth } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
 
@@ -52,7 +51,8 @@ const instanceCheckMiddleware = async (req, res, next) => {
         return res.status(404).json({ success: false, message: 'Order not found' });
       }
       const canManageOrders = Array.isArray(req.user.permissions) && req.user.permissions.includes('orders:manage');
-      if (order.user.toString() !== req.user.id && !canManageOrders) { // Restrict to own orders or manage permission
+      const orderOwnerId = order.user?.toString?.() || null;
+      if ((!orderOwnerId || orderOwnerId !== req.user.id) && !canManageOrders) { // Restrict to own orders or manage permission
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s order' });
       }
     }
@@ -81,9 +81,6 @@ const validate = (req, res, next) => {
 const orderValidation = {
   create: [
     body().custom((value) => {
-      if (!value.user && !value.userId) {
-        throw new Error('Invalid user ID');
-      }
       if (!value.payment_method && !value.paymentMethod) {
         throw new Error('Invalid payment method');
       }
@@ -229,7 +226,7 @@ router.post('/track', orderController.trackPublicOrder);
 
 // POST /api/orders - Create a new order
 router.post('/', 
-  authMiddleware,
+  optionalAuth,
 
   orderValidation.create,
   orderController.createOrder

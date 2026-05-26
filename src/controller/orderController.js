@@ -177,7 +177,7 @@ class OrderController {
         .trim()
         .slice(0, 128);
 
-      if (!this.isValidObjectId(resolvedUser)) throw new Error('Invalid user ID');
+      if (resolvedUser && !this.isValidObjectId(resolvedUser)) throw new Error('Invalid user ID');
       if (!email || !email.match(/^\S+@\S+\.\S+$/)) throw new Error('Valid email is required');
       if (!firstName || !lastName) throw new Error('First and Last name required');
       if (!phone || !phone.match(/^\+?[\d\s-]{10,}$/)) throw new Error('Valid phone number is required');
@@ -185,7 +185,10 @@ class OrderController {
       if (!Array.isArray(items) || items.length === 0) throw new Error('At least one order item required');
 
       if (idempotencyKey) {
-        const existingOrder = await Order.findOne({ user: resolvedUser, idempotencyKey });
+        const existingFilter = resolvedUser
+          ? { user: resolvedUser, idempotencyKey }
+          : { email: email.toLowerCase().trim(), idempotencyKey };
+        const existingOrder = await Order.findOne(existingFilter);
         if (existingOrder) {
           return res.status(200).json({
             success: true,
@@ -225,7 +228,7 @@ class OrderController {
       inventoryReserved = true;
 
       const order = new Order({
-        user: resolvedUser,
+        ...(resolvedUser ? { user: resolvedUser } : {}),
         email: email.toLowerCase().trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -243,7 +246,7 @@ class OrderController {
         ipAddress,
         deviceInfo,
         utmParameters,
-        created_by,
+        created_by: this.isValidObjectId(created_by) ? created_by : undefined,
         payment_status: 'unpaid',
         status: 'pending',
         subtotal: 0,
