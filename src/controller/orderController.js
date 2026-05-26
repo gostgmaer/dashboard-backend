@@ -170,7 +170,7 @@ class OrderController {
     let inventoryReserved = false;
     let normalizedItems = [];
     try {
-      const { user, userId, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, items, additionalNotes, couponCode, payment_method, paymentMethod, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
+      const { user, userId, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, taxAmount, discountAmount, items, additionalNotes, couponCode, payment_method, paymentMethod, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
       const resolvedUser = user || userId;
       const resolvedPaymentMethod = this.normalizePaymentMethod(payment_method || paymentMethod);
       const idempotencyKey = String(req.headers['idempotency-key'] || req.body.idempotencyKey || '')
@@ -246,8 +246,8 @@ class OrderController {
         payment_status: 'unpaid',
         status: 'pending',
         subtotal: 0,
-        taxAmount: 0,
-        discountAmount: 0,
+        taxAmount: Math.max(Number(taxAmount || 0), 0),
+        discountAmount: Math.max(Number(discountAmount || 0), 0),
         loyaltyPointsEarned: 0,
         loyaltyPointsRedeemed: 0,
         amount_paid: 0,

@@ -275,7 +275,7 @@ wishlistSchema.statics.getUserWishlist = async function ({
     if (populateProduct) {
       q = q.populate({
         path: 'product',
-        select: 'name price images category isAvailable',
+        select: 'title name slug prices basePrice originalPrice finalPrice salePrice price image images stock quantity inventory unit shortDescription descriptions category isAvailable',
         match: { isAvailable: true }
       });
     }
