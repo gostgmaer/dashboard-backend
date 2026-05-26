@@ -44,11 +44,8 @@ const instanceCheckMiddleware = async (req, res, next) => {
       if (req.user.id !== userId) { // Restrict to own wishlist unless superadmin
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s wishlist' });
       }
-    
-      const wishlist = await Wishlist.findOne({ userId });
-      if (!wishlist && req.method !== 'POST') { // Allow POST for creation
-        return res.status(404).json({ success: false, message: 'Wishlist not found for user' });
-      }
+
+      req.wishlist = await Wishlist.findOne({ user: userId });
     }
     next();
   } catch (err) {

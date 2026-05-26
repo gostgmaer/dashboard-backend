@@ -162,7 +162,7 @@ wishlistSchema.statics.addToWishlist = async function ({ userId, productId, crea
           status: 'PENDING'
         }
       },
-      { upsert: true, new: true, runValidators: true }
+      { upsert: true, returnDocument: 'after', runValidators: true }
     );
 
     return wishlistItem;
@@ -187,7 +187,7 @@ wishlistSchema.statics.approveWishlistItem = async function ({ userId, productId
           }
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     return wishlistItem;
@@ -211,7 +211,7 @@ wishlistSchema.statics.removeFromWishlist = async function ({ userId, productId,
           }
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     return wishlistItem;
@@ -235,7 +235,7 @@ wishlistSchema.statics.restoreWishlistItem = async function ({ userId, productId
           }
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     return wishlistItem;

@@ -233,8 +233,14 @@ orderSchema.virtual("customerName").get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 
+// Calculate derived totals before validation so required amount fields exist during save.
+orderSchema.pre("validate", function () {
+  if (Array.isArray(this.items) && this.items.length > 0) {
+    this.calculateTotals();
+  }
+});
+
 // Indexes for performance
-orderSchema.index({ order_id: 1 }, { unique: true, sparse: true });
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index(
   { user: 1, idempotencyKey: 1 },
@@ -252,41 +258,31 @@ orderSchema.index({ email: 1 });
 orderSchema.index({ transaction_id: 1 }, { sparse: true });
 
 // Pre-save hook: Generate incremental order_id and invoice
-orderSchema.pre("save", async function (next) {
-  try {
-    if (!this.order_id) {
-      const counter = await OrderCounter.findOneAndUpdate(
-        { prefix: "ECO" },
-        { $inc: { counter: 1 } },
-        { new: true, upsert: true }
-      );
-      this.order_id = `${counter.prefix}${counter.counter.toString().padStart(6, "0")}`;
-    }
-    if (!this.invoice) {
-      this.invoice = `INV-${this.order_id}`;
-    }
-    next();
-  } catch (error) {
-    next(error);
+orderSchema.pre("save", async function () {
+  if (!this.order_id) {
+    const counter = await OrderCounter.findOneAndUpdate(
+      { prefix: "ECO" },
+      { $inc: { counter: 1 } },
+      { new: true, upsert: true }
+    );
+    this.order_id = `${counter.prefix}${counter.counter.toString().padStart(6, "0")}`;
+  }
+  if (!this.invoice) {
+    this.invoice = `INV-${this.order_id}`;
   }
 });
 
 // Pre-save hook: Validate and calculate totals
-orderSchema.pre("save", async function (next) {
-  try {
-    this.calculateTotals();
-    if (this.$locals?.inventoryReserved) {
-      return next();
+orderSchema.pre("save", async function () {
+  this.calculateTotals();
+  if (this.$locals?.inventoryReserved) {
+    return;
+  }
+  for (const item of this.items) {
+    const product = await mongoose.model("Product").findById(item.product);
+    if (!product || Number(product.inventory || 0) < item.quantity) {
+      throw new Error(`Insufficient stock for product ${item.product}`);
     }
-    for (const item of this.items) {
-      const product = await mongoose.model("Product").findById(item.product);
-      if (!product || Number(product.inventory || 0) < item.quantity) {
-        throw new Error(`Insufficient stock for product ${item.product}`);
-      }
-    }
-    next();
-  } catch (error) {
-    next(error);
   }
 });
 
