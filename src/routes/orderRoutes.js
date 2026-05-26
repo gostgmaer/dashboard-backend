@@ -80,15 +80,40 @@ const validate = (req, res, next) => {
 
 const orderValidation = {
   create: [
-    body('userId').isMongoId().withMessage('Invalid user ID'),
+    body().custom((value) => {
+      if (!value.user && !value.userId) {
+        throw new Error('Invalid user ID');
+      }
+      if (!value.payment_method && !value.paymentMethod) {
+        throw new Error('Invalid payment method');
+      }
+      return true;
+    }),
+    body('user').optional().isMongoId().withMessage('Invalid user ID'),
+    body('userId').optional().isMongoId().withMessage('Invalid user ID'),
     body('items').isArray({ min: 1 }).withMessage('Items array is required'),
-    body('items.*.productId').isMongoId().withMessage('Invalid product ID'),
+    body('items.*').custom((item) => {
+      if (!item.product && !item.productId) {
+        throw new Error('Invalid product ID');
+      }
+      return true;
+    }),
+    body('items.*.product').optional().isMongoId().withMessage('Invalid product ID'),
+    body('items.*.productId').optional().isMongoId().withMessage('Invalid product ID'),
     body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
     body('shippingAddress').isObject().withMessage('Shipping address must be an object'),
-    body('shippingAddress.street').isString().withMessage('Street must be a string').isLength({ max: 100 }).withMessage('Street cannot exceed 100 characters').trim().escape(),
+    body('shippingAddress').custom((address) => {
+      if (!address.addressLine1 && !address.street) {
+        throw new Error('Street address is required');
+      }
+      return true;
+    }),
+    body('shippingAddress.addressLine1').optional().isString().withMessage('Street must be a string').isLength({ max: 100 }).withMessage('Street cannot exceed 100 characters').trim().escape(),
+    body('shippingAddress.street').optional().isString().withMessage('Street must be a string').isLength({ max: 100 }).withMessage('Street cannot exceed 100 characters').trim().escape(),
     body('shippingAddress.city').isString().withMessage('City must be a string').isLength({ max: 50 }).withMessage('City cannot exceed 50 characters').trim().escape(),
     body('shippingAddress.country').isString().withMessage('Country must be a string').isLength({ max: 50 }).withMessage('Country cannot exceed 50 characters').trim().escape(),
-    body('paymentMethod').isIn(['credit_card', 'paypal', 'bank_transfer']).withMessage('Invalid payment method'),
+    body('payment_method').optional().isIn(['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cod', 'COD', 'wallet', 'RazorPay', 'razorpay']).withMessage('Invalid payment method'),
+    body('paymentMethod').optional().isIn(['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cod', 'COD', 'wallet', 'RazorPay', 'razorpay']).withMessage('Invalid payment method'),
     body('couponCode').optional().isString().withMessage('Coupon code must be a string').isLength({ max: 20 }).withMessage('Coupon code cannot exceed 20 characters').trim().escape(),
     validate
   ],

@@ -37,17 +37,27 @@ const addAllCoupon = catchAsync(async (req, res) => {
 
 const getAllCoupons = catchAsync(async (req, res) => {
   const queryObject = {};
-  const { status } = req.query;
+  const { status, isActive } = req.query;
 
   if (status) {
     queryObject.status = { $regex: `${status}`, $options: 'i' };
   }
+  if (isActive !== undefined) {
+    queryObject.isActive = isActive === 'true' || isActive === true;
+  }
+  queryObject.isDeleted = { $ne: true };
   const coupons = await Coupon.find(queryObject).sort({ _id: -1 });
   return sendSuccess(res, { data: coupons, message: 'Coupons retrieved' });
 });
 
 const getShowingCoupons = catchAsync(async (req, res) => {
-  const coupons = await Coupon.find({ status: 'show' }).sort({ _id: -1 });
+  const now = new Date();
+  const coupons = await Coupon.find({
+    isActive: true,
+    isDeleted: { $ne: true },
+    startDate: { $lte: now },
+    endDate: { $gte: now },
+  }).sort({ _id: -1 });
   return sendSuccess(res, { data: coupons, message: 'Showing coupons retrieved' });
 });
 
@@ -60,52 +70,80 @@ const getCouponById = catchAsync(async (req, res) => {
 });
 
 const applyCouponToProduct = catchAsync(async (req, res) => {
-  const { products, code, cart } = req.body;
+  const { products = [], productId, code, couponCode, cart = {} } = req.body;
+  const normalizedCode = String(code || couponCode || '').trim().toUpperCase();
+  const productIds = products.length ? products : productId ? [productId] : [];
 
-  const coupon = await Coupon.findOne({ couponCode: code }, 'couponCode discountType discountValue isActive minOrderAmount title');
+  const coupon = await Coupon.findOne({
+    code: normalizedCode,
+    isActive: true,
+    isDeleted: { $ne: true },
+  }, 'code discountType discountValue isActive minOrderValue title startDate endDate');
   if (!coupon) {
     throw AppError.notFound('Coupon not found');
   }
 
   const now = new Date();
-  if (coupon.startTime > now || coupon.endTime < now) {
+  if (coupon.startDate > now || coupon.endDate < now) {
     throw AppError.badRequest('Coupon is not valid at this time');
   }
 
-  const discountedProducts = await Promise.all(
-    products.map(async (productId) => {
-      const product = await Product.findById(productId);
-      if (!product) return null;
+  if (!productIds.length) {
+    throw AppError.badRequest('At least one product is required to apply coupon');
+  }
 
-      const { finalAmount } = calculateDiscount(product.price, coupon);
+  const productDocs = await Product.find({ _id: { $in: productIds } });
+  const productMap = new Map(productDocs.map((product) => [product._id.toString(), product]));
+  const cartItems = Array.isArray(cart.cartItems) && cart.cartItems.length
+    ? cart.cartItems
+    : productIds.map((id) => ({ productId: id, quantity: 1 }));
 
-      return {
-        productId: product._id,
-        price: product.price,
-        discountedPrice: finalAmount,
-      };
-    })
-  );
+  const lineItems = cartItems.map((item) => {
+    const id = String(item.productId || item.product || item._id || item.id || '');
+    const product = productMap.get(id);
+    if (!product) return null;
 
-  const combined = cart.cartItems.map((quantityItem) => {
-    const priceItem = discountedProducts.find((priceItem) => priceItem.productId == quantityItem.productId);
     return {
-      ...quantityItem,
-      ...priceItem,
+      productId: product._id,
+      quantity: Number(item.quantity || item.cartQuantity || 1),
+      price: Number(product.finalPrice ?? product.salePrice ?? product.basePrice ?? 0),
     };
-  });
+  }).filter(Boolean);
 
-  const totals = combined.reduce(
-    (acc, item) => {
-      acc.totalPrice += parseFloat(item.price) * parseFloat(item.quantity);
-      acc.totalDiscountedPrice += parseFloat(item.discountedPrice) * parseFloat(item.quantity);
-      return acc;
-    },
-    { totalPrice: 0, totalDiscountedPrice: 0 }
-  );
+  if (lineItems.length !== cartItems.length) {
+    throw AppError.badRequest('One or more products are invalid');
+  }
+
+  const totalPrice = lineItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  if (totalPrice <= 0) {
+    throw AppError.badRequest('Coupon cannot be applied to a zero-value cart');
+  }
+  if (coupon.minOrderValue && totalPrice < coupon.minOrderValue) {
+    throw AppError.badRequest(`Minimum order value is ${coupon.minOrderValue}`);
+  }
+
+  const discountAmount = coupon.discountType === 'percentage'
+    ? (totalPrice * Number(coupon.discountValue || 0)) / 100
+    : Number(coupon.discountValue || 0);
+  const cappedDiscount = Math.min(discountAmount, totalPrice);
+  const totalDiscountedPrice = Math.max(totalPrice - cappedDiscount, 0);
+
+  const discountedProducts = lineItems.map((item) => ({
+    productId: item.productId,
+    price: item.price,
+    discountedPrice: Number((item.price - (item.price / totalPrice) * cappedDiscount).toFixed(2)),
+  }));
 
   return sendSuccess(res, {
-    data: { coupon, totals, discountedProducts },
+    data: {
+      coupon,
+      totals: {
+        totalPrice: Number(totalPrice.toFixed(2)),
+        totalDiscountedPrice: Number(totalDiscountedPrice.toFixed(2)),
+        discountAmount: Number(cappedDiscount.toFixed(2)),
+      },
+      discountedProducts,
+    },
     message: 'Coupon applied successfully',
   });
 });
@@ -116,31 +154,24 @@ const updateCoupon = catchAsync(async (req, res) => {
     throw AppError.notFound('Coupon not found');
   }
 
-  coupon.title = { ...coupon.title, ...req.body.title };
-  coupon.couponCode = req.body.couponCode;
-  coupon.endTime = dayjs().utc().format(req.body.endTime);
-  coupon.minimumAmount = req.body.minimumAmount;
-  coupon.productType = req.body.productType;
-  coupon.discountType = req.body.discountType;
-  coupon.logo = req.body.logo;
-
+  Object.assign(coupon, req.body);
   await coupon.save();
   return sendSuccess(res, { message: 'Coupon updated successfully' });
 });
 
 const updateManyCoupons = catchAsync(async (req, res) => {
   await Coupon.updateMany(
-    { _id: { $in: req.body.ids } },
-    { $set: { status: req.body.status, startTime: req.body.startTime, endTime: req.body.endTime } },
+    { _id: { $in: req.body.ids || req.body.couponIds } },
+    { $set: req.body.updates || { isActive: req.body.status === 'show' || req.body.isActive } },
     { multi: true }
   );
   return sendSuccess(res, { message: 'Coupons update successfully' });
 });
 
 const updateStatus = catchAsync(async (req, res) => {
-  const newStatus = req.body.status;
-  await Coupon.updateOne({ _id: req.params.id }, { $set: { status: newStatus } });
-  return sendSuccess(res, { message: `Coupon ${newStatus === 'show' ? 'Published' : 'Un-Published'} Successfully` });
+  const isActive = req.body.isActive ?? req.body.status === 'show';
+  await Coupon.updateOne({ _id: req.params.id }, { $set: { isActive } });
+  return sendSuccess(res, { message: `Coupon ${isActive ? 'Published' : 'Un-Published'} Successfully` });
 });
 
 const deleteCoupon = catchAsync(async (req, res) => {

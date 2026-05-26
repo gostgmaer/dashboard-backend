@@ -125,7 +125,7 @@ const orderSchema = new mongoose.Schema(
     },
     payment_method: {
       type: String,
-      enum: ["credit_card", "debit_card", "paypal", "bank_transfer", "cod", "wallet"],
+      enum: ["credit_card", "debit_card", "paypal", "bank_transfer", "cod", "wallet", "razorpay"],
     },
     transaction_id: { type: String, trim: true },
     transactions: [
@@ -674,7 +674,7 @@ orderSchema.statics.validateStock = async function (orders) {
 };
 
 orderSchema.statics.updateStock = async function (orderId) {
-  const order = await this.findOne({ order_id });
+  const order = await this.findOne({ order_id: orderId });
   if (!order) throw new Error("Order not found");
   for (const item of order.items) {
     await mongoose.model("Product").findByIdAndUpdate(
@@ -789,6 +789,9 @@ orderSchema.statics.getPendingFulfillmentOrders = async function () {
 
 // Error handling middleware
 orderSchema.post("save", function (error, doc, next) {
+  if (typeof next !== "function") {
+    return;
+  }
   if (error.name === "MongoServerError" && error.code === 11000) {
     next(new Error("Order ID or Invoice already exists"));
   } else {

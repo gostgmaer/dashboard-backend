@@ -72,7 +72,33 @@ function buildSafeProjection(fields) {
 
 
 class OrderController {
-  constructor() {}
+  constructor() {
+    Object.getOwnPropertyNames(OrderController.prototype)
+      .filter((name) => name !== 'constructor' && typeof this[name] === 'function')
+      .forEach((name) => {
+        this[name] = this[name].bind(this);
+      });
+  }
+
+  normalizePaymentMethod(method) {
+    const normalized = String(method || '').trim();
+    if (normalized === 'COD') return 'cod';
+    if (normalized === 'RazorPay') return 'razorpay';
+    return normalized;
+  }
+
+  orderPayload(order) {
+    return {
+      _id: order._id,
+      id: order._id,
+      order_id: order.order_id,
+      invoice: order.invoice,
+      status: order.status,
+      payment_status: order.payment_status,
+      payment_method: order.payment_method,
+      total: order.total,
+    };
+  }
 
   handleError(res, error, status = 400) {
     return res.status(status).json({ error: error.message || 'An error occurred' });
@@ -141,16 +167,17 @@ class OrderController {
 
   // Create order
   async createOrder(req, res) {
-    const session = await mongoose.startSession();
+    let inventoryReserved = false;
+    let normalizedItems = [];
     try {
-      const { user, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, items, additionalNotes, couponCode, payment_method, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
+      const { user, userId, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, items, additionalNotes, couponCode, payment_method, paymentMethod, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
+      const resolvedUser = user || userId;
+      const resolvedPaymentMethod = this.normalizePaymentMethod(payment_method || paymentMethod);
       const idempotencyKey = String(req.headers['idempotency-key'] || req.body.idempotencyKey || '')
         .trim()
         .slice(0, 128);
 
-      await session.startTransaction();
-
-      if (!this.isValidObjectId(user)) throw new Error('Invalid user ID');
+      if (!this.isValidObjectId(resolvedUser)) throw new Error('Invalid user ID');
       if (!email || !email.match(/^\S+@\S+\.\S+$/)) throw new Error('Valid email is required');
       if (!firstName || !lastName) throw new Error('First and Last name required');
       if (!phone || !phone.match(/^\+?[\d\s-]{10,}$/)) throw new Error('Valid phone number is required');
@@ -158,24 +185,26 @@ class OrderController {
       if (!Array.isArray(items) || items.length === 0) throw new Error('At least one order item required');
 
       if (idempotencyKey) {
-        const existingOrder = await Order.findOne({ user, idempotencyKey }).session(session);
+        const existingOrder = await Order.findOne({ user: resolvedUser, idempotencyKey });
         if (existingOrder) {
-          await session.commitTransaction();
           return res.status(200).json({
+            success: true,
+            statusCode: 200,
             message: 'Idempotent replay detected, returning existing order',
-            order_id: existingOrder.order_id,
-            invoice: existingOrder.invoice,
+            result: this.orderPayload(existingOrder),
+            data: { result: this.orderPayload(existingOrder) },
           });
         }
       }
 
-      const normalizedItems = [];
+      normalizedItems = [];
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        if (!this.isValidObjectId(item.product)) throw new Error(`Invalid product ID for item ${i}`);
+        const productId = item.product || item.productId;
+        if (!this.isValidObjectId(productId)) throw new Error(`Invalid product ID for item ${i}`);
         if (!Number.isInteger(item.quantity) || item.quantity < 1) throw new Error(`Quantity must be positive integer for item ${i}`);
-        const product = await Product.findById(item.product).session(session);
+        const product = await Product.findById(productId);
         if (!product) throw new Error(`Product not found for item ${i}`);
         const availableInventory = Number(product.inventory || 0);
         if (availableInventory < item.quantity) throw new Error(`Insufficient inventory for product ${product._id}`);
@@ -185,15 +214,17 @@ class OrderController {
 
         normalizedItems.push({
           ...item,
+          product: productId,
           price: resolvedPrice,
           discount: typeof item.discount === 'number' && item.discount >= 0 ? item.discount : 0,
         });
       }
 
-      await this.reserveInventory(normalizedItems, session);
+      await this.reserveInventory(normalizedItems);
+      inventoryReserved = true;
 
       const order = new Order({
-        user,
+        user: resolvedUser,
         email: email.toLowerCase().trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -206,7 +237,7 @@ class OrderController {
         additionalNotes: additionalNotes ? additionalNotes.trim() : '',
         couponCode: couponCode ? couponCode.trim() : '',
         idempotencyKey: idempotencyKey || undefined,
-        payment_method,
+        payment_method: resolvedPaymentMethod,
         orderSource,
         ipAddress,
         deviceInfo,
@@ -229,18 +260,37 @@ class OrderController {
       order.calculateTotals();
 
       if (couponCode) {
-        await order.applyCoupon(couponCode, { session });
+        await order.applyCoupon(couponCode);
       }
 
-      await order.save({ session });
-      await session.commitTransaction();
+      await order.save();
 
-      return res.status(201).json({ message: 'Order created successfully', order_id: order.order_id, invoice: order.invoice });
+      return res.status(201).json({
+        success: true,
+        statusCode: 201,
+        message: 'Order created successfully',
+        result: this.orderPayload(order),
+        data: { result: this.orderPayload(order) },
+      });
     } catch (error) {
-      await session.abortTransaction();
+      if (inventoryReserved) {
+        await Product.bulkWrite(
+          normalizedItems.map((item) => ({
+            updateOne: {
+              filter: { _id: item.product },
+              update: {
+                $inc: {
+                  inventory: item.quantity,
+                  soldCount: -item.quantity,
+                },
+              },
+            },
+          }))
+        ).catch((restoreError) => {
+          console.error('Failed to restore inventory after order failure:', restoreError);
+        });
+      }
       return this.handleError(res, error);
-    } finally {
-      session.endSession();
     }
   }
 
@@ -415,7 +465,7 @@ class OrderController {
 
       const blockedFields = ['order_id', 'invoice', '_id', 'amount_paid', 'amount_due', 'payment_status', 'payment_method', 'user'];
       for (const field of blockedFields) {
-        if (updates.hasOwnProperty(field)) {
+        if (Object.prototype.hasOwnProperty.call(updates, field)) {
           delete updates[field];
         }
       }

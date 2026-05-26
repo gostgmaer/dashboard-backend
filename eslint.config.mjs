@@ -3,6 +3,10 @@ import js from '@eslint/js';
 
 export default [
   {
+    ignores: ['node_modules/**', 'uploads/**'],
+  },
+  js.configs.recommended,
+  {
     files: ['**/*.js'],
     languageOptions: {
       sourceType: 'commonjs',
@@ -14,12 +18,6 @@ export default [
   },
   {
     files: ['**/*.js'],
-    plugins: {
-      js
-    },
-    extends: [
-      'plugin:js/recommended'
-    ],
     rules: {
       'no-unused-vars': 'warn',
       'no-undef': 'warn'

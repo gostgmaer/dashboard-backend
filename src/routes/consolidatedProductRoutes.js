@@ -74,6 +74,40 @@ const validate = (req, res, next) => {
   next();
 };
 
+const reservedProductIdentifiers = new Set([
+  'all',
+  'active-data',
+  'database-stats',
+  'featured',
+  'low-stock',
+  'out-of-stock',
+  'new-arrivals',
+  'price-range',
+  'top-selling',
+  'most-viewed',
+  'discounted',
+  'favorites',
+  'export',
+  'docs',
+  'analytics',
+  'alerts',
+  'archive',
+  'bulk',
+  'category',
+  'flash-sale',
+  'recommendations',
+  'search',
+  'tags',
+  'taxonomy',
+]);
+
+const skipReservedIdentifier = (req, _res, next) => {
+  if (reservedProductIdentifiers.has(String(req.params.identifier || '').toLowerCase())) {
+    return next('route');
+  }
+  return next();
+};
+
 
 
 const productValidation = {
@@ -172,6 +206,7 @@ router.get('/database-stats',
 );
 // GET /api/products/:identifier - Get single product by ID or slug
 router.get('/:identifier',
+  skipReservedIdentifier,
   productValidation.identifier,
   ProductController.getProductByIdOrSlug
 );

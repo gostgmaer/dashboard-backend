@@ -190,12 +190,18 @@ class authController {
       //   templateId: 'welcomeEmailTemplate',
       //   data: user,
       // });
-      // Send welcome email
-      await sendEmail(welcomeEmailTemplate, user);
-
       res.locals.createdUser = user;
-      await user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo);
-      await NotificationMiddleware.onUserCreate(req, res, () => { });
+      setImmediate(() => {
+        sendEmail(welcomeEmailTemplate, user).catch((error) => {
+          console.error('Welcome email failed:', error);
+        });
+        user.logSecurityEvent('user_registered', 'New user registration', 'low', deviceInfo).catch((error) => {
+          console.error('Registration security log failed:', error);
+        });
+        NotificationMiddleware.onUserCreate(req, res, () => { }).catch((error) => {
+          console.error('Registration notification failed:', error);
+        });
+      });
 
       return standardResponse(
         res,

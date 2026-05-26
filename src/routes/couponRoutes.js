@@ -172,9 +172,22 @@ const couponValidation = {
   ],
 
   applyCouponToProduct: [
-    body('couponCode').isString().withMessage('Coupon code must be a string').isLength({ min: 1, max: 50 }).withMessage('Coupon code must be between 1 and 50 characters').trim().escape(),
-    body('productId').isMongoId().withMessage('Invalid product ID'),
-    body('quantity').optional().isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
+    body().custom((value) => {
+      if (!value.code && !value.couponCode) {
+        throw new Error('Coupon code is required');
+      }
+      if (!value.productId && (!Array.isArray(value.products) || value.products.length === 0)) {
+        throw new Error('At least one product is required');
+      }
+      return true;
+    }),
+    body('code').optional().isString().withMessage('Coupon code must be a string').isLength({ min: 1, max: 50 }).withMessage('Coupon code must be between 1 and 50 characters').trim().escape(),
+    body('couponCode').optional().isString().withMessage('Coupon code must be a string').isLength({ min: 1, max: 50 }).withMessage('Coupon code must be between 1 and 50 characters').trim().escape(),
+    body('productId').optional().isMongoId().withMessage('Invalid product ID'),
+    body('products').optional().isArray().withMessage('Products must be an array'),
+    body('products.*').optional().isMongoId().withMessage('Invalid product ID'),
+    body('cart.cartItems').optional().isArray().withMessage('Cart items must be an array'),
+    body('cart.cartItems.*.quantity').optional().isInt({ min: 1 }).withMessage('Quantity must be a positive integer').toInt(),
     validate
   ],
 
@@ -195,7 +208,7 @@ const couponValidation = {
 // ========================================
 
 // POST /api/coupons - Add a new coupon
-couponRouter.post('/coupons',
+couponRouter.post(['/', '/coupons'],
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -204,15 +217,13 @@ couponRouter.post('/coupons',
 );
 
 // POST /api/coupons/apply - Apply coupon to product
-couponRouter.post('/coupons/apply',
-  authMiddleware,
-
+couponRouter.post(['/apply', '/coupons/apply'],
   couponValidation.applyCouponToProduct,
   applyCouponToProduct
 );
 
 // POST /api/coupons/bulk - Add multiple coupons
-couponRouter.post('/coupons/bulk',
+couponRouter.post(['/bulk', '/coupons/bulk'],
   authMiddleware,
 
   bulkOperationLimiter,
@@ -221,7 +232,7 @@ couponRouter.post('/coupons/bulk',
 );
 
 // GET /api/coupons - Get all coupons
-couponRouter.get('/coupons',
+couponRouter.get(['/', '/coupons'],
   authMiddleware,
 
   couponValidation.getAllCoupons,
@@ -229,15 +240,13 @@ couponRouter.get('/coupons',
 );
 
 // GET /api/coupons/active - Get only enabled coupons (showing)
-couponRouter.get('/coupons/active',
-  authMiddleware,
-
+couponRouter.get(['/active', '/show', '/coupons/active', '/coupons/show'],
   couponValidation.getShowingCoupons,
   getShowingCoupons
 );
 
 // GET /api/coupons/:id - Get a single coupon by ID
-couponRouter.get('/coupons/:id',
+couponRouter.get(['/:id', '/coupons/:id'],
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -246,7 +255,7 @@ couponRouter.get('/coupons/:id',
 );
 
 // PUT /api/coupons/:id - Update a single coupon by ID
-couponRouter.put('/coupons/:id',
+couponRouter.put(['/:id', '/coupons/:id'],
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -255,7 +264,7 @@ couponRouter.put('/coupons/:id',
 );
 
 // PATCH /api/coupons/bulk/update - Update many coupons
-couponRouter.patch('/coupons/bulk/update',
+couponRouter.patch(['/bulk/update', '/coupons/bulk/update'],
   authMiddleware,
 
   bulkOperationLimiter,
@@ -264,7 +273,7 @@ couponRouter.patch('/coupons/bulk/update',
 );
 
 // PUT /api/coupons/:id/status - Show/hide a coupon (update status)
-couponRouter.put('/coupons/:id/status',
+couponRouter.put(['/:id/status', '/coupons/:id/status'],
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -273,7 +282,7 @@ couponRouter.put('/coupons/:id/status',
 );
 
 // DELETE /api/coupons/:id - Delete a single coupon by ID
-couponRouter.delete('/coupons/:id',
+couponRouter.delete(['/:id', '/coupons/:id'],
   authMiddleware,
 
   instanceCheckMiddleware,
@@ -282,7 +291,7 @@ couponRouter.delete('/coupons/:id',
 );
 
 // PATCH /api/coupons/bulk/delete - Delete multiple coupons
-couponRouter.patch('/coupons/bulk/delete',
+couponRouter.patch(['/bulk/delete', '/coupons/bulk/delete'],
   authMiddleware,
 
   bulkOperationLimiter,
