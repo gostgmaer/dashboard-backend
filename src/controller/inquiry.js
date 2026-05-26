@@ -74,6 +74,48 @@ const buildInquirySubject = (body = {}, category = 'general') => {
   return `${label || 'Support'} request`;
 };
 
+const getReplyAuthorName = (user = {}) => {
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+  return fullName || user.username || user.email || 'Support Team';
+};
+
+const normalizeAttachmentPayload = (value, uploadedByType = 'customer') => {
+  if (!value) return [];
+
+  const parsedValue = typeof value === 'string'
+    ? (() => {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+    })()
+    : value;
+
+  if (!Array.isArray(parsedValue)) return [];
+
+  return parsedValue
+    .filter((attachment) => attachment && attachment.url)
+    .map((attachment) => ({
+      filename: attachment.filename || attachment.name || 'Attachment',
+      url: attachment.url,
+      size: Number(attachment.size || 0),
+      contentType: attachment.contentType || attachment.type || '',
+      uploadedByType,
+      uploadedAt: attachment.uploadedAt || new Date(),
+    }));
+};
+
+const mapUploadedFilesToAttachments = (req, uploadedByType = 'customer') =>
+  (req.files || []).map((file) => ({
+    filename: file.originalname,
+    url: `${req.protocol}://${req.get('host')}/uploads/support-tickets/${file.filename}`,
+    size: file.size,
+    contentType: file.mimetype,
+    uploadedByType,
+    uploadedAt: new Date(),
+  }));
+
 // ================================
 // CONTACT INQUIRY CONTROLLERS
 // ===============================
@@ -83,9 +125,15 @@ class InquiryController {
   static createInquiry = catchAsync(async (req, res) => {
     const category = normalizeSupportCategory(req.body.category);
     const projectType = req.body.projectType || req.body.projectDetails?.servicesInterested?.[0] || SUPPORT_CATEGORY_TO_PROJECT_TYPE[category] || 'other';
+    const description = req.body.description || req.body.message?.body || req.body.message;
+    const attachments = [
+      ...normalizeAttachmentPayload(req.body.attachments, 'customer'),
+      ...mapUploadedFilesToAttachments(req, 'customer'),
+    ];
+    const customerName = buildInquiryName(req.body);
     // support both old nested shape and the current flat schema
     const inquiryData = {
-      name: buildInquiryName(req.body),
+      name: customerName,
       email: req.body.email || req.body.client?.email,
       phone: req.body.phone || req.body.client?.phone,
       company: req.body.company || req.body.client?.companyName,
@@ -96,9 +144,16 @@ class InquiryController {
       projectType,
       budget: req.body.budget || req.body.projectDetails?.budgetRange || 'not-sure',
       timeline: req.body.timeline || req.body.projectDetails?.timelinePreference || 'flexible',
-      description: req.body.description || req.body.message?.body || req.body.message,
+      description,
       requirements: req.body.requirements || req.body.preferences?.requirements,
-      attachments: req.body.attachments,
+      attachments,
+      publicReplies: description ? [{
+        message: description,
+        authorType: 'customer',
+        authorName: customerName || 'Customer',
+        attachments,
+        createdAt: new Date(),
+      }] : [],
       preferredContactMethod: req.body.preferredContactMethod || req.body.preferences?.preferredContactMethod || 'email',
       source: req.body.source || 'website',
       referrer: req.body.referrer,
@@ -171,18 +226,70 @@ class InquiryController {
 
   // UPDATE - Update inquiry status, notes, assignment
   static updateInquiry = catchAsync(async (req, res) => {
-    const updates = {};
-
-    if (req.body.status) updates.status = req.body.status;
-    if (req.body.priority !== undefined) updates.priority = req.body.priority;
-    if (req.body.internalNotes !== undefined) updates.internalNotes = req.body.internalNotes;
-    if (req.body.assignedTo !== undefined) updates.assignedTo = req.body.assignedTo;
-
-    const inquiry = await Inquiry.findByIdAndUpdate(req.params.id, { $set: updates }, { new: true, runValidators: true });
+    const inquiry = await Inquiry.findById(req.params.id);
 
     if (!inquiry) {
       throw AppError.notFound('Inquiry not found');
     }
+
+    const updates = {};
+    const previousStatus = inquiry.status;
+
+    if (req.body.status) {
+      inquiry.status = req.body.status;
+      updates.status = req.body.status;
+    }
+
+    if (req.body.priority !== undefined) {
+      inquiry.priority = req.body.priority;
+      updates.priority = req.body.priority;
+    }
+
+    if (req.body.internalNotes !== undefined) {
+      inquiry.internalNotes = req.body.internalNotes;
+      updates.internalNotes = req.body.internalNotes;
+    }
+
+    if (req.body.assignedTo !== undefined) {
+      inquiry.assignedTo = req.body.assignedTo;
+      updates.assignedTo = req.body.assignedTo;
+    }
+
+    const publicReply = String(req.body.publicReply || '').trim();
+    if (publicReply) {
+      const supportAttachments = normalizeAttachmentPayload(req.body.replyAttachments, 'support');
+      inquiry.publicReplies.push({
+        message: publicReply,
+        authorType: 'support',
+        authorName: getReplyAuthorName(req.user),
+        attachments: supportAttachments.map((attachment) => ({
+          filename: attachment.filename,
+          url: attachment.url,
+          size: attachment.size,
+          contentType: attachment.contentType,
+          uploadedAt: attachment.uploadedAt,
+        })),
+        createdAt: new Date(),
+      });
+      inquiry.lastContactedAt = new Date();
+      updates.publicReply = publicReply;
+
+      if (!req.body.status && ['new', 'reviewing'].includes(inquiry.status)) {
+        inquiry.status = 'contacted';
+        updates.status = 'contacted';
+      }
+    }
+
+    if (inquiry.status !== previousStatus) {
+      inquiry.statusHistory.push({
+        status: previousStatus,
+        changedBy: req.user.id,
+        changedAt: new Date(),
+        note: publicReply ? 'Status updated with public reply' : 'Status updated',
+      });
+    }
+
+    await inquiry.save();
 
     // Log activity
     await logActivity({ userId: req.user.id, action: 'UPDATE_INQUIRY', resourceId: req.params.id, details: updates });
@@ -248,8 +355,19 @@ class InquiryController {
       sent = true;
     }
 
+    if (message) {
+      inquiry.publicReplies.push({
+        message,
+        authorType: 'support',
+        authorName: getReplyAuthorName(req.user),
+        attachments: [],
+        createdAt: new Date(),
+      });
+    }
+
     // Update status
     inquiry.status = 'contacted';
+    inquiry.lastContactedAt = new Date();
     await inquiry.save();
 
     return sendSuccess(res, { data: { sent, inquiry: inquiry.toAPIResponse() }, message: `Client contacted via ${method}` });

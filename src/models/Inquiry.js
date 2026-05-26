@@ -97,7 +97,43 @@ const inquirySchema = new mongoose.Schema({
     filename: String,
     url: String,
     size: Number,
+    contentType: String,
+    uploadedByType: {
+      type: String,
+      enum: ['customer', 'support'],
+      default: 'customer'
+    },
     uploadedAt: { type: Date, default: Date.now }
+  }],
+
+  publicReplies: [{
+    message: {
+      type: String,
+      required: true,
+      maxlength: 4000,
+      trim: true,
+    },
+    authorType: {
+      type: String,
+      enum: ['customer', 'support', 'system'],
+      required: true,
+    },
+    authorName: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+    attachments: [{
+      filename: String,
+      url: String,
+      size: Number,
+      contentType: String,
+      uploadedAt: { type: Date, default: Date.now }
+    }],
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
   }],
 
   // Optional contact preferences
@@ -319,6 +355,18 @@ inquirySchema.methods.addNote = async function (content, adminId, isInternal = t
   return this.save();
 };
 
+inquirySchema.methods.addPublicReply = async function ({ message, authorType, authorName, attachments = [] }) {
+  this.publicReplies.push({
+    message,
+    authorType,
+    authorName,
+    attachments,
+    createdAt: new Date(),
+  });
+
+  return this.save();
+};
+
 // Set quote
 inquirySchema.methods.setQuote = async function (amount, currency, adminId) {
   this.quotedAmount = amount;
@@ -438,6 +486,27 @@ inquirySchema.methods.toPublicResponse = function () {
     category: obj.category,
     orderReference: obj.orderReference,
     description: obj.description,
+    attachments: (obj.attachments || []).map((attachment) => ({
+      filename: attachment.filename,
+      url: attachment.url,
+      size: attachment.size,
+      contentType: attachment.contentType,
+      uploadedAt: attachment.uploadedAt,
+      uploadedByType: attachment.uploadedByType,
+    })),
+    publicReplies: (obj.publicReplies || []).map((reply) => ({
+      message: reply.message,
+      authorType: reply.authorType,
+      authorName: reply.authorName,
+      attachments: (reply.attachments || []).map((attachment) => ({
+        filename: attachment.filename,
+        url: attachment.url,
+        size: attachment.size,
+        contentType: attachment.contentType,
+        uploadedAt: attachment.uploadedAt,
+      })),
+      createdAt: reply.createdAt,
+    })),
     status: obj.status,
     priority: obj.priority,
     preferredContactMethod: obj.preferredContactMethod,
