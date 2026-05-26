@@ -31,15 +31,29 @@ const validateEmailConfig = (options = {}) => {
  * @param {Object} options - Optional override for configuration.
  * @returns {Object} Nodemailer transporter configuration.
  */
-const buildTransporterConfig = (options = {}) => {
+const buildTransporterConfig = async (options = {}) => {
+  let dbSettings = null;
+  try {
+    const Setting = require('../models/Setting');
+    dbSettings = await Setting.getSettings();
+  } catch (err) {
+    // Database connection might not be fully initialized yet during startup checks
+  }
+
+  const host = options.host || dbSettings?.smtpHost || emailHost;
+  const port = parseInt(options.port || dbSettings?.smtpPort || emailPort) || 587;
+  const secure = options.secure !== undefined ? options.secure : (port === 465 ? true : emailSecure);
+  const user = options.user || dbSettings?.smtpUser || mailUserName;
+  const pass = options.pass || dbSettings?.smtpPassword || mailPassword;
+
   const config = {
     ...(options.service || mailService ? { service: options.service || mailService } : {}),
-    host: options.host || emailHost,
-    port: parseInt(options.port || emailPort) || 587,
-    secure: options.secure || emailSecure,
+    host,
+    port,
+    secure,
     auth: {
-      user: options.user || mailUserName,
-      pass: options.pass || mailPassword,
+      user,
+      pass,
     },
     logger: emailDebug ? console : false,
     debug: emailDebug,
@@ -50,7 +64,7 @@ const buildTransporterConfig = (options = {}) => {
   if (isGmail && oauth2ClientId && oauth2ClientSecret && oauth2RefreshToken) {
     config.auth = {
       type: 'OAuth2',
-      user: options.user || mailUserName,
+      user,
       clientId: oauth2ClientId,
       clientSecret: oauth2ClientSecret,
       refreshToken: oauth2RefreshToken,
@@ -76,9 +90,9 @@ const buildTransporterConfig = (options = {}) => {
  * @param {Object} options - Optional override for configuration.
  * @returns {Object} Nodemailer transporter instance.
  */
-const createTransporter = (options = {}) => {
+const createTransporter = async (options = {}) => {
   validateEmailConfig(options);
-  const config = buildTransporterConfig(options);
+  const config = await buildTransporterConfig(options);
   return nodemailer.createTransport(config);
 };
 
@@ -86,9 +100,9 @@ const createTransporter = (options = {}) => {
  * Creates a fallback transporter if configured.
  * @returns {Object|null} Fallback transporter instance or null.
  */
-const createFallbackTransporter = () => {
+const createFallbackTransporter = async () => {
   if (!fallbackEmailHost && !fallbackMailService) return null;
-  return createTransporter({
+  return await createTransporter({
     service: fallbackMailService,
     host: fallbackEmailHost,
     port: fallbackEmailPort,
@@ -110,9 +124,9 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
 
   while (attempts < retries) {
     try {
-      const transporter = createTransporter();
+      const transporter = await createTransporter();
       await transporter.verify();
-      -metrics.connectionSuccesses++;
+      metrics.connectionSuccesses++;
       return '✅ Email service connection verified';
       //  return { success: true, message: 'Email service connection verified', metrics };
     } catch (error) {
@@ -120,7 +134,7 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
       metrics.connectionFailures++;
       console.error(`❌ Email service error (attempt ${attempts}/${retries}): ${error.message}`);
       if (attempts === retries) {
-        const fallbackTransporter = createFallbackTransporter();
+        const fallbackTransporter = await createFallbackTransporter();
         if (fallbackTransporter) {
           try {
             await fallbackTransporter.verify();
@@ -174,7 +188,7 @@ const sendEmail = async (EmailTemplate, data) => {
       },
     };
 
-    let transporter = createTransporter();
+    let transporter = await createTransporter();
     let info;
     try {
       info = await transporter.sendMail(mailOptions);
@@ -183,7 +197,7 @@ const sendEmail = async (EmailTemplate, data) => {
       return { success: true, messageId: info.messageId, metrics };
     } catch (error) {
       console.error(`Primary transporter failed: ${error.message}`);
-      const fallbackTransporter = createFallbackTransporter();
+      const fallbackTransporter = await createFallbackTransporter();
       if (fallbackTransporter) {
         try {
           info = await fallbackTransporter.sendMail(mailOptions);
