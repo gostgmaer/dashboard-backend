@@ -211,11 +211,12 @@ class OrderController {
 
         const resolvedPrice = Number(product.finalPrice ?? product.basePrice ?? 0);
         if (!Number.isFinite(resolvedPrice) || resolvedPrice < 0) throw new Error(`Invalid server price for product ${product._id}`);
+        const normalizedPrice = Number(resolvedPrice.toFixed(2));
 
         normalizedItems.push({
           ...item,
           product: productId,
-          price: resolvedPrice,
+          price: normalizedPrice,
           discount: typeof item.discount === 'number' && item.discount >= 0 ? item.discount : 0,
         });
       }
