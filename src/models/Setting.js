@@ -570,6 +570,10 @@ const SETTING_DEFINITIONS = [
   { key: 'security.requireDeviceVerification', label: 'Require Device Verification', type: 'boolean', section: 'security' },
   { key: 'security.enableSuspiciousLoginDetection', label: 'Suspicious Login Detection', type: 'boolean', section: 'security' },
   { key: 'security.enableIpWhitelist', label: 'Enable IP Whitelist', type: 'boolean', section: 'security' },
+  { key: 'security.maxLoginAttempts', label: 'Max Login Attempts', type: 'number', section: 'security' },
+  { key: 'security.lockoutTimeMinutes', label: 'Lockout Duration (Minutes)', type: 'number', section: 'security' },
+  { key: 'security.sessionTimeoutMinutes', label: 'Session Timeout (Minutes)', type: 'number', section: 'security' },
+  { key: 'security.maxConcurrentSessions', label: 'Max Concurrent Sessions', type: 'number', section: 'security' },
 
   // ── Email / SMTP ──
   { key: 'email.name', label: 'Sender Display Name', type: 'string', section: 'email' },

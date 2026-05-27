@@ -103,6 +103,10 @@ function buildDefaultSettings() {
       requireDeviceVerification: process.env.REQUIRE_DEVICE_VERIFICATION === 'true',
       enableSuspiciousLoginDetection: process.env.ENABLE_SUSPICIOUS_LOGIN_DETECTION === 'true',
       enableIpWhitelist: process.env.ENABLE_IP_WHITELIST === 'true',
+      maxLoginAttempts: process.env.MAX_LOGIN_ATTEMPTS ? Number.parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) : 5,
+      lockoutTimeMinutes: process.env.LOCKOUT_TIME_MINUTES ? Number.parseInt(process.env.LOCKOUT_TIME_MINUTES, 10) : 30,
+      sessionTimeoutMinutes: process.env.SESSION_TIMEOUT_MINUTES ? Number.parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) : 120,
+      maxConcurrentSessions: process.env.MAX_CONCURRENT_SESSIONS ? Number.parseInt(process.env.MAX_CONCURRENT_SESSIONS, 10) : 3,
     },
 
     // ---------- Email / SMTP ----------

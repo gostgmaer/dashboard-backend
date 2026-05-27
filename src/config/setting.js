@@ -187,7 +187,9 @@ const database = {
 const jwt = {
   secret: process.env.JWT_SECRET,
   refreshSecret: process.env.JWT_REFRESH_SECRET,
+  idSecret: process.env.JWT_ID_SECRET,
   expiresIn: process.env.JWT_EXPIRES_IN || '1h',
+  refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
   idExpiry: process.env.JWT_ID_EXPIRY || '30d',
   algorithm: process.env.JWT_ALGORITHM || 'HS256',
   issuer: process.env.JWT_ISSUER || 'your-app-name',
@@ -208,6 +210,10 @@ const security = createLiveProxy('security', {
   enableIpWhitelist: parseBoolean(process.env.ENABLE_IP_WHITELIST, false),
   allowedIPs: process.env.ALLOWED_IPS ? process.env.ALLOWED_IPS.split(',').map(ip => ip.trim()) : [],
   allowedOrigins: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()) : [],
+  maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS, 5),
+  lockoutTimeMinutes: parseInt(process.env.LOCKOUT_TIME_MINUTES, 30),
+  sessionTimeoutMinutes: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 120),
+  maxConcurrentSessions: parseInt(process.env.MAX_CONCURRENT_SESSIONS, 3),
 });
 
 const client = createLiveProxy('client', {

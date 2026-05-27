@@ -9,44 +9,12 @@ const Product = require('./products');
 const Address = require('./address');
 const Order = require('./orders');
 const Role = require('./role');
-const { jwtSecret, jwt: jwtConfig } = require('../config/setting');
+const { jwt: jwtConfig, security: securityConfig } = require('../config/setting');
 const otpService = require('../services/otpService');
 const { paginateSortSearch } = require('../utils/helper');
 const { default: tenant } = require('./tenant');
 
 const SALT_ROUNDS = 10;
-
-// Environment variables — NO weak defaults; crash at startup if unset
-const {
-  JWT_SECRET,
-  JWT_ID_SECRET,
-  JWT_REFRESH_SECRET,
-  JWT_EXPIRY = '1h',
-  JWT_REFRESH_EXPIRY = '7d',
-  JWT_ID_EXPIRY = '30d',
-  JWT_ALGORITHM = 'HS256',
-  JWT_ISSUER = 'your-app-name',
-  JWT_AUDIENCE = 'your-app-users',
-  OTP_TYPE = 'email', // 'email' or 'sms'
-  OTP_EXPIRY_MINUTES = '5',
-  MAX_LOGIN_ATTEMPTS = '5',
-  LOCKOUT_TIME_MINUTES = '30',
-  OTP_SECRET,
-  ENABLE_OTP_VERIFICATION = 'false',
-  OTP_PRIORITY_ORDER = 'totp,email,sms',
-  DEFAULT_OTP_METHOD = 'totp',
-
-  SESSION_TIMEOUT_MINUTES = '120',
-  MAX_CONCURRENT_SESSIONS = '3',
-  REQUIRE_DEVICE_VERIFICATION = 'false',
-  ENABLE_SUSPICIOUS_LOGIN_DETECTION = 'true',
-} = process.env;
-
-const MAX_ATTEMPTS = parseInt(MAX_LOGIN_ATTEMPTS);
-const LOCK_TIME = parseInt(LOCKOUT_TIME_MINUTES) * 60 * 1000;
-const OTP_EXPIRY = parseInt(OTP_EXPIRY_MINUTES) * 60 * 1000;
-const SESSION_TIMEOUT = parseInt(SESSION_TIMEOUT_MINUTES) * 60 * 1000;
-const MAX_SESSIONS = parseInt(MAX_CONCURRENT_SESSIONS);
 
 const userSchema = new mongoose.Schema(
   {
@@ -407,6 +375,19 @@ userSchema.pre('save', function (next) {
 const populateFields = ['role', 'address', 'orders', 'favoriteProducts', 'shoppingCart', 'wishList', 'referredBy', 'created_by', 'updated_by'];
 
 userSchema.method({
+  async getSettings() {
+    const Tenant = mongoose.model('Tenant');
+    const Setting = mongoose.model('Setting');
+    let siteKey = 'my-store-001';
+    if (this.tenantId) {
+      const tenantDoc = await Tenant.findById(this.tenantId).lean();
+      if (tenantDoc && tenantDoc.slug) {
+        siteKey = tenantDoc.slug;
+      }
+    }
+    return await Setting.getSettingsBySite(siteKey);
+  },
+
   async getPaginatedTrustedDevices(options = {}) {
     const filteredDevices = this.knownDevices.filter((device) => device.isActive && device.isTrusted);
     return paginateSortSearch(filteredDevices, {
@@ -520,7 +501,7 @@ userSchema.method({
 
     // 1. Magic link flow (default)
     if (method === 'link') {
-      const token = jwt.sign({ sub: this._id.toString(), action: 'PASSWORD_RESET' }, JWT_SECRET, { expiresIn: '15m', issuer: JWT_ISSUER });
+      const token = jwt.sign({ sub: this._id.toString(), action: 'PASSWORD_RESET' }, jwtConfig.secret, { expiresIn: '15m', issuer: jwtConfig.issuer });
 
       this.currentReset = {
         type: 'link',
@@ -1363,14 +1344,19 @@ userSchema.method({
 
   // Create session for this user
   async createSession(sessionData) {
-    const { sessionId = crypto.randomUUID(), deviceId, browser, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
+    const dbSettings = await this.getSettings();
+    const sessionTimeout = (dbSettings?.security?.sessionTimeoutMinutes ?? securityConfig.sessionTimeoutMinutes) * 60 * 1000;
+    const maxSessions = dbSettings?.security?.maxConcurrentSessions ?? securityConfig.maxConcurrentSessions;
+
+    const { sessionId = crypto.randomUUID(), deviceId, browser, ipAddress, userAgent } = sessionData;
+    const expiresAt = sessionData.expiresAt ? new Date(sessionData.expiresAt) : new Date(Date.now() + sessionTimeout);
 
     // Clean expired sessions first
     await this.cleanupExpiredSessions(sessionData);
 
     // Check session limit
     const activeSessionsCount = this.activeSessions.filter((s) => s.isActive).length;
-    if (activeSessionsCount >= MAX_SESSIONS) {
+    if (activeSessionsCount >= maxSessions) {
       // Deactivate oldest active session
       const oldestSession = this.activeSessions.filter((s) => s.isActive).sort((a, b) => a.createdAt - b.createdAt)[0];
 
@@ -1564,7 +1550,7 @@ userSchema.method({
   async cleanupExpiredSessions(device) {
     const now = new Date();
     let hasSessionChanged = false;
-    const { deviceId } = device;
+    const deviceId = device?.deviceId;
 
     // 1. Mark expired sessions inactive
     this.activeSessions.forEach((session) => {
@@ -1578,7 +1564,7 @@ userSchema.method({
     // 2. Remove sessions for this device+browser and all inactive/expired sessions
     const beforeCleanup = this.activeSessions.length;
     this.activeSessions = this.activeSessions.filter((session) => {
-      const sameDevice = session.deviceId === deviceId;
+      const sameDevice = deviceId && session.deviceId === deviceId;
       const isActive = session.isActive;
       const expiresAt = new Date(session.expiresAt);
 
@@ -1630,14 +1616,18 @@ userSchema.method({
   },
 
   // Extend session expiry
-  async extendSession(sessionId, additionalTime = SESSION_TIMEOUT) {
+  async extendSession(sessionId, additionalTime) {
+    const dbSettings = await this.getSettings();
+    const sessionTimeout = (dbSettings?.security?.sessionTimeoutMinutes ?? securityConfig.sessionTimeoutMinutes) * 60 * 1000;
+    const timeToExtend = additionalTime !== undefined ? additionalTime : sessionTimeout;
+
     const session = this.activeSessions.find((s) => s.sessionId === sessionId && s.isActive);
 
     if (!session) {
       throw new Error('Session not found or inactive');
     }
 
-    session.expiresAt = new Date(Date.now() + additionalTime);
+    session.expiresAt = new Date(Date.now() + timeToExtend);
     session.lastActivity = new Date();
     await this.save();
 
@@ -1664,9 +1654,12 @@ userSchema.method({
       // await User.cleanupExpiredTokens();
 
       // Check session limit
+      const dbSettings = await this.getSettings();
+      const maxSessions = dbSettings?.security?.maxConcurrentSessions ?? securityConfig.maxConcurrentSessions;
+
       const activeSessions = this.authTokens.filter((t) => !t.isRevoked && t.expiresAt > new Date());
 
-      if (activeSessions.length >= MAX_SESSIONS) {
+      if (activeSessions.length >= maxSessions) {
         // Revoke oldest session
         const oldestSession = activeSessions.sort((a, b) => a.createdAt - b.createdAt)[0];
         oldestSession.isRevoked = true;
@@ -1679,8 +1672,8 @@ userSchema.method({
 
       // Store tokens
       const now = new Date();
-      const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_EXPIRY)));
-      const refreshTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_REFRESH_EXPIRY)));
+      const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(jwtConfig.expiresIn)));
+      const refreshTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(jwtConfig.refreshExpiry)));
       // console.log(this.parseTimeToMs(JWT_EXPIRY),this.parseTimeToMs(JWT_REFRESH_EXPIRY));
       const deviceData = {
         name: deviceInfo.name,
@@ -2408,10 +2401,10 @@ userSchema.method({
       deviceId,
     };
 
-    return jwt.sign(payload, JWT_ID_SECRET, {
+    return jwt.sign(payload, jwtConfig.idSecret, {
       expiresIn: jwtConfig.idExpiry || '30d',
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
+      issuer: jwtConfig.issuer,
+      audience: jwtConfig.audience,
     });
   },
 
@@ -2425,11 +2418,11 @@ userSchema.method({
       deviceId: deviceId,
     };
 
-    return jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRY,
-      algorithm: JWT_ALGORITHM,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
+    return jwt.sign(payload, jwtConfig.secret, {
+      expiresIn: jwtConfig.expiresIn,
+      algorithm: jwtConfig.algorithm,
+      issuer: jwtConfig.issuer,
+      audience: jwtConfig.audience,
     });
   },
 
@@ -2440,10 +2433,10 @@ userSchema.method({
       deviceId,
     };
 
-    return jwt.sign(payload, JWT_REFRESH_SECRET, {
-      expiresIn: JWT_REFRESH_EXPIRY,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
+    return jwt.sign(payload, jwtConfig.refreshSecret, {
+      expiresIn: jwtConfig.refreshExpiry,
+      issuer: jwtConfig.issuer,
+      audience: jwtConfig.audience,
     });
   },
 
@@ -2475,7 +2468,7 @@ userSchema.method({
       if (!tokenData) {
         throw new Error('Invalid or expired refresh token');
       }
-      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+      const decoded = jwt.verify(refreshToken, jwtConfig.refreshSecret);
       if (decoded.userId !== this._id.toString()) {
         throw new Error('Token mismatch');
       }
@@ -2484,7 +2477,7 @@ userSchema.method({
 
       // Add new token
       const now = new Date();
-      const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(JWT_EXPIRY)));
+      const accessTokenExpiry = new Date(now.getTime() + (await this.parseTimeToMs(jwtConfig.expiresIn)));
 
       this.authTokens.push({
         token: token,
@@ -2724,15 +2717,19 @@ userSchema.method({
       loginMethod: 'password',
     });
 
+    const dbSettings = await this.getSettings();
+    const maxAttempts = dbSettings?.security?.maxLoginAttempts ?? securityConfig.maxLoginAttempts;
+    const lockoutTimeMs = (dbSettings?.security?.lockoutTimeMinutes ?? securityConfig.lockoutTimeMinutes) * 60 * 1000;
+
     // Check if account should be locked
-    if (this.loginSecurity.consecutiveFailures >= MAX_ATTEMPTS) {
-      this.loginSecurity.lockedUntil = new Date(Date.now() + LOCK_TIME);
-      await this.logSecurityEvent('account_locked', `Account locked due to ${MAX_ATTEMPTS} failed login attempts`, 'high', deviceInfo);
+    if (this.loginSecurity.consecutiveFailures >= maxAttempts) {
+      this.loginSecurity.lockedUntil = new Date(Date.now() + lockoutTimeMs);
+      await this.logSecurityEvent('account_locked', `Account locked due to ${maxAttempts} failed login attempts`, 'high', deviceInfo);
     }
 
     // Lock account after max attempts
-    if (this.consecutiveFailedAttempts >= MAX_ATTEMPTS) {
-      this.lockoutUntil = new Date(Date.now() + LOCK_TIME);
+    if (this.consecutiveFailedAttempts >= maxAttempts) {
+      this.lockoutUntil = new Date(Date.now() + lockoutTimeMs);
 
       // Add security event
       this.securityEvents.push({
@@ -3609,7 +3606,7 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
   // Token Management
   (userSchema.statics.verifyAccessToken = async function (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, jwtConfig.secret);
       const user = await this.findById(decoded.userId).populate('role');
 
       if (!user || user.status !== 'active') {
@@ -3623,7 +3620,7 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
   }),
   (userSchema.statics.verifyRefreshToken = async function (refreshToken) {
     try {
-      const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+      const decoded = jwt.verify(refreshToken, jwtConfig.refreshSecret);
       const user = await this.findById(decoded.userId);
 
       if (!user) {
@@ -4076,19 +4073,24 @@ userSchema.statics.findUserFullDetails = async function (identifier) {
 
 // Create a new active session
 userSchema.statics.createActiveSession = async function (userId, sessionData) {
-  const { sessionId, deviceId, ipAddress, userAgent, expiresAt = new Date(Date.now() + SESSION_TIMEOUT) } = sessionData;
-
   const user = await this.findById(userId);
   if (!user) {
     throw new Error('User not found');
   }
+
+  const dbSettings = await user.getSettings();
+  const sessionTimeout = (dbSettings?.security?.sessionTimeoutMinutes ?? securityConfig.sessionTimeoutMinutes) * 60 * 1000;
+  const maxSessions = dbSettings?.security?.maxConcurrentSessions ?? securityConfig.maxConcurrentSessions;
+
+  const { sessionId, deviceId, ipAddress, userAgent } = sessionData;
+  const expiresAt = sessionData.expiresAt ? new Date(sessionData.expiresAt) : new Date(Date.now() + sessionTimeout);
 
   // Remove expired sessions before adding new one
   await user.cleanupExpiredSessions();
 
   // Check if session limit reached
   const activeSessionsCount = user.activeSessions.filter((s) => s.isActive).length;
-  if (activeSessionsCount >= MAX_SESSIONS) {
+  if (activeSessionsCount >= maxSessions) {
     // Deactivate oldest session
     const oldestSession = user.activeSessions.filter((s) => s.isActive).sort((a, b) => a.createdAt - b.createdAt)[0];
 
