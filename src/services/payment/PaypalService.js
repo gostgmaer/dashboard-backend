@@ -13,13 +13,13 @@ class PaypalService {
         const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
         const dbSettings = await Setting.getSettingsBySite(siteKey);
 
-        const mode = dbSettings?.paypalMode || payment?.paypal?.mode || 'sandbox';
+        const mode = dbSettings?.payment?.paypal?.mode || payment?.paypal?.mode || 'sandbox';
         const baseURL = mode === 'live' 
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
-        const clientId = dbSettings?.paypalClientId || payment?.paypal?.clientId;
-        const clientSecret = dbSettings?.paypalClientSecret || payment?.paypal?.clientSecret;
-        const webhookId = dbSettings?.paypalWebhookId || payment?.paypal?.webhookId;
+        const clientId = dbSettings?.payment?.paypal?.clientId || payment?.paypal?.clientId;
+        const clientSecret = dbSettings?.payment?.paypal?.clientSecret || payment?.paypal?.clientSecret;
+        const webhookId = dbSettings?.payment?.paypal?.webhookId || payment?.paypal?.webhookId;
 
         return { baseURL, clientId, clientSecret, webhookId };
     }

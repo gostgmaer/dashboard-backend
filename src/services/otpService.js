@@ -29,11 +29,11 @@ class OTPService {
     const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
 
     return {
-      enabled: dbSettings?.otpEnabled !== undefined ? dbSettings.otpEnabled : otpConfig.enabled,
-      defaultMethod: dbSettings?.otpDefaultMethod || otpConfig.defaultMethod,
+      enabled: dbSettings?.otp?.enabled !== undefined ? dbSettings.otp.enabled : otpConfig.enabled,
+      defaultMethod: dbSettings?.otp?.defaultMethod || otpConfig.defaultMethod,
       allowFallback: false,
-      expiryMinutes: dbSettings?.otpExpiryMinutes || otpConfig.expiryMinutes,
-      maxAttempts: dbSettings?.otpMaxAttempts || otpConfig.maxAttempts,
+      expiryMinutes: dbSettings?.otp?.expiryMinutes || otpConfig.expiryMinutes,
+      maxAttempts: dbSettings?.otp?.maxAttempts || otpConfig.maxAttempts,
       rateLimit: {
         window: otpConfig.rateLimit.windowMs,
         maxRequests: otpConfig.rateLimit.maxRequests,
@@ -46,12 +46,12 @@ class OTPService {
         issuer: dbSettings?.siteName || otpConfig.totp.issuer,
       },
       email: {
-        length: dbSettings?.otpLength || otpConfig.emailOtp.length,
+        length: dbSettings?.otp?.emailOtp?.length || otpConfig.emailOtp.length,
         template: otpConfig.emailOtp.template,
         sender: dbSettings?.contactInfo?.email || otpConfig.emailOtp.sender,
       },
       sms: {
-        length: dbSettings?.otpLength || otpConfig.smsOtp.length,
+        length: dbSettings?.otp?.smsOtp?.length || otpConfig.smsOtp.length,
         provider: otpConfig.smsOtp.provider,
       },
     };
@@ -66,8 +66,8 @@ class OTPService {
     const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
     const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
     
-    const accountSid = dbSettings?.twilioAccountSid || services?.twilio?.accountSid;
-    const authToken = dbSettings?.twilioAuthToken || services?.twilio?.authToken;
+    const accountSid = dbSettings?.services?.twilio?.accountSid || services?.twilio?.accountSid;
+    const authToken = dbSettings?.services?.twilio?.authToken || services?.twilio?.authToken;
     
     if (accountSid && authToken) {
       return twilio(accountSid, authToken);
@@ -367,7 +367,7 @@ class OTPService {
       const Setting = require('../models/Setting');
       const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
       const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
-      const twilioPhone = dbSettings?.twilioPhoneNumber || services?.twilio?.phoneNumber;
+      const twilioPhone = dbSettings?.services?.twilio?.phoneNumber || services?.twilio?.phoneNumber;
 
       const smsResult = await this.twilioClient.messages.create({
         body: message,

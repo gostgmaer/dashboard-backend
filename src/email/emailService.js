@@ -164,7 +164,7 @@ const sendEmail = async (EmailTemplate, data) => {
 
     // Email options with custom headers
     const mailOptions = {
-      from: data.sender || `"${email.senderName}" <${email.user}>`,
+      from: data.sender || `"${email.name || email.senderName}" <${email.user}>`,
       to: data.email,
       subject,
       html,

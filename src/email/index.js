@@ -198,8 +198,9 @@ const sendEmail = async (EmailTemplate, data) => {
     const { subject, html, attachments = [] } = EmailTemplate(data);
     const sender = email.sender || email.user;
 
+    const displayName = email.name || email.senderName;
     const mailOptions = {
-      from: email.senderName ? `"${email.senderName}" <${sender}>` : sender,
+      from: displayName ? `"${displayName}" <${sender}>` : sender,
       to:   data.email,
       subject,
       html,

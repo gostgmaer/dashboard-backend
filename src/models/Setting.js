@@ -589,6 +589,7 @@ const SETTING_DEFINITIONS = [
   { key: 'email.fallback.port', label: 'Fallback SMTP Port', type: 'number', section: 'email_fallback' },
   { key: 'email.fallback.user', label: 'Fallback SMTP User', type: 'string', section: 'email_fallback' },
   { key: 'email.fallback.password', label: 'Fallback SMTP Password', type: 'password', section: 'email_fallback' },
+  { key: 'email.fallback.secure', label: 'Fallback SMTP Secure (TLS)', type: 'boolean', section: 'email_fallback' },
   { key: 'email.debug', label: 'Email Debug Mode', type: 'boolean', section: 'email' },
 
   // ── Stripe Gateway ──
@@ -654,6 +655,8 @@ const SETTING_DEFINITIONS = [
   { key: 'services.apple.clientId', label: 'Apple Client ID', type: 'string', section: 'oauth' },
   { key: 'services.twitter.apiKey', label: 'Twitter API Key', type: 'string', section: 'oauth' },
   { key: 'services.twitter.apiSecret', label: 'Twitter API Secret', type: 'password', section: 'oauth' },
+  { key: 'services.mailchimp.apiKey', label: 'Mailchimp API Key', type: 'password', section: 'oauth' },
+  { key: 'services.mailchimp.listId', label: 'Mailchimp List ID', type: 'string', section: 'oauth' },
   { key: 'services.storeUrl', label: 'Store URL (for emails)', type: 'string', section: 'oauth' },
 
   // ── OTP & Two-Factor ──

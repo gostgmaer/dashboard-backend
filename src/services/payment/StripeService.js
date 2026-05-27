@@ -12,7 +12,7 @@ class StripeService {
         const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
         const dbSettings = await Setting.getSettingsBySite(siteKey);
         
-        const secretKey = dbSettings?.stripeSecretKey || payment?.stripe?.secretKey;
+        const secretKey = dbSettings?.payment?.stripe?.secretKey || payment?.stripe?.secretKey;
         if (!secretKey) {
             throw new Error('Stripe client secret key is not configured');
         }
@@ -125,7 +125,7 @@ class StripeService {
             const dbSettings = await Setting.getSettingsBySite(siteKey);
             const stripe = await this.getClient();
             const signature = headers['stripe-signature'];
-            const webhookSecret = dbSettings?.stripeWebhookSecret || payment?.stripe?.webhookSecret;
+            const webhookSecret = dbSettings?.payment?.stripe?.webhookSecret || payment?.stripe?.webhookSecret;
 
             if (!webhookSecret) {
                 throw new Error('Stripe webhook secret is not configured');

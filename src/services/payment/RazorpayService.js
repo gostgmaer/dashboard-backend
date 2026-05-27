@@ -13,8 +13,8 @@ class RazorpayService {
         const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
         const dbSettings = await Setting.getSettingsBySite(siteKey);
 
-        const key_id = dbSettings?.razorpayKeyId || payment?.razorpay?.publicKey;
-        const key_secret = dbSettings?.razorpayKeySecret || payment?.razorpay?.secretKey;
+        const key_id = dbSettings?.payment?.razorpay?.publicKey || payment?.razorpay?.publicKey;
+        const key_secret = dbSettings?.payment?.razorpay?.secretKey || payment?.razorpay?.secretKey;
 
         if (!key_id || !key_secret) {
             throw new Error('Razorpay keys are not configured');
@@ -113,7 +113,7 @@ class RazorpayService {
         try {
             const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
             const dbSettings = await Setting.getSettingsBySite(siteKey);
-            const webhookSecret = dbSettings?.razorpayWebhookSecret || payment?.razorpay?.webhookSecret;
+            const webhookSecret = dbSettings?.payment?.razorpay?.webhookSecret || payment?.razorpay?.webhookSecret;
 
             if (!webhookSecret) {
                 throw new Error('Razorpay webhook secret is not configured');
@@ -148,7 +148,7 @@ class RazorpayService {
         try {
             const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
             const dbSettings = await Setting.getSettingsBySite(siteKey);
-            const key_secret = dbSettings?.razorpayKeySecret || payment?.razorpay?.secretKey;
+            const key_secret = dbSettings?.payment?.razorpay?.secretKey || payment?.razorpay?.secretKey;
 
             if (!key_secret) {
                 throw new Error('Razorpay secret key is not configured');
