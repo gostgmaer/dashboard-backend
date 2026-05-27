@@ -1,20 +1,19 @@
 const paypal = require('paypal-rest-sdk');
-const { paypalClient, paypalMode, paypalSecret, host } = require('../../config/setting');
+const { payment, client } = require('../../config/setting');
 
-
-
-
-// Configure PayPal
-paypal.configure({
-    'mode': paypalMode, // or 'live'
-    'client_id': paypalClient,
-    'client_secret': paypalSecret
+const configurePayPal = () => {
+  paypal.configure({
+    'mode': payment.paypal.mode || 'sandbox',
+    'client_id': payment.paypal.clientId,
+    'client_secret': payment.paypal.clientSecret
   });
+};
   
 /**
  * Create PayPal Order
  */
-const createPayPalOrder = (amount, currency,body) => {
+const createPayPalOrder = (amount, currency, body) => {
+  configurePayPal();
   return new Promise((resolve, reject) => {
     const create_payment_json = {
       "intent": "SALE",
@@ -22,8 +21,8 @@ const createPayPalOrder = (amount, currency,body) => {
         "payment_method": "paypal"
       },
       redirect_urls: {
-        return_url: `${host}/checkout/success?method=${body.payment_method}`,
-        cancel_url: `${host}/checkout/cancel?method=${body.payment_method}`,
+        return_url: `${client.url}/checkout/success?method=${body.payment_method}`,
+        cancel_url: `${client.url}/checkout/cancel?method=${body.payment_method}`,
       },
       transactions: [
         {
@@ -37,17 +36,6 @@ const createPayPalOrder = (amount, currency,body) => {
           description: "Hat for the best team ever",
         },
       ],
-      // "transactions": [{
-      //   "amount": {
-      //     "currency": currency,
-      //     "total": amount
-      //   },
-      //   "description": "Your purchase description"
-      // }],
-      // "redirect_urls": {
-      //   "return_url": "https://your-return-url",
-      //   "cancel_url": "https://your-cancel-url"
-      // }
     };
 
     paypal.payment.create(create_payment_json, (error, payment) => {
@@ -65,6 +53,7 @@ const createPayPalOrder = (amount, currency,body) => {
  * Verify PayPal Payment
  */
 const verifyPayPalPayment = (paymentId, PayerID) => {
+  configurePayPal();
   return new Promise((resolve, reject) => {
     const execute_payment_json = {
       "payer_id": PayerID

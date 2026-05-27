@@ -11,7 +11,6 @@ const requiredEnvVars = [
     'JWT_SECRET',
     'JWT_ID_SECRET',
     'JWT_REFRESH_SECRET',
-    'OTP_SECRET',
 ];
 
 const optionalEnvVars = {

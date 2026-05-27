@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
-const { jwtSecret } = require('../config/setting');
+const config = require('../config/setting');
 const { errorResponse } = require('../utils/apiUtils');
 const DeviceDetector = require('../services/deviceDetector');
 const LoggerService = require('../services/logger');
@@ -25,7 +25,7 @@ const authMiddleware = async (req, res, next) => {
     // Verify token
     let decoded;
     try {
-      decoded = jwt.verify(token, jwtSecret);
+      decoded = jwt.verify(token, config.jwt.secret);
     } catch (jwtError) {
       if (jwtError.name === 'TokenExpiredError') {
         return errorResponse(res, 'Access denied. Token expired', 401);
@@ -37,7 +37,8 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // Find user with role and permissions populated
-    const user = await User.findByIdWithPermissions(decoded.userId);
+    const userId = decoded.userId || decoded.id || decoded.user_id;
+    const user = await User.findByIdWithPermissions(userId);
 
     if (!user) {
       return errorResponse(res, 'Access denied. User not found', 401);
@@ -94,8 +95,9 @@ const optionalAuth = async (req, res, next) => {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret);
-      const user = await User.findByIdWithPermissions(decoded.userId);
+      const decoded = jwt.verify(token, config.jwt.secret);
+      const userId = decoded.userId || decoded.id || decoded.user_id;
+      const user = await User.findByIdWithPermissions(userId);
 
       if (user && user.isActive) {
 

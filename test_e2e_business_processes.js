@@ -72,21 +72,51 @@ async function runE2ETest() {
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '1_registration_filled.png') });
 
+    // Check if any validation errors are visible BEFORE submit
+    const errorsBefore = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.text-red-500')).map(el => el.textContent);
+    });
+    if (errorsBefore.length > 0) {
+      console.log('⚠️ Validation errors before submit:', errorsBefore);
+    }
+
     console.log('Submit registration...');
     await page.evaluate(() => {
-      const submitBtn = document.querySelector('button[type="submit"]');
-      if (submitBtn) submitBtn.click();
+      const forms = Array.from(document.querySelectorAll('form'));
+      const registerForm = forms.find(f => f.querySelector('#firstName'));
+      const submitBtn = registerForm ? registerForm.querySelector('button[type="submit"]') : null;
+      if (submitBtn) {
+        submitBtn.click();
+      } else {
+        console.error('Could not find register submit button');
+      }
     });
     
     // Wait for redirect to login page
-    console.log('⏳ Waiting for redirect to Login Page...');
+    console.log('⏳ Waiting for redirect...');
     await sleep(6000);
+    console.log('Current URL after registration attempt:', page.url());
+    
+    // Check if any validation errors are visible AFTER submit
+    const errorsAfter = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.text-red-500')).map(el => el.textContent);
+    });
+    if (errorsAfter.length > 0) {
+      console.log('❌ Validation errors after submit:', errorsAfter);
+    }
+
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '2_redirected_to_login.png') });
 
     // ==========================================
     // 2. LOGIN USER
     // ==========================================
+    if (page.url().includes('/auth/register')) {
+      console.error('❌ Still on register page after submit. Cannot proceed to login.');
+      throw new Error('Registration failed to redirect.');
+    }
+
     console.log('✏️ Filling out login form...');
+    console.log('Current URL before login:', page.url());
     await page.waitForSelector('#email', { timeout: 10000 });
     await page.type('#email', testEmail);
     await page.type('#password', testPassword);
@@ -95,30 +125,44 @@ async function runE2ETest() {
 
     console.log('Submit login...');
     await page.evaluate(() => {
-      const submitBtn = document.querySelector('button[type="submit"]');
-      if (submitBtn) submitBtn.click();
+      const forms = Array.from(document.querySelectorAll('form'));
+      const loginForm = forms.find(f => f.querySelector('#password') && !f.querySelector('#firstName'));
+      const submitBtn = loginForm ? loginForm.querySelector('button[type="submit"]') : null;
+      if (submitBtn) {
+        submitBtn.click();
+      } else {
+        console.error('Could not find login submit button');
+      }
     });
 
     // Wait for redirect to homepage
     console.log('⏳ Waiting for login redirect to Homepage...');
     await sleep(6000);
+    console.log('Current URL after login attempt:', page.url());
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '4_logged_in_homepage.png') });
 
     // ==========================================
     // 3. SEARCH & ADD TO CART
     // ==========================================
+    console.log('🌐 Navigating to search page to select products...');
+    await page.goto('http://localhost:3000/product/search?query=', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(5000);
+
     console.log('🛒 Finding "Add to cart" button...');
-    
-    // Wait for product cards to render
-    const addCartBtnSelector = 'button[aria-label="Add to cart"]';
+    const addCartBtnSelector = 'button[aria-label="Add to cart"]:not([disabled])';
     await page.waitForSelector(addCartBtnSelector, { timeout: 15000 });
     
     console.log('Clicking "Add to cart"...');
     await page.evaluate(() => {
-      const addBtn = document.querySelector('button[aria-label="Add to cart"]');
-      if (addBtn) addBtn.click();
+      const addBtn = document.querySelector('button[aria-label="Add to cart"]:not([disabled])');
+      if (addBtn) {
+        console.log('[PAGE LOG] Found Add to Cart button: ', addBtn.outerHTML);
+        addBtn.click();
+      } else {
+        console.error('[PAGE LOG] Add to Cart button not found in page.evaluate');
+      }
     });
-    await sleep(2000);
+    await sleep(4000);
     
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '5_product_added.png') });
 
@@ -194,8 +238,14 @@ async function runE2ETest() {
 
     console.log('Clicking "Confirm Order"...');
     await page.evaluate(() => {
-      const confirmBtn = document.querySelector('button[type="submit"]');
-      if (confirmBtn) confirmBtn.click();
+      const btns = Array.from(document.querySelectorAll('button'));
+      const confirmBtn = btns.find(b => b.textContent.includes('Confirm Order') || b.textContent.includes('Place Order'));
+      if (confirmBtn) {
+        confirmBtn.click();
+      } else {
+        const submitBtn = document.querySelector('form button[type="submit"]');
+        if (submitBtn) submitBtn.click();
+      }
     });
 
     // ==========================================

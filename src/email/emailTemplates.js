@@ -1,4 +1,4 @@
-const { frontendUrl, applicaionName, host, confirmPath } = require("../config/setting");
+const config = require("../config/setting");
 
 
 /**
@@ -8,6 +8,10 @@ const { frontendUrl, applicaionName, host, confirmPath } = require("../config/se
  */
 const welcomeEmailTemplate = (data) => {
   const { username, email, attachments = [] } = data;
+  const host = config.client.url;
+  const confirmPath = config.client.emailVerifyUrl;
+  const applicaionName = config.app.name;
+
   return {
     subject: `Welcome to Our App, ${username}!`,
     html: `

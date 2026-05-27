@@ -3532,7 +3532,7 @@ userSchema.statics.registerNewUser = async function (userData, registrationMetad
       {
         email,
       },
-      jwtSecret,
+      jwtConfig.secret,
       {
         expiresIn: '72h',
       }
@@ -4753,6 +4753,11 @@ userSchema.statics.verifyAndLinkUser = async function ({ provider, providerId, e
     throw new Error(`Social login verification failed: ${error.message}`);
   }
 };
+
+// Virtual getter to check if user has superadmin role, used across route bypass checks
+userSchema.virtual('isSuperadmin').get(function () {
+  return this.role && (this.role.name === 'super_admin' || (typeof this.role === 'object' && this.role.name === 'super_admin'));
+});
 
 const User = mongoose.model('User', userSchema);
 

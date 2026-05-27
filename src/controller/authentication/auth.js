@@ -1,5 +1,6 @@
 const { ReasonPhrases, StatusCodes } = require('http-status-codes');
-const { jwtSecret, refressSecret, applicaionName, host, confirmPath, resetPath, loginPath } = require('../../config/setting');
+const config = require('../../config/setting');
+const { jwtSecret, refressSecret } = config;
 const User = require('../../models/user');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -10,6 +11,9 @@ const { generateTokens, setCookiesOnHeader } = require('../../lib/service');
 const { APIError, formatResponse, standardResponse, errorResponse } = require('../../utils/apiUtils');
 const signUp = async (req, res) => {
   const { firstName, lastName, email, password, username } = req.body;
+  const host = config.client.url;
+  const loginPath = config.client.loginPage;
+  const applicaionName = config.app.name;
   if (!firstName || !lastName || !email || !password || !username) {
     return res.status(StatusCodes.BAD_REQUEST).json({
       message: 'Please Provide Required Information',
@@ -421,6 +425,8 @@ const resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { password } = req.body;
+    const host = config.client.url;
+    const confirmPath = config.client.emailVerifyUrl;
 
     const user = await User.findOne({
       resetToken: token,
@@ -620,6 +626,8 @@ const varifySession = async (req, res) => {
 
 const forgetPassword = async (req, res) => {
   const { email } = req.body;
+  const host = config.client.url;
+  const resetPath = config.client.resetPasswordUrl;
 
   try {
     const user = await User.findOne({

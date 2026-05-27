@@ -1,12 +1,14 @@
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
-const { razorPaySecret, razorPayPublic } = require("../../config/setting");
+const { payment } = require("../../config/setting");
 
-// Razorpay instance
-const razorpayInstance = new Razorpay({
-  key_id: razorPayPublic,
-  key_secret: razorPaySecret,
-});
+// Helper to get active Razorpay instance dynamically
+const getRazorpayInstance = () => {
+  return new Razorpay({
+    key_id: payment.razorpay.publicKey,
+    key_secret: payment.razorpay.secretKey,
+  });
+};
 
 /**
  * Create Razorpay Order
@@ -20,6 +22,7 @@ const createRazorpayOrder = async (amount, currency, invoice) => {
   };
 
   try {
+    const razorpayInstance = getRazorpayInstance();
     const order = await razorpayInstance.orders.create(options);
     return order;
   } catch (error) {
@@ -36,7 +39,7 @@ const verifyRazorpayPayment = (order_id, payment_id, signature) => {
   const body = order_id + "|" + payment_id;
 
   const expectedSignature = crypto
-    .createHmac("sha256", razorPaySecret)
+     .createHmac("sha256", payment.razorpay.secretKey)
     .update(body.toString())
     .digest("hex");
 
