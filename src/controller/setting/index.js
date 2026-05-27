@@ -435,50 +435,78 @@ exports.getDynamicSchema = async (req, res) => {
 
     const definitions = Setting.SETTING_DEFINITIONS || [];
     
-    // Group fields by section
+    // ── Build a full section map covering ALL sections in SETTING_DEFINITIONS ──
+    // Order determines sidebar order in the frontend.
     const sectionMap = {
-      basic: { id: 'basic', title: 'Basic Settings', fields: [] },
-      contact: { id: 'contact', title: 'Contact Information', fields: [] },
-      branding: { id: 'branding', title: 'Branding', fields: [] },
-      currency: { id: 'currency', title: 'Currency & Tax', fields: [] },
-      email: { id: 'email', title: 'SMTP Settings', fields: [] },
-      stripe: { id: 'stripe', title: 'Stripe Gateway', fields: [] },
-      paypal: { id: 'paypal', title: 'PayPal Gateway', fields: [] },
-      razorpay: { id: 'razorpay', title: 'Razorpay Gateway', fields: [] },
-      otp: { id: 'otp', title: 'OTP & MFA Settings', fields: [] },
-      policies: { id: 'policies', title: 'Policies', fields: [] },
+      basic:          { id: 'basic',          title: 'Basic Settings',          fields: [] },
+      contact:        { id: 'contact',         title: 'Contact Information',     fields: [] },
+      branding:       { id: 'branding',        title: 'Branding',                fields: [] },
+      currency:       { id: 'currency',        title: 'Currency & Tax',          fields: [] },
+      client:         { id: 'client',          title: 'Frontend URLs',           fields: [] },
+      security:       { id: 'security',        title: 'Security & CORS',         fields: [] },
+      email:          { id: 'email',           title: 'Email / SMTP',            fields: [] },
+      email_fallback: { id: 'email_fallback',  title: 'Email Fallback SMTP',     fields: [] },
+      stripe:         { id: 'stripe',          title: 'Stripe Gateway',          fields: [] },
+      paypal:         { id: 'paypal',          title: 'PayPal Gateway',          fields: [] },
+      razorpay:       { id: 'razorpay',        title: 'Razorpay Gateway',        fields: [] },
+      storage:        { id: 'storage',         title: 'Storage Settings',        fields: [] },
+      storage_azure:  { id: 'storage_azure',   title: 'Azure Blob Storage',      fields: [] },
+      storage_s3:     { id: 'storage_s3',      title: 'Amazon S3',               fields: [] },
+      storage_gcs:    { id: 'storage_gcs',     title: 'Google Cloud Storage',    fields: [] },
+      storage_r2:     { id: 'storage_r2',      title: 'Cloudflare R2',           fields: [] },
+      twilio:         { id: 'twilio',          title: 'Twilio SMS',              fields: [] },
+      oauth:          { id: 'oauth',           title: 'OAuth & Social Login',    fields: [] },
+      otp:            { id: 'otp',             title: 'OTP & MFA',               fields: [] },
+      business:       { id: 'business',        title: 'Business Identity',       fields: [] },
+      features:       { id: 'features',        title: 'Features & Toggles',      fields: [] },
+      notifications:  { id: 'notifications',   title: 'Notifications',           fields: [] },
+      policies:       { id: 'policies',        title: 'Policies',                fields: [] },
     };
 
     definitions.forEach(def => {
-      // Resolve value from nested properties
+      // Resolve value by drilling into the nested inflated settings object
       const keys = def.key.split('.');
       let val = settings;
       for (const k of keys) {
-        val = val ? val[k] : undefined;
+        val = (val && typeof val === 'object') ? val[k] : undefined;
       }
+
+      // Normalise type: SETTING_DEFINITIONS uses 'string' but the frontend Input
+      // handles that as the default branch. Textarea-worthy types use 'text'.
+      // 'password', 'boolean', 'select', 'color', 'number', 'text' are kept as-is.
+      const displayType = def.type === 'string' ? 'string' : def.type;
 
       // Mask password/secret fields
       let isConfigured = false;
       if (def.type === 'password') {
-        isConfigured = !!val;
+        isConfigured = !!(val);
         val = val ? '••••••••' : '';
       }
 
       const fieldData = {
         key: def.key,
         label: def.label,
-        type: def.type,
-        value: val !== undefined ? val : '',
+        type: displayType,
+        value: val !== undefined && val !== null ? val : '',
         disabled: def.disabled || false,
         options: def.options || undefined,
-        isConfigured: def.type === 'password' ? isConfigured : undefined
+        isConfigured: def.type === 'password' ? isConfigured : undefined,
       };
 
       if (sectionMap[def.section]) {
         sectionMap[def.section].fields.push(fieldData);
       }
+      // If section is unknown, create it on-the-fly so nothing is lost
+      else {
+        sectionMap[def.section] = {
+          id: def.section,
+          title: def.section.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          fields: [fieldData],
+        };
+      }
     });
 
+    // Only return sections that have at least one field
     const sections = Object.values(sectionMap).filter(sec => sec.fields.length > 0);
 
     return standardResponse(res, true, sections, 'Dynamic settings schema retrieved successfully');

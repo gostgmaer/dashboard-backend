@@ -1,8 +1,18 @@
 const nodemailer = require('nodemailer');
 const { OAuth2Client } = require('google-auth-library');
-const { mailService, mailUserName, mailPassword, emailHost, emailPort, emailSecure, mailSender, oauth2ClientId, oauth2ClientSecret, oauth2RefreshToken, oauth2RedirectUri, fallbackMailService, fallbackEmailHost, fallbackEmailPort, fallbackEmailSecure, fallbackEmailUser, fallbackEmailPassword, emailPool, emailMaxConnections, emailMaxMessages, emailRateLimit, emailRateDelta, emailConnectionTimeout, emailGreetingTimeout, emailTlsRejectUnauthorized, emailTlsMinVersion, emailDebug, emailVerifyRetries, emailVerifyDelay } = require('../config/setting');
+const { email } = require('../config/setting');
 
-// Metrics for monitoring email service performance
+/**
+ * Email service — uses the real-time Proxy-backed `email` config section.
+ *
+ * All settings (host, user, password, service, OAuth2, fallback, etc.) are
+ * read from the in-memory DB settings cache on every transporter creation.
+ * This means updating email settings in the admin dashboard takes effect
+ * immediately without a server restart.
+ */
+
+// ── Metrics ──────────────────────────────────────────────────────────────────
+
 const metrics = {
   connectionAttempts: 0,
   connectionSuccesses: 0,
@@ -11,114 +21,125 @@ const metrics = {
   emailsFailed: 0,
 };
 
+// ── Validation ────────────────────────────────────────────────────────────────
+
 /**
- * Validates required email configuration variables.
- * Skips host/port validation if a service is specified.
- * @param {Object} options - Optional override for configuration.
- * @throws {Error} If required variables are missing.
+ * Validate that required email config is present.
+ * Skip host/port validation when a named service (e.g. 'gmail') is set.
+ * This runs at transporter creation time (not at module load), so the DB
+ * cache is guaranteed to be warm.
  */
 const validateEmailConfig = (options = {}) => {
-  const requiredVars = ['mailUserName', 'emailHost', 'emailPort'];
-  if (options.service || mailService) return;
-  const missingVars = requiredVars.filter((key) => !options[key.toLowerCase()] && !eval(key));
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required email configuration: ${missingVars.join(', ')}`);
+  const effectiveService = options.service || email.service;
+  if (effectiveService) return; // Named service handles its own routing
+
+  const effectiveHost = options.host || email.host;
+  const effectiveUser = options.user || email.user;
+
+  const missing = [];
+  if (!effectiveUser) missing.push('email.user');
+  if (!effectiveHost) missing.push('email.host');
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required email configuration: ${missing.join(', ')}`);
   }
 };
 
+// ── Transporter Builder ───────────────────────────────────────────────────────
+
 /**
- * Creates a Nodemailer transporter configuration.
- * @param {Object} options - Optional override for configuration.
- * @returns {Object} Nodemailer transporter configuration.
+ * Build a nodemailer transporter config from DB-backed settings.
+ * All values resolve from the Proxy on each call — live updates.
+ *
+ * @param {Object} options — Per-call overrides (service, host, user, pass, etc.)
  */
 const buildTransporterConfig = async (options = {}) => {
-  let dbSettings = null;
-  try {
-    const Setting = require('../models/Setting');
-    dbSettings = await Setting.getSettings();
-  } catch (err) {
-    // Database connection might not be fully initialized yet during startup checks
-  }
-
-  const host = options.host || dbSettings?.smtpHost || emailHost;
-  const port = parseInt(options.port || dbSettings?.smtpPort || emailPort) || 587;
-  const secure = options.secure !== undefined ? options.secure : (port === 465 ? true : emailSecure);
-  const user = options.user || dbSettings?.smtpUser || mailUserName;
-  const pass = options.pass || dbSettings?.smtpPassword || mailPassword;
+  const host    = options.host    || email.host    || '';
+  const port    = Number.parseInt(String(options.port || email.port || 587), 10);
+  const secure  = options.secure  !== undefined ? options.secure : (port === 465 || email.secure);
+  const user    = options.user    || email.user    || '';
+  const pass    = options.pass    || email.password || '';
+  const service = options.service || email.service  || null;
 
   const config = {
-    ...(options.service || mailService ? { service: options.service || mailService } : {}),
-    host,
-    port,
-    secure,
-    auth: {
-      user,
-      pass,
+    ...(service ? { service } : { host, port, secure }),
+    auth: { user, pass },
+    pool: email.pool !== false,
+    maxConnections: email.maxConnections || 5,
+    maxMessages:    email.maxMessages    || 100,
+    rateLimit:      email.rateLimit      || 100,
+    rateDelta:      email.rateDelta      || 60000,
+    connectionTimeout: email.connectionTimeout || 10000,
+    greetingTimeout:   email.greetingTimeout   || 10000,
+    tls: {
+      rejectUnauthorized: email.tlsRejectUnauthorized !== false,
+      minVersion: email.tlsMinVersion || 'TLSv1.2',
     },
-    logger: emailDebug ? console : false,
-    debug: emailDebug,
+    logger: email.debug ? console : false,
+    debug: email.debug || false,
   };
 
-  // Configure OAuth2 ONLY for Gmail
-  const isGmail = (options.service || mailService) === 'gmail';
-  if (isGmail && oauth2ClientId && oauth2ClientSecret && oauth2RefreshToken) {
+  // ── OAuth2 (Gmail only) ─────────────────────────────────────────────────────
+  const isGmail  = service === 'gmail';
+  const clientId = email.oauth2ClientId;
+  const clientSecret = email.oauth2ClientSecret;
+  const refreshToken = email.oauth2RefreshToken;
+  const redirectUri  = email.oauth2RedirectUri  || 'https://developers.google.com/oauthplayground';
+
+  if (isGmail && clientId && clientSecret && refreshToken) {
     config.auth = {
       type: 'OAuth2',
       user,
-      clientId: oauth2ClientId,
-      clientSecret: oauth2ClientSecret,
-      refreshToken: oauth2RefreshToken,
+      clientId,
+      clientSecret,
+      refreshToken,
       accessToken: async () => {
         try {
-          const oauth2Client = new OAuth2Client(oauth2ClientId, oauth2ClientSecret, oauth2RedirectUri);
-          oauth2Client.setCredentials({ refresh_token: oauth2RefreshToken });
+          const oauth2Client = new OAuth2Client(clientId, clientSecret, redirectUri);
+          oauth2Client.setCredentials({ refresh_token: refreshToken });
           const { token } = await oauth2Client.getAccessToken();
           return token;
-        } catch (error) {
-          throw new Error(`Failed to obtain OAuth2 access token: ${error.message}`);
+        } catch (err) {
+          throw new Error(`Failed to obtain OAuth2 access token: ${err.message}`);
         }
       },
     };
-    delete config.authMethod; // Remove authMethod for OAuth2
   }
 
   return config;
 };
 
-/**
- * Creates a Nodemailer transporter.
- * @param {Object} options - Optional override for configuration.
- * @returns {Object} Nodemailer transporter instance.
- */
+// ── Transporter Factory ───────────────────────────────────────────────────────
+
 const createTransporter = async (options = {}) => {
   validateEmailConfig(options);
   const config = await buildTransporterConfig(options);
   return nodemailer.createTransport(config);
 };
 
-/**
- * Creates a fallback transporter if configured.
- * @returns {Object|null} Fallback transporter instance or null.
- */
 const createFallbackTransporter = async () => {
-  if (!fallbackEmailHost && !fallbackMailService) return null;
-  return await createTransporter({
-    service: fallbackMailService,
-    host: fallbackEmailHost,
-    port: fallbackEmailPort,
-    secure: fallbackEmailSecure,
-    user: fallbackEmailUser,
-    pass: fallbackEmailPassword,
+  const fb = email.fallback || {};
+  if (!fb.host && !fb.service) return null;
+  return createTransporter({
+    service: fb.service,
+    host:    fb.host,
+    port:    fb.port,
+    secure:  fb.secure,
+    user:    fb.user,
+    pass:    fb.password,
   });
 };
 
+// ── Connection Verification ───────────────────────────────────────────────────
+
 /**
- * Verifies email service connection with retry and fallback support.
- * @param {number} retries - Number of retry attempts.
- * @param {number} baseDelay - Base delay for exponential backoff (ms).
- * @returns {Promise<Object>} Verification result with success status and metrics.
+ * Verify the email service connection with retry + exponential backoff.
+ * If the primary fails all retries, attempts the fallback transporter.
  */
-const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = emailVerifyDelay) => {
+const verifyEmailConnection = async (
+  retries   = email.verifyRetries  || 3,
+  baseDelay = email.verifyDelay    || 2000,
+) => {
   let attempts = 0;
   metrics.connectionAttempts++;
 
@@ -128,12 +149,13 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
       await transporter.verify();
       metrics.connectionSuccesses++;
       return '✅ Email service connection verified';
-      //  return { success: true, message: 'Email service connection verified', metrics };
     } catch (error) {
       attempts++;
       metrics.connectionFailures++;
       console.error(`❌ Email service error (attempt ${attempts}/${retries}): ${error.message}`);
+
       if (attempts === retries) {
+        // Try fallback
         const fallbackTransporter = await createFallbackTransporter();
         if (fallbackTransporter) {
           try {
@@ -143,11 +165,6 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
             return { success: true, message: 'Fallback email service connection verified', metrics };
           } catch (fallbackError) {
             console.error(`❌ Fallback email service error: ${fallbackError.message}`);
-            return {
-              success: false,
-              error: `Failed to verify email service after ${retries} attempts and fallback: ${error.message}`,
-              metrics,
-            };
           }
         }
         return {
@@ -156,17 +173,21 @@ const verifyEmailConnection = async (retries = emailVerifyRetries, baseDelay = e
           metrics,
         };
       }
+
+      // Exponential backoff
       const delay = baseDelay * Math.pow(2, attempts - 1);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 };
 
+// ── Send Email ────────────────────────────────────────────────────────────────
+
 /**
- * Sends an email using the provided template and data.
- * @param {Function} EmailTemplate - Template function returning subject, html, and optional attachments.
- * @param {Object} data - Data for the template, including recipient email.
- * @returns {Promise<Object>} Result with success status, message ID, and metrics.
+ * Send an email using a template function.
+ *
+ * @param {Function} EmailTemplate — Called with `data`, returns { subject, html, attachments? }
+ * @param {Object}   data          — Template data; must include `data.email` (recipient)
  */
 const sendEmail = async (EmailTemplate, data) => {
   try {
@@ -175,32 +196,41 @@ const sendEmail = async (EmailTemplate, data) => {
     }
 
     const { subject, html, attachments = [] } = EmailTemplate(data);
+    const sender = email.sender || email.user;
+
     const mailOptions = {
-      from: mailSender || `"Easy Dev" <${mailSender}>`,
-      to: data.email,
+      from: email.senderName ? `"${email.senderName}" <${sender}>` : sender,
+      to:   data.email,
       subject,
       html,
       attachments,
       headers: {
-        'X-Email-Service': mailService || 'CustomSMTP',
+        'X-Email-Service': email.service || 'CustomSMTP',
         'X-Message-ID': `msg-${Date.now()}-${Math.random().toString(36).substring(2)}`,
         ...(data.customHeaders || {}),
       },
     };
 
-    let transporter = await createTransporter();
-    let info;
+    let transporter;
     try {
-      info = await transporter.sendMail(mailOptions);
+      transporter = await createTransporter();
+    } catch (configError) {
+      console.error(`Email config error: ${configError.message}`);
+      return { success: false, error: configError.message, metrics };
+    }
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
       metrics.emailsSent++;
       console.log(`Email sent: ${info.messageId}`);
       return { success: true, messageId: info.messageId, metrics };
-    } catch (error) {
-      console.error(`Primary transporter failed: ${error.message}`);
+    } catch (sendError) {
+      console.error(`Primary transporter failed: ${sendError.message}`);
+
       const fallbackTransporter = await createFallbackTransporter();
       if (fallbackTransporter) {
         try {
-          info = await fallbackTransporter.sendMail(mailOptions);
+          const info = await fallbackTransporter.sendMail(mailOptions);
           metrics.emailsSent++;
           console.log(`Email sent via fallback: ${info.messageId}`);
           return { success: true, messageId: info.messageId, metrics, usedFallback: true };
@@ -209,13 +239,14 @@ const sendEmail = async (EmailTemplate, data) => {
           console.error(`Fallback transporter failed: ${fallbackError.message}`);
           return {
             success: false,
-            error: `Failed to send email with primary and fallback transporters: ${fallbackError.message}`,
+            error: `Failed with primary and fallback: ${fallbackError.message}`,
             metrics,
           };
         }
       }
+
       metrics.emailsFailed++;
-      throw error;
+      throw sendError;
     }
   } catch (error) {
     metrics.emailsFailed++;
@@ -223,6 +254,8 @@ const sendEmail = async (EmailTemplate, data) => {
     return { success: false, error: error.message, metrics };
   }
 };
+
+// ── Exports ───────────────────────────────────────────────────────────────────
 
 const getMetrics = () => metrics;
 
