@@ -291,43 +291,47 @@ const seedSettings = async () => {
       // Index might not exist, ignore
     }
 
-    console.log(`🌱 Checking settings seeding for tenant: ${activeTenantKey}`);
+    const tenantsToSeed = [...new Set([activeTenantKey, 'e-commerce'])];
 
-    // ── Step 1: Migrate old flat keys to new section-prefixed keys ──
-    let migratedCount = 0;
-    for (const m of KEY_MIGRATIONS) {
-      const oldDoc = await Setting.findOne({ siteKey: activeTenantKey, key: m.old });
-      if (oldDoc) {
-        const newExists = await Setting.findOne({ siteKey: activeTenantKey, key: m.new });
-        if (!newExists) {
-          await Setting.create({ siteKey: activeTenantKey, key: m.new, value: oldDoc.value });
-          migratedCount++;
+    for (const tenantKey of tenantsToSeed) {
+      console.log(`🌱 Checking settings seeding for tenant: ${tenantKey}`);
+
+      // ── Step 1: Migrate old flat keys to new section-prefixed keys ──
+      let migratedCount = 0;
+      for (const m of KEY_MIGRATIONS) {
+        const oldDoc = await Setting.findOne({ siteKey: tenantKey, key: m.old });
+        if (oldDoc) {
+          const newExists = await Setting.findOne({ siteKey: tenantKey, key: m.new });
+          if (!newExists) {
+            await Setting.create({ siteKey: tenantKey, key: m.new, value: oldDoc.value });
+            migratedCount++;
+          }
+          // Remove old key after successful migration
+          await Setting.deleteOne({ siteKey: tenantKey, key: m.old });
         }
-        // Remove old key after successful migration
-        await Setting.deleteOne({ siteKey: activeTenantKey, key: m.old });
       }
-    }
-    if (migratedCount > 0) {
-      console.log(`🔄 Migrated ${migratedCount} settings from old keys to section-prefixed keys`);
-    }
-
-    // ── Step 2: Seed default settings (skip keys that already exist) ──
-    const defaultSettingsObj = buildDefaultSettings();
-    const flatDefaults = Setting.flattenObject(defaultSettingsObj);
-
-    let activeNewCount = 0;
-    for (const [key, value] of Object.entries(flatDefaults)) {
-      const exists = await Setting.findOne({ siteKey: activeTenantKey, key });
-      if (!exists) {
-        await Setting.create({ siteKey: activeTenantKey, key, value });
-        activeNewCount++;
+      if (migratedCount > 0) {
+        console.log(`🔄 Migrated ${migratedCount} settings from old keys to section-prefixed keys for tenant ${tenantKey}`);
       }
-    }
 
-    if (activeNewCount > 0) {
-      console.log(`✅ Seeded ${activeNewCount} new default settings for tenant: ${activeTenantKey}`);
-    } else {
-      console.log(`ℹ️  Settings for tenant: ${activeTenantKey} are fully up-to-date`);
+      // ── Step 2: Seed default settings (skip keys that already exist) ──
+      const defaultSettingsObj = buildDefaultSettings();
+      const flatDefaults = Setting.flattenObject(defaultSettingsObj);
+
+      let activeNewCount = 0;
+      for (const [key, value] of Object.entries(flatDefaults)) {
+        const exists = await Setting.findOne({ siteKey: tenantKey, key });
+        if (!exists) {
+          await Setting.create({ siteKey: tenantKey, key, value });
+          activeNewCount++;
+        }
+      }
+
+      if (activeNewCount > 0) {
+        console.log(`✅ Seeded ${activeNewCount} new default settings for tenant: ${tenantKey}`);
+      } else {
+        console.log(`ℹ️  Settings for tenant: ${tenantKey} are fully up-to-date`);
+      }
     }
 
     // ── Step 3: Seed minimal fallback for legacy 'sitekey' tenant ──

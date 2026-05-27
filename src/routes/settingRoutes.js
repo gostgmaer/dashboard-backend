@@ -53,8 +53,9 @@ settingRoute.get('/:siteKey/public',
   settingsCtrl.getPublicSettings
 );
 
-// GET /api/settings/:siteKey - Get settings for a specific site/app
+// GET /api/settings/:siteKey - Get settings for a specific site/app (Authenticated)
 settingRoute.get('/:siteKey',
+  authMiddleware,
   settingsCtrl.getSettingsBySite
 );
 
