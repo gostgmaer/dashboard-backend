@@ -3,6 +3,7 @@ const router = express.Router();
 const orderController = require('../controller/orderController');
 const { body, query, param, validationResult } = require('express-validator');
 const { authMiddleware, optionalAuth } = require('../middleware/auth');
+const authorize = require('../middleware/authorize');
 const rateLimit = require('express-rate-limit');
 const { enviroment } = require('../config/setting');
 
@@ -244,8 +245,8 @@ router.get('/:id',
 // GET /api/orders - Get all orders with filtering
 router.get('/', 
   authMiddleware,
-  // authorize('orders', 'read'),
-  // orderValidation.query,
+  authorize('orders', 'read'),
+  orderValidation.query,
   orderController.getOrders
 );
 
@@ -292,7 +293,7 @@ router.put('/:id/refund',
 // PUT /api/orders/bulk-refund - Bulk refund orders
 router.put('/bulk-refund', 
   authMiddleware,
-
+  authorize('orders', 'write'),
   bulkOperationLimiter,
   orderValidation.bulkUpdate,
   orderController.bulkRefundOrders
@@ -325,7 +326,7 @@ router.put('/:id/status',
 // PUT /api/orders/bulk-status - Bulk update order status
 router.put('/bulk-status', 
   authMiddleware,
-
+  authorize('orders', 'write'),
   bulkOperationLimiter,
   orderValidation.bulkUpdate,
   orderController.bulkUpdateOrderStatus
@@ -425,7 +426,7 @@ router.put('/:id/resolve-return',
 // GET /api/orders/return-requests - Get return requests
 router.get('/return-requests', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getReturnRequests
 );
@@ -437,7 +438,7 @@ router.get('/return-requests',
 // GET /api/orders/top-customers - Get top customers
 router.get('/top-customers', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getTopCustomers
 );
@@ -460,7 +461,7 @@ router.get('/user/:userId/history',
 // GET /api/orders/analytics/stats - Get order statistics
 router.get('/analytics/stats', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getOrderStats
 );
@@ -468,7 +469,7 @@ router.get('/analytics/stats',
 // GET /api/orders/analytics/trends - Get order trends
 router.get('/analytics/trends', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getOrderTrends
 );
@@ -476,7 +477,7 @@ router.get('/analytics/trends',
 // GET /api/orders/analytics/revenue-by-source - Get revenue by source
 router.get('/analytics/revenue-by-source', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getRevenueBySource
 );
@@ -484,7 +485,7 @@ router.get('/analytics/revenue-by-source',
 // GET /api/orders/analytics/product-performance - Get product performance
 router.get('/analytics/product-performance', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getProductPerformance
 );
@@ -492,7 +493,7 @@ router.get('/analytics/product-performance',
 // GET /api/orders/analytics/conversion-funnel - Get order conversion funnel
 router.get('/analytics/conversion-funnel', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getOrderConversionFunnel
 );
@@ -500,7 +501,7 @@ router.get('/analytics/conversion-funnel',
 // GET /api/orders/featured - Get featured orders
 router.get('/featured', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getFeaturedOrders
 );
@@ -508,7 +509,7 @@ router.get('/featured',
 // GET /api/orders/low-stock - Get low stock orders
 router.get('/low-stock', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getLowStockOrders
 );
@@ -516,7 +517,7 @@ router.get('/low-stock',
 // GET /api/orders/analytics/average-order-value - Get average order value
 router.get('/analytics/average-order-value', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getAverageOrderValue
 );
@@ -524,7 +525,7 @@ router.get('/analytics/average-order-value',
 // GET /api/orders/search-by-customer - Search orders by customer name
 router.get('/search-by-customer', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   query('customerName').isString().withMessage('Customer name must be a string').trim().escape(),
   orderValidation.query,
   orderController.searchOrdersByCustomerName
@@ -533,7 +534,7 @@ router.get('/search-by-customer',
 // GET /api/orders/analytics/by-payment-method - Get orders by payment method
 router.get('/analytics/by-payment-method', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getOrdersByPaymentMethod
 );
@@ -541,7 +542,7 @@ router.get('/analytics/by-payment-method',
 // GET /api/orders/analytics/delayed-orders - Get delayed orders
 router.get('/analytics/delayed-orders', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getDelayedOrders
 );
@@ -549,7 +550,7 @@ router.get('/analytics/delayed-orders',
 // GET /api/orders/analytics/loyalty-points-summary - Get loyalty points summary
 router.get('/analytics/loyalty-points-summary', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getLoyaltyPointsSummary
 );
@@ -592,7 +593,7 @@ router.post('/:id/reorder',
 // GET /api/orders/fraudulent - Get fraudulent orders
 router.get('/fraudulent', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getFraudulentOrders
 );
@@ -624,7 +625,7 @@ router.put('/:id/flag',
 // POST /api/orders/validate-stock - Validate stock in bulk
 router.post('/validate-stock', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   bulkOperationLimiter,
   body('orderIds').isArray({ min: 1 }).withMessage('Order IDs array is required'),
   body('orderIds.*').isMongoId().withMessage('Invalid order ID in array'),
@@ -635,7 +636,7 @@ router.post('/validate-stock',
 // POST /api/orders/update-stock - Update stock in bulk
 router.post('/update-stock', 
   authMiddleware,
-
+  authorize('orders', 'write'),
   bulkOperationLimiter,
   body('updates').isArray({ min: 1 }).withMessage('Updates array is required'),
   body('updates.*.orderId').isMongoId().withMessage('Invalid order ID in updates'),
@@ -648,7 +649,7 @@ router.post('/update-stock',
 // GET /api/orders/export - Export orders report
 router.get('/export', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   bulkOperationLimiter,
   orderValidation.export,
   orderController.exportOrdersReport
@@ -657,7 +658,7 @@ router.get('/export',
 // POST /api/orders/import - Import orders in bulk
 router.post('/import', 
   authMiddleware,
-
+  authorize('orders', 'write'),
   bulkOperationLimiter,
   body('orders').isArray({ min: 1 }).withMessage('Orders array is required'),
   body('orders.*.userId').isMongoId().withMessage('Invalid user ID in orders'),
@@ -681,7 +682,7 @@ router.get('/:id/audit',
 // POST /api/orders/status-notification - Push status notification
 router.post('/status-notification', 
   authMiddleware,
-
+  authorize('orders', 'write'),
   body('orderId').isMongoId().withMessage('Invalid order ID'),
   body('status').isIn(['pending', 'processing', 'shipped', 'delivered', 'canceled']).withMessage('Invalid status'),
   validate,
@@ -712,7 +713,7 @@ router.put('/:id/restore',
 // POST /api/orders/archive-completed - Archive completed orders
 router.post('/archive-completed', 
   authMiddleware,
-
+  authorize('orders', 'write'),
   bulkOperationLimiter,
   body('beforeDate').isISO8601().withMessage('Valid before date is required'),
   validate,
@@ -731,7 +732,7 @@ router.post('/:id/send-invoice',
 // GET /api/orders/historical-data - Get historical order data
 router.get('/historical-data', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getHistoricalOrderData
 );
@@ -739,7 +740,7 @@ router.get('/historical-data',
 // GET /api/orders/growth-stats - Get order growth stats
 router.get('/growth-stats', 
   authMiddleware,
-
+  authorize('orders', 'read'),
   orderValidation.query,
   orderController.getOrderGrowthStats
 );

@@ -142,21 +142,21 @@ router.post(
 );
 router.get(
   '/stats-data',
-  // authMiddleware,
-  // authorize('users', 'full'),
+  authMiddleware,
+  authorize('users', 'full'),
   UserController.getUserStats
 );
 
 router.get(
   '/analytics',
-  // authMiddleware,
-  // authorize('users', 'full'),
+  authMiddleware,
+  authorize('users', 'full'),
   UserController.getDashboardStats
 );
 router.patch(
   '/:userId/role',
   authMiddleware,
-  // Ensure the user has admin privileges
+  authorize('users', 'full'),
   UserController.assignUserRoleById
 );
 

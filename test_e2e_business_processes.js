@@ -153,15 +153,18 @@ async function runE2ETest() {
     await page.waitForSelector(addCartBtnSelector, { timeout: 15000 });
     
     console.log('Clicking "Add to cart"...');
-    await page.evaluate(() => {
-      const addBtn = document.querySelector('button[aria-label="Add to cart"]:not([disabled])');
-      if (addBtn) {
-        console.log('[PAGE LOG] Found Add to Cart button: ', addBtn.outerHTML);
-        addBtn.click();
-      } else {
-        console.error('[PAGE LOG] Add to Cart button not found in page.evaluate');
+    // Scroll element into view first
+    await page.evaluate((selector) => {
+      const el = document.querySelector(selector);
+      if (el) {
+        console.log('[PAGE LOG] Found Add to Cart button to scroll: ', el.outerHTML);
+        el.scrollIntoView({ block: 'center' });
       }
-    });
+    }, addCartBtnSelector);
+    await sleep(2000);
+
+    // Native Puppeteer click
+    await page.click(addCartBtnSelector);
     await sleep(4000);
     
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '5_product_added.png') });
@@ -183,18 +186,58 @@ async function runE2ETest() {
     await sleep(5000);
 
     console.log('✏️ Completing Checkout Step 1: Personal Details...');
-    await page.waitForSelector('#phone', { timeout: 10000 });
+    await page.waitForSelector('#firstName', { timeout: 10000 });
+    
+    // Explicitly type fields to trigger React Hook Form onChange
+    await page.click('#firstName', { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.type('#firstName', 'Test');
+
+    await page.click('#lastName', { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.type('#lastName', 'User');
+
+    await page.click('#email', { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.type('#email', testEmail);
+
+    await page.click('#phone', { clickCount: 3 });
+    await page.keyboard.press('Backspace');
     await page.type('#phone', '1234567890');
     
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '7_checkout_step1_filled.png') });
     
-    console.log('Clicking "Continue to Shipping"...');
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button'));
-      const continueBtn = btns.find(b => b.textContent.includes('Continue to Shipping'));
-      if (continueBtn) continueBtn.click();
+    const checkoutErrorsBefore = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.text-red-500')).map(el => el.textContent);
     });
-    await sleep(3000);
+    if (checkoutErrorsBefore.length > 0) {
+      console.log('⚠️ Checkout Step 1 validation errors before click:', checkoutErrorsBefore);
+    }
+
+    console.log('Clicking "Continue to Shipping"...');
+    const continueShippingCoords = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button'));
+      const btn = btns.find(b => b.textContent.includes('Continue to Shipping'));
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      }
+      return null;
+    });
+    if (continueShippingCoords) {
+      await page.mouse.click(continueShippingCoords.x, continueShippingCoords.y);
+    } else {
+      console.error('Could not find Continue to Shipping button coordinates');
+    }
+    await sleep(4000);
+
+    const checkoutErrorsAfter = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('.text-red-500')).map(el => el.textContent);
+    });
+    if (checkoutErrorsAfter.length > 0) {
+      console.log('❌ Checkout Step 1 validation errors after click:', checkoutErrorsAfter);
+    }
+    await sleep(4000);
 
     // ==========================================
     // 6. CHECKOUT - STEP 2 (SHIPPING DETAILS)
@@ -209,12 +252,21 @@ async function runE2ETest() {
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '8_checkout_step2_filled.png') });
 
     console.log('Clicking "Continue to Payment"...');
-    await page.evaluate(() => {
+    const continuePaymentCoords = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
-      const continueBtn = btns.find(b => b.textContent.includes('Continue to Payment'));
-      if (continueBtn) continueBtn.click();
+      const btn = btns.find(b => b.textContent.includes('Continue to Payment'));
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      }
+      return null;
     });
-    await sleep(3000);
+    if (continuePaymentCoords) {
+      await page.mouse.click(continuePaymentCoords.x, continuePaymentCoords.y);
+    } else {
+      console.error('Could not find Continue to Payment button coordinates');
+    }
+    await sleep(4000);
 
     // ==========================================
     // 7. CHECKOUT - STEP 3 (PAYMENT & CONFIRM)
@@ -237,16 +289,25 @@ async function runE2ETest() {
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '9_checkout_step3_filled.png') });
 
     console.log('Clicking "Confirm Order"...');
-    await page.evaluate(() => {
+    const confirmOrderCoords = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
-      const confirmBtn = btns.find(b => b.textContent.includes('Confirm Order') || b.textContent.includes('Place Order'));
-      if (confirmBtn) {
-        confirmBtn.click();
-      } else {
-        const submitBtn = document.querySelector('form button[type="submit"]');
-        if (submitBtn) submitBtn.click();
+      const btn = btns.find(b => b.textContent.includes('Confirm Order') || b.textContent.includes('Place Order'));
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
       }
+      return null;
     });
+    if (confirmOrderCoords) {
+      await page.mouse.click(confirmOrderCoords.x, confirmOrderCoords.y);
+    } else {
+      console.error('Could not find Confirm Order button coordinates');
+      // Fallback
+      await page.evaluate(() => {
+        const btn = document.querySelector('button[type="submit"]');
+        if (btn) btn.click();
+      });
+    }
 
     // ==========================================
     // 8. ORDER SUCCESS PAGE
