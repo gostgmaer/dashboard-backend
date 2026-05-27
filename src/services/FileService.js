@@ -9,7 +9,16 @@ const AdapterFactory = require('../controller/fileUploader/adapters/AdapterFacto
 
 class FileService {
   constructor() {
-    this.storageAdapter = AdapterFactory.createAdapter();
+    // Lazy-initialize — adapter is created on first use so that a missing/
+    // misconfigured storage provider does not crash the server at startup.
+    this._storageAdapter = null;
+  }
+
+  get storageAdapter() {
+    if (!this._storageAdapter) {
+      this._storageAdapter = AdapterFactory.createAdapter();
+    }
+    return this._storageAdapter;
   }
 
   generateStorageKey(originalName, uploaderId) {

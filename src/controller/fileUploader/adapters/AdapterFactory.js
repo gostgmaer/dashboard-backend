@@ -1,56 +1,51 @@
-const S3Adapter = require("./S3Adapter");
-const GCSAdapter = require("./GCSAdapter");
-const AzureAdapter = require("./AzureAdapter");
-const R2Adapter = require("./R2Adapter");
+const S3Adapter = require('./S3Adapter');
+const GCSAdapter = require('./GCSAdapter');
+const AzureAdapter = require('./AzureAdapter');
+const R2Adapter = require('./R2Adapter');
+const LocalAdapter = require('./LocalAdapter');
 const { storage } = require('../../../config/setting');
 
-
 class AdapterFactory {
+  /**
+   * Create and return the appropriate storage adapter.
+   *
+   * @param {string|null} provider - Override the configured storage type.
+   * @returns {StorageAdapter}
+   */
   static createAdapter(provider = null) {
-    const storageProvider = provider || storage.type;
+    // Read from Proxy-backed config (real-time from DB settings)
+    const storageProvider = (provider || storage.type || 'local').toLowerCase();
 
-    if (!storageProvider) {
-      throw new Error("STORAGE_PROVIDER environment variable is required");
-    }
+    switch (storageProvider) {
+      case 'local':
+        return new LocalAdapter();
 
-    switch (storageProvider.toLowerCase()) {
-      case "s3":
-        if (
-          !storage.s3.accessKey ||
-          !storage.s3.secretKey ||
-          !storage.s3.bucket
-        ) {
-          throw new Error("Missing required S3 environment variables");
+      case 's3':
+        if (!storage.s3.accessKey || !storage.s3.secretKey || !storage.s3.bucket) {
+          console.warn('⚠️  AdapterFactory: S3 credentials incomplete — check DB settings (storage.s3.*)');
         }
-        //logger.info("Initializing S3 storage adapter");
         return new S3Adapter();
 
-      case "gcs":
+      case 'gcs':
         if (!storage.gcs.bucket) {
-          throw new Error("Missing required GCS environment variables");
+          console.warn('⚠️  AdapterFactory: GCS bucket missing — check DB settings (storage.gcs.bucket)');
         }
-        //logger.info("Initializing Google Cloud Storage adapter");
         return new GCSAdapter();
 
-      case "azure":
-        if (
-          !storage.azure.connectionString ||
-          !storage.azure.container
-        ) {
-          throw new Error("Missing required Azure environment variables");
+      case 'azure':
+        if (!storage.azure.connectionString || !storage.azure.container) {
+          console.warn('⚠️  AdapterFactory: Azure credentials incomplete — check DB settings (storage.azure.*)');
         }
-        //logger.info("Initializing Azure Blob Storage adapter");
         return new AzureAdapter();
 
-      case "r2":
-        //logger.info("Initializing Cloudflare R2 adapter");
-        const r2 = new R2Adapter();
-        return r2;
+      case 'r2':
+        return new R2Adapter();
 
       default:
-        throw new Error(
-          `Unsupported storage provider: ${storageProvider}. Supported providers: s3, gcs, azure, r2`
+        console.warn(
+          `⚠️  AdapterFactory: Unknown storage provider "${storageProvider}", falling back to local.`
         );
+        return new LocalAdapter();
     }
   }
 }
