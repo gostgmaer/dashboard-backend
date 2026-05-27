@@ -2413,7 +2413,7 @@ userSchema.method({
       userId: this._id,
       username: this.username,
       email: this.email,
-      role: this.role.name,
+      role: this.role && this.role.name ? this.role.name : (this.role ? this.role.toString() : 'customer'),
       type: 'access',
       deviceId: deviceId,
     };
