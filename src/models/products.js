@@ -65,11 +65,9 @@ const productSchema = new mongoose.Schema(
     allergens: { type: [String] },
     certifications: { type: [String] },
     awards: { type: [String] },
-    reviews: {
-      type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }],
-      averageRating: { type: Number, min: 0, max: 5 },
-      totalReviews: { type: Number, min: 0 },
-    },
+    reviews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }],
+    averageRating: { type: Number, min: 0, max: 5, default: 0 },
+    totalReviews: { type: Number, min: 0, default: 0 },
     socialMedia: {
       hashtags: { type: [String] },
       instagramHandle: { type: String },
@@ -97,16 +95,15 @@ const productSchema = new mongoose.Schema(
     loyaltyPoints: { type: Number, min: 0 },
     barcode: { type: String },
     inventory: { type: Number, min: 0 },
-    trackInventory: { type: String, enum: ['yes', 'no', ''], default: 'yes' },
+    trackInventory: { type: Boolean, default: true },
     allowBackorder: { type: Boolean, default: false },
-    lowStockThreshold: { type: Number, min: 0 },
     maxOrderQuantity: { type: Number, min: 1 },
     minOrderQuantity: { type: Number, min: 1 },
     stockLocation: { type: String },
     supplier: { type: String },
     supplierSku: { type: String },
     leadTime: { type: Number, min: 0 },
-    restockDate: { type: String },
+    restockDate: { type: Date },
     weight: { type: Number, min: 0 },
     dimensions: {
       length: { type: Number, min: 0 },
@@ -139,8 +136,8 @@ const productSchema = new mongoose.Schema(
     },
     visibility: { type: String, enum: ['public', 'private', 'password'] },
     password: { type: String },
-    publishDate: { type: String },
-    expiryDate: { type: String },
+    publishDate: { type: Date },
+    expiryDate: { type: Date },
     status: {
       type: String,
       required: true,
@@ -241,8 +238,17 @@ const productSchema = new mongoose.Schema(
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
 
-// 🔍 Full-text search
-productSchema.index({ '$**': 'text' });
+// 🔍 Targeted text search index (replaces costly wildcard index)
+productSchema.index({
+  title: 'text',
+  shortDescription: 'text',
+  sku: 'text',
+  tags: 'text',
+  vendor: 'text',
+  metaTitle: 'text',
+  metaDescription: 'text',
+  overview: 'text',
+});
 // productSchema.index({ sku: 1 }, { unique: true });
 // productSchema.index({ slug: 1 }, { unique: true });
 productSchema.index({ status: 1 });

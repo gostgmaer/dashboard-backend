@@ -70,23 +70,23 @@ brandSchema.pre('save', function (next) {
   if (this.isModified('slug')) {
     this.slug = this.slug.toLowerCase().trim();
   }
-  
+  next();
 });
 
 // Middleware: Update updatedAt timestamp on update
 brandSchema.pre('findOneAndUpdate', function (next) {
   this.set({ updatedAt: new Date() });
-  
+  next();
 });
 
 // Middleware: Prevent deletion of brands with products
 brandSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
   const Product = mongoose.model('Product');
-  const productCount = await Product.countDocuments({ brandName: this._id });
+  const productCount = await Product.countDocuments({ brand: this._id });
   if (productCount > 0) {
     return next(new Error('Cannot delete brand with associated products'));
   }
-  
+  next();
 });
 
 // Middleware: Log changes to an audit collection

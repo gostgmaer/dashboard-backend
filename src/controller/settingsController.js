@@ -1,4 +1,4 @@
-const Setting = require('../models/settingsModel');
+const Setting = require('../models/Setting');
 const { validationResult } = require('express-validator');
 const { sendSuccess, HTTP_STATUS } = require('../utils/responseHelper');
 const AppError = require('../utils/appError');

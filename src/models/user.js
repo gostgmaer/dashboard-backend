@@ -156,7 +156,7 @@ const userSchema = new mongoose.Schema(
         sessionId: { type: String, required: true },
         deviceId: { type: String, required: true },
         deviceInfo: { type: mongoose.Schema.Types.Mixed, default: {} },
-        borwser: { type: String },
+        browser: { type: String },
         createdAt: { type: Date, default: Date.now },
         lastActivity: { type: Date, default: Date.now },
         expiresAt: { type: Date, required: true },
@@ -166,6 +166,7 @@ const userSchema = new mongoose.Schema(
       },
     ],
     isDeleted: { type: Boolean, default: false },
+    isBlocked: { type: Boolean, default: false },
     passwordReset: {
       token: { type: String, default: null },
       tokenExpiry: { type: Date, default: null },

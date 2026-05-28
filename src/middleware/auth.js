@@ -60,7 +60,7 @@ const authMiddleware = async (req, res, next) => {
     // Attach user data to request object
     req.user = user;
     req.userId = user._id;
-    if (req.body) {
+    if (req.body && req.method !== 'GET') {
       req.body.created_by = user._id;
       req.body.updated_by = user._id;
     }

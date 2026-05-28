@@ -275,7 +275,7 @@ orderSchema.pre("save", async function () {
 // Pre-save hook: Validate and calculate totals
 orderSchema.pre("save", async function () {
   this.calculateTotals();
-  if (this.$locals?.inventoryReserved) {
+  if (!this.isNew || this.$locals?.inventoryReserved) {
     return;
   }
   for (const item of this.items) {

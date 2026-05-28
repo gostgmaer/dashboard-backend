@@ -110,7 +110,7 @@ const orderValidation = {
     body('shippingAddress.street').optional().isString().withMessage('Street must be a string').isLength({ max: 100 }).withMessage('Street cannot exceed 100 characters').trim().escape(),
     body('shippingAddress.city').isString().withMessage('City must be a string').isLength({ max: 50 }).withMessage('City cannot exceed 50 characters').trim().escape(),
     body('shippingAddress.country').isString().withMessage('Country must be a string').isLength({ max: 50 }).withMessage('Country cannot exceed 50 characters').trim().escape(),
-    body('payment_method').optional().isIn(['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cod', 'COD', 'wallet', 'RazorPay', 'razorpay']).withMessage('Invalid payment method'),
+    body('payment_method').optional().isIn(['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cod', 'wallet', 'razorpay']).withMessage('Invalid payment method'),
     body('paymentMethod').optional().isIn(['credit_card', 'debit_card', 'paypal', 'bank_transfer', 'cod', 'COD', 'wallet', 'RazorPay', 'razorpay']).withMessage('Invalid payment method'),
     body('couponCode').optional().isString().withMessage('Coupon code must be a string').isLength({ max: 20 }).withMessage('Coupon code cannot exceed 20 characters').trim().escape(),
     validate
@@ -171,7 +171,7 @@ const orderValidation = {
 
   priority: [
     param('id').isMongoId().withMessage('Invalid order ID'),
-    body('priority').isIn(['LOW', 'MEDIUM', 'HIGH']).withMessage('Invalid priority'),
+    body('priority').isIn(['low', 'medium', 'high']).withMessage('Invalid priority'),
     validate
   ],
 

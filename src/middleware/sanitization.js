@@ -124,8 +124,8 @@ const sanitizeMongoQuery = (req, res, next) => {
 
         if (typeof obj === 'object') {
             for (const key in obj) {
-                if (key.startsWith('$')) {
-                    delete obj[key]; // Remove MongoDB operators
+                if (key.startsWith('$') || key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                    delete obj[key]; // Remove MongoDB operators and prototype pollution vectors
                 } else {
                     obj[key] = sanitize(obj[key]);
                 }

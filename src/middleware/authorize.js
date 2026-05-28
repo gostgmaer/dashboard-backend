@@ -68,11 +68,19 @@ const Role = require('../models/role');
 const authorize = (resource, action, payloadHandler = null) => {
   return async (req, res, next) => {
     try {
-      const userId = req.user.id;
-      const user = await User.findById(userId).populate('role');
+      // Reuse user from auth middleware to avoid double DB query
+      const user = req.user;
 
       if (!user) {
         return res.status(401).json({ message: 'Unauthorized: User not found' });
+      }
+
+      // Ensure role is populated
+      if (user.role && typeof user.role === 'object' && user.role.name) {
+        // Already populated via auth middleware
+      } else {
+        // Fallback: populate role if not already done
+        await user.populate('role');
       }
 
       // ✅ Superadmin bypass - can access everything

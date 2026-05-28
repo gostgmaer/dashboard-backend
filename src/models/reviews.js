@@ -4,7 +4,7 @@ const reviewSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Customer', // Reference to the User model
+      ref: 'User',
       required: true,
     },
     product: {
@@ -40,8 +40,8 @@ const reviewSchema = new mongoose.Schema(
       default: false,
     },
 
-    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
-    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
+    created_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updated_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   {   timestamps: true,
         toJSON: { virtuals: true },

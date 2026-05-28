@@ -54,7 +54,7 @@ const validateRefundRequest = [
     body('reason')
         .notEmpty()
         .withMessage('Refund reason is required')
-        .isIn(['customer_request', 'order_cancelled', 'duplicate_payment', 'fraud', 'other'])
+        .isIn(['CUSTOMER_REQUEST', 'ORDER_CANCELLED', 'DUPLICATE_PAYMENT', 'FRAUD', 'OTHER'])
         .withMessage('Invalid refund reason'),
 
     body('description')

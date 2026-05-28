@@ -113,6 +113,7 @@ const skipReservedIdentifier = (req, _res, next) => {
 const productValidation = {
   create: [
     body('title').notEmpty().withMessage('Title is required').trim().escape(),
+    body('slug').notEmpty().withMessage('Slug is required').trim().matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).withMessage('Slug must be URL-friendly lowercase'),
     body('sku').notEmpty().withMessage('SKU is required').trim().escape(),
     body('basePrice').isNumeric().withMessage('Base price must be a number').toFloat(),
     body('productType').isIn(['physical', 'digital', 'service']).withMessage('Invalid product type'),

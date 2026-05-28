@@ -46,7 +46,7 @@ const bulkOperationLimiter = rateLimit({
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const userId = req.params.id || req.params.userId;
-    if (userId && !req.user.role.name == 'super_admin') {
+    if (userId && req.user.role.name !== 'super_admin') {
       // Superadmin bypass already in authorize
       if (req.user.id !== userId) {
         // Restrict to own user data unless authorized
