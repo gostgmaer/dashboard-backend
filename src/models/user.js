@@ -1382,6 +1382,14 @@ userSchema.method({
     };
 
     this.activeSessions.push(newSession);
+
+    // Cap active sessions to prevent unbounded growth
+    if (this.activeSessions.length > 20) {
+      this.activeSessions = this.activeSessions
+        .filter(s => s.isActive && s.expiresAt > new Date())
+        .slice(-20);
+    }
+
     await this.save();
 
     await this.logSecurityEvent('session_created', `New session created: ${sessionId}`, 'low', { sessionId, deviceId });
@@ -1640,6 +1648,12 @@ userSchema.method({
     const now = new Date();
     const originalCount = this.authTokens.length;
     this.authTokens = this.authTokens.filter((token) => token.expiresAt > now);
+
+    // Hard cap to prevent unbounded growth
+    if (this.authTokens.length > 50) {
+      this.authTokens = this.authTokens.slice(-50);
+    }
+
     if (this.authTokens.length !== originalCount) {
       await this.save();
     }
