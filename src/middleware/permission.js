@@ -127,12 +127,14 @@ export const checkRole = (...allowedRoles) => {
         return next();
       }
 
-      const userRoleName = req.user.role.name;
+      const allowedRoleNames = allowedRoles.map((role) => String(role).toLowerCase());
+      const rawUserRoleName = typeof req.user.role === 'string' ? req.user.role : req.user.role.name;
+      const userRoleName = String(rawUserRoleName || '').toLowerCase();
 
-      if (!allowedRoles.includes(userRoleName)) {
+      if (!allowedRoleNames.includes(userRoleName)) {
         console.warn(`Role-based access denied for user ${req.user.username} (${req.user._id}). Required roles: [${allowedRoles.join(', ')}]. User role: ${userRoleName}`);
 
-        return next(createError(403, `Access denied: Role '${userRoleName}' not authorized`));
+        return next(createError(403, `Access denied: Role '${rawUserRoleName || userRoleName}' not authorized`));
       }
 
       next();

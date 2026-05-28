@@ -274,7 +274,7 @@ class DashboardController {
   static async getDiscountUsage(req, res) {
     try {
       const [withDiscount, total] = await Promise.all([
-        Order.countDocuments({ discount: { $gt: 0 } }),
+        Order.countDocuments({ discountAmount: { $gt: 0 } }),
         Order.countDocuments({}),
       ]);
       const without = total - withDiscount;
@@ -371,12 +371,12 @@ class DashboardController {
       const data = await Order.find()
         .sort({ createdAt: -1 })
         .limit(limit)
-        .select('orderNumber total status user createdAt')
+        .select('order_id total status user createdAt')
         .populate('user', 'firstName lastName email')
         .lean();
 
       const result = data.map((o) => ({
-        id: o.orderNumber || o._id,
+        id: o.order_id || o._id,
         customer: o.user ? `${o.user.firstName || ''} ${o.user.lastName || ''}`.trim() || o.user.email : 'Guest',
         total: o.total || 0,
         status: o.status || 'Pending',

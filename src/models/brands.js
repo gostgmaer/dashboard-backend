@@ -74,9 +74,8 @@ brandSchema.pre('save', function (next) {
 });
 
 // Middleware: Update updatedAt timestamp on update
-brandSchema.pre('findOneAndUpdate', function (next) {
+brandSchema.pre('findOneAndUpdate', function () {
   this.set({ updatedAt: new Date() });
-  next();
 });
 
 // Middleware: Prevent deletion of brands with products

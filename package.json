@@ -8,7 +8,9 @@
     "build": "node server.js",
     "dev": "nodemon index.js",
     "lint": "eslint .",
-    "audit:webhooks": "node scripts/findDuplicateWebhookEvents.js"
+    "audit:webhooks": "node scripts/findDuplicateWebhookEvents.js",
+    "seed:commerce": "node scripts/seedCommerceDemoData.js",
+    "seed:commerce:reset": "node scripts/seedCommerceDemoData.js --reset"
   },
   "engines": {
     "node": ">=20"

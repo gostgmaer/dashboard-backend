@@ -67,13 +67,16 @@ const bulkOperationLimiter = rateLimit({
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const brandId = req.params.id || req.params.idOrSlug;
-    if (brandId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
-      const Brand = require('../models/Brand'); // Assumed Brand model
+    const userId = req.user?.id || req.user?._id;
+    const isSuperadmin = Boolean(req.user?.isSuperadmin || req.user?.role?.name === 'super_admin');
+
+    if (brandId && !isSuperadmin) {
+      const Brand = require('../models/brands');
       const brand = await Brand.findById(brandId);
       if (!brand) {
         return res.status(404).json({ success: false, message: 'Brand not found' });
       }
-      if (brand.userId.toString() !== req.user.id) { // Restrict to own brands
+      if (brand.created_by && String(brand.created_by) !== String(userId)) {
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s brand' });
       }
     }
@@ -284,7 +287,6 @@ BrandRoute.get('/social-media',
 // GET /api/brands/:idOrSlug - Get a single brand by ID or slug
 BrandRoute.get('/:idOrSlug', 
 
-  instanceCheckMiddleware,
   brandValidation.idOrSlug,
   getBrand
 );

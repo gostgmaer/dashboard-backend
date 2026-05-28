@@ -58,24 +58,27 @@ const bulkOperationLimiter = rateLimit({
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const attributeId = req.params.id || req.params.attributeId || req.params.ids;
-    if (attributeId && !req.user.isSuperadmin) { // Superadmin bypass in authorize
-      const Attribute = require('../models/Attribute'); // Assumed Attribute model
+    const userId = req.user?.id || req.user?._id;
+    const isSuperadmin = Boolean(req.user?.isSuperadmin || req.user?.role?.name === 'super_admin');
+
+    if (attributeId && !isSuperadmin) {
+      const Attribute = require('../models/Attribute');
       const attribute = await Attribute.findById(attributeId);
       if (!attribute) {
         return res.status(404).json({ success: false, message: 'Attribute not found' });
       }
-      if (attribute.userId.toString() !== req.user.id) { // Restrict to own attributes
+      if (attribute.created_by && String(attribute.created_by) !== String(userId)) {
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s attribute' });
       }
     }
     const childId = req.params.childId;
-    if (childId && !req.user.isSuperadmin) {
+    if (childId && !isSuperadmin) {
       const Attribute = require('../models/Attribute');
-      const attribute = await Attribute.findOne({ 'children._id': childId });
+      const attribute = await Attribute.findOne({ 'variants._id': childId });
       if (!attribute) {
         return res.status(404).json({ success: false, message: 'Child attribute not found' });
       }
-      if (attribute.userId.toString() !== req.user.id) {
+      if (attribute.created_by && String(attribute.created_by) !== String(userId)) {
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s child attribute' });
       }
     }
@@ -259,8 +262,12 @@ router.get('/',
 
 // GET /api/attributes/visible - Get visible attributes
 router.get('/visible',
-  authMiddleware,
+  attributeValidation.query,
+  getShowingAttributes
+);
 
+// GET /api/attributes/show - Backward compatible visible attributes alias
+router.get('/show',
   attributeValidation.query,
   getShowingAttributes
 );

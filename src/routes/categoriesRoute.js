@@ -23,11 +23,14 @@ const validate = (req, res, next) => {
 const instanceCheckMiddleware = async (req, res, next) => {
   try {
     const categoryId = req.params.id;
-    if (categoryId && !req.user.isSuperadmin) {
+    const userId = req.user?.id || req.user?._id;
+    const isSuperadmin = Boolean(req.user?.isSuperadmin || req.user?.role?.name === 'super_admin');
+
+    if (categoryId && !isSuperadmin) {
     
       const category = await Category.findById(categoryId);
       if (!category) return res.status(404).json({ success: false, message: 'Category not found' });
-      if (category.created_by.toString() !== req.user.id) {
+      if (category.created_by && String(category.created_by) !== String(userId)) {
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s category' });
       }
     }
@@ -89,23 +92,11 @@ router.post('/',
 );
 
 router.get('/active',
-  authMiddleware,
-
   categoryController.getActiveCategories
 );
 router.get('/',
-  authMiddleware,
-
   categoryValidation.query,
   categoryController.getAll
-);
-
-router.get('/:id',
-  authMiddleware,
-
-  instanceCheckMiddleware,
-  categoryValidation.id,
-  categoryController.getSingle
 );
 
 router.put('/:id',
@@ -129,22 +120,16 @@ router.delete('/:id',
 
 
 router.get('/featured',
-  authMiddleware,
-
   categoryController.getFeaturedCategories
 );
 
 router.get('/search',
-  authMiddleware,
-
   query('keyword').isString().isLength({ min: 1, max: 100 }).trim().escape(),
   validate,
   categoryController.searchCategories
 );
 
 router.get('/tree',
-  authMiddleware,
-
   categoryController.getTree
 );
 
@@ -246,6 +231,14 @@ router.get('/docs/routes',
       }
     });
   }
+);
+
+router.get('/:id',
+  authMiddleware,
+
+  instanceCheckMiddleware,
+  categoryValidation.id,
+  categoryController.getSingle
 );
 
 module.exports = { categoryRoute: router };
