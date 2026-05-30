@@ -170,12 +170,14 @@ class OrderController {
     let inventoryReserved = false;
     let normalizedItems = [];
     try {
-      const { user, userId, email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, shippingPrice, taxAmount, discountAmount, items, additionalNotes, couponCode, payment_method, paymentMethod, orderSource, ipAddress, deviceInfo, utmParameters, created_by } = req.body;
-      const resolvedUser = user || userId;
+      const { email, firstName, lastName, phone, shippingAddress, billingAddress, shippingMethod, items, additionalNotes, couponCode, payment_method, paymentMethod, orderSource, ipAddress, deviceInfo, utmParameters } = req.body;
+      const resolvedUser = req.user?.id || req.user?._id?.toString() || null;
       const resolvedPaymentMethod = this.normalizePaymentMethod(payment_method || paymentMethod);
       const idempotencyKey = String(req.headers['idempotency-key'] || req.body.idempotencyKey || '')
         .trim()
         .slice(0, 128);
+      let computedShippingPrice = 0;
+      let computedTaxAmount = 0;
 
       if (resolvedUser && !this.isValidObjectId(resolvedUser)) throw new Error('Invalid user ID');
       if (!email || !email.match(/^\S+@\S+\.\S+$/)) throw new Error('Valid email is required');
@@ -212,15 +214,35 @@ class OrderController {
         const availableInventory = Number(product.inventory || 0);
         if (availableInventory < item.quantity) throw new Error(`Insufficient inventory for product ${product._id}`);
 
-        const resolvedPrice = Number(product.finalPrice ?? product.basePrice ?? 0);
+        const resolvedPrice = [
+          Number(product.finalPrice),
+          typeof product.getFinalPrice === 'function' ? Number(product.getFinalPrice(item.quantity)) : NaN,
+          Number(product.salePrice),
+          Number(product.basePrice),
+          Number(product.price),
+        ].find((value) => Number.isFinite(value) && value >= 0);
         if (!Number.isFinite(resolvedPrice) || resolvedPrice < 0) throw new Error(`Invalid server price for product ${product._id}`);
         const normalizedPrice = Number(resolvedPrice.toFixed(2));
+        const lineShippingPrice = typeof product.calculateShipping === 'function'
+          ? Number(product.calculateShipping()) * item.quantity
+          : 0;
+        const lineTaxAmount = typeof product.getTaxAmount === 'function'
+          ? Number(product.getTaxAmount()) * item.quantity
+          : 0;
+
+        if (Number.isFinite(lineShippingPrice) && lineShippingPrice > 0) {
+          computedShippingPrice += lineShippingPrice;
+        }
+
+        if (Number.isFinite(lineTaxAmount) && lineTaxAmount > 0) {
+          computedTaxAmount += lineTaxAmount;
+        }
 
         normalizedItems.push({
           ...item,
           product: productId,
           price: normalizedPrice,
-          discount: typeof item.discount === 'number' && item.discount >= 0 ? item.discount : 0,
+          discount: 0,
         });
       }
 
@@ -236,7 +258,7 @@ class OrderController {
         shippingAddress,
         billingAddress,
         shippingMethod: shippingMethod || 'standard',
-        shippingPrice: Math.max(Number(shippingPrice || 0), 0),
+        shippingPrice: Number(computedShippingPrice.toFixed(2)),
         items: normalizedItems,
         additionalNotes: additionalNotes ? additionalNotes.trim() : '',
         couponCode: couponCode ? couponCode.trim() : '',
@@ -246,12 +268,13 @@ class OrderController {
         ipAddress,
         deviceInfo,
         utmParameters,
-        created_by: this.isValidObjectId(created_by) ? created_by : undefined,
+        created_by: resolvedUser || undefined,
+        updated_by: resolvedUser || undefined,
         payment_status: 'unpaid',
         status: 'pending',
         subtotal: 0,
-        taxAmount: Math.max(Number(taxAmount || 0), 0),
-        discountAmount: Math.max(Number(discountAmount || 0), 0),
+        taxAmount: Number(computedTaxAmount.toFixed(2)),
+        discountAmount: 0,
         loyaltyPointsEarned: 0,
         loyaltyPointsRedeemed: 0,
         amount_paid: 0,
@@ -637,10 +660,9 @@ class OrderController {
       let order = await this.findOrderByIdOrCode(id, session);
       if (!order) throw new Error('Order not found');
 
-      const projectedRefundedAmount = Number(order.refunded_amount || 0) + amount;
-      const isFullRefund = projectedRefundedAmount >= Number(order.amount_paid || 0);
+      const isFullRefund = amount >= Number(order.amount_paid || 0);
 
-      await order.refundOrder(amount, reason || 'Customer refund requested');
+      order.refundOrder(amount, reason || 'Customer refund requested');
 
       if (isFullRefund && !order.inventoryRestoredAt) {
         await this.restoreInventory(order, session);

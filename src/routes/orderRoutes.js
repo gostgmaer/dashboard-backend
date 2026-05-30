@@ -38,6 +38,57 @@ const bulkOperationLimiter = rateLimit({
   message: { success: false, message: 'Too many requests, please try again later' }
 });
 
+const getRequestUserId = (user) => String(user?.id || user?._id || '');
+
+const hasOrderManageAccess = (user) => {
+  if (!user) return false;
+  if (user.isSuperadmin) return true;
+
+  if (!Array.isArray(user.permissions)) {
+    return false;
+  }
+
+  return user.permissions.some((permission) => {
+    if (typeof permission === 'string') {
+      return ['orders:manage', 'orders:write', 'orders:full'].includes(permission.toLowerCase());
+    }
+
+    const resource = String(permission?.resource || '').toLowerCase();
+    const name = String(permission?.name || '').toLowerCase();
+    const action = String(permission?.action || '').toLowerCase();
+    const actions = Array.isArray(permission?.actions)
+      ? permission.actions.map((value) => String(value).toLowerCase())
+      : [];
+
+    if (resource === 'orders' && actions.some((value) => ['manage', 'write', 'full'].includes(value))) {
+      return true;
+    }
+
+    if (name.startsWith('orders:') && ['manage', 'write', 'full'].includes(name.split(':')[1])) {
+      return true;
+    }
+
+    return ['manage', 'write', 'full'].includes(action) && (resource === 'orders' || name.startsWith('orders:'));
+  });
+};
+
+const userHistoryAccessMiddleware = (req, res, next) => {
+  const requestUserId = getRequestUserId(req.user);
+  const targetUserId = String(req.params.userId || '');
+
+  if (!targetUserId) {
+    return res.status(400).json({ success: false, message: 'User ID is required' });
+  }
+
+  if (requestUserId === targetUserId || hasOrderManageAccess(req.user)) {
+    return next();
+  }
+
+  return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s order history' });
+};
+
+const requireOrderWrite = [authMiddleware, authorize('orders', 'write')];
+
 /**
  * Middleware to check instance-level access for order-specific routes
  * Ensures the user has permission to access/modify the specific order
@@ -51,9 +102,9 @@ const instanceCheckMiddleware = async (req, res, next) => {
       if (!order) {
         return res.status(404).json({ success: false, message: 'Order not found' });
       }
-      const canManageOrders = Array.isArray(req.user.permissions) && req.user.permissions.includes('orders:manage');
+      const canManageOrders = hasOrderManageAccess(req.user);
       const orderOwnerId = order.user?.toString?.() || null;
-      if ((!orderOwnerId || orderOwnerId !== req.user.id) && !canManageOrders) { // Restrict to own orders or manage permission
+      if ((!orderOwnerId || orderOwnerId !== getRequestUserId(req.user)) && !canManageOrders) { // Restrict to own orders or manage permission
         return res.status(403).json({ success: false, message: 'Forbidden: Cannot access another user\'s order' });
       }
     }
@@ -274,7 +325,7 @@ router.delete('/:id',
 
 // PUT /api/orders/:id/pay - Mark order as paid
 router.put('/:id/pay', 
-  authMiddleware,
+  ...requireOrderWrite,
 
   instanceCheckMiddleware,
   orderValidation.id,
@@ -283,7 +334,7 @@ router.put('/:id/pay',
 
 // PUT /api/orders/:id/refund - Refund order
 router.put('/:id/refund', 
-  authMiddleware,
+  ...requireOrderWrite,
 
   instanceCheckMiddleware,
   orderValidation.id,
@@ -314,7 +365,7 @@ router.put('/:id/redeem-points',
 
 // PUT /api/orders/:id/status - Update order status
 router.put('/:id/status', 
-  authMiddleware,
+  ...requireOrderWrite,
 
   instanceCheckMiddleware,
   orderValidation.id,
@@ -352,7 +403,7 @@ router.put('/:id/tracking',
 
 // PUT /api/orders/:id/mark-delivered - Mark order as delivered
 router.put('/:id/mark-delivered', 
-  authMiddleware,
+  ...requireOrderWrite,
 
   instanceCheckMiddleware,
   orderValidation.id,
@@ -361,7 +412,7 @@ router.put('/:id/mark-delivered',
 
 // PUT /api/orders/:id/priority - Set priority level
 router.put('/:id/priority', 
-  authMiddleware,
+  ...requireOrderWrite,
 
   instanceCheckMiddleware,
   orderValidation.priority,
@@ -416,7 +467,7 @@ router.post('/:id/request-return',
 
 // PUT /api/orders/:id/resolve-return - Resolve return request
 router.put('/:id/resolve-return', 
-  authMiddleware,
+  ...requireOrderWrite,
 
   instanceCheckMiddleware,
   orderValidation.resolveReturn,
@@ -446,8 +497,7 @@ router.get('/top-customers',
 // GET /api/orders/user/:userId/history - Get customer order history
 router.get('/user/:userId/history', 
   authMiddleware,
-
-  instanceCheckMiddleware,
+  userHistoryAccessMiddleware,
   param('userId').isMongoId().withMessage('Invalid user ID'),
   validate,
   orderValidation.query,

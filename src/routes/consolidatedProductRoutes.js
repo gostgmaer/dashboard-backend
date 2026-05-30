@@ -182,6 +182,10 @@ const productValidation = {
   ]
 };
 
+const requireProductWrite = [authMiddleware, authorize('products', 'write')];
+const requireProductRead = [authMiddleware, authorize('products', 'read')];
+const requireProductReport = [authMiddleware, authorize('products', 'report')];
+
 
 // ========================================
 // 📋 CRUD OPERATIONS
@@ -201,8 +205,7 @@ router.get('/active-data', ProductController.getActiveDealStatics);
 
 // GET /api/products/database-stats - Get database statistics
 router.get('/database-stats',
-  // authMiddleware,
-  // authorize('products', 'report'),
+  ...requireProductReport,
   ProductController.getProductDashboardStats
 );
 // GET /api/products/:identifier - Get single product by ID or slug
@@ -214,7 +217,7 @@ router.get('/:identifier',
 
 // POST /api/products - Create new product
 router.post('/',
-  authMiddleware,
+  ...requireProductWrite,
 
   // productValidation.create,
   ProductController.createProduct
@@ -222,7 +225,7 @@ router.post('/',
 
 // PUT /api/products/:id - Update product
 router.put('/:id',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   productValidation.update,
@@ -231,7 +234,7 @@ router.put('/:id',
 
 // DELETE /api/products/:id - Delete product (soft delete by default)
 router.delete('/:id',
-  authMiddleware,
+  ...requireProductWrite,
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -239,7 +242,7 @@ router.delete('/:id',
 );
 
 router.post('/restore/:id',
-  authMiddleware,
+  ...requireProductWrite,
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   validate,
@@ -252,7 +255,7 @@ router.post('/restore/:id',
 
 // DELETE /api/products/bulk/delete - Bulk delete products
 router.delete('/bulk/delete',
-  authMiddleware,
+  ...requireProductWrite,
   bulkOperationLimiter,
   body('ids').isArray({ min: 1 }).withMessage('Product IDs array is required'),
   body('ids.*').isMongoId().withMessage('Invalid product ID in array'),
@@ -263,7 +266,7 @@ router.delete('/bulk/delete',
 
 // PUT /api/products/bulk/status - Bulk update status
 router.put('/bulk/status',
-  authMiddleware,
+  ...requireProductWrite,
 
   bulkOperationLimiter,
   productValidation.bulkUpdate,
@@ -272,7 +275,7 @@ router.put('/bulk/status',
 
 // PUT /api/products/bulk/stock - Bulk update stock
 router.put('/bulk/stock',
-  authMiddleware,
+  ...requireProductWrite,
 
   bulkOperationLimiter,
   body('updates').isArray({ min: 1 }).withMessage('Updates array is required'),
@@ -302,14 +305,14 @@ router.get('/featured',
 
 // GET /api/products/low-stock - Get low stock products
 router.get('/low-stock',
-  authMiddleware,
+  ...requireProductRead,
 
   ProductController.getLowStockProducts
 );
 
 // GET /api/products/out-of-stock - Get out of stock products
 router.get('/out-of-stock',
-  authMiddleware,
+  ...requireProductRead,
 
   ProductController.getOutOfStockProducts
 );
@@ -412,7 +415,7 @@ router.get('/:id/stock/status',
 
 // PUT /api/products/:id/stock/mark-out - Mark as out of stock
 router.put('/:id/stock/mark-out',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -432,7 +435,7 @@ router.put('/:id/views/increment',
 
 // PUT /api/products/:id/sold/increment - Increment sold count
 router.put('/:id/sold/increment',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -483,7 +486,7 @@ router.get('/:id/purchasable',
 
 // PUT /api/products/:id/stock/reduce - Reduce stock
 router.put('/:id/stock/reduce',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -494,7 +497,7 @@ router.put('/:id/stock/reduce',
 
 // PUT /api/products/:id/stock/restock - Restock product
 router.put('/:id/stock/restock',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -505,7 +508,7 @@ router.put('/:id/stock/restock',
 
 // PUT /api/products/:id/featured/toggle - Toggle featured status
 router.put('/:id/featured/toggle',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -555,7 +558,7 @@ router.post('/:id/reviews/add',
 
 // PUT /api/products/:id/promotion/apply - Apply promotion
 router.put('/:id/promotion/apply',
-  authMiddleware,
+  ...requireProductWrite,
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
   body('promotionId').isMongoId().withMessage('Invalid promotion ID'),
@@ -601,28 +604,27 @@ router.get('/:id/stock/virtual-status',
 
 // GET /api/products/analytics/schema-report - Get schema report
 router.get('/analytics/schema-report',
-  authMiddleware,
+  ...requireProductReport,
 
   ProductController.getSchemaReport
 );
 
 // GET /api/products/analytics/database-stats - Get database statistics
 router.get('/analytics/database-stats',
-  // authMiddleware,
-  // authorize('products', 'report'),
+  ...requireProductReport,
   ProductController.getDatabaseStatistics
 );
 
 // GET /api/products/analytics/products - Get products with analytics
 router.get('/analytics/products',
-  authMiddleware,
+  ...requireProductReport,
 
   ProductController.getProductsWithAnalytics
 );
 
 // PUT /api/products/:id/stock/update - Enhanced stock update
 router.put('/:id/stock/update',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   productValidation.stock,
@@ -631,7 +633,7 @@ router.put('/:id/stock/update',
 
 // POST /api/products/archive/old - Archive old products
 router.post('/archive/old',
-  authMiddleware,
+  ...requireProductWrite,
 
   bulkOperationLimiter,
   body('beforeDate').isISO8601().withMessage('Valid before date is required'),
@@ -683,7 +685,7 @@ router.get('/recommendations/:id',
 // );
 
 router.get('/export',
-  authMiddleware,
+  ...requireProductReport,
 
   bulkOperationLimiter,
   ProductController.exportCSV
@@ -691,7 +693,7 @@ router.get('/export',
 
 // 4. Review Moderation
 router.put('/:id/reviews/:reviewId/approve',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -701,7 +703,7 @@ router.put('/:id/reviews/:reviewId/approve',
 );
 
 router.delete('/:id/reviews/:reviewId',
-  authMiddleware,
+  ...requireProductWrite,
 
   instanceCheckMiddleware,
   param('id').isMongoId().withMessage('Invalid product ID'),
@@ -712,13 +714,13 @@ router.delete('/:id/reviews/:reviewId',
 
 // 5. Inventory Alerts
 router.get('/alerts/low-stock',
-  authMiddleware,
+  ...requireProductReport,
 
   ProductController.lowStockAlerts
 );
 
 router.post('/alerts/low-stock/email',
-  authMiddleware,
+  ...requireProductWrite,
 
   bulkOperationLimiter,
   ProductController.sendLowStockEmails
@@ -726,7 +728,7 @@ router.post('/alerts/low-stock/email',
 
 // 6. Bulk Price & Sales
 router.put('/bulk/price-update',
-  authMiddleware,
+  ...requireProductWrite,
 
   bulkOperationLimiter,
   body('updates').isArray({ min: 1 }).withMessage('Updates array is required'),
@@ -737,7 +739,7 @@ router.put('/bulk/price-update',
 );
 
 router.post('/flash-sale',
-  authMiddleware,
+  ...requireProductWrite,
 
   bulkOperationLimiter,
   body('productIds').isArray({ min: 1 }).withMessage('Product IDs array is required'),
@@ -751,20 +753,20 @@ router.post('/flash-sale',
 
 // 7. Extended Analytics
 router.get('/analytics/sales-metrics',
-  authMiddleware,
+  ...requireProductReport,
 
   ProductController.salesMetrics
 );
 
 router.get('/analytics/popularity',
-  authMiddleware,
+  ...requireProductReport,
 
   ProductController.popularity
 );
 
 // 8. Taxonomy (Categories)
 router.post('/taxonomy/category',
-  authMiddleware,
+  ...requireProductWrite,
 
   body('name').notEmpty().withMessage('Category name is required').trim().escape(),
   body('parentId').optional().isMongoId().withMessage('Invalid parent category ID'),
@@ -773,7 +775,7 @@ router.post('/taxonomy/category',
 );
 
 router.put('/taxonomy/category/:id',
-  authMiddleware,
+  ...requireProductWrite,
 
   param('id').isMongoId().withMessage('Invalid category ID'),
   body('name').optional().notEmpty().withMessage('Category name cannot be empty').trim().escape(),

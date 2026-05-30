@@ -138,7 +138,7 @@ const orderSchema = new mongoose.Schema(
     ],
     payment_status: {
       type: String,
-      enum: ["unpaid", "paid", "failed", "refunded", "partial", "pending"],
+      enum: ["unpaid", "paid", "failed", "refunded", "partial", "pending", "partially-refunded"],
       default: "unpaid",
     },
     subtotal: { type: Number, default: 0, min: 0 },
@@ -294,22 +294,32 @@ orderSchema.methods.calculateTotals = function () {
   );
   this.subtotal = parseFloat(subtotal.toFixed(2));
   this.total = parseFloat((subtotal + this.shippingPrice + this.taxAmount - this.discountAmount).toFixed(2));
-  this.amount_due = this.total - this.amount_paid;
+  this.amount_due = parseFloat(Math.max(0, this.total - this.amount_paid).toFixed(2));
 };
 
 // Mark as paid
 orderSchema.methods.markAsPaid = function (transactionId, amount) {
   if (!transactionId) throw new Error("Transaction ID is required");
-  this.payment_status = amount >= this.total ? "paid" : "partial";
+  const paymentAmount = Number(amount);
+  if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+    throw new Error("Payment amount must be a positive number");
+  }
+
+  const nextAmountPaid = Number(this.amount_paid || 0) + paymentAmount;
+  if (nextAmountPaid > Number(this.total || 0)) {
+    throw new Error("Payment amount exceeds outstanding order total");
+  }
+
+  this.payment_status = nextAmountPaid >= this.total ? "paid" : "partial";
   this.transaction_id = transactionId;
-  this.amount_paid += amount;
-  this.amount_due = this.total - this.amount_paid;
+  this.amount_paid = parseFloat(nextAmountPaid.toFixed(2));
+  this.amount_due = parseFloat(Math.max(0, this.total - this.amount_paid).toFixed(2));
   this.transactions.push({
     transactionId,
-    amount,
+    amount: paymentAmount,
     status: "completed",
   });
-  this.notes.push(`Payment processed: ${amount} via ${this.payment_method}`);
+  this.notes.push(`Payment processed: ${paymentAmount} via ${this.payment_method}`);
 };
 
 // Cancel order
@@ -323,16 +333,22 @@ orderSchema.methods.cancelOrder = function (reason = "Customer request") {
 
 // Refund order
 orderSchema.methods.refundOrder = function (amount, reason = "Customer request") {
-  if (amount > this.amount_paid) throw new Error("Refund amount exceeds paid amount");
-  this.payment_status = amount === this.amount_paid ? "refunded" : "partially-refunded";
-  this.amount_paid -= amount;
-  this.amount_due += amount;
+  const refundAmount = Number(amount);
+  if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+    throw new Error("Refund amount must be a positive number");
+  }
+  if (refundAmount > Number(this.amount_paid || 0)) throw new Error("Refund amount exceeds paid amount");
+
+  const remainingPaidAmount = Number(this.amount_paid || 0) - refundAmount;
+  this.payment_status = remainingPaidAmount <= 0 ? "refunded" : "partially-refunded";
+  this.amount_paid = parseFloat(Math.max(0, remainingPaidAmount).toFixed(2));
+  this.amount_due = parseFloat(Math.max(0, this.total - this.amount_paid).toFixed(2));
   this.transactions.push({
     transactionId: `REF-${this.order_id}-${Date.now()}`,
-    amount: -amount,
+    amount: -refundAmount,
     status: "refunded",
   });
-  this.notes.push(`Refund processed: ${amount} - ${reason}`);
+  this.notes.push(`Refund processed: ${refundAmount} - ${reason}`);
 };
 
 // Update status with validation
@@ -755,23 +771,33 @@ orderSchema.statics.getFraudulentOrders = async function (threshold = 80) {
 };
 
 orderSchema.statics.bulkRefundOrders = async function (orderIds, amount, reason = "Bulk refund") {
-  return await this.updateMany(
-    { order_id: { $in: orderIds }, payment_status: { $in: ["paid", "partial"] } },
-    {
-      $inc: { amount_paid: -amount, amount_due: amount },
-      $push: {
-        transactions: {
-          transactionId: `REF-BULK-${Date.now()}`,
-          amount: -amount,
-          status: "refunded",
-        },
-        notes: `Bulk refund processed: ${amount} - ${reason}`,
-      },
-      $set: {
-        payment_status: { $cond: [{ $eq: ["$amount_paid", amount] }, "refunded", "partially-refunded"] },
-      },
+  const refundAmount = Number(amount);
+  if (!Number.isFinite(refundAmount) || refundAmount <= 0) {
+    throw new Error('Refund amount must be a positive number');
+  }
+
+  const orders = await this.find({
+    order_id: { $in: orderIds },
+    payment_status: { $in: ['paid', 'partial', 'partially-refunded'] },
+  });
+
+  let modifiedCount = 0;
+
+  for (const order of orders) {
+    if (refundAmount > Number(order.amount_paid || 0)) {
+      continue;
     }
-  );
+
+    order.refundOrder(refundAmount, reason);
+    await order.save();
+    modifiedCount += 1;
+  }
+
+  return {
+    matchedCount: orders.length,
+    modifiedCount,
+    skippedCount: Math.max(0, orderIds.length - modifiedCount),
+  };
 };
 
 orderSchema.statics.getPendingFulfillmentOrders = async function () {

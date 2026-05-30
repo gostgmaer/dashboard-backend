@@ -113,6 +113,8 @@ class ProductController {
       }
 
       const productData = req.body;
+      delete productData.created_by;
+      delete productData.updated_by;
 
       // Auto-generate fields
       if (productData.title && !productData.slug) {
@@ -123,10 +125,10 @@ class ProductController {
       }
 
       // Set created/updated by
-      // if (req.user) {
-      //   productData.created_by = req.user.id;
-      //   productData.updated_by = req.user.id;
-      // }
+      if (req.user) {
+        productData.created_by = req.user.id;
+        productData.updated_by = req.user.id;
+      }
 
       // Auto-calculate fields
       if (productData.basePrice && productData.discount) {
