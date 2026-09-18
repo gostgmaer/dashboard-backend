@@ -2,6 +2,7 @@ const S3Adapter = require('./S3Adapter');
 const GCSAdapter = require('./GCSAdapter');
 const AzureAdapter = require('./AzureAdapter');
 const R2Adapter = require('./R2Adapter');
+const DropboxAdapter = require('./DropboxAdapter');
 const LocalAdapter = require('./LocalAdapter');
 const { storage } = require('../../../config/setting');
 
@@ -40,6 +41,12 @@ class AdapterFactory {
 
       case 'r2':
         return new R2Adapter();
+
+      case 'dropbox':
+        if (!storage.dropbox.accessToken) {
+          console.warn('⚠️  AdapterFactory: Dropbox access token missing — check DB settings (storage.dropbox.accessToken)');
+        }
+        return new DropboxAdapter();
 
       default:
         console.warn(

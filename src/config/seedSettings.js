@@ -200,6 +200,13 @@ function buildDefaultSettings() {
         bucket: process.env.R2_BUCKET || '',
         publicDomain: process.env.R2_PUBLIC_DOMAIN || '',
       },
+      dropbox: {
+        accessToken: process.env.DROPBOX_ACCESS_TOKEN || '',
+        appKey: process.env.DROPBOX_APP_KEY || '',
+        appSecret: process.env.DROPBOX_APP_SECRET || '',
+        refreshToken: process.env.DROPBOX_REFRESH_TOKEN || '',
+        rootPath: process.env.DROPBOX_ROOT_PATH || '',
+      },
     },
 
     // ---------- Third-Party Services ----------
