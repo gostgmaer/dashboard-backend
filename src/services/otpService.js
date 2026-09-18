@@ -368,7 +368,7 @@ class OTPService {
       const siteKey = process.env.NEXT_PUBLIC_SITEKEY || 'my-store-001';
       const dbSettings = Setting.getCachedSettings ? Setting.getCachedSettings(siteKey) : null;
       const twilioPhone = dbSettings?.services?.twilio?.phoneNumber || services?.twilio?.phoneNumber;
-
+      const message = `Your verification code is: ${code}. Valid for ${this.config.expiryMinutes} minutes.`;
       const smsResult = await this.twilioClient.messages.create({
         body: message,
         from: twilioPhone,

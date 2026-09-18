@@ -6,7 +6,7 @@ const { app } = require('../config/setting');
 
 class publicServices {
   static async getMemoryUsage() {
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
       const memory = process.memoryUsage();
       const totalMem = os.totalmem();
       const freeMem = os.freemem();
@@ -121,7 +121,7 @@ class publicServices {
   }
 
   static async getServerInfo() {
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
       const uptime = process.uptime();
       const interfaces = os.networkInterfaces();
 

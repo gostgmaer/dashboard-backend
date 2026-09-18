@@ -39,7 +39,6 @@ module.exports = (io) => {
       try {
         const notification = await Notification.findById(notificationId);
         await notification.markAsRead(userId, {
-          deviceType: opts.deviceType,
           ipAddress: socket.handshake.address,
           userAgent: socket.handshake.headers['user-agent']
         });

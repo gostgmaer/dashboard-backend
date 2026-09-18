@@ -57,7 +57,7 @@ function sanitizeInput(input) {
   
   return input
     .trim()
-    .replace(/[<>\"']/g, '') // Remove potentially harmful characters
+    .replace(/[<>"']/g, '') // Remove potentially harmful characters
     .substring(0, 1000); // Limit length
 }
 
@@ -72,9 +72,9 @@ function isValidEmail(email) {
 /**
  * Validate phone number
  */
-function isValidPhoneNumber(phone, countryCode = 'US') {
+function isValidPhoneNumber(phone) {
   // Simple validation - in production, use a library like libphonenumber
-  const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+  const phoneRegex = /^\+?[1-9][\d]{0,15}$/;
   return phoneRegex.test(phone.replace(/\s|-|\(|\)/g, ''));
 }
 
@@ -102,7 +102,7 @@ function isValidPhoneNumber(phone, countryCode = 'US') {
             hasUppercase: /[A-Z]/.test(password),
             hasLowercase: /[a-z]/.test(password),
             hasNumbers: /\d/.test(password),
-            hasSpecialChars: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+            hasSpecialChars: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
         };
 
         // Use zxcvbn for advanced password analysis
